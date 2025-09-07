@@ -80,7 +80,7 @@ const Dashboard = () => {
       case "driver-sales":
         return (
           <DailySalesModule
-            salesData={salesData.filter(sale => userRole === 'driver' ? sale.staffName === userName : true)}
+            salesData={salesData.filter(sale => sale.staffName === userName)}
             setSalesData={setSalesData}
           />
         );
