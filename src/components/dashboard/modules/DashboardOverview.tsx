@@ -110,11 +110,13 @@ export const DashboardOverview = ({ analytics, drivers, userRole }: DashboardOve
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Welcome Section */}
-      <div className="space-y-2">
-        <h2 className="text-3xl font-bold text-primary">Welcome back! 👋</h2>
-        <p className="text-muted-foreground">
+      <div className="space-y-3 animate-fade-in">
+        <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+          Welcome back! 👋
+        </h1>
+        <p className="text-lg text-muted-foreground">
           Here's what's happening with your LPG business today.
         </p>
       </div>
@@ -124,27 +126,31 @@ export const DashboardOverview = ({ analytics, drivers, userRole }: DashboardOve
         {stats.map((stat, index) => {
           const Icon = stat.icon;
           return (
-            <Card key={index} className="border-0 shadow-elegant hover:shadow-elegant-lg transition-all duration-300 bg-gradient-to-br from-background to-surface">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <Card 
+              key={index} 
+              className="group border-0 shadow-elegant hover:shadow-elegant-lg transition-all duration-300 bg-gradient-to-br from-card to-muted/20 hover:scale-105 animate-fade-in"
+              style={{ animationDelay: `${index * 100}ms` }}
+            >
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
                   {stat.title}
                 </CardTitle>
-                <div className="h-8 w-8 bg-gradient-primary rounded-lg flex items-center justify-center">
-                  <Icon className="h-4 w-4 text-primary-foreground" />
+                <div className="h-10 w-10 bg-gradient-primary rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
+                  <Icon className="h-5 w-5 text-primary-foreground" />
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2">
-                  <div className="text-2xl font-bold text-primary">{stat.value}</div>
+                <div className="space-y-3">
+                  <div className="text-3xl font-bold text-primary">{stat.value}</div>
                   <div className="flex items-center space-x-2">
                     <Badge 
                       variant="secondary" 
-                      className={stat.changeType === 'positive' ? 'bg-accent/10 text-accent border-accent/20' : 'bg-destructive/10 text-destructive border-destructive/20'}
+                      className={`${stat.changeType === 'positive' ? 'bg-accent/10 text-accent border-accent/20' : 'bg-destructive/10 text-destructive border-destructive/20'} font-medium`}
                     >
                       <TrendingUp className="h-3 w-3 mr-1" />
                       {stat.change}
                     </Badge>
-                    <span className="text-xs text-muted-foreground">{stat.description}</span>
+                    <span className="text-sm text-muted-foreground">{stat.description}</span>
                   </div>
                 </div>
               </CardContent>

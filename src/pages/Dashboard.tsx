@@ -1,6 +1,7 @@
 import { useState } from "react";
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/components/dashboard/AppSidebar";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
-import { DashboardSidebar } from "@/components/dashboard/DashboardSidebar";
 import { DashboardOverview } from "@/components/dashboard/modules/DashboardOverview";
 import { DailySalesModule } from "@/components/dashboard/modules/DailySalesModule";
 import { LPGStockModule } from "@/components/dashboard/modules/LPGStockModule";
@@ -10,7 +11,6 @@ import { SearchModule } from "@/components/dashboard/modules/SearchModule";
 import { useDashboardData } from "@/hooks/useDashboardData";
 
 const Dashboard = () => {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeModule, setActiveModule] = useState("overview");
   const [searchQuery, setSearchQuery] = useState("");
   
@@ -37,10 +37,13 @@ const Dashboard = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-surface flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="text-muted-foreground">Loading dashboard...</p>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center space-y-4 animate-fade-in">
+          <div className="h-12 w-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <div className="space-y-2">
+            <p className="text-lg font-medium text-foreground">Loading Stock-X Dashboard</p>
+            <p className="text-muted-foreground">Preparing your LPG management system...</p>
+          </div>
         </div>
       </div>
     );
@@ -165,31 +168,33 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-surface">
-      <DashboardHeader
-        sidebarOpen={sidebarOpen}
-        setSidebarOpen={setSidebarOpen}
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
-        userRole={userRole}
-        userName={userName}
-      />
-
-      <div className="flex">
-        <DashboardSidebar
-          sidebarOpen={sidebarOpen}
+    <SidebarProvider defaultOpen={true}>
+      <div className="min-h-screen flex w-full bg-background">
+        <AppSidebar
           activeModule={activeModule}
           setActiveModule={setActiveModule}
           userRole={userRole}
+          userName={userName}
           analytics={analytics}
         />
 
-        {/* Main Content */}
-        <main className="flex-1 p-6">
-          {renderActiveModule()}
-        </main>
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <DashboardHeader
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            userRole={userRole}
+            userName={userName}
+          />
+
+          {/* Main Content */}
+          <main className="flex-1 overflow-auto">
+            <div className="container mx-auto p-6 animate-fade-in">
+              {renderActiveModule()}
+            </div>
+          </main>
+        </div>
       </div>
-    </div>
+    </SidebarProvider>
   );
 };
 
