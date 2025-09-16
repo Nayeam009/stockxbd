@@ -29,6 +29,7 @@ import {
   BarChart3,
   Calendar
 } from "lucide-react";
+import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
 import { SalesData, Customer, StockItem, Driver } from "@/hooks/useDashboardData";
 
 interface SearchModuleProps {
@@ -64,7 +65,7 @@ export const SearchModule = ({ salesData, customers, stockData, drivers, userRol
             type: 'sale',
             id: sale.id,
             title: `Sale: ${sale.productName}`,
-            subtitle: `${sale.quantity}x - ₹${sale.totalAmount.toLocaleString()}`,
+            subtitle: `${sale.quantity}x - ${BANGLADESHI_CURRENCY_SYMBOL}${sale.totalAmount.toLocaleString()}`,
             meta: `${sale.date} | ${sale.staffName}`,
             data: sale
           });
@@ -85,7 +86,7 @@ export const SearchModule = ({ salesData, customers, stockData, drivers, userRol
             id: customer.id,
             title: `Customer: ${customer.name}`,
             subtitle: customer.phone,
-            meta: `${customer.totalOrders} orders | ₹${customer.outstanding} outstanding`,
+            meta: `${customer.totalOrders} orders | ${BANGLADESHI_CURRENCY_SYMBOL}${customer.outstanding} outstanding`,
             data: customer
           });
         }
@@ -101,7 +102,7 @@ export const SearchModule = ({ salesData, customers, stockData, drivers, userRol
             id: item.id,
             title: `Stock: ${item.name}`,
             subtitle: `${item.currentStock} units available`,
-            meta: `₹${item.price} per unit | ${item.type}`,
+            meta: `${BANGLADESHI_CURRENCY_SYMBOL}${item.price} per unit | ${item.type}`,
             data: item
           });
         }

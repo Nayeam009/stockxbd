@@ -13,6 +13,7 @@ import {
   TrendingUp,
   TrendingDown
 } from "lucide-react";
+import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
 import { StockItem } from "@/hooks/useDashboardData";
 
 interface StoveStockModuleProps {
@@ -93,7 +94,7 @@ export const StoveStockModule = ({ stockData, setStockData }: StoveStockModulePr
             <ChefHat className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-secondary">₹{analytics.totalValue.toLocaleString()}</div>
+            <div className="text-2xl font-bold text-secondary">{BANGLADESHI_CURRENCY_SYMBOL}{analytics.totalValue.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">{analytics.totalStock} stoves in stock</p>
           </CardContent>
         </Card>
@@ -154,7 +155,7 @@ export const StoveStockModule = ({ stockData, setStockData }: StoveStockModulePr
                       {item.name}
                     </CardTitle>
                     <CardDescription>
-                      Price: ₹{item.price.toLocaleString()} | Min: {item.minStock} | Max: {item.maxStock}
+                      Price: {BANGLADESHI_CURRENCY_SYMBOL}{item.price.toLocaleString()} | Min: {item.minStock} | Max: {item.maxStock}
                     </CardDescription>
                   </div>
                   <Badge 
@@ -174,7 +175,7 @@ export const StoveStockModule = ({ stockData, setStockData }: StoveStockModulePr
                       <p className="text-sm text-muted-foreground">Units Available</p>
                     </div>
                     <div className="text-right space-y-1">
-                      <p className="text-lg font-semibold">₹{(item.currentStock * item.price).toLocaleString()}</p>
+                      <p className="text-lg font-semibold">{BANGLADESHI_CURRENCY_SYMBOL}{(item.currentStock * item.price).toLocaleString()}</p>
                       <p className="text-sm text-muted-foreground">Inventory Value</p>
                     </div>
                   </div>

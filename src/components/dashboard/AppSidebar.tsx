@@ -23,7 +23,7 @@ import {
   Users,
   FileText,
   UserCheck,
-  IndianRupee,
+  Banknote,
   Truck,
   ShoppingCart,
   Search,
@@ -95,7 +95,7 @@ export const AppSidebar = ({
     { 
       id: 'staff-salary', 
       title: 'Staff Salary', 
-      icon: IndianRupee, 
+      icon: Banknote, 
       roles: ['owner', 'manager'] 
     },
     { 

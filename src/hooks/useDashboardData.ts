@@ -1,4 +1,11 @@
 import { useState, useEffect } from 'react';
+import { 
+  getRandomBangladeshiName, 
+  getRandomBangladeshiLocation, 
+  getRandomBangladeshiPhone,
+  getRandomPaymentMethod,
+  BANGLADESHI_LPG_PRODUCTS
+} from '@/lib/bangladeshConstants';
 
 // Mock data types
 export interface SalesData {
@@ -9,7 +16,7 @@ export interface SalesData {
   quantity: number;
   unitPrice: number;
   totalAmount: number;
-  paymentMethod: 'cash' | 'card' | 'upi' | 'credit';
+  paymentMethod: 'cash' | 'bkash' | 'nagad' | 'rocket' | 'bank' | 'credit';
   staffId: string;
   staffName: string;
 }
@@ -101,52 +108,59 @@ export const useDashboardData = () => {
   // Mock data generation
   useEffect(() => {
     const generateMockData = () => {
-      // Generate mock sales data
-      const mockSales: SalesData[] = Array.from({ length: 50 }, (_, i) => ({
-        id: `sale-${i + 1}`,
-        date: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        productType: ['cylinder', 'stove', 'accessory'][Math.floor(Math.random() * 3)] as any,
-        productName: ['5kg Cylinder', '12kg Cylinder', '35kg Cylinder', 'Gas Stove', 'Regulator'][Math.floor(Math.random() * 5)],
-        quantity: Math.floor(Math.random() * 10) + 1,
-        unitPrice: Math.floor(Math.random() * 1000) + 500,
-        totalAmount: 0,
-        paymentMethod: ['cash', 'card', 'upi', 'credit'][Math.floor(Math.random() * 4)] as any,
-        staffId: `staff-${Math.floor(Math.random() * 5) + 1}`,
-        staffName: ['Raj Kumar', 'Priya Singh', 'Amit Sharma', 'Sunita Devi', 'Rohit Gupta'][Math.floor(Math.random() * 5)],
-      }));
+      // Generate mock sales data with Bangladeshi context
+      const mockSales: SalesData[] = Array.from({ length: 50 }, (_, i) => {
+        const product = BANGLADESHI_LPG_PRODUCTS[Math.floor(Math.random() * BANGLADESHI_LPG_PRODUCTS.length)];
+        const paymentMethod = getRandomPaymentMethod();
+        const quantity = Math.floor(Math.random() * 10) + 1;
+        const unitPrice = product.standardPrice + (Math.random() * 200 - 100); // ±100 taka variation
+        
+        return {
+          id: `sale-${i + 1}`,
+          date: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          productType: product.category as any,
+          productName: product.name,
+          quantity,
+          unitPrice: Math.round(unitPrice),
+          totalAmount: 0,
+          paymentMethod: paymentMethod.id as any,
+          staffId: `staff-${Math.floor(Math.random() * 5) + 1}`,
+          staffName: getRandomBangladeshiName(),
+        };
+      });
 
       mockSales.forEach(sale => {
         sale.totalAmount = sale.quantity * sale.unitPrice;
       });
 
-      // Generate mock stock data
+      // Generate mock stock data with Bangladeshi pricing (in Taka)
       const mockStock: StockItem[] = [
-        { id: '1', type: 'cylinder', name: '5kg LPG Cylinder', currentStock: 45, minStock: 20, maxStock: 100, lastUpdated: new Date().toISOString(), price: 650 },
-        { id: '2', type: 'cylinder', name: '12kg LPG Cylinder', currentStock: 78, minStock: 30, maxStock: 150, lastUpdated: new Date().toISOString(), price: 950 },
-        { id: '3', type: 'cylinder', name: '35kg Commercial Cylinder', currentStock: 25, minStock: 15, maxStock: 80, lastUpdated: new Date().toISOString(), price: 2500 },
-        { id: '4', type: 'stove', name: '2 Burner Gas Stove', currentStock: 15, minStock: 10, maxStock: 50, lastUpdated: new Date().toISOString(), price: 3500 },
-        { id: '5', type: 'stove', name: '3 Burner Gas Stove', currentStock: 8, minStock: 5, maxStock: 30, lastUpdated: new Date().toISOString(), price: 5500 },
-        { id: '6', type: 'stove', name: '4 Burner Gas Stove', currentStock: 12, minStock: 8, maxStock: 25, lastUpdated: new Date().toISOString(), price: 7500 },
+        { id: '1', type: 'cylinder', name: '5kg LPG Cylinder', currentStock: 45, minStock: 20, maxStock: 100, lastUpdated: new Date().toISOString(), price: 850 },
+        { id: '2', type: 'cylinder', name: '12kg LPG Cylinder', currentStock: 78, minStock: 30, maxStock: 150, lastUpdated: new Date().toISOString(), price: 1200 },
+        { id: '3', type: 'cylinder', name: '35kg Commercial Cylinder', currentStock: 25, minStock: 15, maxStock: 80, lastUpdated: new Date().toISOString(), price: 3200 },
+        { id: '4', type: 'stove', name: '2 Burner Gas Stove', currentStock: 15, minStock: 10, maxStock: 50, lastUpdated: new Date().toISOString(), price: 4500 },
+        { id: '5', type: 'stove', name: '3 Burner Gas Stove', currentStock: 8, minStock: 5, maxStock: 30, lastUpdated: new Date().toISOString(), price: 6500 },
+        { id: '6', type: 'stove', name: '4 Burner Gas Stove', currentStock: 12, minStock: 8, maxStock: 25, lastUpdated: new Date().toISOString(), price: 8500 },
       ];
 
-      // Generate mock drivers
+      // Generate mock drivers with Bangladeshi names and numbers
       const mockDrivers: Driver[] = [
-        { id: '1', name: 'Rajesh Kumar', phone: '+91 9876543210', vehicleId: 'VH001', todaySales: 15000, todayDeliveries: 12, status: 'active' },
-        { id: '2', name: 'Suresh Singh', phone: '+91 9876543211', vehicleId: 'VH002', todaySales: 8500, todayDeliveries: 7, status: 'active' },
-        { id: '3', name: 'Amit Sharma', phone: '+91 9876543212', vehicleId: 'VH003', todaySales: 12000, todayDeliveries: 9, status: 'break' },
-        { id: '4', name: 'Vinod Gupta', phone: '+91 9876543213', vehicleId: 'VH004', todaySales: 6000, todayDeliveries: 5, status: 'offline' },
+        { id: '1', name: 'Abdul Rahman', phone: getRandomBangladeshiPhone(), vehicleId: 'DH-001', todaySales: 18000, todayDeliveries: 12, status: 'active' },
+        { id: '2', name: 'Mohammad Karim', phone: getRandomBangladeshiPhone(), vehicleId: 'DH-002', todaySales: 12500, todayDeliveries: 8, status: 'active' },
+        { id: '3', name: 'Rafiq Ahmed', phone: getRandomBangladeshiPhone(), vehicleId: 'CTG-003', todaySales: 15000, todayDeliveries: 10, status: 'break' },
+        { id: '4', name: 'Nasir Uddin', phone: getRandomBangladeshiPhone(), vehicleId: 'SYL-004', todaySales: 8500, todayDeliveries: 6, status: 'offline' },
       ];
 
-      // Generate mock customers
+      // Generate mock customers with Bangladeshi context
       const mockCustomers: Customer[] = Array.from({ length: 20 }, (_, i) => ({
         id: `cust-${i + 1}`,
-        name: ['Rakesh Patel', 'Sunita Sharma', 'Anil Kumar', 'Priya Singh', 'Mohit Gupta'][i % 5],
-        phone: `+91 98765432${10 + i}`,
-        address: `${i + 1}, Sector ${Math.floor(i / 5) + 1}, Gurgaon`,
+        name: getRandomBangladeshiName(),
+        phone: getRandomBangladeshiPhone(),
+        address: getRandomBangladeshiLocation(),
         totalOrders: Math.floor(Math.random() * 50) + 5,
         lastOrder: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        outstanding: Math.floor(Math.random() * 5000),
-        loyaltyPoints: Math.floor(Math.random() * 1000),
+        outstanding: Math.floor(Math.random() * 8000), // Higher amounts in Taka
+        loyaltyPoints: Math.floor(Math.random() * 1500),
       }));
 
       setSalesData(mockSales);

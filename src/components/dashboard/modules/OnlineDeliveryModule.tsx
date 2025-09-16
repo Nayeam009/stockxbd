@@ -30,6 +30,7 @@ import {
   Search
 } from "lucide-react";
 import { Order } from "@/hooks/useDashboardData";
+import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
 
 interface OnlineDeliveryModuleProps {
   orders: Order[];
@@ -48,35 +49,35 @@ export const OnlineDeliveryModule = ({ orders, setOrders, drivers, userRole }: O
     {
       id: "ORD001",
       customerId: "cust-1",
-      customerName: "Rajesh Kumar",
-      items: [{ productId: "1", productName: "12kg LPG Cylinder", quantity: 2, price: 950 }],
-      totalAmount: 1900,
+      customerName: "Abdul Rahman",
+      items: [{ productId: "1", productName: "12kg LPG Cylinder", quantity: 2, price: 1200 }],
+      totalAmount: 2400,
       status: "pending",
       paymentStatus: "pending",
-      deliveryAddress: "Sector 14, Gurgaon",
+      deliveryAddress: "Dhanmondi, Dhaka",
       orderDate: new Date().toISOString(),
     },
     {
       id: "ORD002",
       customerId: "cust-2",
-      customerName: "Priya Singh",
-      items: [{ productId: "4", productName: "2 Burner Gas Stove", quantity: 1, price: 3500 }],
-      totalAmount: 3500,
+      customerName: "Rashida Begum",
+      items: [{ productId: "4", productName: "2 Burner Gas Stove", quantity: 1, price: 4500 }],
+      totalAmount: 4500,
       status: "dispatched",
       paymentStatus: "paid",
-      deliveryAddress: "Sector 15, Gurgaon",
+      deliveryAddress: "Gulshan, Dhaka",
       driverId: "1",
       orderDate: new Date(Date.now() - 86400000).toISOString(),
     },
     {
       id: "ORD003",
       customerId: "cust-3",
-      customerName: "Amit Sharma",
-      items: [{ productId: "2", productName: "12kg LPG Cylinder", quantity: 3, price: 950 }],
-      totalAmount: 2850,
+      customerName: "Mohammad Karim",
+      items: [{ productId: "2", productName: "12kg LPG Cylinder", quantity: 3, price: 1200 }],
+      totalAmount: 3600,
       status: "delivered",
       paymentStatus: "paid",
-      deliveryAddress: "Sector 16, Gurgaon",
+      deliveryAddress: "Uttara, Dhaka",
       driverId: "2",
       orderDate: new Date(Date.now() - 172800000).toISOString(),
       deliveryDate: new Date(Date.now() - 86400000).toISOString(),
@@ -214,7 +215,7 @@ export const OnlineDeliveryModule = ({ orders, setOrders, drivers, userRole }: O
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-accent">{analytics.deliveredOrders}</div>
-            <p className="text-xs text-muted-foreground">₹{analytics.todayRevenue.toLocaleString()} revenue</p>
+            <p className="text-xs text-muted-foreground">{BANGLADESHI_CURRENCY_SYMBOL}{analytics.todayRevenue.toLocaleString()} revenue</p>
           </CardContent>
         </Card>
       </div>
@@ -298,7 +299,7 @@ export const OnlineDeliveryModule = ({ orders, setOrders, drivers, userRole }: O
                         ))}
                       </div>
                     </TableCell>
-                    <TableCell className="font-semibold">₹{order.totalAmount.toLocaleString()}</TableCell>
+                    <TableCell className="font-semibold">{BANGLADESHI_CURRENCY_SYMBOL}{order.totalAmount.toLocaleString()}</TableCell>
                     <TableCell>
                       <Badge variant="secondary" className={getStatusColor(order.status)}>
                         {order.status.toUpperCase()}

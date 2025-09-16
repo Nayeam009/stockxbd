@@ -23,11 +23,12 @@ import {
   Plus, 
   Filter, 
   Download,
-  IndianRupee,
+  Banknote,
   Package,
   Users,
   TrendingUp
 } from "lucide-react";
+import { BANGLADESHI_CURRENCY_SYMBOL, BANGLADESHI_PAYMENT_METHODS } from "@/lib/bangladeshConstants";
 import { SalesData } from "@/hooks/useDashboardData";
 
 interface DailySalesModuleProps {
@@ -80,12 +81,10 @@ export const DailySalesModule = ({ salesData, setSalesData }: DailySalesModulePr
   const topProduct = Object.entries(analytics.topProduct).sort(([,a], [,b]) => b - a)[0];
   const topStaff = Object.entries(analytics.topStaff).sort(([,a], [,b]) => b - a)[0];
 
-  const paymentMethodColors = {
-    cash: "bg-accent/10 text-accent border-accent/20",
-    card: "bg-primary/10 text-primary border-primary/20",
-    upi: "bg-secondary/10 text-secondary border-secondary/20",
-    credit: "bg-warning/10 text-warning border-warning/20"
-  };
+  const paymentMethodColors = BANGLADESHI_PAYMENT_METHODS.reduce((acc, method) => {
+    acc[method.id] = method.color;
+    return acc;
+  }, {} as Record<string, string>);
 
   return (
     <div className="space-y-6">
@@ -108,10 +107,10 @@ export const DailySalesModule = ({ salesData, setSalesData }: DailySalesModulePr
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Today's Revenue
             </CardTitle>
-            <IndianRupee className="h-4 w-4 text-muted-foreground" />
+            <Banknote className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-primary">₹{analytics.todayRevenue.toLocaleString()}</div>
+            <div className="text-2xl font-bold text-primary">{BANGLADESHI_CURRENCY_SYMBOL}{analytics.todayRevenue.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">{analytics.todayOrders} orders today</p>
           </CardContent>
         </Card>
@@ -124,7 +123,7 @@ export const DailySalesModule = ({ salesData, setSalesData }: DailySalesModulePr
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-primary">₹{analytics.monthlyRevenue.toLocaleString()}</div>
+            <div className="text-2xl font-bold text-primary">{BANGLADESHI_CURRENCY_SYMBOL}{analytics.monthlyRevenue.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">{analytics.monthlyOrders} orders this month</p>
           </CardContent>
         </Card>
@@ -151,7 +150,7 @@ export const DailySalesModule = ({ salesData, setSalesData }: DailySalesModulePr
           </CardHeader>
           <CardContent>
             <div className="text-lg font-bold text-primary">{topStaff?.[0] || 'N/A'}</div>
-            <p className="text-xs text-muted-foreground">₹{topStaff?.[1]?.toLocaleString() || 0} in sales</p>
+            <p className="text-xs text-muted-foreground">{BANGLADESHI_CURRENCY_SYMBOL}{topStaff?.[1]?.toLocaleString() || 0} in sales</p>
           </CardContent>
         </Card>
       </div>
@@ -184,8 +183,8 @@ export const DailySalesModule = ({ salesData, setSalesData }: DailySalesModulePr
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Products</SelectItem>
-                  <SelectItem value="cylinder">Cylinders</SelectItem>
-                  <SelectItem value="stove">Stoves</SelectItem>
+                  <SelectItem value="cylinder">LPG Cylinders</SelectItem>
+                  <SelectItem value="stove">Gas Stoves</SelectItem>
                   <SelectItem value="accessory">Accessories</SelectItem>
                 </SelectContent>
               </Select>
@@ -246,8 +245,8 @@ export const DailySalesModule = ({ salesData, setSalesData }: DailySalesModulePr
                     <TableCell className="font-medium">{sale.date}</TableCell>
                     <TableCell>{sale.productName}</TableCell>
                     <TableCell>{sale.quantity}</TableCell>
-                    <TableCell>₹{sale.unitPrice.toLocaleString()}</TableCell>
-                    <TableCell className="font-semibold">₹{sale.totalAmount.toLocaleString()}</TableCell>
+                    <TableCell>{BANGLADESHI_CURRENCY_SYMBOL}{sale.unitPrice.toLocaleString()}</TableCell>
+                    <TableCell className="font-semibold">{BANGLADESHI_CURRENCY_SYMBOL}{sale.totalAmount.toLocaleString()}</TableCell>
                     <TableCell>
                       <Badge 
                         variant="secondary" 

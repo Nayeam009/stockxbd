@@ -5,7 +5,7 @@ import {
   Package, 
   Users, 
   FileText, 
-  IndianRupee, 
+  Banknote, 
   TrendingUp,
   AlertCircle,
   CheckCircle,
@@ -13,6 +13,7 @@ import {
   Truck,
   ShoppingCart
 } from "lucide-react";
+import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
 
 interface DashboardOverviewProps {
   analytics: {
@@ -31,15 +32,15 @@ export const DashboardOverview = ({ analytics, drivers, userRole }: DashboardOve
   const stats = [
     {
       title: "Today's Revenue",
-      value: `₹${analytics.todayRevenue.toLocaleString()}`,
+      value: `${BANGLADESHI_CURRENCY_SYMBOL}${analytics.todayRevenue.toLocaleString()}`,
       change: "+12%",
       changeType: "positive" as const,
-      icon: IndianRupee,
+      icon: Banknote,
       description: "From today's sales"
     },
     {
       title: "Monthly Revenue",
-      value: `₹${analytics.monthlyRevenue.toLocaleString()}`,
+      value: `${BANGLADESHI_CURRENCY_SYMBOL}${analytics.monthlyRevenue.toLocaleString()}`,
       change: "+23%",
       changeType: "positive" as const,
       icon: TrendingUp,
@@ -65,15 +66,15 @@ export const DashboardOverview = ({ analytics, drivers, userRole }: DashboardOve
 
   const recentActivities = [
     {
-      title: "New order from Rajesh Kumar",
-      description: "3x 12kg LPG Cylinders - ₹2,850",
+      title: "New order from Abdul Rahman",
+      description: `3x 12kg LPG Cylinders - ${BANGLADESHI_CURRENCY_SYMBOL}3,600`,
       time: "5 min ago",
       status: "pending",
       icon: FileText
     },
     {
       title: "Delivery completed",
-      description: "Driver Suresh completed delivery in Sector 14",
+      description: "Driver Mohammad Karim completed delivery in Dhanmondi",
       time: "15 min ago",
       status: "completed",
       icon: CheckCircle
@@ -87,10 +88,10 @@ export const DashboardOverview = ({ analytics, drivers, userRole }: DashboardOve
     },
     {
       title: "Payment received",
-      description: "₹15,000 payment processed via UPI",
+      description: `${BANGLADESHI_CURRENCY_SYMBOL}18,000 payment processed via bKash`,
       time: "2 hours ago",
       status: "completed",
-      icon: IndianRupee
+      icon: Banknote
     }
   ];
 
@@ -117,7 +118,7 @@ export const DashboardOverview = ({ analytics, drivers, userRole }: DashboardOve
           Welcome back! 👋
         </h1>
         <p className="text-lg text-muted-foreground">
-          Here's what's happening with your LPG business today.
+          Here's what's happening with your LPG business in Bangladesh today.
         </p>
       </div>
 
@@ -239,7 +240,7 @@ export const DashboardOverview = ({ analytics, drivers, userRole }: DashboardOve
                     </Badge>
                   </div>
                   <div className="space-y-1 text-sm">
-                    <p className="text-muted-foreground">Today's Sales: <span className="font-medium text-foreground">₹{driver.todaySales.toLocaleString()}</span></p>
+                    <p className="text-muted-foreground">Today's Sales: <span className="font-medium text-foreground">{BANGLADESHI_CURRENCY_SYMBOL}{driver.todaySales.toLocaleString()}</span></p>
                     <p className="text-muted-foreground">Deliveries: <span className="font-medium text-foreground">{driver.todayDeliveries}</span></p>
                   </div>
                 </div>
