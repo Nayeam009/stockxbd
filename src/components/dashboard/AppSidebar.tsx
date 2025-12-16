@@ -28,7 +28,14 @@ import {
   ShoppingCart,
   Search,
   Home,
-  User
+  User,
+  Receipt,
+  Wallet,
+  ClipboardList,
+  Wrench,
+  RefreshCw,
+  Tag,
+  Settings
 } from "lucide-react";
 import stockXLogo from "@/assets/stock-x-logo.png";
 
@@ -54,69 +61,23 @@ export const AppSidebar = ({
   const location = useLocation();
   
   const navigationItems = [
-    { 
-      id: 'overview', 
-      title: 'Dashboard', 
-      icon: Home, 
-      roles: ['owner', 'manager', 'driver'] 
-    },
-    { 
-      id: 'daily-sales', 
-      title: 'Daily Sales', 
-      icon: BarChart3, 
-      roles: ['owner', 'manager'],
-      badge: null
-    },
-    { 
-      id: 'lpg-stock', 
-      title: 'LPG Stock', 
-      icon: Package, 
-      roles: ['owner', 'manager'],
-      badge: analytics.lowStockItems.length > 0 ? analytics.lowStockItems.length : null
-    },
-    { 
-      id: 'stove-stock', 
-      title: 'Stove Stock', 
-      icon: ChefHat, 
-      roles: ['owner', 'manager'] 
-    },
-    { 
-      id: 'driver-sales', 
-      title: 'Driver Sales', 
-      icon: UserCheck, 
-      roles: ['owner', 'manager', 'driver'] 
-    },
-    { 
-      id: 'community', 
-      title: 'LPG Community', 
-      icon: Users, 
-      roles: ['owner', 'manager', 'driver'] 
-    },
-    { 
-      id: 'staff-salary', 
-      title: 'Staff Salary', 
-      icon: Banknote, 
-      roles: ['owner', 'manager'] 
-    },
-    { 
-      id: 'vehicle-cost', 
-      title: 'Vehicle Cost', 
-      icon: Truck, 
-      roles: ['owner', 'manager'] 
-    },
-    { 
-      id: 'online-delivery', 
-      title: 'Online Delivery', 
-      icon: ShoppingCart, 
-      roles: ['owner', 'manager', 'driver'],
-      badge: analytics.activeOrders > 0 ? analytics.activeOrders : null
-    },
-    { 
-      id: 'search', 
-      title: 'Search & Reports', 
-      icon: Search, 
-      roles: ['owner', 'manager'] 
-    }
+    { id: 'overview', title: 'Dashboard', icon: Home, roles: ['owner', 'manager', 'driver'] },
+    { id: 'pos', title: 'Point of Sale', icon: Receipt, roles: ['owner', 'manager', 'driver'] },
+    { id: 'daily-sales', title: 'Daily Sales', icon: BarChart3, roles: ['owner', 'manager'] },
+    { id: 'daily-expenses', title: 'Daily Expenses', icon: Wallet, roles: ['owner', 'manager'] },
+    { id: 'orders', title: 'Orders', icon: ClipboardList, roles: ['owner', 'manager', 'driver'], badge: analytics.activeOrders > 0 ? analytics.activeOrders : null },
+    { id: 'lpg-stock', title: 'LPG Stock', icon: Package, roles: ['owner', 'manager'], badge: analytics.lowStockItems.length > 0 ? analytics.lowStockItems.length : null },
+    { id: 'stove-stock', title: 'Gas Stove', icon: ChefHat, roles: ['owner', 'manager'] },
+    { id: 'regulators', title: 'Regulators', icon: Wrench, roles: ['owner', 'manager'] },
+    { id: 'exchange', title: 'Exchange', icon: RefreshCw, roles: ['owner', 'manager', 'driver'] },
+    { id: 'deliveries', title: 'Deliveries', icon: Truck, roles: ['owner', 'manager', 'driver'] },
+    { id: 'customers', title: 'Customers', icon: Users, roles: ['owner', 'manager'] },
+    { id: 'vehicle-cost', title: 'Vehicle Cost', icon: Truck, roles: ['owner', 'manager'] },
+    { id: 'staff-salary', title: 'Staff Salary', icon: Banknote, roles: ['owner', 'manager'] },
+    { id: 'product-pricing', title: 'Product Pricing', icon: Tag, roles: ['owner', 'manager'] },
+    { id: 'community', title: 'LPG Community', icon: Users, roles: ['owner', 'manager', 'driver'] },
+    { id: 'analytics', title: 'Analytics', icon: BarChart3, roles: ['owner', 'manager'] },
+    { id: 'search', title: 'Search & Reports', icon: Search, roles: ['owner', 'manager'] }
   ];
 
   const filteredItems = navigationItems.filter(item => 

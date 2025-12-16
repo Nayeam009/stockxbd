@@ -57,7 +57,124 @@ const Dashboard = () => {
             analytics={analytics}
             drivers={drivers}
             userRole={userRole}
+            setActiveModule={setActiveModule}
           />
+        );
+      case "pos":
+        return (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-3xl font-bold text-primary">Point of Sale</h2>
+              <p className="text-muted-foreground">Quick sales and billing system</p>
+            </div>
+            <div className="text-center py-12 bg-card rounded-lg border border-border">
+              <p className="text-lg text-muted-foreground">POS module coming soon...</p>
+            </div>
+          </div>
+        );
+      case "daily-expenses":
+        return (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-3xl font-bold text-primary">Daily Expenses</h2>
+              <p className="text-muted-foreground">Track and manage daily business expenses</p>
+            </div>
+            <div className="text-center py-12 bg-card rounded-lg border border-border">
+              <p className="text-lg text-muted-foreground">Daily expenses module coming soon...</p>
+            </div>
+          </div>
+        );
+      case "orders":
+        return (
+          <OnlineDeliveryModule
+            orders={orders}
+            setOrders={setOrders}
+            drivers={drivers}
+            userRole={userRole}
+          />
+        );
+      case "regulators":
+        return (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-3xl font-bold text-primary">Regulators Stock</h2>
+              <p className="text-muted-foreground">Manage LPG regulators inventory</p>
+            </div>
+            <div className="text-center py-12 bg-card rounded-lg border border-border">
+              <p className="text-lg text-muted-foreground">Regulators module coming soon...</p>
+            </div>
+          </div>
+        );
+      case "exchange":
+        return (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-3xl font-bold text-primary">Cylinder Exchange</h2>
+              <p className="text-muted-foreground">Manage cylinder exchange and refill operations</p>
+            </div>
+            <div className="text-center py-12 bg-card rounded-lg border border-border">
+              <p className="text-lg text-muted-foreground">Exchange module coming soon...</p>
+            </div>
+          </div>
+        );
+      case "deliveries":
+        return (
+          <OnlineDeliveryModule
+            orders={orders}
+            setOrders={setOrders}
+            drivers={drivers}
+            userRole={userRole}
+          />
+        );
+      case "customers":
+        return (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-3xl font-bold text-primary">Customer Management</h2>
+              <p className="text-muted-foreground">Manage customer database and records</p>
+            </div>
+            <div className="grid gap-4">
+              {customers.slice(0, 10).map((customer) => (
+                <div key={customer.id} className="p-4 bg-card rounded-lg border border-border shadow-elegant">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-semibold text-foreground">{customer.name}</h3>
+                      <p className="text-sm text-muted-foreground">{customer.phone}</p>
+                      <p className="text-sm text-muted-foreground">{customer.address}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-medium">{customer.totalOrders} orders</p>
+                      <p className="text-sm text-muted-foreground">৳{customer.outstanding} outstanding</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      case "product-pricing":
+        return (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-3xl font-bold text-primary">Product Pricing</h2>
+              <p className="text-muted-foreground">Manage product prices and rates</p>
+            </div>
+            <div className="text-center py-12 bg-card rounded-lg border border-border">
+              <p className="text-lg text-muted-foreground">Product pricing module coming soon...</p>
+            </div>
+          </div>
+        );
+      case "analytics":
+        return (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-3xl font-bold text-primary">Business Analytics</h2>
+              <p className="text-muted-foreground">View detailed business reports and insights</p>
+            </div>
+            <div className="text-center py-12 bg-card rounded-lg border border-border">
+              <p className="text-lg text-muted-foreground">Analytics module coming soon...</p>
+            </div>
+          </div>
         );
       case "daily-sales":
         return (

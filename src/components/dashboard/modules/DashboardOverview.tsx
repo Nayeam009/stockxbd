@@ -1,6 +1,5 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { 
   Package, 
   Users, 
@@ -11,7 +10,15 @@ import {
   CheckCircle,
   Clock,
   Truck,
-  ShoppingCart
+  Receipt,
+  Wallet,
+  ClipboardList,
+  ChefHat,
+  Wrench,
+  RefreshCw,
+  Tag,
+  BarChart3,
+  Settings
 } from "lucide-react";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
 
@@ -26,9 +33,10 @@ interface DashboardOverviewProps {
   };
   drivers: any[];
   userRole: string;
+  setActiveModule?: (module: string) => void;
 }
 
-export const DashboardOverview = ({ analytics, drivers, userRole }: DashboardOverviewProps) => {
+export const DashboardOverview = ({ analytics, drivers, userRole, setActiveModule }: DashboardOverviewProps) => {
   const stats = [
     {
       title: "Today's Revenue",
@@ -96,13 +104,28 @@ export const DashboardOverview = ({ analytics, drivers, userRole }: DashboardOve
   ];
 
   const quickActions = [
-    { title: "Add New Order", icon: FileText, color: "bg-primary", module: "online-delivery" },
-    { title: "Check Stock", icon: Package, color: "bg-secondary", module: "lpg-stock" },
-    { title: "View Customers", icon: Users, color: "bg-accent", module: "community" },
-    { title: "Driver Performance", icon: Truck, color: "bg-info", module: "driver-sales" },
-    { title: "Daily Sales", icon: TrendingUp, color: "bg-warning", module: "daily-sales" },
-    { title: "Delivery Status", icon: ShoppingCart, color: "bg-primary", module: "online-delivery" }
+    { title: "Point of Sale", icon: Receipt, module: "pos" },
+    { title: "Daily Sales", icon: BarChart3, module: "daily-sales" },
+    { title: "Daily Expenses", icon: Wallet, module: "daily-expenses" },
+    { title: "Orders", icon: ClipboardList, module: "orders" },
+    { title: "LPG Stock", icon: Package, module: "lpg-stock" },
+    { title: "Gas Stove", icon: ChefHat, module: "stove-stock" },
+    { title: "Regulators", icon: Wrench, module: "regulators" },
+    { title: "Exchange", icon: RefreshCw, module: "exchange" },
+    { title: "Deliveries", icon: Truck, module: "deliveries" },
+    { title: "Customers", icon: Users, module: "customers" },
+    { title: "Vehicle Cost", icon: Truck, module: "vehicle-cost" },
+    { title: "Staff Salary", icon: Banknote, module: "staff-salary" },
+    { title: "Product Pricing", icon: Tag, module: "product-pricing" },
+    { title: "LPG Community", icon: Users, module: "community" },
+    { title: "Analytics", icon: BarChart3, module: "analytics" }
   ];
+
+  const handleQuickAction = (module: string) => {
+    if (setActiveModule) {
+      setActiveModule(module);
+    }
+  };
 
   const statusColors = {
     pending: "bg-warning/10 text-warning border-warning/20",
@@ -189,28 +212,33 @@ export const DashboardOverview = ({ analytics, drivers, userRole }: DashboardOve
           </CardContent>
         </Card>
 
-        {/* Quick Actions */}
+        {/* Quick Actions Card */}
         <Card className="border-0 shadow-elegant">
           <CardHeader>
-            <CardTitle className="text-primary">Quick Actions</CardTitle>
-            <CardDescription>Frequently used features</CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-primary">Quick Actions</CardTitle>
+                <CardDescription>Access key features of your business management.</CardDescription>
+              </div>
+              <Settings className="h-5 w-5 text-muted-foreground" />
+            </div>
           </CardHeader>
-          <CardContent className="space-y-3">
-            {quickActions.slice(0, userRole === 'driver' ? 4 : 6).map((action, index) => {
-              const Icon = action.icon;
-              return (
-                <Button
-                  key={index}
-                  variant="outline"
-                  className="w-full justify-start border-border hover:bg-surface hover:border-primary/20 transition-all duration-200"
-                >
-                  <div className={`h-8 w-8 ${action.color} rounded-lg flex items-center justify-center mr-3`}>
-                    <Icon className="h-4 w-4 text-white" />
-                  </div>
-                  <span className="text-sm font-medium">{action.title}</span>
-                </Button>
-              );
-            })}
+          <CardContent>
+            <div className="grid grid-cols-2 gap-3">
+              {quickActions.slice(0, 6).map((action, index) => {
+                const Icon = action.icon;
+                return (
+                  <button
+                    key={index}
+                    onClick={() => handleQuickAction(action.module)}
+                    className="flex flex-col items-center justify-center p-4 rounded-xl border border-border bg-card hover:bg-surface hover:border-primary/30 transition-all duration-200 group"
+                  >
+                    <Icon className="h-6 w-6 text-primary mb-2 group-hover:scale-110 transition-transform" />
+                    <span className="text-xs font-medium text-center text-foreground">{action.title}</span>
+                  </button>
+                );
+              })}
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -249,6 +277,36 @@ export const DashboardOverview = ({ analytics, drivers, userRole }: DashboardOve
           </CardContent>
         </Card>
       )}
+
+      {/* Full Quick Actions Grid */}
+      <Card className="border-0 shadow-elegant">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-primary text-xl">Quick Actions</CardTitle>
+              <CardDescription>Access key features of your business management.</CardDescription>
+            </div>
+            <Settings className="h-5 w-5 text-muted-foreground cursor-pointer hover:text-primary transition-colors" />
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-8 gap-4">
+            {quickActions.map((action, index) => {
+              const Icon = action.icon;
+              return (
+                <button
+                  key={index}
+                  onClick={() => handleQuickAction(action.module)}
+                  className="flex flex-col items-center justify-center p-5 rounded-xl border border-border bg-card hover:bg-surface hover:border-primary/40 hover:shadow-lg transition-all duration-300 group min-h-[100px]"
+                >
+                  <Icon className="h-7 w-7 text-primary mb-3 group-hover:scale-110 transition-transform duration-200" />
+                  <span className="text-sm font-medium text-center text-foreground leading-tight">{action.title}</span>
+                </button>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
