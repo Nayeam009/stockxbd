@@ -183,9 +183,9 @@ export const DashboardOverview = ({ analytics, drivers, userRole, setActiveModul
         })}
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-6">
+      <div className="grid lg:grid-cols-1 gap-6">
         {/* Recent Activities */}
-        <Card className="lg:col-span-2 border-0 shadow-elegant">
+        <Card className="border-0 shadow-elegant">
           <CardHeader>
             <CardTitle className="text-primary flex items-center">
               <Clock className="h-5 w-5 mr-2" />
@@ -209,36 +209,6 @@ export const DashboardOverview = ({ analytics, drivers, userRole, setActiveModul
                 </div>
               );
             })}
-          </CardContent>
-        </Card>
-
-        {/* Quick Actions Card */}
-        <Card className="border-0 shadow-elegant">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-primary">Quick Actions</CardTitle>
-                <CardDescription>Access key features of your business management.</CardDescription>
-              </div>
-              <Settings className="h-5 w-5 text-muted-foreground" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-3">
-              {quickActions.slice(0, 6).map((action, index) => {
-                const Icon = action.icon;
-                return (
-                  <button
-                    key={index}
-                    onClick={() => handleQuickAction(action.module)}
-                    className="flex flex-col items-center justify-center p-4 rounded-xl border border-border bg-card hover:bg-surface hover:border-primary/30 transition-all duration-200 group"
-                  >
-                    <Icon className="h-6 w-6 text-primary mb-2 group-hover:scale-110 transition-transform" />
-                    <span className="text-xs font-medium text-center text-foreground">{action.title}</span>
-                  </button>
-                );
-              })}
-            </div>
           </CardContent>
         </Card>
       </div>
