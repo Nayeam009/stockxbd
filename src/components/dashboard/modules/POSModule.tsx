@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -15,18 +15,20 @@ import {
   Search,
   X,
   Check,
-  Receipt
+  Receipt,
+  Loader2
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Product {
   id: string;
   name: string;
   category: string;
   price: number;
-  stock: number;
+  stock_quantity: number;
   unit: string;
 }
 
@@ -34,29 +36,28 @@ interface CartItem extends Product {
   quantity: number;
 }
 
-const products: Product[] = [
-  // LPG Cylinders
-  { id: "1", name: "Bashundhara 12kg", category: "LPG Cylinder", price: 1200, stock: 50, unit: "pcs" },
-  { id: "2", name: "Omera 12kg", category: "LPG Cylinder", price: 1180, stock: 35, unit: "pcs" },
-  { id: "3", name: "Total 12kg", category: "LPG Cylinder", price: 1220, stock: 28, unit: "pcs" },
-  { id: "4", name: "Bashundhara 5kg", category: "LPG Cylinder", price: 550, stock: 40, unit: "pcs" },
-  { id: "5", name: "Omera 5kg", category: "LPG Cylinder", price: 530, stock: 25, unit: "pcs" },
-  // Gas Stoves
-  { id: "6", name: "Single Burner Stove", category: "Gas Stove", price: 850, stock: 15, unit: "pcs" },
-  { id: "7", name: "Double Burner Stove", category: "Gas Stove", price: 1500, stock: 12, unit: "pcs" },
-  { id: "8", name: "Auto Ignition Stove", category: "Gas Stove", price: 2200, stock: 8, unit: "pcs" },
-  // Regulators
-  { id: "9", name: "Standard Regulator", category: "Regulator", price: 350, stock: 30, unit: "pcs" },
-  { id: "10", name: "High Pressure Regulator", category: "Regulator", price: 550, stock: 20, unit: "pcs" },
-  // Accessories
-  { id: "11", name: "Gas Pipe (1m)", category: "Accessories", price: 150, stock: 100, unit: "pcs" },
-  { id: "12", name: "Gas Pipe (2m)", category: "Accessories", price: 280, stock: 80, unit: "pcs" },
-  { id: "13", name: "Cylinder Cap", category: "Accessories", price: 50, stock: 150, unit: "pcs" },
-];
+const categoryMap: Record<string, string> = {
+  'lpg_cylinder': 'LPG Cylinder',
+  'stove': 'Gas Stove',
+  'regulator': 'Regulator',
+  'accessory': 'Accessories'
+};
+
+const paymentMethodMap: Record<string, string> = {
+  'Cash': 'cash',
+  'bKash': 'bkash',
+  'Nagad': 'nagad',
+  'Rocket': 'rocket',
+  'Card': 'card',
+  'Bank Transfer': 'card'
+};
 
 const categories = ["All", "LPG Cylinder", "Gas Stove", "Regulator", "Accessories"];
 
 export const POSModule = () => {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [processing, setProcessing] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
@@ -68,6 +69,56 @@ export const POSModule = () => {
   const [receivedAmount, setReceivedAmount] = useState("");
   const [lastReceipt, setLastReceipt] = useState<any>(null);
 
+  // Fetch products from database
+  useEffect(() => {
+    const fetchProducts = async () => {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('is_active', true)
+        .order('category', { ascending: true });
+
+      if (error) {
+        toast({ title: "Error loading products", description: error.message, variant: "destructive" });
+      } else {
+        setProducts(data.map(p => ({
+          id: p.id,
+          name: p.name,
+          category: categoryMap[p.category] || p.category,
+          price: Number(p.price),
+          stock_quantity: p.stock_quantity,
+          unit: p.unit
+        })));
+      }
+      setLoading(false);
+    };
+
+    fetchProducts();
+
+    // Subscribe to real-time updates
+    const channel = supabase
+      .channel('products-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'products' },
+        (payload) => {
+          if (payload.eventType === 'UPDATE') {
+            const updated = payload.new as any;
+            setProducts(prev => prev.map(p => 
+              p.id === updated.id 
+                ? { ...p, stock_quantity: updated.stock_quantity, price: Number(updated.price) }
+                : p
+            ));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
   const filteredProducts = products.filter(product => {
     const matchesCategory = selectedCategory === "All" || product.category === selectedCategory;
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
@@ -77,7 +128,7 @@ export const POSModule = () => {
   const addToCart = (product: Product) => {
     const existingItem = cart.find(item => item.id === product.id);
     if (existingItem) {
-      if (existingItem.quantity >= product.stock) {
+      if (existingItem.quantity >= product.stock_quantity) {
         toast({ title: "Stock limit reached", variant: "destructive" });
         return;
       }
@@ -94,7 +145,7 @@ export const POSModule = () => {
       if (item.id === productId) {
         const newQuantity = item.quantity + change;
         if (newQuantity <= 0) return item;
-        if (newQuantity > item.stock) {
+        if (newQuantity > item.stock_quantity) {
           toast({ title: "Stock limit reached", variant: "destructive" });
           return item;
         }
@@ -118,7 +169,7 @@ export const POSModule = () => {
   const tax = 0; // No VAT for LPG in Bangladesh
   const total = subtotal + tax;
 
-  const handlePayment = () => {
+  const handlePayment = async () => {
     if (!selectedPaymentMethod) {
       toast({ title: "Please select a payment method", variant: "destructive" });
       return;
@@ -130,26 +181,84 @@ export const POSModule = () => {
       return;
     }
 
-    // Generate receipt
-    const receipt = {
-      id: `INV-${Date.now()}`,
-      date: new Date().toLocaleString('en-BD'),
-      customer: customerName || "Walk-in Customer",
-      phone: customerPhone || "-",
-      items: cart,
-      subtotal,
-      tax,
-      total,
-      paymentMethod: selectedPaymentMethod,
-      received: received || total,
-      change: Math.max(0, received - total),
-    };
+    setProcessing(true);
 
-    setLastReceipt(receipt);
-    setShowPaymentModal(false);
-    setShowReceiptModal(true);
+    try {
+      // Generate transaction number
+      const { data: txnNumData, error: txnNumError } = await supabase.rpc('generate_transaction_number');
+      if (txnNumError) throw txnNumError;
 
-    toast({ title: "Payment successful!", description: `Invoice: ${receipt.id}` });
+      const transactionNumber = txnNumData || `TXN-${Date.now()}`;
+
+      // Create transaction
+      const { data: transaction, error: transactionError } = await supabase
+        .from('pos_transactions')
+        .insert({
+          transaction_number: transactionNumber,
+          customer_name: customerName || null,
+          customer_phone: customerPhone || null,
+          subtotal: subtotal,
+          discount: 0,
+          total: total,
+          payment_method: paymentMethodMap[selectedPaymentMethod] as any,
+          payment_status: 'completed'
+        })
+        .select()
+        .single();
+
+      if (transactionError) throw transactionError;
+
+      // Insert transaction items
+      const transactionItems = cart.map(item => ({
+        transaction_id: transaction.id,
+        product_id: item.id,
+        product_name: item.name,
+        quantity: item.quantity,
+        unit_price: item.price,
+        total_price: item.price * item.quantity
+      }));
+
+      const { error: itemsError } = await supabase
+        .from('pos_transaction_items')
+        .insert(transactionItems);
+
+      if (itemsError) throw itemsError;
+
+      // Update stock quantities
+      for (const item of cart) {
+        const { error: stockError } = await supabase
+          .from('products')
+          .update({ stock_quantity: item.stock_quantity - item.quantity })
+          .eq('id', item.id);
+
+        if (stockError) throw stockError;
+      }
+
+      // Generate receipt
+      const receipt = {
+        id: transactionNumber,
+        date: new Date().toLocaleString('en-BD'),
+        customer: customerName || "Walk-in Customer",
+        phone: customerPhone || "-",
+        items: cart,
+        subtotal,
+        tax,
+        total,
+        paymentMethod: selectedPaymentMethod,
+        received: received || total,
+        change: Math.max(0, received - total),
+      };
+
+      setLastReceipt(receipt);
+      setShowPaymentModal(false);
+      setShowReceiptModal(true);
+
+      toast({ title: "Payment successful!", description: `Invoice: ${receipt.id}` });
+    } catch (error: any) {
+      toast({ title: "Payment failed", description: error.message, variant: "destructive" });
+    } finally {
+      setProcessing(false);
+    }
   };
 
   const printReceipt = () => {
@@ -233,6 +342,15 @@ export const POSModule = () => {
     setReceivedAmount("");
   };
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="ml-2 text-muted-foreground">Loading products...</span>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -289,8 +407,8 @@ export const POSModule = () => {
                   </div>
                   <h3 className="font-medium text-sm text-foreground line-clamp-2 mb-1">{product.name}</h3>
                   <p className="text-lg font-bold text-primary">{BANGLADESHI_CURRENCY_SYMBOL}{product.price}</p>
-                  <Badge variant="secondary" className="mt-2 text-xs">
-                    Stock: {product.stock}
+                  <Badge variant={product.stock_quantity > 10 ? "secondary" : "destructive"} className="mt-2 text-xs">
+                    Stock: {product.stock_quantity}
                   </Badge>
                 </CardContent>
               </Card>
@@ -433,24 +551,38 @@ export const POSModule = () => {
 
             {selectedPaymentMethod === "Cash" && (
               <div className="space-y-2">
-                <label className="text-sm font-medium">Amount Received</label>
+                <p className="text-sm font-medium">Amount Received</p>
                 <Input
                   type="number"
-                  placeholder="Enter amount"
+                  placeholder="Enter amount received"
                   value={receivedAmount}
                   onChange={(e) => setReceivedAmount(e.target.value)}
                 />
                 {receivedAmount && parseFloat(receivedAmount) >= total && (
-                  <p className="text-sm text-accent">
+                  <p className="text-sm text-green-600 font-medium">
                     Change: {BANGLADESHI_CURRENCY_SYMBOL}{(parseFloat(receivedAmount) - total).toLocaleString()}
                   </p>
                 )}
               </div>
             )}
 
-            <Button className="w-full" size="lg" onClick={handlePayment}>
-              <Check className="h-5 w-5 mr-2" />
-              Complete Payment
+            <Button 
+              className="w-full" 
+              size="lg" 
+              onClick={handlePayment}
+              disabled={processing}
+            >
+              {processing ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <Check className="h-4 w-4 mr-2" />
+                  Complete Payment
+                </>
+              )}
             </Button>
           </div>
         </DialogContent>
@@ -460,50 +592,46 @@ export const POSModule = () => {
       <Dialog open={showReceiptModal} onOpenChange={setShowReceiptModal}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-primary flex items-center gap-2">
+            <DialogTitle className="flex items-center gap-2 text-primary">
               <Receipt className="h-5 w-5" />
-              Receipt
+              Transaction Complete
             </DialogTitle>
           </DialogHeader>
           {lastReceipt && (
             <div className="space-y-4">
-              <div className="bg-surface p-4 rounded-lg space-y-3 text-sm">
-                <div className="text-center border-b border-border pb-3">
-                  <h3 className="font-bold text-lg">Stock-X LPG</h3>
-                  <p className="text-muted-foreground text-xs">Invoice: {lastReceipt.id}</p>
-                  <p className="text-muted-foreground text-xs">{lastReceipt.date}</p>
+              <div className="bg-surface rounded-lg p-4 space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Invoice</span>
+                  <span className="font-medium">{lastReceipt.id}</span>
                 </div>
-                
-                <div className="space-y-1">
-                  <p><span className="text-muted-foreground">Customer:</span> {lastReceipt.customer}</p>
-                  <p><span className="text-muted-foreground">Phone:</span> {lastReceipt.phone}</p>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Date</span>
+                  <span>{lastReceipt.date}</span>
                 </div>
-
-                <div className="border-t border-border pt-3 space-y-1">
-                  {lastReceipt.items.map((item: CartItem) => (
-                    <div key={item.id} className="flex justify-between">
-                      <span>{item.name} × {item.quantity}</span>
-                      <span>{BANGLADESHI_CURRENCY_SYMBOL}{item.price * item.quantity}</span>
-                    </div>
-                  ))}
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Customer</span>
+                  <span>{lastReceipt.customer}</span>
                 </div>
-
-                <div className="border-t border-border pt-3 space-y-1">
-                  <div className="flex justify-between font-bold text-lg">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Items</span>
+                  <span>{lastReceipt.items.length}</span>
+                </div>
+                <div className="border-t border-border pt-2 mt-2">
+                  <div className="flex justify-between text-lg font-bold">
                     <span>Total</span>
-                    <span className="text-primary">{BANGLADESHI_CURRENCY_SYMBOL}{lastReceipt.total}</span>
+                    <span className="text-primary">{BANGLADESHI_CURRENCY_SYMBOL}{lastReceipt.total.toLocaleString()}</span>
                   </div>
-                  <div className="flex justify-between text-muted-foreground">
-                    <span>Payment</span>
-                    <span>{lastReceipt.paymentMethod}</span>
-                  </div>
-                  {lastReceipt.change > 0 && (
-                    <div className="flex justify-between">
-                      <span>Change</span>
-                      <span>{BANGLADESHI_CURRENCY_SYMBOL}{lastReceipt.change}</span>
-                    </div>
-                  )}
                 </div>
+                <div className="flex justify-between text-green-600">
+                  <span>Paid via</span>
+                  <span className="font-medium">{lastReceipt.paymentMethod}</span>
+                </div>
+                {lastReceipt.change > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Change</span>
+                    <span>{BANGLADESHI_CURRENCY_SYMBOL}{lastReceipt.change.toLocaleString()}</span>
+                  </div>
+                )}
               </div>
 
               <div className="flex gap-2">
@@ -513,7 +641,7 @@ export const POSModule = () => {
                 </Button>
                 <Button className="flex-1" onClick={completeTransaction}>
                   <Check className="h-4 w-4 mr-2" />
-                  Done
+                  New Sale
                 </Button>
               </div>
             </div>
