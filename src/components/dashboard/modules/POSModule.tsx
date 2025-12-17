@@ -224,7 +224,8 @@ export const POSModule = () => {
         product_name: item.name,
         quantity: item.quantity,
         unit_price: item.price,
-        total_price: item.price * item.quantity
+        total_price: item.price * item.quantity,
+        created_by: user.id
       }));
 
       const { error: itemsError } = await supabase
