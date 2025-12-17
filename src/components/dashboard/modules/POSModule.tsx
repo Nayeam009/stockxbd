@@ -190,6 +190,14 @@ export const POSModule = () => {
 
       const transactionNumber = txnNumData || `TXN-${Date.now()}`;
 
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({ title: "Please log in to complete transaction", variant: "destructive" });
+        setProcessing(false);
+        return;
+      }
+
       // Create transaction
       const { data: transaction, error: transactionError } = await supabase
         .from('pos_transactions')
@@ -201,7 +209,8 @@ export const POSModule = () => {
           discount: 0,
           total: total,
           payment_method: paymentMethodMap[selectedPaymentMethod] as any,
-          payment_status: 'completed'
+          payment_status: 'completed',
+          created_by: user.id
         })
         .select()
         .single();

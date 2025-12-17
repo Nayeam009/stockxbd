@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { 
@@ -35,9 +35,12 @@ import {
   Wrench,
   RefreshCw,
   Tag,
-  Settings
+  Settings,
+  LogOut
 } from "lucide-react";
 import stockXLogo from "@/assets/stock-x-logo.png";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
 
 interface AppSidebarProps {
   activeModule: string;
@@ -178,12 +181,35 @@ export const AppSidebar = ({
                 </div>
               </div>
             </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="w-full"
+              onClick={async () => {
+                await supabase.auth.signOut();
+                toast({ title: "Signed out successfully" });
+              }}
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              Sign Out
+            </Button>
           </div>
         ) : (
-          <div className="flex justify-center">
+          <div className="flex flex-col items-center gap-2">
             <div className="h-8 w-8 bg-gradient-primary rounded-full flex items-center justify-center">
               <User className="h-4 w-4 text-primary-foreground" />
             </div>
+            <Button 
+              variant="ghost" 
+              size="icon"
+              className="h-8 w-8"
+              onClick={async () => {
+                await supabase.auth.signOut();
+                toast({ title: "Signed out successfully" });
+              }}
+            >
+              <LogOut className="h-4 w-4" />
+            </Button>
           </div>
         )}
       </SidebarFooter>
