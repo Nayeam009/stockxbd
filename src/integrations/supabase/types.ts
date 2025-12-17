@@ -65,6 +65,7 @@ export type Database = {
       pos_transactions: {
         Row: {
           created_at: string
+          created_by: string | null
           customer_name: string | null
           customer_phone: string | null
           discount: number
@@ -78,6 +79,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          created_by?: string | null
           customer_name?: string | null
           customer_phone?: string | null
           discount?: number
@@ -91,6 +93,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          created_by?: string | null
           customer_name?: string | null
           customer_phone?: string | null
           discount?: number
@@ -108,6 +111,7 @@ export type Database = {
         Row: {
           category: Database["public"]["Enums"]["product_category"]
           created_at: string
+          created_by: string | null
           id: string
           is_active: boolean
           name: string
@@ -120,6 +124,7 @@ export type Database = {
         Insert: {
           category: Database["public"]["Enums"]["product_category"]
           created_at?: string
+          created_by?: string | null
           id?: string
           is_active?: boolean
           name: string
@@ -132,6 +137,7 @@ export type Database = {
         Update: {
           category?: Database["public"]["Enums"]["product_category"]
           created_at?: string
+          created_by?: string | null
           id?: string
           is_active?: boolean
           name?: string
