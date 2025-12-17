@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/dashboard/AppSidebar";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
@@ -10,14 +10,38 @@ import { OnlineDeliveryModule } from "@/components/dashboard/modules/OnlineDeliv
 import { SearchModule } from "@/components/dashboard/modules/SearchModule";
 import { POSModule } from "@/components/dashboard/modules/POSModule";
 import { useDashboardData } from "@/hooks/useDashboardData";
+import { supabase } from "@/integrations/supabase/client";
 
 const Dashboard = () => {
   const [activeModule, setActiveModule] = useState("overview");
   const [searchQuery, setSearchQuery] = useState("");
-  
-  // Mock user data - in real app this would come from auth context
-  const userRole: 'owner' | 'manager' | 'driver' = "owner"; // Can be 'owner', 'manager', or 'driver'
-  const userName = "John Doe";
+  const [userRole, setUserRole] = useState<'owner' | 'manager' | 'driver'>('driver');
+  const [userName, setUserName] = useState("");
+  const [authLoading, setAuthLoading] = useState(true);
+
+  // Fetch user role from database
+  useEffect(() => {
+    const fetchUserRole = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUserName(user.email || "User");
+        
+        // Fetch role from user_roles table
+        const { data: roleData } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .single();
+        
+        if (roleData?.role) {
+          setUserRole(roleData.role as 'owner' | 'manager' | 'driver');
+        }
+      }
+      setAuthLoading(false);
+    };
+
+    fetchUserRole();
+  }, []);
 
   const {
     salesData,
@@ -36,7 +60,7 @@ const Dashboard = () => {
     setOrders,
   } = useDashboardData();
 
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center space-y-4 animate-fade-in">

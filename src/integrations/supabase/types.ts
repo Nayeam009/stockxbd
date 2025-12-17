@@ -17,6 +17,7 @@ export type Database = {
       pos_transaction_items: {
         Row: {
           created_at: string
+          created_by: string | null
           id: string
           product_id: string
           product_name: string
@@ -27,6 +28,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          created_by?: string | null
           id?: string
           product_id: string
           product_name: string
@@ -37,6 +39,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          created_by?: string | null
           id?: string
           product_id?: string
           product_name?: string
@@ -149,14 +152,44 @@ export type Database = {
         }
         Relationships: []
       }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
       generate_transaction_number: { Args: never; Returns: string }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_admin: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
+      app_role: "owner" | "manager" | "driver"
       payment_method: "cash" | "bkash" | "nagad" | "rocket" | "card"
       product_category: "lpg_cylinder" | "stove" | "regulator" | "accessory"
     }
@@ -286,6 +319,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      app_role: ["owner", "manager", "driver"],
       payment_method: ["cash", "bkash", "nagad", "rocket", "card"],
       product_category: ["lpg_cylinder", "stove", "regulator", "accessory"],
     },
