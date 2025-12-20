@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      customers: {
+        Row: {
+          address: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          phone: string | null
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          phone?: string | null
+        }
+        Update: {
+          address?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          phone?: string | null
+        }
+        Relationships: []
+      }
       pos_transaction_items: {
         Row: {
           created_at: string
@@ -69,8 +96,7 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string | null
-          customer_name: string | null
-          customer_phone: string | null
+          customer_id: string | null
           discount: number
           id: string
           notes: string | null
@@ -83,8 +109,7 @@ export type Database = {
         Insert: {
           created_at?: string
           created_by?: string | null
-          customer_name?: string | null
-          customer_phone?: string | null
+          customer_id?: string | null
           discount?: number
           id?: string
           notes?: string | null
@@ -97,8 +122,7 @@ export type Database = {
         Update: {
           created_at?: string
           created_by?: string | null
-          customer_name?: string | null
-          customer_phone?: string | null
+          customer_id?: string | null
           discount?: number
           id?: string
           notes?: string | null
@@ -108,7 +132,15 @@ export type Database = {
           total?: number
           transaction_number?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "pos_transactions_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       products: {
         Row: {
