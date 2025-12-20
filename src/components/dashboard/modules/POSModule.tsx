@@ -198,13 +198,29 @@ export const POSModule = () => {
         return;
       }
 
-      // Create transaction
+      // Create customer record if name provided (stores PII separately with restricted access)
+      let customerId: string | null = null;
+      if (customerName) {
+        const { data: customer, error: customerError } = await supabase
+          .from('customers')
+          .insert({
+            name: customerName,
+            phone: customerPhone || null,
+            created_by: user.id
+          })
+          .select()
+          .single();
+
+        if (customerError) throw customerError;
+        customerId = customer.id;
+      }
+
+      // Create transaction (no PII stored here)
       const { data: transaction, error: transactionError } = await supabase
         .from('pos_transactions')
         .insert({
           transaction_number: transactionNumber,
-          customer_name: customerName || null,
-          customer_phone: customerPhone || null,
+          customer_id: customerId,
           subtotal: subtotal,
           discount: 0,
           total: total,
