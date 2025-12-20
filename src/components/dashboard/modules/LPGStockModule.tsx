@@ -46,7 +46,11 @@ interface LPGBrand {
   updated_at: string;
 }
 
-export const LPGStockModule = () => {
+interface LPGStockModuleProps {
+  size?: "22mm" | "20mm";
+}
+
+export const LPGStockModule = ({ size = "22mm" }: LPGStockModuleProps) => {
   const [brands, setBrands] = useState<LPGBrand[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -57,7 +61,7 @@ export const LPGStockModule = () => {
   const [newBrand, setNewBrand] = useState({
     name: "",
     color: "#22c55e",
-    size: "22mm",
+    size: size,
     package_cylinder: 0,
     refill_cylinder: 0,
     empty_cylinder: 0,
@@ -71,6 +75,7 @@ export const LPGStockModule = () => {
         .from("lpg_brands")
         .select("*")
         .eq("is_active", true)
+        .eq("size", size)
         .order("created_at", { ascending: true });
 
       if (error) throw error;
@@ -85,7 +90,7 @@ export const LPGStockModule = () => {
 
   useEffect(() => {
     fetchBrands();
-  }, []);
+  }, [size]);
 
   // Filter brands based on search
   const filteredBrands = brands.filter(brand =>
@@ -134,7 +139,7 @@ export const LPGStockModule = () => {
       setNewBrand({
         name: "",
         color: "#22c55e",
-        size: "22mm",
+        size: size,
         package_cylinder: 0,
         refill_cylinder: 0,
         empty_cylinder: 0,
@@ -258,7 +263,7 @@ export const LPGStockModule = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-foreground">LPG Stock (22mm)</h2>
+          <h2 className="text-2xl font-bold text-foreground">LPG Stock ({size})</h2>
           <p className="text-muted-foreground text-sm">Manage cylinder inventory by brand</p>
         </div>
         

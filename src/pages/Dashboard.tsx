@@ -199,7 +199,9 @@ const Dashboard = () => {
           />
         );
       case "lpg-stock":
-        return <LPGStockModule />;
+        return <LPGStockModule size="22mm" />;
+      case "lpg-stock-20mm":
+        return <LPGStockModule size="20mm" />;
       case "stove-stock":
         return (
           <StoveStockModule
