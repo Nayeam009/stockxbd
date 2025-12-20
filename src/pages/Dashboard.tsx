@@ -199,12 +199,7 @@ const Dashboard = () => {
           />
         );
       case "lpg-stock":
-        return (
-          <LPGStockModule
-            stockData={stockData}
-            setStockData={setStockData}
-          />
-        );
+        return <LPGStockModule />;
       case "stove-stock":
         return (
           <StoveStockModule

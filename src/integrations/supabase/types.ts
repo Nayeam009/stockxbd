@@ -41,6 +41,51 @@ export type Database = {
         }
         Relationships: []
       }
+      lpg_brands: {
+        Row: {
+          color: string
+          created_at: string
+          created_by: string | null
+          empty_cylinder: number
+          id: string
+          is_active: boolean
+          name: string
+          package_cylinder: number
+          problem_cylinder: number
+          refill_cylinder: number
+          size: string
+          updated_at: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          created_by?: string | null
+          empty_cylinder?: number
+          id?: string
+          is_active?: boolean
+          name: string
+          package_cylinder?: number
+          problem_cylinder?: number
+          refill_cylinder?: number
+          size?: string
+          updated_at?: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          created_by?: string | null
+          empty_cylinder?: number
+          id?: string
+          is_active?: boolean
+          name?: string
+          package_cylinder?: number
+          problem_cylinder?: number
+          refill_cylinder?: number
+          size?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       pos_transaction_items: {
         Row: {
           created_at: string

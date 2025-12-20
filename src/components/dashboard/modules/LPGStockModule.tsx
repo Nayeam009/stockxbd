@@ -1,9 +1,8 @@
-import { useState, useMemo } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { 
   Table,
   TableBody,
@@ -12,287 +11,515 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { 
-  AlertTriangle, 
-  Package, 
-  Plus, 
-  Minus,
-  TrendingUp,
-  TrendingDown,
-  CheckCircle,
-  Clock
+  Search,
+  Plus,
+  Trash2,
+  Package,
+  AlertTriangle,
+  Loader2
 } from "lucide-react";
-import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
-import { StockItem } from "@/hooks/useDashboardData";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
-interface LPGStockModuleProps {
-  stockData: StockItem[];
-  setStockData: (data: StockItem[]) => void;
+interface LPGBrand {
+  id: string;
+  name: string;
+  color: string;
+  size: string;
+  package_cylinder: number;
+  refill_cylinder: number;
+  empty_cylinder: number;
+  problem_cylinder: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
-export const LPGStockModule = ({ stockData, setStockData }: LPGStockModuleProps) => {
-  const [selectedItem, setSelectedItem] = useState<string | null>(null);
-  const [adjustmentQuantity, setAdjustmentQuantity] = useState<number>(0);
+export const LPGStockModule = () => {
+  const [brands, setBrands] = useState<LPGBrand[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editingCell, setEditingCell] = useState<{id: string, field: string} | null>(null);
+  
+  const [newBrand, setNewBrand] = useState({
+    name: "",
+    color: "#22c55e",
+    size: "22mm",
+    package_cylinder: 0,
+    refill_cylinder: 0,
+    empty_cylinder: 0,
+    problem_cylinder: 0,
+  });
 
-  // Filter only cylinder stock
-  const cylinderStock = stockData.filter(item => item.type === 'cylinder');
+  // Fetch LPG brands
+  const fetchBrands = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("lpg_brands")
+        .select("*")
+        .eq("is_active", true)
+        .order("created_at", { ascending: true });
 
-  // Calculate analytics
-  const analytics = useMemo(() => {
-    const lowStock = cylinderStock.filter(item => item.currentStock <= item.minStock);
-    const totalValue = cylinderStock.reduce((sum, item) => sum + (item.currentStock * item.price), 0);
-    const totalStock = cylinderStock.reduce((sum, item) => sum + item.currentStock, 0);
-    
-    return {
-      lowStockItems: lowStock.length,
-      totalValue,
-      totalStock,
-      stockHealth: cylinderStock.length > 0 ? 
-        ((cylinderStock.length - lowStock.length) / cylinderStock.length) * 100 : 0
-    };
-  }, [cylinderStock]);
-
-  const getStockStatus = (item: StockItem) => {
-    const percentage = (item.currentStock / item.maxStock) * 100;
-    if (item.currentStock <= item.minStock) return { status: 'critical', color: 'text-destructive', bg: 'bg-destructive/10' };
-    if (percentage <= 30) return { status: 'low', color: 'text-warning', bg: 'bg-warning/10' };
-    if (percentage <= 60) return { status: 'medium', color: 'text-info', bg: 'bg-info/10' };
-    return { status: 'good', color: 'text-accent', bg: 'bg-accent/10' };
+      if (error) throw error;
+      setBrands(data || []);
+    } catch (error: any) {
+      toast.error("Failed to load LPG brands");
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const adjustStock = (itemId: string, adjustment: number, type: 'in' | 'out') => {
-    setStockData(stockData.map(item => {
-      if (item.id === itemId) {
-        const newStock = type === 'in' 
-          ? item.currentStock + adjustment 
-          : Math.max(0, item.currentStock - adjustment);
-        
-        return {
-          ...item,
-          currentStock: newStock,
-          lastUpdated: new Date().toISOString()
-        };
-      }
-      return item;
-    }));
-    setAdjustmentQuantity(0);
-    setSelectedItem(null);
+  useEffect(() => {
+    fetchBrands();
+  }, []);
+
+  // Filter brands based on search
+  const filteredBrands = brands.filter(brand =>
+    brand.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // Calculate totals
+  const totals = filteredBrands.reduce(
+    (acc, brand) => ({
+      package: acc.package + brand.package_cylinder,
+      refill: acc.refill + brand.refill_cylinder,
+      empty: acc.empty + brand.empty_cylinder,
+      problem: acc.problem + brand.problem_cylinder,
+    }),
+    { package: 0, refill: 0, empty: 0, problem: 0 }
+  );
+
+  // Get status based on stock levels
+  const getStatus = (brand: LPGBrand) => {
+    const total = brand.package_cylinder + brand.refill_cylinder;
+    if (total === 0) return { label: "Out of Stock", variant: "destructive" as const };
+    if (brand.problem_cylinder > 10) return { label: "Issues", variant: "secondary" as const };
+    return { label: "In Stock", variant: "default" as const };
   };
+
+  // Add new brand
+  const handleAddBrand = async () => {
+    if (!newBrand.name.trim()) {
+      toast.error("Brand name is required");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      
+      const { error } = await supabase.from("lpg_brands").insert({
+        ...newBrand,
+        created_by: userData.user?.id,
+      });
+
+      if (error) throw error;
+
+      toast.success("Brand added successfully");
+      setIsAddDialogOpen(false);
+      setNewBrand({
+        name: "",
+        color: "#22c55e",
+        size: "22mm",
+        package_cylinder: 0,
+        refill_cylinder: 0,
+        empty_cylinder: 0,
+        problem_cylinder: 0,
+      });
+      fetchBrands();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to add brand");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Update cylinder count
+  const handleUpdateCylinder = async (id: string, field: string, value: number) => {
+    try {
+      const { error } = await supabase
+        .from("lpg_brands")
+        .update({ [field]: value })
+        .eq("id", id);
+
+      if (error) throw error;
+
+      setBrands(prev =>
+        prev.map(brand =>
+          brand.id === id ? { ...brand, [field]: value } : brand
+        )
+      );
+      setEditingCell(null);
+    } catch (error: any) {
+      toast.error("Failed to update");
+      console.error(error);
+    }
+  };
+
+  // Delete brand
+  const handleDeleteBrand = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from("lpg_brands")
+        .update({ is_active: false })
+        .eq("id", id);
+
+      if (error) throw error;
+
+      toast.success("Brand removed");
+      setBrands(prev => prev.filter(brand => brand.id !== id));
+    } catch (error: any) {
+      toast.error("Failed to delete brand");
+    }
+  };
+
+  // Editable cell component
+  const EditableCell = ({ 
+    value, 
+    brandId, 
+    field,
+    isProblem = false 
+  }: { 
+    value: number; 
+    brandId: string; 
+    field: string;
+    isProblem?: boolean;
+  }) => {
+    const [localValue, setLocalValue] = useState(value);
+    const isEditing = editingCell?.id === brandId && editingCell?.field === field;
+
+    useEffect(() => {
+      setLocalValue(value);
+    }, [value]);
+
+    if (isEditing) {
+      return (
+        <Input
+          type="number"
+          value={localValue}
+          onChange={(e) => setLocalValue(parseInt(e.target.value) || 0)}
+          onBlur={() => handleUpdateCylinder(brandId, field, localValue)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              handleUpdateCylinder(brandId, field, localValue);
+            }
+            if (e.key === "Escape") {
+              setEditingCell(null);
+              setLocalValue(value);
+            }
+          }}
+          className="w-20 h-8 text-center bg-background"
+          autoFocus
+          min={0}
+        />
+      );
+    }
+
+    return (
+      <div
+        onClick={() => setEditingCell({ id: brandId, field })}
+        className={`
+          px-3 py-2 rounded-md cursor-pointer transition-colors min-w-[60px] text-center font-medium
+          ${isProblem 
+            ? "bg-destructive/20 text-destructive hover:bg-destructive/30" 
+            : "bg-muted hover:bg-muted/80"
+          }
+        `}
+      >
+        {value}
+      </div>
+    );
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold text-primary">LPG Stock Management</h2>
-          <p className="text-muted-foreground">Real-time tracking of cylinder inventory levels</p>
+          <h2 className="text-2xl font-bold text-foreground">LPG Stock (22mm)</h2>
+          <p className="text-muted-foreground text-sm">Manage cylinder inventory by brand</p>
         </div>
-        <Button variant="outline" className="border-primary text-primary hover:bg-primary hover:text-primary-foreground">
-          <Package className="h-4 w-4 mr-2" />
-          Stock Report
-        </Button>
-      </div>
-
-      {/* Analytics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="border-0 shadow-elegant">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Stock Value
-            </CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-primary">{BANGLADESHI_CURRENCY_SYMBOL}{analytics.totalValue.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">{analytics.totalStock} cylinders in stock</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-0 shadow-elegant">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Stock Health
-            </CardTitle>
-            <CheckCircle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-primary">{analytics.stockHealth.toFixed(0)}%</div>
-            <Progress value={analytics.stockHealth} className="mt-2" />
-          </CardContent>
-        </Card>
-
-        <Card className="border-0 shadow-elegant">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Low Stock Alerts
-            </CardTitle>
-            <AlertTriangle className="h-4 w-4 text-destructive" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-destructive">{analytics.lowStockItems}</div>
-            <p className="text-xs text-muted-foreground">Items below minimum stock</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-0 shadow-elegant">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Last Updated
-            </CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-lg font-bold text-primary">Just now</div>
-            <p className="text-xs text-muted-foreground">Auto-sync enabled</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Stock Items */}
-      <div className="grid gap-6">
-        {cylinderStock.map((item) => {
-          const stockStatus = getStockStatus(item);
-          const stockPercentage = Math.min((item.currentStock / item.maxStock) * 100, 100);
+        
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          <div className="relative flex-1 sm:flex-initial">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search Brands..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 w-full sm:w-64 bg-muted/50"
+            />
+          </div>
           
-          return (
-            <Card key={item.id} className="border-0 shadow-elegant">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="text-lg text-primary">{item.name}</CardTitle>
-                    <CardDescription>
-                      Price: {BANGLADESHI_CURRENCY_SYMBOL}{item.price} | Min: {item.minStock} | Max: {item.maxStock}
-                    </CardDescription>
-                  </div>
-                  <Badge 
-                    variant="secondary" 
-                    className={`${stockStatus.color} ${stockStatus.bg} border-current/20`}
-                  >
-                    {stockStatus.status.toUpperCase()}
-                  </Badge>
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-orange-500 hover:bg-orange-600 text-white shrink-0">
+                <Plus className="h-4 w-4 mr-2" />
+                New Brand
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[500px]">
+              <DialogHeader>
+                <DialogTitle>Add New LPG Brand</DialogTitle>
+                <DialogDescription>
+                  Enter the brand details and initial cylinder counts.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="name" className="text-right">Brand Name</Label>
+                  <Input
+                    id="name"
+                    value={newBrand.name}
+                    onChange={(e) => setNewBrand({ ...newBrand, name: e.target.value })}
+                    className="col-span-3"
+                    placeholder="e.g., Total Energies"
+                  />
                 </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {/* Current Stock Display */}
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-1">
-                      <p className="text-2xl font-bold text-primary">{item.currentStock}</p>
-                      <p className="text-sm text-muted-foreground">Current Stock</p>
-                    </div>
-                    <div className="text-right space-y-1">
-                      <p className="text-lg font-semibold">{BANGLADESHI_CURRENCY_SYMBOL}{(item.currentStock * item.price).toLocaleString()}</p>
-                      <p className="text-sm text-muted-foreground">Total Value</p>
-                    </div>
-                  </div>
-
-                  {/* Progress Bar */}
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Stock Level</span>
-                      <span>{stockPercentage.toFixed(0)}%</span>
-                    </div>
-                    <Progress 
-                      value={stockPercentage} 
-                      className={`h-3 ${
-                        stockStatus.status === 'critical' ? 'bg-destructive/20' :
-                        stockStatus.status === 'low' ? 'bg-warning/20' : 'bg-accent/20'
-                      }`}
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="color" className="text-right">Color</Label>
+                  <div className="col-span-3 flex items-center gap-2">
+                    <input
+                      type="color"
+                      id="color"
+                      value={newBrand.color}
+                      onChange={(e) => setNewBrand({ ...newBrand, color: e.target.value })}
+                      className="w-10 h-10 rounded cursor-pointer"
                     />
+                    <span className="text-sm text-muted-foreground">Brand indicator color</span>
                   </div>
-
-                  {/* Stock Adjustment */}
-                  <div className="flex items-center space-x-2 pt-2 border-t border-border">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        if (selectedItem === item.id) {
-                          setSelectedItem(null);
-                        } else {
-                          setSelectedItem(item.id);
-                          setAdjustmentQuantity(0);
-                        }
-                      }}
-                      className="border-primary text-primary hover:bg-primary hover:text-primary-foreground"
-                    >
-                      {selectedItem === item.id ? 'Cancel' : 'Adjust Stock'}
-                    </Button>
-
-                    {selectedItem === item.id && (
-                      <>
-                        <Input
-                          type="number"
-                          placeholder="Qty"
-                          value={adjustmentQuantity}
-                          onChange={(e) => setAdjustmentQuantity(parseInt(e.target.value) || 0)}
-                          className="w-20"
-                          min="0"
-                        />
-                        <Button
-                          size="sm"
-                          onClick={() => adjustStock(item.id, adjustmentQuantity, 'in')}
-                          disabled={adjustmentQuantity <= 0}
-                          className="bg-accent hover:bg-accent-dark text-accent-foreground"
-                        >
-                          <Plus className="h-4 w-4 mr-1" />
-                          Stock In
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => adjustStock(item.id, adjustmentQuantity, 'out')}
-                          disabled={adjustmentQuantity <= 0 || adjustmentQuantity > item.currentStock}
-                          className="border-warning text-warning hover:bg-warning hover:text-warning-foreground"
-                        >
-                          <Minus className="h-4 w-4 mr-1" />
-                          Stock Out
-                        </Button>
-                      </>
-                    )}
-                  </div>
-
-                  {/* Last Updated */}
-                  <p className="text-xs text-muted-foreground">
-                    Last updated: {new Date(item.lastUpdated).toLocaleString()}
-                  </p>
                 </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-
-      {/* Stock Movement History */}
-      <Card className="border-0 shadow-elegant">
-        <CardHeader>
-          <CardTitle className="text-primary">Recent Stock Movements</CardTitle>
-          <CardDescription>Latest stock in/out activities</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {/* Mock recent activities */}
-            {[
-              { type: 'in', product: '12kg LPG Cylinder', quantity: 50, time: '2 hours ago', staff: 'Manager' },
-              { type: 'out', product: '5kg LPG Cylinder', quantity: 15, time: '3 hours ago', staff: 'Sale - Raj Kumar' },
-              { type: 'out', product: '35kg Commercial Cylinder', quantity: 5, time: '5 hours ago', staff: 'Sale - Suresh Singh' },
-            ].map((activity, index) => (
-              <div key={index} className="flex items-center space-x-3 p-3 bg-surface rounded-lg">
-                <div className={`h-8 w-8 rounded-full flex items-center justify-center ${
-                  activity.type === 'in' ? 'bg-accent/10 text-accent' : 'bg-warning/10 text-warning'
-                }`}>
-                  {activity.type === 'in' ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="package" className="text-right">Package</Label>
+                  <Input
+                    id="package"
+                    type="number"
+                    value={newBrand.package_cylinder}
+                    onChange={(e) => setNewBrand({ ...newBrand, package_cylinder: parseInt(e.target.value) || 0 })}
+                    className="col-span-3"
+                    min={0}
+                  />
                 </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium">
-                    {activity.type === 'in' ? 'Stock In' : 'Stock Out'}: {activity.product}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Quantity: {activity.quantity} | {activity.staff} | {activity.time}
-                  </p>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="refill" className="text-right">Refill</Label>
+                  <Input
+                    id="refill"
+                    type="number"
+                    value={newBrand.refill_cylinder}
+                    onChange={(e) => setNewBrand({ ...newBrand, refill_cylinder: parseInt(e.target.value) || 0 })}
+                    className="col-span-3"
+                    min={0}
+                  />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="empty" className="text-right">Empty</Label>
+                  <Input
+                    id="empty"
+                    type="number"
+                    value={newBrand.empty_cylinder}
+                    onChange={(e) => setNewBrand({ ...newBrand, empty_cylinder: parseInt(e.target.value) || 0 })}
+                    className="col-span-3"
+                    min={0}
+                  />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="problem" className="text-right">Problem</Label>
+                  <Input
+                    id="problem"
+                    type="number"
+                    value={newBrand.problem_cylinder}
+                    onChange={(e) => setNewBrand({ ...newBrand, problem_cylinder: parseInt(e.target.value) || 0 })}
+                    className="col-span-3"
+                    min={0}
+                  />
                 </div>
               </div>
-            ))}
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleAddBrand} disabled={isSubmitting}>
+                  {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  Add Brand
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card className="border-0 shadow-sm bg-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <Package className="h-4 w-4" />
+              Package Cylinders
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold text-primary">{totals.package.toLocaleString()}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-0 shadow-sm bg-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <Package className="h-4 w-4" />
+              Refill Cylinders
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold text-accent">{totals.refill.toLocaleString()}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-0 shadow-sm bg-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <Package className="h-4 w-4" />
+              Empty Cylinders
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold text-muted-foreground">{totals.empty.toLocaleString()}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-0 shadow-sm bg-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-destructive" />
+              Problem Cylinders
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold text-destructive">{totals.problem.toLocaleString()}</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Stock Table */}
+      <Card className="border-0 shadow-sm">
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/50 hover:bg-muted/50">
+                  <TableHead className="w-16 text-muted-foreground">Sl. NO.</TableHead>
+                  <TableHead className="text-muted-foreground">Brand</TableHead>
+                  <TableHead className="text-muted-foreground">Status</TableHead>
+                  <TableHead className="text-center text-muted-foreground">Package cylinder</TableHead>
+                  <TableHead className="text-center text-muted-foreground">Refill cylinder</TableHead>
+                  <TableHead className="text-center text-muted-foreground">Empty cylinder</TableHead>
+                  <TableHead className="text-center text-muted-foreground">Problem Cylinder</TableHead>
+                  <TableHead className="text-center text-muted-foreground">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredBrands.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                      No brands found. Add your first LPG brand.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredBrands.map((brand, index) => {
+                    const status = getStatus(brand);
+                    return (
+                      <TableRow key={brand.id} className="border-b border-border/50">
+                        <TableCell className="font-medium text-muted-foreground">
+                          {String(index + 1).padStart(2, "0")}.
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <div
+                              className="w-3 h-8 rounded-full"
+                              style={{ backgroundColor: brand.color }}
+                            />
+                            <span className="font-medium text-foreground">{brand.name}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge 
+                            variant={status.variant}
+                            className={status.variant === "default" ? "bg-green-500 hover:bg-green-600 text-white" : ""}
+                          >
+                            {status.label}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex justify-center">
+                            <EditableCell
+                              value={brand.package_cylinder}
+                              brandId={brand.id}
+                              field="package_cylinder"
+                            />
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex justify-center">
+                            <EditableCell
+                              value={brand.refill_cylinder}
+                              brandId={brand.id}
+                              field="refill_cylinder"
+                            />
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex justify-center">
+                            <EditableCell
+                              value={brand.empty_cylinder}
+                              brandId={brand.id}
+                              field="empty_cylinder"
+                            />
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex justify-center">
+                            <EditableCell
+                              value={brand.problem_cylinder}
+                              brandId={brand.id}
+                              field="problem_cylinder"
+                              isProblem
+                            />
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDeleteBrand(brand.id)}
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
           </div>
         </CardContent>
       </Card>
