@@ -5,6 +5,7 @@ import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { DashboardOverview } from "@/components/dashboard/modules/DashboardOverview";
 import { DailySalesModule } from "@/components/dashboard/modules/DailySalesModule";
 import { LPGStockModule } from "@/components/dashboard/modules/LPGStockModule";
+import { RegulatorsModule } from "@/components/dashboard/modules/RegulatorsModule";
 import { StoveStockModule } from "@/components/dashboard/modules/StoveStockModule";
 import { OnlineDeliveryModule } from "@/components/dashboard/modules/OnlineDeliveryModule";
 import { SearchModule } from "@/components/dashboard/modules/SearchModule";
@@ -109,17 +110,7 @@ const Dashboard = () => {
           />
         );
       case "regulators":
-        return (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-3xl font-bold text-primary">Regulators Stock</h2>
-              <p className="text-muted-foreground">Manage LPG regulators inventory</p>
-            </div>
-            <div className="text-center py-12 bg-card rounded-lg border border-border">
-              <p className="text-lg text-muted-foreground">Regulators module coming soon...</p>
-            </div>
-          </div>
-        );
+        return <RegulatorsModule />;
       case "exchange":
         return (
           <div className="space-y-6">

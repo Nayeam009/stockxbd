@@ -229,6 +229,39 @@ export type Database = {
         }
         Relationships: []
       }
+      regulators: {
+        Row: {
+          brand: string
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          quantity: number
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          brand: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          quantity?: number
+          type?: string
+          updated_at?: string
+        }
+        Update: {
+          brand?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          quantity?: number
+          type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
