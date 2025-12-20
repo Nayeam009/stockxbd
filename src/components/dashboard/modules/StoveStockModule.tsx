@@ -1,307 +1,455 @@
-import { useState, useMemo } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { 
-  ChefHat, 
-  Plus, 
-  Minus,
-  AlertTriangle,
-  CheckCircle,
-  TrendingUp,
-  TrendingDown
-} from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Plus, Minus, Trash2, Search, ChefHat, Package, DollarSign, AlertTriangle } from "lucide-react";
+import { toast } from "sonner";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
-import { StockItem } from "@/hooks/useDashboardData";
 
-interface StoveStockModuleProps {
-  stockData: StockItem[];
-  setStockData: (data: StockItem[]) => void;
+interface Stove {
+  id: string;
+  brand: string;
+  model: string;
+  burners: number;
+  quantity: number;
+  price: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
-export const StoveStockModule = ({ stockData, setStockData }: StoveStockModuleProps) => {
-  const [selectedItem, setSelectedItem] = useState<string | null>(null);
-  const [adjustmentQuantity, setAdjustmentQuantity] = useState<number>(0);
+export const StoveStockModule = () => {
+  const [stoves, setStoves] = useState<Stove[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [newStove, setNewStove] = useState({
+    brand: "",
+    model: "",
+    burners: 2,
+    quantity: 0,
+    price: 0,
+  });
 
-  // Filter only stove stock
-  const stoveStock = stockData.filter(item => item.type === 'stove');
+  const fetchStoves = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("stoves")
+        .select("*")
+        .eq("is_active", true)
+        .order("brand", { ascending: true })
+        .order("burners", { ascending: true });
 
-  // Calculate analytics
-  const analytics = useMemo(() => {
-    const lowStock = stoveStock.filter(item => item.currentStock <= item.minStock);
-    const totalValue = stoveStock.reduce((sum, item) => sum + (item.currentStock * item.price), 0);
-    const totalStock = stoveStock.reduce((sum, item) => sum + item.currentStock, 0);
-    
-    return {
-      lowStockItems: lowStock.length,
-      totalValue,
-      totalStock,
-      stockHealth: stoveStock.length > 0 ? 
-        ((stoveStock.length - lowStock.length) / stoveStock.length) * 100 : 0
-    };
-  }, [stoveStock]);
-
-  const getStockStatus = (item: StockItem) => {
-    const percentage = (item.currentStock / item.maxStock) * 100;
-    if (item.currentStock <= item.minStock) return { status: 'critical', color: 'text-destructive', bg: 'bg-destructive/10' };
-    if (percentage <= 30) return { status: 'low', color: 'text-warning', bg: 'bg-warning/10' };
-    if (percentage <= 60) return { status: 'medium', color: 'text-info', bg: 'bg-info/10' };
-    return { status: 'good', color: 'text-accent', bg: 'bg-accent/10' };
+      if (error) throw error;
+      setStoves(data || []);
+    } catch (error) {
+      console.error("Error fetching stoves:", error);
+      toast.error("Failed to load stoves");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const adjustStock = (itemId: string, adjustment: number, type: 'in' | 'out') => {
-    setStockData(stockData.map(item => {
-      if (item.id === itemId) {
-        const newStock = type === 'in' 
-          ? item.currentStock + adjustment 
-          : Math.max(0, item.currentStock - adjustment);
-        
-        return {
-          ...item,
-          currentStock: newStock,
-          lastUpdated: new Date().toISOString()
-        };
-      }
-      return item;
-    }));
-    setAdjustmentQuantity(0);
-    setSelectedItem(null);
+  useEffect(() => {
+    fetchStoves();
+  }, []);
+
+  // Filter stoves based on search
+  const filteredStoves = stoves.filter(
+    (stove) =>
+      stove.brand.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      stove.model.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // Calculate summary stats
+  const totalQuantity = stoves.reduce((sum, s) => sum + s.quantity, 0);
+  const totalValue = stoves.reduce((sum, s) => sum + s.quantity * s.price, 0);
+  const inStockCount = stoves.filter((s) => s.quantity > 10).length;
+  const lowStockCount = stoves.filter((s) => s.quantity > 0 && s.quantity <= 10).length;
+  const outOfStockCount = stoves.filter((s) => s.quantity === 0).length;
+
+  const getStatus = (quantity: number) => {
+    if (quantity === 0) return { label: "Out of Stock", color: "destructive" };
+    if (quantity <= 10) return { label: "Low Stock", color: "warning" };
+    return { label: "In Stock", color: "success" };
   };
+
+  const handleAddStove = async () => {
+    if (!newStove.brand.trim() || !newStove.model.trim()) {
+      toast.error("Please enter brand and model");
+      return;
+    }
+
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const { error } = await supabase.from("stoves").insert({
+        brand: newStove.brand.trim(),
+        model: newStove.model.trim(),
+        burners: newStove.burners,
+        quantity: newStove.quantity,
+        price: newStove.price,
+        created_by: userData.user?.id,
+      });
+
+      if (error) throw error;
+
+      toast.success("Stove added successfully");
+      setNewStove({ brand: "", model: "", burners: 2, quantity: 0, price: 0 });
+      setIsAddDialogOpen(false);
+      fetchStoves();
+    } catch (error) {
+      console.error("Error adding stove:", error);
+      toast.error("Failed to add stove");
+    }
+  };
+
+  const handleUpdateQuantity = async (id: string, change: number) => {
+    const stove = stoves.find((s) => s.id === id);
+    if (!stove) return;
+
+    const newQuantity = Math.max(0, stove.quantity + change);
+
+    try {
+      const { error } = await supabase
+        .from("stoves")
+        .update({ quantity: newQuantity })
+        .eq("id", id);
+
+      if (error) throw error;
+
+      setStoves((prev) =>
+        prev.map((s) => (s.id === id ? { ...s, quantity: newQuantity } : s))
+      );
+      toast.success("Quantity updated");
+    } catch (error) {
+      console.error("Error updating quantity:", error);
+      toast.error("Failed to update quantity");
+    }
+  };
+
+  const handleDeleteStove = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from("stoves")
+        .update({ is_active: false })
+        .eq("id", id);
+
+      if (error) throw error;
+
+      setStoves((prev) => prev.filter((s) => s.id !== id));
+      toast.success("Stove removed");
+    } catch (error) {
+      console.error("Error deleting stove:", error);
+      toast.error("Failed to remove stove");
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <Card className="bg-card border-border">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-primary/10">
+                <Package className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-foreground">{totalQuantity}</p>
+                <p className="text-xs text-muted-foreground">Total Stoves</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-card border-border">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-blue-500/10">
+                <DollarSign className="h-5 w-5 text-blue-500" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-foreground">{BANGLADESHI_CURRENCY_SYMBOL}{totalValue.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">Total Value</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-card border-border">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-green-500/10">
+                <ChefHat className="h-5 w-5 text-green-500" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-foreground">{inStockCount}</p>
+                <p className="text-xs text-muted-foreground">In Stock</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-card border-border">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-yellow-500/10">
+                <AlertTriangle className="h-5 w-5 text-yellow-500" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-foreground">{lowStockCount}</p>
+                <p className="text-xs text-muted-foreground">Low Stock</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-card border-border">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-destructive/10">
+                <ChefHat className="h-5 w-5 text-destructive" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-foreground">{outOfStockCount}</p>
+                <p className="text-xs text-muted-foreground">Out of Stock</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Header with Search and Add Button */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold text-primary">LPG Gas Stove Stock Management</h2>
-          <p className="text-muted-foreground">Manage inventory of LPG gas stoves and accessories</p>
+          <h2 className="text-2xl font-bold text-foreground">Gas Stove Stock</h2>
+          <p className="text-muted-foreground text-sm">Manage gas stove inventory by brand and model</p>
         </div>
-        <Button variant="outline" className="border-secondary text-secondary hover:bg-secondary hover:text-secondary-foreground">
-          <ChefHat className="h-4 w-4 mr-2" />
-          Stove Report
-        </Button>
-      </div>
 
-      {/* Analytics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="border-0 shadow-elegant">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Stove Value
-            </CardTitle>
-            <ChefHat className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-secondary">{BANGLADESHI_CURRENCY_SYMBOL}{analytics.totalValue.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">{analytics.totalStock} stoves in stock</p>
-          </CardContent>
-        </Card>
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          <div className="relative flex-1 sm:w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search stoves..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 bg-background border-border"
+            />
+          </div>
 
-        <Card className="border-0 shadow-elegant">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Stock Health
-            </CardTitle>
-            <CheckCircle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-secondary">{analytics.stockHealth.toFixed(0)}%</div>
-            <Progress value={analytics.stockHealth} className="mt-2" />
-          </CardContent>
-        </Card>
-
-        <Card className="border-0 shadow-elegant">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Low Stock Alerts
-            </CardTitle>
-            <AlertTriangle className="h-4 w-4 text-destructive" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-destructive">{analytics.lowStockItems}</div>
-            <p className="text-xs text-muted-foreground">Items below minimum stock</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-0 shadow-elegant">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Models Available
-            </CardTitle>
-            <CheckCircle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-secondary">{stoveStock.length}</div>
-            <p className="text-xs text-muted-foreground">Different stove models</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Stove Stock Items */}
-      <div className="grid gap-6">
-        {stoveStock.map((item) => {
-          const stockStatus = getStockStatus(item);
-          const stockPercentage = Math.min((item.currentStock / item.maxStock) * 100, 100);
-          
-          return (
-            <Card key={item.id} className="border-0 shadow-elegant">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="text-lg text-secondary flex items-center">
-                      <ChefHat className="h-5 w-5 mr-2" />
-                      {item.name}
-                    </CardTitle>
-                    <CardDescription>
-                      Price: {BANGLADESHI_CURRENCY_SYMBOL}{item.price.toLocaleString()} | Min: {item.minStock} | Max: {item.maxStock}
-                    </CardDescription>
-                  </div>
-                  <Badge 
-                    variant="secondary" 
-                    className={`${stockStatus.color} ${stockStatus.bg} border-current/20`}
-                  >
-                    {stockStatus.status.toUpperCase()}
-                  </Badge>
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="gap-2 whitespace-nowrap">
+                <Plus className="h-4 w-4" />
+                Add New Stove
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="bg-card border-border">
+              <DialogHeader>
+                <DialogTitle>Add New Stove</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label>Brand Name</Label>
+                  <Input
+                    placeholder="e.g., Walton, RFL, Minister"
+                    value={newStove.brand}
+                    onChange={(e) =>
+                      setNewStove({ ...newStove, brand: e.target.value })
+                    }
+                    className="bg-background border-border"
+                  />
                 </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {/* Current Stock Display */}
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-1">
-                      <p className="text-2xl font-bold text-secondary">{item.currentStock}</p>
-                      <p className="text-sm text-muted-foreground">Units Available</p>
-                    </div>
-                    <div className="text-right space-y-1">
-                      <p className="text-lg font-semibold">{BANGLADESHI_CURRENCY_SYMBOL}{(item.currentStock * item.price).toLocaleString()}</p>
-                      <p className="text-sm text-muted-foreground">Inventory Value</p>
-                    </div>
-                  </div>
-
-                  {/* Progress Bar */}
+                <div className="space-y-2">
+                  <Label>Model</Label>
+                  <Input
+                    placeholder="e.g., WGS-2B100"
+                    value={newStove.model}
+                    onChange={(e) =>
+                      setNewStove({ ...newStove, model: e.target.value })
+                    }
+                    className="bg-background border-border"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Burners</Label>
+                  <Select
+                    value={newStove.burners.toString()}
+                    onValueChange={(value) =>
+                      setNewStove({ ...newStove, burners: parseInt(value) })
+                    }
+                  >
+                    <SelectTrigger className="bg-background border-border">
+                      <SelectValue placeholder="Select burners" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">1 Burner</SelectItem>
+                      <SelectItem value="2">2 Burners</SelectItem>
+                      <SelectItem value="3">3 Burners</SelectItem>
+                      <SelectItem value="4">4 Burners</SelectItem>
+                      <SelectItem value="5">5 Burners</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Stock Level</span>
-                      <span>{stockPercentage.toFixed(0)}%</span>
-                    </div>
-                    <Progress 
-                      value={stockPercentage} 
-                      className={`h-3 ${
-                        stockStatus.status === 'critical' ? 'bg-destructive/20' :
-                        stockStatus.status === 'low' ? 'bg-warning/20' : 'bg-secondary/20'
-                      }`}
+                    <Label>Price ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={newStove.price}
+                      onChange={(e) =>
+                        setNewStove({
+                          ...newStove,
+                          price: parseFloat(e.target.value) || 0,
+                        })
+                      }
+                      className="bg-background border-border"
                     />
                   </div>
-
-                  {/* Stock Features */}
-                  <div className="grid grid-cols-2 gap-4 p-3 bg-surface rounded-lg">
-                    <div className="text-center">
-                      <p className="text-lg font-semibold text-secondary">{item.name.includes('2') ? '2' : item.name.includes('3') ? '3' : '4'}</p>
-                      <p className="text-xs text-muted-foreground">Burners</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-lg font-semibold text-secondary">
-                        {item.name.includes('2') ? 'Compact' : item.name.includes('3') ? 'Medium' : 'Large'}
-                      </p>
-                      <p className="text-xs text-muted-foreground">Size</p>
-                    </div>
+                  <div className="space-y-2">
+                    <Label>Initial Quantity</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={newStove.quantity}
+                      onChange={(e) =>
+                        setNewStove({
+                          ...newStove,
+                          quantity: parseInt(e.target.value) || 0,
+                        })
+                      }
+                      className="bg-background border-border"
+                    />
                   </div>
-
-                  {/* Stock Adjustment */}
-                  <div className="flex items-center space-x-2 pt-2 border-t border-border">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        if (selectedItem === item.id) {
-                          setSelectedItem(null);
-                        } else {
-                          setSelectedItem(item.id);
-                          setAdjustmentQuantity(0);
-                        }
-                      }}
-                      className="border-secondary text-secondary hover:bg-secondary hover:text-secondary-foreground"
-                    >
-                      {selectedItem === item.id ? 'Cancel' : 'Adjust Stock'}
-                    </Button>
-
-                    {selectedItem === item.id && (
-                      <>
-                        <Input
-                          type="number"
-                          placeholder="Qty"
-                          value={adjustmentQuantity}
-                          onChange={(e) => setAdjustmentQuantity(parseInt(e.target.value) || 0)}
-                          className="w-20"
-                          min="0"
-                        />
-                        <Button
-                          size="sm"
-                          onClick={() => adjustStock(item.id, adjustmentQuantity, 'in')}
-                          disabled={adjustmentQuantity <= 0}
-                          className="bg-accent hover:bg-accent-dark text-accent-foreground"
-                        >
-                          <Plus className="h-4 w-4 mr-1" />
-                          Add
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => adjustStock(item.id, adjustmentQuantity, 'out')}
-                          disabled={adjustmentQuantity <= 0 || adjustmentQuantity > item.currentStock}
-                          className="border-warning text-warning hover:bg-warning hover:text-warning-foreground"
-                        >
-                          <Minus className="h-4 w-4 mr-1" />
-                          Remove
-                        </Button>
-                      </>
-                    )}
-                  </div>
-
-                  {/* Last Updated */}
-                  <p className="text-xs text-muted-foreground">
-                    Last updated: {new Date(item.lastUpdated).toLocaleString()}
-                  </p>
                 </div>
-              </CardContent>
-            </Card>
-          );
-        })}
+                <Button onClick={handleAddStove} className="w-full">
+                  Add Stove
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
-      {/* Recent Stove Activities */}
-      <Card className="border-0 shadow-elegant">
-        <CardHeader>
-          <CardTitle className="text-secondary">Recent Stove Activities</CardTitle>
-          <CardDescription>Latest stove inventory movements</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {[
-              { type: 'sale', product: '3 Burner Gas Stove', quantity: 2, customer: 'Priya Singh', time: '1 hour ago' },
-              { type: 'in', product: '2 Burner Gas Stove', quantity: 10, supplier: 'ABC Appliances', time: '4 hours ago' },
-              { type: 'sale', product: '4 Burner Gas Stove', quantity: 1, customer: 'Rohit Gupta', time: '6 hours ago' },
-            ].map((activity, index) => (
-              <div key={index} className="flex items-center space-x-3 p-3 bg-surface rounded-lg">
-                <div className={`h-8 w-8 rounded-full flex items-center justify-center ${
-                  activity.type === 'in' ? 'bg-accent/10 text-accent' : 'bg-secondary/10 text-secondary'
-                }`}>
-                  {activity.type === 'in' ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium">
-                    {activity.type === 'in' ? 'Stock In' : 'Sale'}: {activity.product}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Quantity: {activity.quantity} | {activity.type === 'in' ? activity.supplier : activity.customer} | {activity.time}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
+      {/* Stoves Table */}
+      <Card className="bg-card border-border overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow className="border-border hover:bg-transparent">
+              <TableHead className="text-muted-foreground font-medium">Brand</TableHead>
+              <TableHead className="text-muted-foreground font-medium">Model</TableHead>
+              <TableHead className="text-muted-foreground font-medium">Burners</TableHead>
+              <TableHead className="text-muted-foreground font-medium">Price</TableHead>
+              <TableHead className="text-muted-foreground font-medium">Quantity</TableHead>
+              <TableHead className="text-muted-foreground font-medium">Status</TableHead>
+              <TableHead className="text-muted-foreground font-medium text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredStoves.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  {searchQuery ? "No stoves found matching your search" : "No stoves added yet"}
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredStoves.map((stove) => {
+                const status = getStatus(stove.quantity);
+                return (
+                  <TableRow key={stove.id} className="border-border">
+                    <TableCell className="font-medium text-foreground">
+                      {stove.brand}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {stove.model}
+                    </TableCell>
+                    <TableCell className="text-foreground">
+                      {stove.burners} Burner{stove.burners > 1 ? 's' : ''}
+                    </TableCell>
+                    <TableCell className="text-foreground">
+                      {BANGLADESHI_CURRENCY_SYMBOL}{stove.price.toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-foreground font-semibold">
+                      {stove.quantity}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant="outline"
+                        className={
+                          status.color === "success"
+                            ? "bg-green-500/20 text-green-500 border-green-500/30"
+                            : status.color === "warning"
+                            ? "bg-yellow-500/20 text-yellow-500 border-yellow-500/30"
+                            : "bg-destructive/20 text-destructive border-destructive/30"
+                        }
+                      >
+                        {status.label}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8 border-border hover:bg-primary/10 hover:text-primary"
+                          onClick={() => handleUpdateQuantity(stove.id, 1)}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8 border-border hover:bg-primary/10 hover:text-primary"
+                          onClick={() => handleUpdateQuantity(stove.id, -1)}
+                        >
+                          <Minus className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8 border-border hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30"
+                          onClick={() => handleDeleteStove(stove.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
+            )}
+          </TableBody>
+        </Table>
       </Card>
     </div>
   );

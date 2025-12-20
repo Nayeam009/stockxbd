@@ -262,6 +262,45 @@ export type Database = {
         }
         Relationships: []
       }
+      stoves: {
+        Row: {
+          brand: string
+          burners: number
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          model: string
+          price: number
+          quantity: number
+          updated_at: string
+        }
+        Insert: {
+          brand: string
+          burners?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          model: string
+          price?: number
+          quantity?: number
+          updated_at?: string
+        }
+        Update: {
+          brand?: string
+          burners?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          model?: string
+          price?: number
+          quantity?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string

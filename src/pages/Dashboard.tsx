@@ -194,12 +194,7 @@ const Dashboard = () => {
       case "lpg-stock-20mm":
         return <LPGStockModule size="20mm" />;
       case "stove-stock":
-        return (
-          <StoveStockModule
-            stockData={stockData}
-            setStockData={setStockData}
-          />
-        );
+        return <StoveStockModule />;
       case "driver-sales":
         return (
           <DailySalesModule
