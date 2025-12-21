@@ -137,7 +137,7 @@ export const POSModule = () => {
     const brand = lpgBrands.find(b => b.id === sellingBrand);
     if (!brand) return;
 
-    const returnBrandName = returnBrand ? lpgBrands.find(b => b.id === returnBrand)?.name : undefined;
+    const returnBrandName = returnBrand && returnBrand !== "none" ? lpgBrands.find(b => b.id === returnBrand)?.name : undefined;
     
     const newItem: SaleItem = {
       id: `lpg-${Date.now()}`,
@@ -499,7 +499,7 @@ export const POSModule = () => {
                           <SelectValue placeholder="Select or type brand..." />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">None</SelectItem>
+                          <SelectItem value="none">None</SelectItem>
                           {filteredBrands.map(brand => (
                             <SelectItem key={brand.id} value={brand.id}>
                               <div className="flex items-center gap-2">
