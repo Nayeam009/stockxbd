@@ -198,8 +198,16 @@ export const DailySalesModule = ({ salesData, setSalesData }: DailySalesModulePr
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Staff</SelectItem>
-                  {Array.from(new Set(salesData.map(s => s.staffName))).map(staff => (
-                    <SelectItem key={staff} value={staff}>{staff}</SelectItem>
+                  {Array.from(
+                    new Set(
+                      salesData
+                        .map((s) => s.staffName.trim())
+                        .filter((s) => s.length > 0)
+                    )
+                  ).map((staff) => (
+                    <SelectItem key={staff} value={staff}>
+                      {staff}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>

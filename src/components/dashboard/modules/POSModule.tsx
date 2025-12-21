@@ -251,7 +251,7 @@ export const POSModule = () => {
       const transactionNumber = txnNum || `TXN-${Date.now()}`;
 
       // Create or get customer
-      let customerId = selectedCustomerId;
+      let customerId = selectedCustomerId === "walkin" ? null : selectedCustomerId;
       if (!customerId && customerName.trim()) {
         const { data: customer, error } = await supabase
           .from('customers')
@@ -710,20 +710,29 @@ export const POSModule = () => {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label>Customer Name</Label>
-                <Select value={selectedCustomerId || ""} onValueChange={(v) => {
-                  if (v) {
-                    setSelectedCustomerId(v);
-                    const customer = customers.find(c => c.id === v);
-                    if (customer) setCustomerName(customer.name);
-                  } else {
-                    setSelectedCustomerId(null);
-                  }
-                }}>
+                <Select
+                  value={selectedCustomerId || ""}
+                  onValueChange={(v) => {
+                    if (v === "walkin") {
+                      setSelectedCustomerId("walkin");
+                      setCustomerName("");
+                      return;
+                    }
+
+                    if (v) {
+                      setSelectedCustomerId(v);
+                      const customer = customers.find((c) => c.id === v);
+                      if (customer) setCustomerName(customer.name);
+                    } else {
+                      setSelectedCustomerId(null);
+                    }
+                  }}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select or type customer name..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Walk-in Customer</SelectItem>
+                    <SelectItem value="walkin">Walk-in Customer</SelectItem>
                     {customers.map(customer => (
                       <SelectItem key={customer.id} value={customer.id}>
                         {customer.name} {customer.phone && `(${customer.phone})`}
@@ -732,7 +741,7 @@ export const POSModule = () => {
                   </SelectContent>
                 </Select>
               </div>
-              {!selectedCustomerId && (
+              {(selectedCustomerId === null || selectedCustomerId === "walkin") && (
                 <Input
                   placeholder="Or type new customer name..."
                   value={customerName}
