@@ -3,285 +3,333 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { 
   Plus, 
   Minus, 
   Trash2, 
   ShoppingCart, 
   Printer, 
-  CreditCard,
-  Banknote,
-  Smartphone,
-  Search,
-  X,
-  Check,
-  Receipt,
-  Loader2
+  Loader2,
+  FileText,
+  Clock,
+  X
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
 import { supabase } from "@/integrations/supabase/client";
 
-interface Product {
+interface LPGBrand {
   id: string;
   name: string;
-  category: string;
-  price: number;
-  stock_quantity: number;
-  unit: string;
+  size: string;
+  refill_cylinder: number;
+  package_cylinder: number;
+  color: string;
 }
 
-interface CartItem extends Product {
+interface Stove {
+  id: string;
+  brand: string;
+  model: string;
+  burners: number;
+  price: number;
   quantity: number;
 }
 
-const categoryMap: Record<string, string> = {
-  'lpg_cylinder': 'LPG Cylinder',
-  'stove': 'Gas Stove',
-  'regulator': 'Regulator',
-  'accessory': 'Accessories'
-};
+interface Regulator {
+  id: string;
+  brand: string;
+  type: string;
+  quantity: number;
+}
 
-const paymentMethodMap: Record<string, string> = {
-  'Cash': 'cash',
-  'bKash': 'bkash',
-  'Nagad': 'nagad',
-  'Rocket': 'rocket',
-  'Card': 'card',
-  'Bank Transfer': 'card'
-};
+interface Customer {
+  id: string;
+  name: string;
+  phone: string | null;
+}
 
-const categories = ["All", "LPG Cylinder", "Gas Stove", "Regulator", "Accessories"];
+interface SaleItem {
+  id: string;
+  type: 'lpg' | 'stove' | 'regulator';
+  name: string;
+  details: string;
+  price: number;
+  quantity: number;
+  returnBrand?: string;
+}
+
+const lpgWeights = ["5.5", "12", "22.7", "35"];
+const mouthSizes = ["20mm", "22mm"];
 
 export const POSModule = () => {
-  const [products, setProducts] = useState<Product[]>([]);
+  const [activeTab, setActiveTab] = useState("lpg");
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState("All");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [showReceiptModal, setShowReceiptModal] = useState(false);
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("");
+  
+  // LPG form state
+  const [cylinderType, setCylinderType] = useState<"refill" | "package">("refill");
+  const [saleType, setSaleType] = useState<"retail" | "wholesale">("retail");
+  const [sellingBrand, setSellingBrand] = useState("");
+  const [returnBrand, setReturnBrand] = useState("");
+  const [weight, setWeight] = useState("");
+  const [mouthSize, setMouthSize] = useState("22mm");
+  const [price, setPrice] = useState("0");
+  const [quantity, setQuantity] = useState("1");
+  
+  // Stove/Regulator state
+  const [selectedStove, setSelectedStove] = useState("");
+  const [stoveQuantity, setStoveQuantity] = useState("1");
+  const [selectedRegulator, setSelectedRegulator] = useState("");
+  const [regulatorQuantity, setRegulatorQuantity] = useState("1");
+  
+  // Data
+  const [lpgBrands, setLpgBrands] = useState<LPGBrand[]>([]);
+  const [stoves, setStoves] = useState<Stove[]>([]);
+  const [regulators, setRegulators] = useState<Regulator[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  
+  // Cart & Customer
+  const [saleItems, setSaleItems] = useState<SaleItem[]>([]);
   const [customerName, setCustomerName] = useState("");
-  const [customerPhone, setCustomerPhone] = useState("");
-  const [receivedAmount, setReceivedAmount] = useState("");
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+  const [discount, setDiscount] = useState("0");
+  
+  // Receipt
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [lastReceipt, setLastReceipt] = useState<any>(null);
 
-  // Fetch products from database
   useEffect(() => {
-    const fetchProducts = async () => {
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .eq('is_active', true)
-        .order('category', { ascending: true });
+    const fetchData = async () => {
+      setLoading(true);
+      
+      const [brandsRes, stovesRes, regulatorsRes, customersRes] = await Promise.all([
+        supabase.from('lpg_brands').select('*').eq('is_active', true),
+        supabase.from('stoves').select('*').eq('is_active', true),
+        supabase.from('regulators').select('*').eq('is_active', true),
+        supabase.from('customers').select('*').order('name')
+      ]);
 
-      if (error) {
-        toast({ title: "Error loading products", description: error.message, variant: "destructive" });
-      } else {
-        setProducts(data.map(p => ({
-          id: p.id,
-          name: p.name,
-          category: categoryMap[p.category] || p.category,
-          price: Number(p.price),
-          stock_quantity: p.stock_quantity,
-          unit: p.unit
-        })));
-      }
+      if (brandsRes.data) setLpgBrands(brandsRes.data);
+      if (stovesRes.data) setStoves(stovesRes.data);
+      if (regulatorsRes.data) setRegulators(regulatorsRes.data);
+      if (customersRes.data) setCustomers(customersRes.data);
+      
       setLoading(false);
     };
 
-    fetchProducts();
-
-    // Subscribe to real-time updates
-    const channel = supabase
-      .channel('products-changes')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'products' },
-        (payload) => {
-          if (payload.eventType === 'UPDATE') {
-            const updated = payload.new as any;
-            setProducts(prev => prev.map(p => 
-              p.id === updated.id 
-                ? { ...p, stock_quantity: updated.stock_quantity, price: Number(updated.price) }
-                : p
-            ));
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    fetchData();
   }, []);
 
-  const filteredProducts = products.filter(product => {
-    const matchesCategory = selectedCategory === "All" || product.category === selectedCategory;
-    const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesSearch;
-  });
+  const filteredBrands = lpgBrands.filter(b => b.size === mouthSize);
 
-  const addToCart = (product: Product) => {
-    const existingItem = cart.find(item => item.id === product.id);
-    if (existingItem) {
-      if (existingItem.quantity >= product.stock_quantity) {
-        toast({ title: "Stock limit reached", variant: "destructive" });
-        return;
-      }
-      setCart(cart.map(item =>
-        item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
-      ));
-    } else {
-      setCart([...cart, { ...product, quantity: 1 }]);
-    }
-  };
-
-  const updateQuantity = (productId: string, change: number) => {
-    setCart(cart.map(item => {
-      if (item.id === productId) {
-        const newQuantity = item.quantity + change;
-        if (newQuantity <= 0) return item;
-        if (newQuantity > item.stock_quantity) {
-          toast({ title: "Stock limit reached", variant: "destructive" });
-          return item;
-        }
-        return { ...item, quantity: newQuantity };
-      }
-      return item;
-    }).filter(item => item.quantity > 0));
-  };
-
-  const removeFromCart = (productId: string) => {
-    setCart(cart.filter(item => item.id !== productId));
-  };
-
-  const clearCart = () => {
-    setCart([]);
-    setCustomerName("");
-    setCustomerPhone("");
-  };
-
-  const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const tax = 0; // No VAT for LPG in Bangladesh
-  const total = subtotal + tax;
-
-  const handlePayment = async () => {
-    if (!selectedPaymentMethod) {
-      toast({ title: "Please select a payment method", variant: "destructive" });
+  const addLPGToSale = () => {
+    if (!sellingBrand || !weight || !price || parseInt(quantity) < 1) {
+      toast({ title: "Please fill all required fields", variant: "destructive" });
       return;
     }
 
-    const received = parseFloat(receivedAmount) || 0;
-    if (selectedPaymentMethod === "Cash" && received < total) {
-      toast({ title: "Insufficient amount received", variant: "destructive" });
+    const brand = lpgBrands.find(b => b.id === sellingBrand);
+    if (!brand) return;
+
+    const returnBrandName = returnBrand ? lpgBrands.find(b => b.id === returnBrand)?.name : undefined;
+    
+    const newItem: SaleItem = {
+      id: `lpg-${Date.now()}`,
+      type: 'lpg',
+      name: `${brand.name} - ${cylinderType === 'refill' ? 'Refill' : 'Package'}`,
+      details: `${weight}kg, ${mouthSize}, ${saleType}${returnBrandName ? `, Return: ${returnBrandName}` : ''}`,
+      price: parseFloat(price),
+      quantity: parseInt(quantity),
+      returnBrand: returnBrandName
+    };
+
+    setSaleItems([...saleItems, newItem]);
+    
+    // Reset form
+    setSellingBrand("");
+    setReturnBrand("");
+    setWeight("");
+    setPrice("0");
+    setQuantity("1");
+    
+    toast({ title: "Added to sale" });
+  };
+
+  const addStoveToSale = () => {
+    if (!selectedStove || parseInt(stoveQuantity) < 1) {
+      toast({ title: "Please select a stove", variant: "destructive" });
+      return;
+    }
+
+    const stove = stoves.find(s => s.id === selectedStove);
+    if (!stove) return;
+
+    const newItem: SaleItem = {
+      id: `stove-${Date.now()}`,
+      type: 'stove',
+      name: `${stove.brand} ${stove.model}`,
+      details: `${stove.burners} Burner`,
+      price: stove.price,
+      quantity: parseInt(stoveQuantity)
+    };
+
+    setSaleItems([...saleItems, newItem]);
+    setSelectedStove("");
+    setStoveQuantity("1");
+    
+    toast({ title: "Added to sale" });
+  };
+
+  const addRegulatorToSale = () => {
+    if (!selectedRegulator || parseInt(regulatorQuantity) < 1) {
+      toast({ title: "Please select a regulator", variant: "destructive" });
+      return;
+    }
+
+    const regulator = regulators.find(r => r.id === selectedRegulator);
+    if (!regulator) return;
+
+    const newItem: SaleItem = {
+      id: `reg-${Date.now()}`,
+      type: 'regulator',
+      name: regulator.brand,
+      details: regulator.type,
+      price: 0, // Can set price manually
+      quantity: parseInt(regulatorQuantity)
+    };
+
+    setSaleItems([...saleItems, newItem]);
+    setSelectedRegulator("");
+    setRegulatorQuantity("1");
+    
+    toast({ title: "Added to sale" });
+  };
+
+  const removeItem = (id: string) => {
+    setSaleItems(saleItems.filter(item => item.id !== id));
+  };
+
+  const updateItemQuantity = (id: string, change: number) => {
+    setSaleItems(saleItems.map(item => {
+      if (item.id === id) {
+        const newQty = item.quantity + change;
+        if (newQty < 1) return item;
+        return { ...item, quantity: newQty };
+      }
+      return item;
+    }));
+  };
+
+  const subtotal = saleItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const discountAmount = parseFloat(discount) || 0;
+  const total = Math.max(0, subtotal - discountAmount);
+
+  const handleCompleteSale = async (paymentStatus: 'completed' | 'pending') => {
+    if (saleItems.length === 0) {
+      toast({ title: "No items in sale", variant: "destructive" });
       return;
     }
 
     setProcessing(true);
 
     try {
-      // Generate transaction number
-      const { data: txnNumData, error: txnNumError } = await supabase.rpc('generate_transaction_number');
-      if (txnNumError) throw txnNumError;
-
-      const transactionNumber = txnNumData || `TXN-${Date.now()}`;
-
-      // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        toast({ title: "Please log in to complete transaction", variant: "destructive" });
+        toast({ title: "Please log in", variant: "destructive" });
         setProcessing(false);
         return;
       }
 
-      // Create customer record if name provided (stores PII separately with restricted access)
-      let customerId: string | null = null;
-      if (customerName) {
-        const { data: customer, error: customerError } = await supabase
+      // Generate transaction number
+      const { data: txnNum } = await supabase.rpc('generate_transaction_number');
+      const transactionNumber = txnNum || `TXN-${Date.now()}`;
+
+      // Create or get customer
+      let customerId = selectedCustomerId;
+      if (!customerId && customerName.trim()) {
+        const { data: customer, error } = await supabase
           .from('customers')
-          .insert({
-            name: customerName,
-            phone: customerPhone || null,
-            created_by: user.id
-          })
+          .insert({ name: customerName.trim(), created_by: user.id })
           .select()
           .single();
-
-        if (customerError) throw customerError;
-        customerId = customer.id;
+        
+        if (!error && customer) customerId = customer.id;
       }
 
-      // Create transaction (no PII stored here)
-      const { data: transaction, error: transactionError } = await supabase
+      // Create transaction
+      const { data: transaction, error: txnError } = await supabase
         .from('pos_transactions')
         .insert({
           transaction_number: transactionNumber,
           customer_id: customerId,
-          subtotal: subtotal,
-          discount: 0,
-          total: total,
-          payment_method: paymentMethodMap[selectedPaymentMethod] as any,
-          payment_status: 'completed',
+          subtotal,
+          discount: discountAmount,
+          total,
+          payment_method: 'cash' as const,
+          payment_status: paymentStatus,
           created_by: user.id
         })
         .select()
         .single();
 
-      if (transactionError) throw transactionError;
+      if (txnError) throw txnError;
 
-      // Insert transaction items
-      const transactionItems = cart.map(item => ({
-        transaction_id: transaction.id,
-        product_id: item.id,
-        product_name: item.name,
-        quantity: item.quantity,
-        unit_price: item.price,
-        total_price: item.price * item.quantity,
-        created_by: user.id
-      }));
+      // Get first product for items (simplified - in production, map properly)
+      const { data: defaultProduct } = await supabase
+        .from('products')
+        .select('id')
+        .limit(1)
+        .single();
 
-      const { error: itemsError } = await supabase
-        .from('pos_transaction_items')
-        .insert(transactionItems);
+      // Insert items
+      if (transaction && defaultProduct) {
+        const items = saleItems.map(item => ({
+          transaction_id: transaction.id,
+          product_id: defaultProduct.id,
+          product_name: `${item.name} - ${item.details}`,
+          quantity: item.quantity,
+          unit_price: item.price,
+          total_price: item.price * item.quantity,
+          created_by: user.id
+        }));
 
-      if (itemsError) throw itemsError;
-
-      // Update stock quantities
-      for (const item of cart) {
-        const { error: stockError } = await supabase
-          .from('products')
-          .update({ stock_quantity: item.stock_quantity - item.quantity })
-          .eq('id', item.id);
-
-        if (stockError) throw stockError;
+        await supabase.from('pos_transaction_items').insert(items);
       }
 
-      // Generate receipt
+      // Create receipt
       const receipt = {
         id: transactionNumber,
         date: new Date().toLocaleString('en-BD'),
         customer: customerName || "Walk-in Customer",
-        phone: customerPhone || "-",
-        items: cart,
+        items: saleItems,
         subtotal,
-        tax,
+        discount: discountAmount,
         total,
-        paymentMethod: selectedPaymentMethod,
-        received: received || total,
-        change: Math.max(0, received - total),
+        status: paymentStatus === 'completed' ? 'Paid' : 'Due'
       };
 
       setLastReceipt(receipt);
-      setShowPaymentModal(false);
       setShowReceiptModal(true);
+      
+      // Clear form
+      setSaleItems([]);
+      setCustomerName("");
+      setSelectedCustomerId(null);
+      setDiscount("0");
 
-      toast({ title: "Payment successful!", description: `Invoice: ${receipt.id}` });
+      toast({ 
+        title: paymentStatus === 'completed' ? "Sale completed!" : "Saved as due",
+        description: `Invoice: ${transactionNumber}`
+      });
+
     } catch (error: any) {
-      toast({ title: "Payment failed", description: error.message, variant: "destructive" });
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     } finally {
       setProcessing(false);
     }
@@ -297,15 +345,14 @@ export const POSModule = () => {
             body { font-family: 'Courier New', monospace; width: 80mm; margin: 0; padding: 10px; font-size: 12px; }
             .header { text-align: center; border-bottom: 1px dashed #000; padding-bottom: 10px; margin-bottom: 10px; }
             .header h1 { margin: 0; font-size: 18px; }
-            .header p { margin: 2px 0; font-size: 10px; }
-            .info { margin-bottom: 10px; }
             .info p { margin: 2px 0; }
             table { width: 100%; border-collapse: collapse; margin: 10px 0; }
-            th, td { text-align: left; padding: 2px 0; }
+            th, td { text-align: left; padding: 4px 0; font-size: 11px; }
             th:last-child, td:last-child { text-align: right; }
             .totals { border-top: 1px dashed #000; padding-top: 10px; }
-            .totals p { display: flex; justify-content: space-between; margin: 2px 0; }
+            .totals p { display: flex; justify-content: space-between; margin: 4px 0; }
             .total-row { font-weight: bold; font-size: 14px; }
+            .status { text-align: center; font-weight: bold; margin-top: 10px; padding: 5px; border: 1px solid #000; }
             .footer { text-align: center; margin-top: 15px; border-top: 1px dashed #000; padding-top: 10px; font-size: 10px; }
           </style>
         </head>
@@ -313,18 +360,15 @@ export const POSModule = () => {
           <div class="header">
             <h1>Stock-X LPG</h1>
             <p>LPG Dealer & Distributor</p>
-            <p>Dhaka, Bangladesh</p>
-            <p>Phone: 01XXXXXXXXX</p>
           </div>
           <div class="info">
             <p><strong>Invoice:</strong> ${lastReceipt.id}</p>
             <p><strong>Date:</strong> ${lastReceipt.date}</p>
             <p><strong>Customer:</strong> ${lastReceipt.customer}</p>
-            <p><strong>Phone:</strong> ${lastReceipt.phone}</p>
           </div>
           <table>
-            <tr><th>Item</th><th>Qty</th><th>Price</th><th>Total</th></tr>
-            ${lastReceipt.items.map((item: CartItem) => `
+            <tr><th>Item</th><th>Qty</th><th>Rate</th><th>Total</th></tr>
+            ${lastReceipt.items.map((item: SaleItem) => `
               <tr>
                 <td>${item.name}</td>
                 <td>${item.quantity}</td>
@@ -335,14 +379,13 @@ export const POSModule = () => {
           </table>
           <div class="totals">
             <p><span>Subtotal:</span><span>${BANGLADESHI_CURRENCY_SYMBOL}${lastReceipt.subtotal}</span></p>
+            ${lastReceipt.discount > 0 ? `<p><span>Discount:</span><span>-${BANGLADESHI_CURRENCY_SYMBOL}${lastReceipt.discount}</span></p>` : ''}
             <p class="total-row"><span>Total:</span><span>${BANGLADESHI_CURRENCY_SYMBOL}${lastReceipt.total}</span></p>
-            <p><span>Payment:</span><span>${lastReceipt.paymentMethod}</span></p>
-            <p><span>Received:</span><span>${BANGLADESHI_CURRENCY_SYMBOL}${lastReceipt.received}</span></p>
-            ${lastReceipt.change > 0 ? `<p><span>Change:</span><span>${BANGLADESHI_CURRENCY_SYMBOL}${lastReceipt.change}</span></p>` : ''}
           </div>
+          <div class="status">${lastReceipt.status}</div>
           <div class="footer">
             <p>Thank you for your business!</p>
-            <p>ধন্যবাদ আপনার ক্রয়ের জন্য</p>
+            <p>ধন্যবাদ!</p>
           </div>
         </body>
       </html>
@@ -352,7 +395,6 @@ export const POSModule = () => {
     if (printWindow) {
       printWindow.document.write(receiptContent);
       printWindow.document.close();
-      printWindow.focus();
       setTimeout(() => {
         printWindow.print();
         printWindow.close();
@@ -360,314 +402,447 @@ export const POSModule = () => {
     }
   };
 
-  const completeTransaction = () => {
-    clearCart();
-    setShowReceiptModal(false);
-    setLastReceipt(null);
-    setSelectedPaymentMethod("");
-    setReceivedAmount("");
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <span className="ml-2 text-muted-foreground">Loading products...</span>
+        <span className="ml-2 text-muted-foreground">Loading...</span>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h2 className="text-3xl font-bold text-primary">Point of Sale</h2>
-          <p className="text-muted-foreground">Quick sales and billing system</p>
-        </div>
+      <div>
+        <h2 className="text-3xl font-bold text-foreground">Point of Sale</h2>
+        <p className="text-muted-foreground">Quick sales and billing system</p>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
-        {/* Products Section */}
+        {/* Left Side - Product Entry */}
         <div className="lg:col-span-2 space-y-4">
-          {/* Search and Categories */}
-          <Card className="border-0 shadow-elegant">
-            <CardContent className="p-4">
-              <div className="flex flex-col sm:flex-row gap-4">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search products..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-                <div className="flex gap-2 flex-wrap">
-                  {categories.map(category => (
-                    <Button
-                      key={category}
-                      variant={selectedCategory === category ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setSelectedCategory(category)}
-                    >
-                      {category}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          {/* Tabs */}
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-3 bg-muted">
+              <TabsTrigger value="lpg" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                LPG Cylinder
+              </TabsTrigger>
+              <TabsTrigger value="stove" className="data-[state=active]:bg-muted-foreground/20">
+                Gas Stove
+              </TabsTrigger>
+              <TabsTrigger value="regulator" className="data-[state=active]:bg-muted-foreground/20">
+                Regulator
+              </TabsTrigger>
+            </TabsList>
 
-          {/* Product Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-            {filteredProducts.map(product => (
-              <Card
-                key={product.id}
-                className="border border-border hover:border-primary/40 hover:shadow-lg transition-all duration-200 cursor-pointer group"
-                onClick={() => addToCart(product)}
-              >
-                <CardContent className="p-4 text-center">
-                  <div className="h-12 w-12 mx-auto mb-3 bg-primary/10 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <ShoppingCart className="h-6 w-6 text-primary" />
+            {/* LPG Cylinder Tab */}
+            <TabsContent value="lpg">
+              <Card className="border-0 shadow-lg">
+                <CardHeader>
+                  <CardTitle className="text-xl">Add LPG Cylinder Sale</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Cylinder Type & Sale Type */}
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <div className="space-y-3">
+                      <Label className="text-sm font-medium">Cylinder Type</Label>
+                      <RadioGroup value={cylinderType} onValueChange={(v) => setCylinderType(v as "refill" | "package")} className="flex gap-4">
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="refill" id="refill" className="text-primary border-primary" />
+                          <Label htmlFor="refill" className="cursor-pointer">Refill</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="package" id="package" />
+                          <Label htmlFor="package" className="cursor-pointer">Package</Label>
+                        </div>
+                      </RadioGroup>
+                    </div>
+                    <div className="space-y-3">
+                      <Label className="text-sm font-medium">Sale Type</Label>
+                      <RadioGroup value={saleType} onValueChange={(v) => setSaleType(v as "retail" | "wholesale")} className="flex gap-4">
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="retail" id="retail" className="text-primary border-primary" />
+                          <Label htmlFor="retail" className="cursor-pointer">Retail</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="wholesale" id="wholesale" />
+                          <Label htmlFor="wholesale" className="cursor-pointer">Wholesale</Label>
+                        </div>
+                      </RadioGroup>
+                    </div>
                   </div>
-                  <h3 className="font-medium text-sm text-foreground line-clamp-2 mb-1">{product.name}</h3>
-                  <p className="text-lg font-bold text-primary">{BANGLADESHI_CURRENCY_SYMBOL}{product.price}</p>
-                  <Badge variant={product.stock_quantity > 10 ? "secondary" : "destructive"} className="mt-2 text-xs">
-                    Stock: {product.stock_quantity}
-                  </Badge>
+
+                  {/* Brand Selection */}
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Selling Brand</Label>
+                      <Select value={sellingBrand} onValueChange={setSellingBrand}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select or type brand..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {filteredBrands.map(brand => (
+                            <SelectItem key={brand.id} value={brand.id}>
+                              <div className="flex items-center gap-2">
+                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: brand.color }} />
+                                {brand.name}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Return Brand (Optional)</Label>
+                      <Select value={returnBrand} onValueChange={setReturnBrand}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select or type brand..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">None</SelectItem>
+                          {filteredBrands.map(brand => (
+                            <SelectItem key={brand.id} value={brand.id}>
+                              <div className="flex items-center gap-2">
+                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: brand.color }} />
+                                {brand.name}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {/* Weight, Size, Price, Quantity */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="space-y-2">
+                      <Label>Weight (kg)</Label>
+                      <Select value={weight} onValueChange={setWeight}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select weight" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {lpgWeights.map(w => (
+                            <SelectItem key={w} value={w}>{w} kg</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Mouth Size</Label>
+                      <Select value={mouthSize} onValueChange={setMouthSize}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select size" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {mouthSizes.map(s => (
+                            <SelectItem key={s} value={s}>{s}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Price</Label>
+                      <Input 
+                        type="number" 
+                        value={price} 
+                        onChange={(e) => setPrice(e.target.value)}
+                        placeholder="0"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Quantity</Label>
+                      <Input 
+                        type="number" 
+                        value={quantity} 
+                        onChange={(e) => setQuantity(e.target.value)}
+                        min="1"
+                      />
+                    </div>
+                  </div>
+
+                  <Button 
+                    onClick={addLPGToSale} 
+                    className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add to Sale
+                  </Button>
                 </CardContent>
               </Card>
-            ))}
-          </div>
-        </div>
+            </TabsContent>
 
-        {/* Cart Section */}
-        <div className="space-y-4">
-          <Card className="border-0 shadow-elegant sticky top-4">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center justify-between text-primary">
-                <div className="flex items-center gap-2">
-                  <ShoppingCart className="h-5 w-5" />
-                  Cart ({cart.length})
-                </div>
-                {cart.length > 0 && (
-                  <Button variant="ghost" size="sm" onClick={clearCart}>
-                    <Trash2 className="h-4 w-4" />
+            {/* Gas Stove Tab */}
+            <TabsContent value="stove">
+              <Card className="border-0 shadow-lg">
+                <CardHeader>
+                  <CardTitle className="text-xl">Add Gas Stove Sale</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Select Stove</Label>
+                      <Select value={selectedStove} onValueChange={setSelectedStove}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select stove..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {stoves.map(stove => (
+                            <SelectItem key={stove.id} value={stove.id}>
+                              {stove.brand} {stove.model} ({stove.burners} Burner) - {BANGLADESHI_CURRENCY_SYMBOL}{stove.price}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Quantity</Label>
+                      <Input 
+                        type="number" 
+                        value={stoveQuantity} 
+                        onChange={(e) => setStoveQuantity(e.target.value)}
+                        min="1"
+                      />
+                    </div>
+                  </div>
+                  <Button onClick={addStoveToSale} className="w-full bg-primary hover:bg-primary/90">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add to Sale
                   </Button>
-                )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Regulator Tab */}
+            <TabsContent value="regulator">
+              <Card className="border-0 shadow-lg">
+                <CardHeader>
+                  <CardTitle className="text-xl">Add Regulator Sale</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Select Regulator</Label>
+                      <Select value={selectedRegulator} onValueChange={setSelectedRegulator}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select regulator..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {regulators.map(reg => (
+                            <SelectItem key={reg.id} value={reg.id}>
+                              {reg.brand} ({reg.type})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Quantity</Label>
+                      <Input 
+                        type="number" 
+                        value={regulatorQuantity} 
+                        onChange={(e) => setRegulatorQuantity(e.target.value)}
+                        min="1"
+                      />
+                    </div>
+                  </div>
+                  <Button onClick={addRegulatorToSale} className="w-full bg-primary hover:bg-primary/90">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add to Sale
+                  </Button>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+
+          {/* Sale Items */}
+          <Card className="border-0 shadow-lg">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ShoppingCart className="h-5 w-5" />
+                Sale Items
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Customer Info */}
-              <div className="space-y-2">
-                <Input
-                  placeholder="Customer Name (optional)"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                />
-                <Input
-                  placeholder="Phone Number (optional)"
-                  value={customerPhone}
-                  onChange={(e) => setCustomerPhone(e.target.value)}
-                />
-              </div>
-
-              {/* Cart Items */}
-              <div className="max-h-[300px] overflow-y-auto space-y-3">
-                {cart.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-8">Cart is empty</p>
-                ) : (
-                  cart.map(item => (
-                    <div key={item.id} className="flex items-center justify-between p-3 bg-surface rounded-lg">
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm truncate">{item.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {BANGLADESHI_CURRENCY_SYMBOL}{item.price} × {item.quantity}
-                        </p>
+            <CardContent>
+              {saleItems.length === 0 ? (
+                <p className="text-center text-muted-foreground py-8">No items added yet</p>
+              ) : (
+                <div className="space-y-3">
+                  {saleItems.map(item => (
+                    <div key={item.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                      <div className="flex-1">
+                        <p className="font-medium">{item.name}</p>
+                        <p className="text-sm text-muted-foreground">{item.details}</p>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => updateQuantity(item.id, -1)}
-                        >
-                          <Minus className="h-3 w-3" />
-                        </Button>
-                        <span className="w-8 text-center font-medium">{item.quantity}</span>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => updateQuantity(item.id, 1)}
-                        >
-                          <Plus className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-destructive"
-                          onClick={() => removeFromCart(item.id)}
-                        >
-                          <X className="h-3 w-3" />
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
+                          <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => updateItemQuantity(item.id, -1)}>
+                            <Minus className="h-3 w-3" />
+                          </Button>
+                          <span className="w-8 text-center font-medium">{item.quantity}</span>
+                          <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => updateItemQuantity(item.id, 1)}>
+                            <Plus className="h-3 w-3" />
+                          </Button>
+                        </div>
+                        <span className="font-bold w-24 text-right">
+                          {BANGLADESHI_CURRENCY_SYMBOL}{item.price * item.quantity}
+                        </span>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => removeItem(item.id)}>
+                          <X className="h-4 w-4" />
                         </Button>
                       </div>
                     </div>
-                  ))
-                )}
-              </div>
-
-              {/* Totals */}
-              {cart.length > 0 && (
-                <div className="border-t border-border pt-4 space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Subtotal</span>
-                    <span>{BANGLADESHI_CURRENCY_SYMBOL}{subtotal.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between text-lg font-bold">
-                    <span>Total</span>
-                    <span className="text-primary">{BANGLADESHI_CURRENCY_SYMBOL}{total.toLocaleString()}</span>
-                  </div>
-                  <Button
-                    className="w-full mt-4"
-                    size="lg"
-                    onClick={() => setShowPaymentModal(true)}
-                  >
-                    <CreditCard className="h-5 w-5 mr-2" />
-                    Proceed to Payment
-                  </Button>
+                  ))}
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Right Side - Customer & Summary */}
+        <div className="space-y-4">
+          {/* Customer */}
+          <Card className="border-0 shadow-lg">
+            <CardHeader>
+              <CardTitle>Customer</CardTitle>
+              <p className="text-sm text-muted-foreground">Select an existing customer or type a new name.</p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Customer Name</Label>
+                <Select value={selectedCustomerId || ""} onValueChange={(v) => {
+                  if (v) {
+                    setSelectedCustomerId(v);
+                    const customer = customers.find(c => c.id === v);
+                    if (customer) setCustomerName(customer.name);
+                  } else {
+                    setSelectedCustomerId(null);
+                  }
+                }}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select or type customer name..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Walk-in Customer</SelectItem>
+                    {customers.map(customer => (
+                      <SelectItem key={customer.id} value={customer.id}>
+                        {customer.name} {customer.phone && `(${customer.phone})`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {!selectedCustomerId && (
+                <Input
+                  placeholder="Or type new customer name..."
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                />
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Summary */}
+          <Card className="border-0 shadow-lg">
+            <CardHeader>
+              <CardTitle>Summary & Actions</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-3">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Subtotal</span>
+                  <span className="font-medium">{BANGLADESHI_CURRENCY_SYMBOL}{subtotal.toFixed(2)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label className="text-muted-foreground">Discount</Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      value={discount}
+                      onChange={(e) => setDiscount(e.target.value)}
+                      className="w-24 text-right"
+                      min="0"
+                    />
+                    <span className="text-muted-foreground">{BANGLADESHI_CURRENCY_SYMBOL}</span>
+                  </div>
+                </div>
+                <div className="border-t pt-3 flex justify-between">
+                  <span className="text-lg font-bold">Total</span>
+                  <span className="text-lg font-bold text-primary">{BANGLADESHI_CURRENCY_SYMBOL}{total.toFixed(2)}</span>
+                </div>
+              </div>
+
+              <div className="space-y-3 pt-4">
+                <Button 
+                  onClick={() => handleCompleteSale('completed')}
+                  className="w-full bg-primary hover:bg-primary/90"
+                  disabled={processing || saleItems.length === 0}
+                >
+                  {processing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <FileText className="h-4 w-4 mr-2" />}
+                  Complete Sale (Paid)
+                </Button>
+                <Button 
+                  onClick={() => handleCompleteSale('pending')}
+                  variant="secondary"
+                  className="w-full bg-amber-500 hover:bg-amber-600 text-white"
+                  disabled={processing || saleItems.length === 0}
+                >
+                  <Clock className="h-4 w-4 mr-2" />
+                  Save as Due (Unpaid)
+                </Button>
+                <Button 
+                  variant="outline"
+                  className="w-full"
+                  disabled={saleItems.length === 0}
+                  onClick={() => {
+                    // Just show print preview without completing
+                    setLastReceipt({
+                      id: 'PREVIEW',
+                      date: new Date().toLocaleString('en-BD'),
+                      customer: customerName || "Walk-in Customer",
+                      items: saleItems,
+                      subtotal,
+                      discount: discountAmount,
+                      total,
+                      status: 'Preview'
+                    });
+                    printReceipt();
+                  }}
+                >
+                  <Printer className="h-4 w-4 mr-2" />
+                  Print Memo
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>
       </div>
 
-      {/* Payment Modal */}
-      <Dialog open={showPaymentModal} onOpenChange={setShowPaymentModal}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-primary">Payment</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="text-center py-4 bg-surface rounded-lg">
-              <p className="text-sm text-muted-foreground">Total Amount</p>
-              <p className="text-3xl font-bold text-primary">{BANGLADESHI_CURRENCY_SYMBOL}{total.toLocaleString()}</p>
-            </div>
-
-            <div className="space-y-2">
-              <p className="text-sm font-medium">Select Payment Method</p>
-              <div className="grid grid-cols-2 gap-2">
-                {["Cash", "bKash", "Nagad", "Rocket", "Bank Transfer", "Card"].map(method => (
-                  <Button
-                    key={method}
-                    variant={selectedPaymentMethod === method ? "default" : "outline"}
-                    className="justify-start"
-                    onClick={() => setSelectedPaymentMethod(method)}
-                  >
-                    {method === "Cash" && <Banknote className="h-4 w-4 mr-2" />}
-                    {(method === "bKash" || method === "Nagad" || method === "Rocket") && <Smartphone className="h-4 w-4 mr-2" />}
-                    {(method === "Bank Transfer" || method === "Card") && <CreditCard className="h-4 w-4 mr-2" />}
-                    {method}
-                  </Button>
-                ))}
-              </div>
-            </div>
-
-            {selectedPaymentMethod === "Cash" && (
-              <div className="space-y-2">
-                <p className="text-sm font-medium">Amount Received</p>
-                <Input
-                  type="number"
-                  placeholder="Enter amount received"
-                  value={receivedAmount}
-                  onChange={(e) => setReceivedAmount(e.target.value)}
-                />
-                {receivedAmount && parseFloat(receivedAmount) >= total && (
-                  <p className="text-sm text-green-600 font-medium">
-                    Change: {BANGLADESHI_CURRENCY_SYMBOL}{(parseFloat(receivedAmount) - total).toLocaleString()}
-                  </p>
-                )}
-              </div>
-            )}
-
-            <Button 
-              className="w-full" 
-              size="lg" 
-              onClick={handlePayment}
-              disabled={processing}
-            >
-              {processing ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Processing...
-                </>
-              ) : (
-                <>
-                  <Check className="h-4 w-4 mr-2" />
-                  Complete Payment
-                </>
-              )}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
       {/* Receipt Modal */}
       <Dialog open={showReceiptModal} onOpenChange={setShowReceiptModal}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-primary">
-              <Receipt className="h-5 w-5" />
-              Transaction Complete
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-primary" />
+              Sale Complete
             </DialogTitle>
           </DialogHeader>
           {lastReceipt && (
             <div className="space-y-4">
-              <div className="bg-surface rounded-lg p-4 space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Invoice</span>
-                  <span className="font-medium">{lastReceipt.id}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Date</span>
-                  <span>{lastReceipt.date}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Customer</span>
-                  <span>{lastReceipt.customer}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Items</span>
-                  <span>{lastReceipt.items.length}</span>
-                </div>
-                <div className="border-t border-border pt-2 mt-2">
-                  <div className="flex justify-between text-lg font-bold">
-                    <span>Total</span>
-                    <span className="text-primary">{BANGLADESHI_CURRENCY_SYMBOL}{lastReceipt.total.toLocaleString()}</span>
-                  </div>
-                </div>
-                <div className="flex justify-between text-green-600">
-                  <span>Paid via</span>
-                  <span className="font-medium">{lastReceipt.paymentMethod}</span>
-                </div>
-                {lastReceipt.change > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Change</span>
-                    <span>{BANGLADESHI_CURRENCY_SYMBOL}{lastReceipt.change.toLocaleString()}</span>
-                  </div>
-                )}
+              <div className="text-center py-4">
+                <Badge variant={lastReceipt.status === 'Paid' ? 'default' : 'secondary'} className="text-lg px-4 py-2">
+                  {lastReceipt.status}
+                </Badge>
+                <p className="mt-2 text-2xl font-bold">{BANGLADESHI_CURRENCY_SYMBOL}{lastReceipt.total}</p>
+                <p className="text-sm text-muted-foreground">Invoice: {lastReceipt.id}</p>
               </div>
-
-              <div className="flex gap-2">
-                <Button variant="outline" className="flex-1" onClick={printReceipt}>
+              <div className="flex gap-3">
+                <Button onClick={printReceipt} className="flex-1">
                   <Printer className="h-4 w-4 mr-2" />
                   Print Receipt
                 </Button>
-                <Button className="flex-1" onClick={completeTransaction}>
-                  <Check className="h-4 w-4 mr-2" />
-                  New Sale
+                <Button variant="outline" onClick={() => setShowReceiptModal(false)} className="flex-1">
+                  Close
                 </Button>
               </div>
             </div>

@@ -10,6 +10,7 @@ import { StoveStockModule } from "@/components/dashboard/modules/StoveStockModul
 import { OnlineDeliveryModule } from "@/components/dashboard/modules/OnlineDeliveryModule";
 import { SearchModule } from "@/components/dashboard/modules/SearchModule";
 import { POSModule } from "@/components/dashboard/modules/POSModule";
+import { CommunityModule } from "@/components/dashboard/modules/CommunityModule";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -203,31 +204,7 @@ const Dashboard = () => {
           />
         );
       case "community":
-        return (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-3xl font-bold text-primary">LPG Community Management</h2>
-              <p className="text-muted-foreground">Manage customer database and community activities</p>
-            </div>
-            <div className="grid gap-6">
-              {customers.slice(0, 10).map((customer) => (
-                <div key={customer.id} className="p-4 bg-background rounded-lg border border-border shadow-elegant">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="font-semibold text-foreground">{customer.name}</h3>
-                      <p className="text-sm text-muted-foreground">{customer.phone}</p>
-                      <p className="text-sm text-muted-foreground">{customer.address}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-medium">{customer.totalOrders} orders</p>
-                      <p className="text-sm text-muted-foreground">₹{customer.outstanding} outstanding</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
+        return <CommunityModule />;
       case "staff-salary":
         return (
           <div className="space-y-6">
