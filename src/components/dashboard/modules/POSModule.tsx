@@ -711,7 +711,7 @@ export const POSModule = () => {
               <div className="space-y-2">
                 <Label>Customer Name</Label>
                 <Select
-                  value={selectedCustomerId || ""}
+                  value={selectedCustomerId || "walkin"}
                   onValueChange={(v) => {
                     if (v === "walkin") {
                       setSelectedCustomerId("walkin");
