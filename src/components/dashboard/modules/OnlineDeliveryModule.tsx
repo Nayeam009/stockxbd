@@ -1,8 +1,9 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { 
   Table,
   TableBody,
@@ -18,6 +19,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { 
   ShoppingCart, 
   Plus, 
@@ -26,11 +33,13 @@ import {
   Phone,
   CheckCircle,
   Clock,
-  AlertCircle,
+  Loader2,
   Search
 } from "lucide-react";
 import { Order } from "@/hooks/useDashboardData";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface OnlineDeliveryModuleProps {
   orders: Order[];
@@ -43,77 +52,60 @@ export const OnlineDeliveryModule = ({ orders, setOrders, drivers, userRole }: O
   const [filterStatus, setFilterStatus] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
 
-  // Mock orders data since orders is empty from the hook
-  const mockOrders: Order[] = [
-    {
-      id: "ORD001",
-      customerId: "cust-1",
-      customerName: "Abdul Rahman",
-      items: [{ productId: "1", productName: "12kg LPG Cylinder", quantity: 2, price: 1200 }],
-      totalAmount: 2400,
-      status: "pending",
-      paymentStatus: "pending",
-      deliveryAddress: "Dhanmondi, Dhaka",
-      orderDate: new Date().toISOString(),
-    },
-    {
-      id: "ORD002",
-      customerId: "cust-2",
-      customerName: "Rashida Begum",
-      items: [{ productId: "4", productName: "2 Burner Gas Stove", quantity: 1, price: 4500 }],
-      totalAmount: 4500,
-      status: "dispatched",
-      paymentStatus: "paid",
-      deliveryAddress: "Gulshan, Dhaka",
-      driverId: "1",
-      orderDate: new Date(Date.now() - 86400000).toISOString(),
-    },
-    {
-      id: "ORD003",
-      customerId: "cust-3",
-      customerName: "Mohammad Karim",
-      items: [{ productId: "2", productName: "12kg LPG Cylinder", quantity: 3, price: 1200 }],
-      totalAmount: 3600,
-      status: "delivered",
-      paymentStatus: "paid",
-      deliveryAddress: "Uttara, Dhaka",
-      driverId: "2",
-      orderDate: new Date(Date.now() - 172800000).toISOString(),
-      deliveryDate: new Date(Date.now() - 86400000).toISOString(),
-    },
-  ];
+  // New order form state
+  const [newOrder, setNewOrder] = useState({
+    customerName: "",
+    customerId: "",
+    deliveryAddress: "",
+    productId: "",
+    productName: "",
+    quantity: 1,
+    price: 0
+  });
 
-  const allOrders = orders.length ? orders : mockOrders;
+  useEffect(() => {
+    const fetchFormData = async () => {
+      const [customersRes, productsRes] = await Promise.all([
+        supabase.from('customers').select('id, name, address').order('name'),
+        supabase.from('products').select('id, name, price').eq('is_active', true)
+      ]);
+      if (customersRes.data) setCustomers(customersRes.data);
+      if (productsRes.data) setProducts(productsRes.data);
+    };
+    fetchFormData();
+  }, []);
 
   // Filter orders
   const filteredOrders = useMemo(() => {
-    return allOrders.filter(order => {
+    return orders.filter(order => {
       if (filterStatus !== "all" && order.status !== filterStatus) return false;
       if (searchQuery && !order.customerName.toLowerCase().includes(searchQuery.toLowerCase()) && 
-          !order.id.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+          !order.orderNumber?.toLowerCase().includes(searchQuery.toLowerCase())) return false;
       if (userRole === 'driver') {
-        // Driver can only see their own orders
-        return order.driverId === "1"; // Assuming current driver ID is 1
+        return order.driverId === drivers[0]?.id;
       }
       return true;
     });
-  }, [allOrders, filterStatus, searchQuery, userRole]);
+  }, [orders, filterStatus, searchQuery, userRole, drivers]);
 
   // Analytics
   const analytics = useMemo(() => {
     const today = new Date().toISOString().split('T')[0];
-    const todayOrders = allOrders.filter(order => order.orderDate.startsWith(today));
+    const todayOrders = orders.filter(order => order.orderDate?.startsWith(today));
     
     return {
-      totalOrders: allOrders.length,
-      pendingOrders: allOrders.filter(o => o.status === 'pending').length,
-      dispatchedOrders: allOrders.filter(o => o.status === 'dispatched').length,
-      deliveredOrders: allOrders.filter(o => o.status === 'delivered').length,
+      totalOrders: orders.length,
+      pendingOrders: orders.filter(o => o.status === 'pending').length,
+      dispatchedOrders: orders.filter(o => o.status === 'dispatched').length,
+      deliveredOrders: orders.filter(o => o.status === 'delivered').length,
       todayOrders: todayOrders.length,
       todayRevenue: todayOrders.reduce((sum, order) => sum + order.totalAmount, 0),
     };
-  }, [allOrders]);
+  }, [orders]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -135,18 +127,122 @@ export const OnlineDeliveryModule = ({ orders, setOrders, drivers, userRole }: O
     }
   };
 
-  const updateOrderStatus = (orderId: string, newStatus: string) => {
-    const updatedOrders = allOrders.map(order => {
-      if (order.id === orderId) {
-        return {
-          ...order,
-          status: newStatus as any,
-          deliveryDate: newStatus === 'delivered' ? new Date().toISOString() : order.deliveryDate
-        };
+  const handleCreateOrder = async () => {
+    if (!newOrder.customerName || !newOrder.deliveryAddress || !newOrder.productName) {
+      toast.error("Please fill all required fields");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error("Not authenticated");
+
+      // Generate order number
+      const { data: orderNum } = await supabase.rpc('generate_order_number');
+      const orderNumber = orderNum || `ORD-${Date.now()}`;
+
+      // Create order
+      const { data: order, error } = await supabase
+        .from('orders')
+        .insert({
+          order_number: orderNumber,
+          customer_id: newOrder.customerId || null,
+          customer_name: newOrder.customerName,
+          delivery_address: newOrder.deliveryAddress,
+          total_amount: newOrder.price * newOrder.quantity,
+          status: 'pending',
+          payment_status: 'pending',
+          created_by: userData.user.id
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Create order item
+      if (order) {
+        await supabase.from('order_items').insert({
+          order_id: order.id,
+          product_id: newOrder.productId || null,
+          product_name: newOrder.productName,
+          quantity: newOrder.quantity,
+          price: newOrder.price
+        });
       }
-      return order;
-    });
-    setOrders(updatedOrders);
+
+      toast.success(`Order ${orderNumber} created successfully`);
+      setShowAddForm(false);
+      setNewOrder({
+        customerName: "",
+        customerId: "",
+        deliveryAddress: "",
+        productId: "",
+        productName: "",
+        quantity: 1,
+        price: 0
+      });
+
+      // Refresh orders
+      const { data: updatedOrders } = await supabase
+        .from('orders')
+        .select(`*, order_items (*)`)
+        .order('created_at', { ascending: false });
+
+      if (updatedOrders) {
+        const formatted = updatedOrders.map(o => ({
+          id: o.id,
+          orderNumber: o.order_number,
+          customerId: o.customer_id || '',
+          customerName: o.customer_name,
+          items: (o.order_items || []).map((item: any) => ({
+            productId: item.product_id || '',
+            productName: item.product_name,
+            quantity: item.quantity,
+            price: Number(item.price)
+          })),
+          totalAmount: Number(o.total_amount),
+          status: o.status as Order['status'],
+          paymentStatus: o.payment_status as Order['paymentStatus'],
+          deliveryAddress: o.delivery_address,
+          driverId: o.driver_id,
+          orderDate: o.order_date,
+          deliveryDate: o.delivery_date
+        }));
+        setOrders(formatted);
+      }
+
+    } catch (error: any) {
+      toast.error(error.message || "Failed to create order");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateOrderStatus = async (orderId: string, newStatus: string) => {
+    try {
+      const updateData: any = { status: newStatus };
+      if (newStatus === 'delivered') {
+        updateData.delivery_date = new Date().toISOString();
+      }
+
+      const { error } = await supabase
+        .from('orders')
+        .update(updateData)
+        .eq('id', orderId);
+
+      if (error) throw error;
+
+      setOrders(orders.map(order => 
+        order.id === orderId 
+          ? { ...order, status: newStatus as any, deliveryDate: newStatus === 'delivered' ? new Date().toISOString() : order.deliveryDate }
+          : order
+      ));
+
+      toast.success(`Order status updated to ${newStatus}`);
+    } catch (error: any) {
+      toast.error("Failed to update order status");
+    }
   };
 
   return (
@@ -279,81 +375,89 @@ export const OnlineDeliveryModule = ({ orders, setOrders, drivers, userRole }: O
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredOrders.map((order) => (
-                  <TableRow key={order.id} className="hover:bg-surface">
-                    <TableCell className="font-medium">{order.id}</TableCell>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium">{order.customerName}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {new Date(order.orderDate).toLocaleDateString()}
-                        </p>
-                      </div>
+                {filteredOrders.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                      No orders found. Create your first order to get started.
                     </TableCell>
-                    <TableCell>
-                      <div className="space-y-1">
-                        {order.items.map((item, idx) => (
-                          <p key={idx} className="text-sm">
-                            {item.quantity}x {item.productName}
-                          </p>
-                        ))}
-                      </div>
-                    </TableCell>
-                    <TableCell className="font-semibold">{BANGLADESHI_CURRENCY_SYMBOL}{order.totalAmount.toLocaleString()}</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary" className={getStatusColor(order.status)}>
-                        {order.status.toUpperCase()}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary" className={getPaymentStatusColor(order.paymentStatus)}>
-                        {order.paymentStatus.toUpperCase()}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center space-x-1">
-                        <MapPin className="h-3 w-3 text-muted-foreground" />
-                        <span className="text-sm">{order.deliveryAddress}</span>
-                      </div>
-                    </TableCell>
-                    {(userRole === 'owner' || userRole === 'manager') && (
+                  </TableRow>
+                ) : (
+                  filteredOrders.map((order) => (
+                    <TableRow key={order.id} className="hover:bg-surface">
+                      <TableCell className="font-medium">{order.orderNumber || order.id.slice(0, 8)}</TableCell>
                       <TableCell>
-                        <div className="flex space-x-1">
-                          {order.status === 'pending' && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => updateOrderStatus(order.id, 'confirmed')}
-                              className="text-info border-info hover:bg-info hover:text-info-foreground"
-                            >
-                              Confirm
-                            </Button>
-                          )}
-                          {order.status === 'confirmed' && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => updateOrderStatus(order.id, 'dispatched')}
-                              className="text-secondary border-secondary hover:bg-secondary hover:text-secondary-foreground"
-                            >
-                              Dispatch
-                            </Button>
-                          )}
-                          {order.status === 'dispatched' && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => updateOrderStatus(order.id, 'delivered')}
-                              className="text-accent border-accent hover:bg-accent hover:text-accent-foreground"
-                            >
-                              Delivered
-                            </Button>
-                          )}
+                        <div>
+                          <p className="font-medium">{order.customerName}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(order.orderDate).toLocaleDateString()}
+                          </p>
                         </div>
                       </TableCell>
-                    )}
-                  </TableRow>
-                ))}
+                      <TableCell>
+                        <div className="space-y-1">
+                          {order.items.map((item, idx) => (
+                            <p key={idx} className="text-sm">
+                              {item.quantity}x {item.productName}
+                            </p>
+                          ))}
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-semibold">{BANGLADESHI_CURRENCY_SYMBOL}{order.totalAmount.toLocaleString()}</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className={getStatusColor(order.status)}>
+                          {order.status.toUpperCase()}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className={getPaymentStatusColor(order.paymentStatus)}>
+                          {order.paymentStatus.toUpperCase()}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-1">
+                          <MapPin className="h-3 w-3 text-muted-foreground" />
+                          <span className="text-sm">{order.deliveryAddress}</span>
+                        </div>
+                      </TableCell>
+                      {(userRole === 'owner' || userRole === 'manager') && (
+                        <TableCell>
+                          <div className="flex space-x-1">
+                            {order.status === 'pending' && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => updateOrderStatus(order.id, 'confirmed')}
+                                className="text-info border-info hover:bg-info hover:text-info-foreground"
+                              >
+                                Confirm
+                              </Button>
+                            )}
+                            {order.status === 'confirmed' && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => updateOrderStatus(order.id, 'dispatched')}
+                                className="text-secondary border-secondary hover:bg-secondary hover:text-secondary-foreground"
+                              >
+                                Dispatch
+                              </Button>
+                            )}
+                            {order.status === 'dispatched' && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => updateOrderStatus(order.id, 'delivered')}
+                                className="text-accent border-accent hover:bg-accent hover:text-accent-foreground"
+                              >
+                                Delivered
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>
@@ -361,7 +465,7 @@ export const OnlineDeliveryModule = ({ orders, setOrders, drivers, userRole }: O
       </Card>
 
       {/* Driver Assignment - Only for owner/manager */}
-      {(userRole === 'owner' || userRole === 'manager') && (
+      {(userRole === 'owner' || userRole === 'manager') && drivers.length > 0 && (
         <Card className="border-0 shadow-elegant">
           <CardHeader>
             <CardTitle className="text-primary">Driver Status</CardTitle>
@@ -403,6 +507,139 @@ export const OnlineDeliveryModule = ({ orders, setOrders, drivers, userRole }: O
           </CardContent>
         </Card>
       )}
+
+      {/* Add Order Dialog */}
+      <Dialog open={showAddForm} onOpenChange={setShowAddForm}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Create New Order</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Customer</Label>
+              <Select 
+                value={newOrder.customerId || "new"} 
+                onValueChange={(v) => {
+                  if (v === "new") {
+                    setNewOrder({ ...newOrder, customerId: "", customerName: "" });
+                  } else {
+                    const customer = customers.find(c => c.id === v);
+                    setNewOrder({ 
+                      ...newOrder, 
+                      customerId: v, 
+                      customerName: customer?.name || "",
+                      deliveryAddress: customer?.address || newOrder.deliveryAddress
+                    });
+                  }
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select customer..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="new">New Customer</SelectItem>
+                  {customers.map(c => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {(!newOrder.customerId || newOrder.customerId === "new") && (
+              <div className="space-y-2">
+                <Label>Customer Name</Label>
+                <Input
+                  value={newOrder.customerName}
+                  onChange={(e) => setNewOrder({ ...newOrder, customerName: e.target.value })}
+                  placeholder="Enter customer name"
+                />
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label>Delivery Address</Label>
+              <Input
+                value={newOrder.deliveryAddress}
+                onChange={(e) => setNewOrder({ ...newOrder, deliveryAddress: e.target.value })}
+                placeholder="Enter delivery address"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Product</Label>
+              <Select 
+                value={newOrder.productId || "custom"} 
+                onValueChange={(v) => {
+                  if (v === "custom") {
+                    setNewOrder({ ...newOrder, productId: "", productName: "", price: 0 });
+                  } else {
+                    const product = products.find(p => p.id === v);
+                    setNewOrder({ 
+                      ...newOrder, 
+                      productId: v, 
+                      productName: product?.name || "",
+                      price: Number(product?.price) || 0
+                    });
+                  }
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select product..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="custom">Custom Product</SelectItem>
+                  {products.map(p => (
+                    <SelectItem key={p.id} value={p.id}>{p.name} - ৳{p.price}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {(!newOrder.productId || newOrder.productId === "custom") && (
+              <>
+                <div className="space-y-2">
+                  <Label>Product Name</Label>
+                  <Input
+                    value={newOrder.productName}
+                    onChange={(e) => setNewOrder({ ...newOrder, productName: e.target.value })}
+                    placeholder="Enter product name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Price (৳)</Label>
+                  <Input
+                    type="number"
+                    value={newOrder.price}
+                    onChange={(e) => setNewOrder({ ...newOrder, price: Number(e.target.value) })}
+                    placeholder="Enter price"
+                  />
+                </div>
+              </>
+            )}
+
+            <div className="space-y-2">
+              <Label>Quantity</Label>
+              <Input
+                type="number"
+                min="1"
+                value={newOrder.quantity}
+                onChange={(e) => setNewOrder({ ...newOrder, quantity: parseInt(e.target.value) || 1 })}
+              />
+            </div>
+
+            <div className="pt-2 border-t">
+              <p className="text-lg font-semibold">
+                Total: {BANGLADESHI_CURRENCY_SYMBOL}{(newOrder.price * newOrder.quantity).toLocaleString()}
+              </p>
+            </div>
+
+            <Button onClick={handleCreateOrder} className="w-full" disabled={loading}>
+              {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Create Order
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

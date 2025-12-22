@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { 
@@ -21,6 +22,7 @@ import {
   Settings
 } from "lucide-react";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
+import { supabase } from "@/integrations/supabase/client";
 
 interface DashboardOverviewProps {
   analytics: {
@@ -36,7 +38,120 @@ interface DashboardOverviewProps {
   setActiveModule?: (module: string) => void;
 }
 
+interface RecentActivity {
+  id: string;
+  title: string;
+  description: string;
+  time: string;
+  status: 'pending' | 'completed' | 'warning';
+  icon: any;
+}
+
 export const DashboardOverview = ({ analytics, drivers, userRole, setActiveModule }: DashboardOverviewProps) => {
+  const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([]);
+  const [loadingActivities, setLoadingActivities] = useState(true);
+
+  useEffect(() => {
+    const fetchRecentActivities = async () => {
+      try {
+        const activities: RecentActivity[] = [];
+
+        // Fetch recent orders
+        const { data: recentOrders } = await supabase
+          .from('orders')
+          .select('id, customer_name, total_amount, status, created_at')
+          .order('created_at', { ascending: false })
+          .limit(3);
+
+        if (recentOrders) {
+          recentOrders.forEach(order => {
+            const timeAgo = getTimeAgo(new Date(order.created_at));
+            activities.push({
+              id: `order-${order.id}`,
+              title: order.status === 'delivered' ? 'Delivery completed' : `New order from ${order.customer_name}`,
+              description: order.status === 'delivered' 
+                ? `Order delivered to ${order.customer_name}`
+                : `Order total: ${BANGLADESHI_CURRENCY_SYMBOL}${order.total_amount.toLocaleString()}`,
+              time: timeAgo,
+              status: order.status === 'delivered' ? 'completed' : order.status === 'pending' ? 'pending' : 'completed',
+              icon: order.status === 'delivered' ? CheckCircle : FileText
+            });
+          });
+        }
+
+        // Fetch recent POS transactions
+        const { data: recentTransactions } = await supabase
+          .from('pos_transactions')
+          .select('id, transaction_number, total, payment_method, created_at')
+          .order('created_at', { ascending: false })
+          .limit(2);
+
+        if (recentTransactions) {
+          recentTransactions.forEach(txn => {
+            const timeAgo = getTimeAgo(new Date(txn.created_at));
+            activities.push({
+              id: `txn-${txn.id}`,
+              title: 'Payment received',
+              description: `${BANGLADESHI_CURRENCY_SYMBOL}${Number(txn.total).toLocaleString()} via ${txn.payment_method}`,
+              time: timeAgo,
+              status: 'completed',
+              icon: Banknote
+            });
+          });
+        }
+
+        // Add low stock alert if any
+        if (analytics.lowStockItems.length > 0) {
+          activities.push({
+            id: 'low-stock',
+            title: 'Low stock alert',
+            description: `${analytics.lowStockItems.length} items below minimum stock`,
+            time: 'Now',
+            status: 'warning',
+            icon: AlertCircle
+          });
+        }
+
+        // Sort by time (most recent first)
+        setRecentActivities(activities.slice(0, 5));
+      } catch (error) {
+        console.error('Error fetching activities:', error);
+      } finally {
+        setLoadingActivities(false);
+      }
+    };
+
+    fetchRecentActivities();
+
+    // Subscribe to realtime updates
+    const channel = supabase
+      .channel('dashboard-updates')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, () => {
+        fetchRecentActivities();
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pos_transactions' }, () => {
+        fetchRecentActivities();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [analytics.lowStockItems.length]);
+
+  const getTimeAgo = (date: Date): string => {
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins} min ago`;
+    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+  };
+
   const stats = [
     {
       title: "Today's Revenue",
@@ -69,37 +184,6 @@ export const DashboardOverview = ({ analytics, drivers, userRole, setActiveModul
       changeType: "positive" as const,
       icon: Users,
       description: "Registered customers"
-    }
-  ];
-
-  const recentActivities = [
-    {
-      title: "New order from Abdul Rahman",
-      description: `3x 12kg LPG Cylinders - ${BANGLADESHI_CURRENCY_SYMBOL}3,600`,
-      time: "5 min ago",
-      status: "pending",
-      icon: FileText
-    },
-    {
-      title: "Delivery completed",
-      description: "Driver Mohammad Karim completed delivery in Dhanmondi",
-      time: "15 min ago",
-      status: "completed",
-      icon: CheckCircle
-    },
-    {
-      title: "Low stock alert",
-      description: `${analytics.lowStockItems.length} items below minimum stock`,
-      time: "1 hour ago",
-      status: "warning",
-      icon: AlertCircle
-    },
-    {
-      title: "Payment received",
-      description: `${BANGLADESHI_CURRENCY_SYMBOL}18,000 payment processed via bKash`,
-      time: "2 hours ago",
-      status: "completed",
-      icon: Banknote
     }
   ];
 
@@ -194,27 +278,33 @@ export const DashboardOverview = ({ analytics, drivers, userRole, setActiveModul
             <CardDescription>Latest updates from your LPG operations</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {recentActivities.map((activity, index) => {
-              const Icon = activity.icon;
-              return (
-                <div key={index} className="flex items-start space-x-3 p-4 hover:bg-surface rounded-lg transition-colors">
-                  <div className={`h-10 w-10 rounded-full flex items-center justify-center ${statusColors[activity.status as keyof typeof statusColors]}`}>
-                    <Icon className="h-5 w-5" />
+            {loadingActivities ? (
+              <div className="text-center py-8 text-muted-foreground">Loading activities...</div>
+            ) : recentActivities.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">No recent activities. Start by creating orders or making sales!</div>
+            ) : (
+              recentActivities.map((activity) => {
+                const Icon = activity.icon;
+                return (
+                  <div key={activity.id} className="flex items-start space-x-3 p-4 hover:bg-surface rounded-lg transition-colors">
+                    <div className={`h-10 w-10 rounded-full flex items-center justify-center ${statusColors[activity.status]}`}>
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      <p className="text-sm font-medium text-foreground">{activity.title}</p>
+                      <p className="text-xs text-muted-foreground">{activity.description}</p>
+                      <p className="text-xs text-muted-foreground font-medium">{activity.time}</p>
+                    </div>
                   </div>
-                  <div className="flex-1 space-y-1">
-                    <p className="text-sm font-medium text-foreground">{activity.title}</p>
-                    <p className="text-xs text-muted-foreground">{activity.description}</p>
-                    <p className="text-xs text-muted-foreground font-medium">{activity.time}</p>
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </CardContent>
         </Card>
       </div>
 
       {/* Driver Status - Only for owner/manager */}
-      {(userRole === 'owner' || userRole === 'manager') && (
+      {(userRole === 'owner' || userRole === 'manager') && drivers.length > 0 && (
         <Card className="border-0 shadow-elegant">
           <CardHeader>
             <CardTitle className="text-primary">Driver Status</CardTitle>
