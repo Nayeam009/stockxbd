@@ -1,13 +1,7 @@
 import { useState, useEffect } from 'react';
-import { 
-  getRandomBangladeshiName, 
-  getRandomBangladeshiLocation, 
-  getRandomBangladeshiPhone,
-  getRandomPaymentMethod,
-  BANGLADESHI_LPG_PRODUCTS
-} from '@/lib/bangladeshConstants';
+import { supabase } from '@/integrations/supabase/client';
 
-// Mock data types
+// Types that match database schema
 export interface SalesData {
   id: string;
   date: string;
@@ -55,6 +49,7 @@ export interface Customer {
 
 export interface Order {
   id: string;
+  orderNumber: string;
   customerId: string;
   customerName: string;
   items: Array<{
@@ -94,7 +89,6 @@ export interface Staff {
   lastPayment: string;
 }
 
-// Custom hook for dashboard data
 export const useDashboardData = () => {
   const [salesData, setSalesData] = useState<SalesData[]>([]);
   const [stockData, setStockData] = useState<StockItem[]>([]);
@@ -105,72 +99,222 @@ export const useDashboardData = () => {
   const [staff, setStaff] = useState<Staff[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Mock data generation
+  // Fetch real data from Supabase
   useEffect(() => {
-    const generateMockData = () => {
-      // Generate mock sales data with Bangladeshi context
-      const mockSales: SalesData[] = Array.from({ length: 50 }, (_, i) => {
-        const product = BANGLADESHI_LPG_PRODUCTS[Math.floor(Math.random() * BANGLADESHI_LPG_PRODUCTS.length)];
-        const paymentMethod = getRandomPaymentMethod();
-        const quantity = Math.floor(Math.random() * 10) + 1;
-        const unitPrice = product.standardPrice + (Math.random() * 200 - 100); // ±100 taka variation
+    const fetchData = async () => {
+      try {
+        // Fetch POS transactions for sales data
+        const { data: transactions } = await supabase
+          .from('pos_transactions')
+          .select(`
+            id,
+            created_at,
+            total,
+            payment_method,
+            created_by,
+            pos_transaction_items (
+              product_name,
+              quantity,
+              unit_price,
+              total_price
+            )
+          `)
+          .order('created_at', { ascending: false })
+          .limit(100);
+
+        if (transactions) {
+          const formattedSales: SalesData[] = transactions.flatMap(txn => 
+            (txn.pos_transaction_items || []).map((item: any) => ({
+              id: `${txn.id}-${item.product_name}`,
+              date: new Date(txn.created_at).toISOString().split('T')[0],
+              productType: item.product_name?.toLowerCase().includes('stove') ? 'stove' as const : 
+                          item.product_name?.toLowerCase().includes('regulator') ? 'accessory' as const : 'cylinder' as const,
+              productName: item.product_name || 'Unknown',
+              quantity: item.quantity,
+              unitPrice: Number(item.unit_price),
+              totalAmount: Number(item.total_price),
+              paymentMethod: txn.payment_method as any,
+              staffId: txn.created_by || '',
+              staffName: 'Staff'
+            }))
+          );
+          setSalesData(formattedSales);
+        }
+
+        // Fetch customers
+        const { data: customerData } = await supabase
+          .from('customers')
+          .select('*')
+          .order('name');
+
+        if (customerData) {
+          // Count orders for each customer
+          const { data: orderCounts } = await supabase
+            .from('orders')
+            .select('customer_id');
+
+          const orderCountMap: Record<string, number> = {};
+          orderCounts?.forEach(o => {
+            if (o.customer_id) {
+              orderCountMap[o.customer_id] = (orderCountMap[o.customer_id] || 0) + 1;
+            }
+          });
+
+          const formattedCustomers: Customer[] = customerData.map(c => ({
+            id: c.id,
+            name: c.name,
+            phone: c.phone || '',
+            address: c.address || '',
+            totalOrders: orderCountMap[c.id] || 0,
+            lastOrder: new Date().toISOString().split('T')[0],
+            outstanding: 0,
+            loyaltyPoints: 0
+          }));
+          setCustomers(formattedCustomers);
+        }
+
+        // Fetch orders
+        const { data: ordersData } = await supabase
+          .from('orders')
+          .select(`
+            *,
+            order_items (
+              id,
+              product_id,
+              product_name,
+              quantity,
+              price
+            )
+          `)
+          .order('created_at', { ascending: false });
+
+        if (ordersData) {
+          const formattedOrders: Order[] = ordersData.map(o => ({
+            id: o.id,
+            orderNumber: o.order_number,
+            customerId: o.customer_id || '',
+            customerName: o.customer_name,
+            items: (o.order_items || []).map((item: any) => ({
+              productId: item.product_id || '',
+              productName: item.product_name,
+              quantity: item.quantity,
+              price: Number(item.price)
+            })),
+            totalAmount: Number(o.total_amount),
+            status: o.status as Order['status'],
+            paymentStatus: o.payment_status as Order['paymentStatus'],
+            deliveryAddress: o.delivery_address,
+            driverId: o.driver_id,
+            orderDate: o.order_date,
+            deliveryDate: o.delivery_date
+          }));
+          setOrders(formattedOrders);
+        }
+
+        // Fetch LPG stock for stock data
+        const { data: lpgBrands } = await supabase
+          .from('lpg_brands')
+          .select('*')
+          .eq('is_active', true);
+
+        const { data: stoves } = await supabase
+          .from('stoves')
+          .select('*')
+          .eq('is_active', true);
+
+        const stockItems: StockItem[] = [];
         
-        return {
-          id: `sale-${i + 1}`,
-          date: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          productType: product.category as any,
-          productName: product.name,
-          quantity,
-          unitPrice: Math.round(unitPrice),
-          totalAmount: 0,
-          paymentMethod: paymentMethod.id as any,
-          staffId: `staff-${Math.floor(Math.random() * 5) + 1}`,
-          staffName: getRandomBangladeshiName(),
-        };
-      });
+        if (lpgBrands) {
+          lpgBrands.forEach(brand => {
+            stockItems.push({
+              id: brand.id,
+              type: 'cylinder',
+              name: `${brand.name} (${brand.size})`,
+              currentStock: brand.refill_cylinder + brand.package_cylinder,
+              minStock: 10,
+              maxStock: 100,
+              lastUpdated: brand.updated_at,
+              price: 1200
+            });
+          });
+        }
 
-      mockSales.forEach(sale => {
-        sale.totalAmount = sale.quantity * sale.unitPrice;
-      });
+        if (stoves) {
+          stoves.forEach(stove => {
+            stockItems.push({
+              id: stove.id,
+              type: 'stove',
+              name: `${stove.brand} ${stove.model}`,
+              currentStock: stove.quantity,
+              minStock: 5,
+              maxStock: 50,
+              lastUpdated: stove.updated_at,
+              price: Number(stove.price)
+            });
+          });
+        }
+        setStockData(stockItems);
 
-      // Generate mock stock data with Bangladeshi pricing (in Taka)
-      const mockStock: StockItem[] = [
-        { id: '1', type: 'cylinder', name: '5kg LPG Cylinder', currentStock: 45, minStock: 20, maxStock: 100, lastUpdated: new Date().toISOString(), price: 850 },
-        { id: '2', type: 'cylinder', name: '12kg LPG Cylinder', currentStock: 78, minStock: 30, maxStock: 150, lastUpdated: new Date().toISOString(), price: 1200 },
-        { id: '3', type: 'cylinder', name: '35kg Commercial Cylinder', currentStock: 25, minStock: 15, maxStock: 80, lastUpdated: new Date().toISOString(), price: 3200 },
-        { id: '4', type: 'stove', name: '2 Burner Gas Stove', currentStock: 15, minStock: 10, maxStock: 50, lastUpdated: new Date().toISOString(), price: 4500 },
-        { id: '5', type: 'stove', name: '3 Burner Gas Stove', currentStock: 8, minStock: 5, maxStock: 30, lastUpdated: new Date().toISOString(), price: 6500 },
-        { id: '6', type: 'stove', name: '4 Burner Gas Stove', currentStock: 12, minStock: 8, maxStock: 25, lastUpdated: new Date().toISOString(), price: 8500 },
-      ];
+        // Fetch user roles to build drivers list
+        const { data: userRoles } = await supabase
+          .from('user_roles')
+          .select('user_id, role')
+          .eq('role', 'driver');
 
-      // Generate mock drivers with Bangladeshi names and numbers
-      const mockDrivers: Driver[] = [
-        { id: '1', name: 'Abdul Rahman', phone: getRandomBangladeshiPhone(), vehicleId: 'DH-001', todaySales: 18000, todayDeliveries: 12, status: 'active' },
-        { id: '2', name: 'Mohammad Karim', phone: getRandomBangladeshiPhone(), vehicleId: 'DH-002', todaySales: 12500, todayDeliveries: 8, status: 'active' },
-        { id: '3', name: 'Rafiq Ahmed', phone: getRandomBangladeshiPhone(), vehicleId: 'CTG-003', todaySales: 15000, todayDeliveries: 10, status: 'break' },
-        { id: '4', name: 'Nasir Uddin', phone: getRandomBangladeshiPhone(), vehicleId: 'SYL-004', todaySales: 8500, todayDeliveries: 6, status: 'offline' },
-      ];
+        if (userRoles && userRoles.length > 0) {
+          // Get today's deliveries per driver
+          const today = new Date().toISOString().split('T')[0];
+          const { data: todayOrders } = await supabase
+            .from('orders')
+            .select('driver_id, total_amount, status')
+            .gte('order_date', `${today}T00:00:00`)
+            .lte('order_date', `${today}T23:59:59`);
 
-      // Generate mock customers with Bangladeshi context
-      const mockCustomers: Customer[] = Array.from({ length: 20 }, (_, i) => ({
-        id: `cust-${i + 1}`,
-        name: getRandomBangladeshiName(),
-        phone: getRandomBangladeshiPhone(),
-        address: getRandomBangladeshiLocation(),
-        totalOrders: Math.floor(Math.random() * 50) + 5,
-        lastOrder: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        outstanding: Math.floor(Math.random() * 8000), // Higher amounts in Taka
-        loyaltyPoints: Math.floor(Math.random() * 1500),
-      }));
+          const driverStats: Record<string, { sales: number; deliveries: number }> = {};
+          todayOrders?.forEach(o => {
+            if (o.driver_id) {
+              if (!driverStats[o.driver_id]) {
+                driverStats[o.driver_id] = { sales: 0, deliveries: 0 };
+              }
+              driverStats[o.driver_id].sales += Number(o.total_amount);
+              if (o.status === 'delivered') {
+                driverStats[o.driver_id].deliveries += 1;
+              }
+            }
+          });
 
-      setSalesData(mockSales);
-      setStockData(mockStock);
-      setDrivers(mockDrivers);
-      setCustomers(mockCustomers);
-      setLoading(false);
+          const formattedDrivers: Driver[] = userRoles.map((ur, index) => ({
+            id: ur.user_id,
+            name: `Driver ${index + 1}`,
+            phone: '01700-000000',
+            vehicleId: `VH-00${index + 1}`,
+            todaySales: driverStats[ur.user_id]?.sales || 0,
+            todayDeliveries: driverStats[ur.user_id]?.deliveries || 0,
+            status: 'active' as const
+          }));
+          setDrivers(formattedDrivers);
+        }
+
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+      } finally {
+        setLoading(false);
+      }
     };
 
-    generateMockData();
+    fetchData();
+
+    // Subscribe to realtime updates for orders
+    const ordersChannel = supabase
+      .channel('orders-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
+        fetchData();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(ordersChannel);
+    };
   }, []);
 
   // Analytics calculations
