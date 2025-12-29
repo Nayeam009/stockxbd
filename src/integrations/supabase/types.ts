@@ -117,30 +117,89 @@ export type Database = {
         }
         Relationships: []
       }
+      customer_payments: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string | null
+          customer_id: string
+          cylinders_collected: number | null
+          id: string
+          notes: string | null
+          payment_date: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          customer_id: string
+          cylinders_collected?: number | null
+          id?: string
+          notes?: string | null
+          payment_date?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string
+          cylinders_collected?: number | null
+          id?: string
+          notes?: string | null
+          payment_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_payments_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           address: string | null
+          billing_status: string | null
           created_at: string
           created_by: string | null
+          cylinders_due: number | null
+          email: string | null
           id: string
+          last_order_date: string | null
           name: string
           phone: string | null
+          total_due: number | null
+          updated_at: string | null
         }
         Insert: {
           address?: string | null
+          billing_status?: string | null
           created_at?: string
           created_by?: string | null
+          cylinders_due?: number | null
+          email?: string | null
           id?: string
+          last_order_date?: string | null
           name: string
           phone?: string | null
+          total_due?: number | null
+          updated_at?: string | null
         }
         Update: {
           address?: string | null
+          billing_status?: string | null
           created_at?: string
           created_by?: string | null
+          cylinders_due?: number | null
+          email?: string | null
           id?: string
+          last_order_date?: string | null
           name?: string
           phone?: string | null
+          total_due?: number | null
+          updated_at?: string | null
         }
         Relationships: []
       }
