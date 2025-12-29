@@ -22,6 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "@/hooks/use-toast";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
 import { supabase } from "@/integrations/supabase/client";
+import { parsePositiveNumber, parsePositiveInt, sanitizeString, posTransactionSchema, customerSchema } from "@/lib/validationSchemas";
 
 interface LPGBrand {
   id: string;
@@ -129,8 +130,20 @@ export const POSModule = () => {
   const filteredBrands = lpgBrands.filter(b => b.size === mouthSize);
 
   const addLPGToSale = () => {
-    if (!sellingBrand || !weight || !price || parseInt(quantity) < 1) {
+    if (!sellingBrand || !weight) {
       toast({ title: "Please fill all required fields", variant: "destructive" });
+      return;
+    }
+
+    const validatedPrice = parsePositiveNumber(price, 10000000);
+    const validatedQuantity = parsePositiveInt(quantity, 10000);
+
+    if (validatedPrice <= 0) {
+      toast({ title: "Price must be greater than 0", variant: "destructive" });
+      return;
+    }
+    if (validatedQuantity < 1) {
+      toast({ title: "Quantity must be at least 1", variant: "destructive" });
       return;
     }
 
@@ -144,8 +157,8 @@ export const POSModule = () => {
       type: 'lpg',
       name: `${brand.name} - ${cylinderType === 'refill' ? 'Refill' : 'Package'}`,
       details: `${weight}kg, ${mouthSize}, ${saleType}${returnBrandName ? `, Return: ${returnBrandName}` : ''}`,
-      price: parseFloat(price),
-      quantity: parseInt(quantity),
+      price: validatedPrice,
+      quantity: validatedQuantity,
       returnBrand: returnBrandName
     };
 
@@ -162,8 +175,14 @@ export const POSModule = () => {
   };
 
   const addStoveToSale = () => {
-    if (!selectedStove || parseInt(stoveQuantity) < 1) {
+    const validatedQuantity = parsePositiveInt(stoveQuantity, 10000);
+    
+    if (!selectedStove) {
       toast({ title: "Please select a stove", variant: "destructive" });
+      return;
+    }
+    if (validatedQuantity < 1) {
+      toast({ title: "Quantity must be at least 1", variant: "destructive" });
       return;
     }
 
@@ -176,7 +195,7 @@ export const POSModule = () => {
       name: `${stove.brand} ${stove.model}`,
       details: `${stove.burners} Burner`,
       price: stove.price,
-      quantity: parseInt(stoveQuantity)
+      quantity: validatedQuantity
     };
 
     setSaleItems([...saleItems, newItem]);
@@ -187,8 +206,14 @@ export const POSModule = () => {
   };
 
   const addRegulatorToSale = () => {
-    if (!selectedRegulator || parseInt(regulatorQuantity) < 1) {
+    const validatedQuantity = parsePositiveInt(regulatorQuantity, 10000);
+    
+    if (!selectedRegulator) {
       toast({ title: "Please select a regulator", variant: "destructive" });
+      return;
+    }
+    if (validatedQuantity < 1) {
+      toast({ title: "Quantity must be at least 1", variant: "destructive" });
       return;
     }
 
@@ -201,7 +226,7 @@ export const POSModule = () => {
       name: regulator.brand,
       details: regulator.type,
       price: 0, // Can set price manually
-      quantity: parseInt(regulatorQuantity)
+      quantity: validatedQuantity
     };
 
     setSaleItems([...saleItems, newItem]);
@@ -236,6 +261,25 @@ export const POSModule = () => {
       return;
     }
 
+    // Validate transaction data
+    const validatedDiscount = parsePositiveNumber(discount, 10000000);
+    const validatedItems = saleItems.map(item => ({
+      price: Math.max(0, Math.min(item.price, 10000000)),
+      quantity: Math.max(1, Math.min(item.quantity, 10000))
+    }));
+
+    const transactionValidation = posTransactionSchema.safeParse({
+      customerName: customerName ? sanitizeString(customerName) : undefined,
+      discount: validatedDiscount,
+      items: validatedItems
+    });
+
+    if (!transactionValidation.success) {
+      const firstError = transactionValidation.error.errors[0];
+      toast({ title: "Validation Error", description: firstError.message, variant: "destructive" });
+      return;
+    }
+
     setProcessing(true);
 
     try {
@@ -250,12 +294,23 @@ export const POSModule = () => {
       const { data: txnNum } = await supabase.rpc('generate_transaction_number');
       const transactionNumber = txnNum || `TXN-${Date.now()}`;
 
+      // Sanitize customer name for storage
+      const sanitizedCustomerName = customerName ? sanitizeString(customerName) : '';
+
       // Create or get customer
       let customerId = selectedCustomerId === "walkin" ? null : selectedCustomerId;
-      if (!customerId && customerName.trim()) {
+      if (!customerId && sanitizedCustomerName) {
+        // Validate customer data
+        const customerValidation = customerSchema.safeParse({ name: sanitizedCustomerName });
+        if (!customerValidation.success) {
+          toast({ title: "Invalid customer name", variant: "destructive" });
+          setProcessing(false);
+          return;
+        }
+        
         const { data: customer, error } = await supabase
           .from('customers')
-          .insert({ name: customerName.trim(), created_by: user.id })
+          .insert({ name: sanitizedCustomerName, created_by: user.id })
           .select()
           .single();
         
@@ -269,8 +324,8 @@ export const POSModule = () => {
           transaction_number: transactionNumber,
           customer_id: customerId,
           subtotal,
-          discount: discountAmount,
-          total,
+          discount: validatedDiscount,
+          total: Math.max(0, subtotal - validatedDiscount),
           payment_method: 'cash' as const,
           payment_status: paymentStatus,
           created_by: user.id
@@ -306,11 +361,11 @@ export const POSModule = () => {
       const receipt = {
         id: transactionNumber,
         date: new Date().toLocaleString('en-BD'),
-        customer: customerName || "Walk-in Customer",
+        customer: sanitizedCustomerName || "Walk-in Customer",
         items: saleItems,
         subtotal,
-        discount: discountAmount,
-        total,
+        discount: validatedDiscount,
+        total: Math.max(0, subtotal - validatedDiscount),
         status: paymentStatus === 'completed' ? 'Paid' : 'Due'
       };
 
