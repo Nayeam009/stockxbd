@@ -11,6 +11,9 @@ import { OnlineDeliveryModule } from "@/components/dashboard/modules/OnlineDeliv
 import { SearchModule } from "@/components/dashboard/modules/SearchModule";
 import { POSModule } from "@/components/dashboard/modules/POSModule";
 import { CommunityModule } from "@/components/dashboard/modules/CommunityModule";
+import { ProductPricingModule } from "@/components/dashboard/modules/ProductPricingModule";
+import { VehicleCostModule } from "@/components/dashboard/modules/VehicleCostModule";
+import { StaffSalaryModule } from "@/components/dashboard/modules/StaffSalaryModule";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -160,17 +163,7 @@ const Dashboard = () => {
           </div>
         );
       case "product-pricing":
-        return (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-3xl font-bold text-primary">Product Pricing</h2>
-              <p className="text-muted-foreground">Manage product prices and rates</p>
-            </div>
-            <div className="text-center py-12 bg-card rounded-lg border border-border">
-              <p className="text-lg text-muted-foreground">Product pricing module coming soon...</p>
-            </div>
-          </div>
-        );
+        return <ProductPricingModule />;
       case "analytics":
         return (
           <div className="space-y-6">
@@ -206,29 +199,9 @@ const Dashboard = () => {
       case "community":
         return <CommunityModule />;
       case "staff-salary":
-        return (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-3xl font-bold text-primary">Staff Salary Management</h2>
-              <p className="text-muted-foreground">Handle payroll and salary records</p>
-            </div>
-            <div className="text-center py-12">
-              <p className="text-lg text-muted-foreground">Staff salary module coming soon...</p>
-            </div>
-          </div>
-        );
+        return <StaffSalaryModule />;
       case "vehicle-cost":
-        return (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-3xl font-bold text-primary">Vehicle Cost Management</h2>
-              <p className="text-muted-foreground">Monitor vehicle expenses and maintenance</p>
-            </div>
-            <div className="text-center py-12">
-              <p className="text-lg text-muted-foreground">Vehicle cost module coming soon...</p>
-            </div>
-          </div>
-        );
+        return <VehicleCostModule />;
       case "online-delivery":
         return (
           <OnlineDeliveryModule
