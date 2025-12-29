@@ -4,6 +4,8 @@ import { AppSidebar } from "@/components/dashboard/AppSidebar";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { DashboardOverview } from "@/components/dashboard/modules/DashboardOverview";
 import { DailySalesModule } from "@/components/dashboard/modules/DailySalesModule";
+import { DailyExpensesModule } from "@/components/dashboard/modules/DailyExpensesModule";
+import { AnalysisModule } from "@/components/dashboard/modules/AnalysisModule";
 import { LPGStockModule } from "@/components/dashboard/modules/LPGStockModule";
 import { RegulatorsModule } from "@/components/dashboard/modules/RegulatorsModule";
 import { StoveStockModule } from "@/components/dashboard/modules/StoveStockModule";
@@ -93,17 +95,7 @@ const Dashboard = () => {
       case "pos":
         return <POSModule />;
       case "daily-expenses":
-        return (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-3xl font-bold text-primary">Daily Expenses</h2>
-              <p className="text-muted-foreground">Track and manage daily business expenses</p>
-            </div>
-            <div className="text-center py-12 bg-card rounded-lg border border-border">
-              <p className="text-lg text-muted-foreground">Daily expenses module coming soon...</p>
-            </div>
-          </div>
-        );
+        return <DailyExpensesModule />;
       case "orders":
         return (
           <OnlineDeliveryModule
@@ -165,24 +157,9 @@ const Dashboard = () => {
       case "product-pricing":
         return <ProductPricingModule />;
       case "analytics":
-        return (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-3xl font-bold text-primary">Business Analytics</h2>
-              <p className="text-muted-foreground">View detailed business reports and insights</p>
-            </div>
-            <div className="text-center py-12 bg-card rounded-lg border border-border">
-              <p className="text-lg text-muted-foreground">Analytics module coming soon...</p>
-            </div>
-          </div>
-        );
+        return <AnalysisModule />;
       case "daily-sales":
-        return (
-          <DailySalesModule
-            salesData={salesData}
-            setSalesData={setSalesData}
-          />
-        );
+        return <DailySalesModule />;
       case "lpg-stock":
         return <LPGStockModule size="22mm" />;
       case "lpg-stock-20mm":
@@ -190,12 +167,7 @@ const Dashboard = () => {
       case "stove-stock":
         return <StoveStockModule />;
       case "driver-sales":
-        return (
-          <DailySalesModule
-            salesData={salesData.filter(sale => sale.staffName === userName)}
-            setSalesData={setSalesData}
-          />
-        );
+        return <DailySalesModule />;
       case "community":
         return <CommunityModule />;
       case "staff-salary":
