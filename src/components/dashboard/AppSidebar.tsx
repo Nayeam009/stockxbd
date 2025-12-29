@@ -102,6 +102,7 @@ export const AppSidebar = ({
   const otherItems = [
     { id: 'community', titleKey: 'community', icon: Users, roles: ['owner', 'manager', 'driver'] },
     { id: 'search', titleKey: 'search', icon: Search, roles: ['owner', 'manager'] },
+    { id: 'profile', titleKey: 'profile', icon: User, roles: ['owner', 'manager', 'driver'] },
     { id: 'settings', titleKey: 'settings', icon: Settings, roles: ['owner', 'manager'] },
   ];
 
