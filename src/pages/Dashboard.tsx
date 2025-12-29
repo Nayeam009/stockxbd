@@ -195,10 +195,12 @@ const Dashboard = () => {
             setSearchQuery={setSearchQuery}
             userRole={userRole}
             userName={userName}
+            onSettingsClick={() => setActiveModule("settings")}
+            onProfileClick={() => setActiveModule("profile")}
           />
 
           {/* Main Content */}
-          <main className="flex-1 overflow-auto">
+          <main className="flex-1 overflow-auto bg-gradient-to-b from-background to-muted/30">
             <div className="container mx-auto p-6 animate-fade-in">
               {renderActiveModule()}
             </div>
