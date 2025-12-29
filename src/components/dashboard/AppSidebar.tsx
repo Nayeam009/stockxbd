@@ -44,6 +44,7 @@ import {
 import stockXLogo from "@/assets/stock-x-logo.png";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface AppSidebarProps {
   activeModule: string;
@@ -65,42 +66,43 @@ export const AppSidebar = ({
 }: AppSidebarProps) => {
   const { open } = useSidebar();
   const location = useLocation();
+  const { t } = useLanguage();
   
   const mainNavItems = [
-    { id: 'overview', title: 'Dashboard', icon: Home, roles: ['owner', 'manager', 'driver'] },
-    { id: 'pos', title: 'Point of Sale', icon: Receipt, roles: ['owner', 'manager', 'driver'] },
+    { id: 'overview', titleKey: 'overview', icon: Home, roles: ['owner', 'manager', 'driver'] },
+    { id: 'pos', titleKey: 'pos', icon: Receipt, roles: ['owner', 'manager', 'driver'] },
   ];
 
   const salesItems = [
-    { id: 'daily-sales', title: 'Daily Sales', icon: BarChart3, roles: ['owner', 'manager'] },
-    { id: 'daily-expenses', title: 'Daily Expenses', icon: Wallet, roles: ['owner', 'manager'] },
-    { id: 'analytics', title: 'Analytics', icon: BarChart3, roles: ['owner', 'manager'] },
+    { id: 'daily-sales', titleKey: 'daily_sales', icon: BarChart3, roles: ['owner', 'manager'] },
+    { id: 'daily-expenses', titleKey: 'daily_expenses', icon: Wallet, roles: ['owner', 'manager'] },
+    { id: 'analytics', titleKey: 'analysis', icon: BarChart3, roles: ['owner', 'manager'] },
   ];
 
   const inventoryItems = [
-    { id: 'lpg-stock', title: 'LPG Stock (22mm)', icon: Flame, roles: ['owner', 'manager'], badge: analytics.lowStockItems.length > 0 ? analytics.lowStockItems.length : null },
-    { id: 'lpg-stock-20mm', title: 'LPG Stock (20mm)', icon: Flame, roles: ['owner', 'manager'] },
-    { id: 'stove-stock', title: 'Gas Stove', icon: ChefHat, roles: ['owner', 'manager'] },
-    { id: 'regulators', title: 'Regulators', icon: Wrench, roles: ['owner', 'manager'] },
-    { id: 'product-pricing', title: 'Product Pricing', icon: Tag, roles: ['owner', 'manager'] },
+    { id: 'lpg-stock', titleKey: 'lpg_stock', titleSuffix: ' (22mm)', icon: Flame, roles: ['owner', 'manager'], badge: analytics.lowStockItems.length > 0 ? analytics.lowStockItems.length : null },
+    { id: 'lpg-stock-20mm', titleKey: 'lpg_stock', titleSuffix: ' (20mm)', icon: Flame, roles: ['owner', 'manager'] },
+    { id: 'stove-stock', titleKey: 'stove_stock', icon: ChefHat, roles: ['owner', 'manager'] },
+    { id: 'regulators', titleKey: 'regulators', icon: Wrench, roles: ['owner', 'manager'] },
+    { id: 'product-pricing', titleKey: 'product_pricing', icon: Tag, roles: ['owner', 'manager'] },
   ];
 
   const operationsItems = [
-    { id: 'orders', title: 'Orders', icon: ClipboardList, roles: ['owner', 'manager', 'driver'], badge: analytics.activeOrders > 0 ? analytics.activeOrders : null },
-    { id: 'deliveries', title: 'Deliveries', icon: Truck, roles: ['owner', 'manager', 'driver'] },
-    { id: 'exchange', title: 'Exchange', icon: RefreshCw, roles: ['owner', 'manager', 'driver'] },
+    { id: 'orders', titleKey: 'online_delivery', icon: ClipboardList, roles: ['owner', 'manager', 'driver'], badge: analytics.activeOrders > 0 ? analytics.activeOrders : null },
+    { id: 'deliveries', titleKey: 'online_delivery', icon: Truck, roles: ['owner', 'manager', 'driver'] },
+    { id: 'exchange', titleKey: 'exchange', icon: RefreshCw, roles: ['owner', 'manager', 'driver'] },
   ];
 
   const managementItems = [
-    { id: 'customers', title: 'Customers', icon: Users, roles: ['owner', 'manager'] },
-    { id: 'staff-salary', title: 'Staff Salary', icon: Banknote, roles: ['owner', 'manager'] },
-    { id: 'vehicle-cost', title: 'Vehicle Cost', icon: Truck, roles: ['owner', 'manager'] },
+    { id: 'customers', titleKey: 'customers', icon: Users, roles: ['owner', 'manager'] },
+    { id: 'staff-salary', titleKey: 'staff_salary', icon: Banknote, roles: ['owner', 'manager'] },
+    { id: 'vehicle-cost', titleKey: 'vehicle_cost', icon: Truck, roles: ['owner', 'manager'] },
   ];
 
   const otherItems = [
-    { id: 'community', title: 'LPG Community', icon: Users, roles: ['owner', 'manager', 'driver'] },
-    { id: 'search', title: 'Search & Reports', icon: Search, roles: ['owner', 'manager'] },
-    { id: 'settings', title: 'Settings', icon: Settings, roles: ['owner', 'manager'] },
+    { id: 'community', titleKey: 'community', icon: Users, roles: ['owner', 'manager', 'driver'] },
+    { id: 'search', titleKey: 'search', icon: Search, roles: ['owner', 'manager'] },
+    { id: 'settings', titleKey: 'settings', icon: Settings, roles: ['owner', 'manager'] },
   ];
 
   const filterByRole = (items: typeof mainNavItems) => 
@@ -119,7 +121,7 @@ export const AppSidebar = ({
     }
   };
 
-  const renderNavGroup = (items: { id: string; title: string; icon: any; roles: string[]; badge?: number | null }[], label?: string) => {
+  const renderNavGroup = (items: { id: string; titleKey: string; titleSuffix?: string; icon: any; roles: string[]; badge?: number | null }[], label?: string) => {
     const filteredItems = items.filter(item => item.roles.includes(userRole));
     if (filteredItems.length === 0) return null;
 
@@ -135,6 +137,7 @@ export const AppSidebar = ({
             {filteredItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeModule === item.id;
+              const displayTitle = t(item.titleKey) + (item.titleSuffix || '');
               
               return (
                 <SidebarMenuItem key={item.id}>
@@ -150,7 +153,7 @@ export const AppSidebar = ({
                     <Icon className={`h-4 w-4 ${isActive ? 'text-primary' : ''}`} />
                     {open && (
                       <div className="flex items-center justify-between w-full">
-                        <span className={`font-medium ${isActive ? 'text-primary' : ''}`}>{item.title}</span>
+                        <span className={`font-medium ${isActive ? 'text-primary' : ''}`}>{displayTitle}</span>
                         {item.badge && (
                           <Badge 
                             variant="destructive" 
@@ -242,11 +245,11 @@ export const AppSidebar = ({
               className="w-full justify-start text-muted-foreground hover:text-foreground hover:bg-accent/50"
               onClick={async () => {
                 await supabase.auth.signOut();
-                toast({ title: "Signed out successfully" });
+                toast({ title: t("logout") });
               }}
             >
               <LogOut className="h-4 w-4 mr-2" />
-              Sign Out
+              {t("logout")}
             </Button>
           </div>
         ) : (
