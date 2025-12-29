@@ -40,6 +40,7 @@ import { Order } from "@/hooks/useDashboardData";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { orderSchema, parsePositiveNumber, parsePositiveInt, sanitizeString } from "@/lib/validationSchemas";
 
 interface OnlineDeliveryModuleProps {
   orders: Order[];
@@ -128,10 +129,29 @@ export const OnlineDeliveryModule = ({ orders, setOrders, drivers, userRole }: O
   };
 
   const handleCreateOrder = async () => {
-    if (!newOrder.customerName || !newOrder.deliveryAddress || !newOrder.productName) {
-      toast.error("Please fill all required fields");
+    // Validate inputs using zod schema
+    const validationResult = orderSchema.safeParse({
+      customerName: newOrder.customerName,
+      deliveryAddress: newOrder.deliveryAddress,
+      productName: newOrder.productName,
+      quantity: newOrder.quantity,
+      price: newOrder.price
+    });
+
+    if (!validationResult.success) {
+      const firstError = validationResult.error.errors[0];
+      toast.error(firstError.message || "Please fill all required fields correctly");
       return;
     }
+
+    // Use validated and sanitized data
+    const sanitizedOrder = {
+      customerName: sanitizeString(newOrder.customerName),
+      deliveryAddress: sanitizeString(newOrder.deliveryAddress),
+      productName: sanitizeString(newOrder.productName),
+      quantity: parsePositiveInt(String(newOrder.quantity), 10000),
+      price: parsePositiveNumber(String(newOrder.price), 10000000)
+    };
 
     setLoading(true);
     try {
@@ -148,9 +168,9 @@ export const OnlineDeliveryModule = ({ orders, setOrders, drivers, userRole }: O
         .insert({
           order_number: orderNumber,
           customer_id: newOrder.customerId || null,
-          customer_name: newOrder.customerName,
-          delivery_address: newOrder.deliveryAddress,
-          total_amount: newOrder.price * newOrder.quantity,
+          customer_name: sanitizedOrder.customerName,
+          delivery_address: sanitizedOrder.deliveryAddress,
+          total_amount: sanitizedOrder.price * sanitizedOrder.quantity,
           status: 'pending',
           payment_status: 'pending',
           created_by: userData.user.id
@@ -165,9 +185,9 @@ export const OnlineDeliveryModule = ({ orders, setOrders, drivers, userRole }: O
         await supabase.from('order_items').insert({
           order_id: order.id,
           product_id: newOrder.productId || null,
-          product_name: newOrder.productName,
-          quantity: newOrder.quantity,
-          price: newOrder.price
+          product_name: sanitizedOrder.productName,
+          quantity: sanitizedOrder.quantity,
+          price: sanitizedOrder.price
         });
       }
 
