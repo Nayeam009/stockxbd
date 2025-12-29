@@ -18,6 +18,8 @@ import { VehicleCostModule } from "@/components/dashboard/modules/VehicleCostMod
 import { StaffSalaryModule } from "@/components/dashboard/modules/StaffSalaryModule";
 import { CustomerManagementModule } from "@/components/dashboard/modules/CustomerManagementModule";
 import { SettingsModule } from "@/components/dashboard/modules/SettingsModule";
+import { ProfileModule } from "@/components/dashboard/modules/ProfileModule";
+import { ExchangeModule } from "@/components/dashboard/modules/ExchangeModule";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -110,17 +112,9 @@ const Dashboard = () => {
       case "regulators":
         return <RegulatorsModule />;
       case "exchange":
-        return (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-3xl font-bold text-primary">Cylinder Exchange</h2>
-              <p className="text-muted-foreground">Manage cylinder exchange and refill operations</p>
-            </div>
-            <div className="text-center py-12 bg-card rounded-lg border border-border">
-              <p className="text-lg text-muted-foreground">Exchange module coming soon...</p>
-            </div>
-          </div>
-        );
+        return <ExchangeModule />;
+      case "profile":
+        return <ProfileModule />;
       case "deliveries":
         return (
           <OnlineDeliveryModule
