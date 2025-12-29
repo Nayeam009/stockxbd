@@ -4,20 +4,23 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { 
   Plus, 
   ThumbsUp, 
   MessageCircle, 
   Phone,
-  RefreshCw,
+  RefreshCcw,
   Loader2,
   Trash2,
-  Send
+  Send,
+  ArrowRightLeft
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
+import { ExchangeModule } from "./ExchangeModule";
 
 interface Post {
   id: string;
@@ -39,11 +42,25 @@ interface Comment {
   user_id: string;
 }
 
+interface Exchange {
+  id: string;
+  user_id: string;
+  author_name: string;
+  from_brand: string;
+  from_weight: string;
+  to_brand: string;
+  to_weight: string;
+  quantity: number;
+  created_at: string;
+}
+
 export const CommunityModule = () => {
   const [posts, setPosts] = useState<Post[]>([]);
+  const [exchanges, setExchanges] = useState<Exchange[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showExchange, setShowExchange] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newContent, setNewContent] = useState("");
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -63,7 +80,7 @@ export const CommunityModule = () => {
         setUserName(user.email?.split('@')[0] || 'User');
       }
 
-      await fetchPosts();
+      await Promise.all([fetchPosts(), fetchExchanges()]);
     };
 
     fetchData();
@@ -76,8 +93,16 @@ export const CommunityModule = () => {
       })
       .subscribe();
 
+    const exchangesChannel = supabase
+      .channel('community-exchanges')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cylinder_exchanges' }, () => {
+        fetchExchanges();
+      })
+      .subscribe();
+
     return () => {
       supabase.removeChannel(postsChannel);
+      supabase.removeChannel(exchangesChannel);
     };
   }, []);
 
@@ -113,6 +138,19 @@ export const CommunityModule = () => {
     }
     
     setLoading(false);
+  };
+
+  const fetchExchanges = async () => {
+    const { data, error } = await supabase
+      .from('cylinder_exchanges')
+      .select('*')
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    if (!error && data) {
+      setExchanges(data);
+    }
   };
 
   const handleCreatePost = async () => {
@@ -298,6 +336,11 @@ export const CommunityModule = () => {
     }
   };
 
+  // Show Exchange Module
+  if (showExchange) {
+    return <ExchangeModule onBack={() => setShowExchange(false)} />;
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -316,8 +359,8 @@ export const CommunityModule = () => {
           <p className="text-muted-foreground">Connect, share, and learn with other LPG professionals.</p>
         </div>
         <div className="flex gap-3">
-          <Button variant="outline" onClick={fetchPosts}>
-            <RefreshCw className="h-4 w-4 mr-2" />
+          <Button variant="outline" onClick={() => setShowExchange(true)}>
+            <RefreshCcw className="h-4 w-4 mr-2" />
             Exchange
           </Button>
           <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
@@ -357,116 +400,169 @@ export const CommunityModule = () => {
         </div>
       </div>
 
-      {/* Posts Grid */}
-      {posts.length === 0 ? (
-        <Card className="border-0 shadow-lg">
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <MessageCircle className="h-16 w-16 text-muted-foreground/50 mb-4" />
-            <h3 className="text-lg font-medium text-muted-foreground">No posts yet</h3>
-            <p className="text-sm text-muted-foreground">Be the first to start a discussion!</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {posts.map(post => (
-            <Card key={post.id} className="border border-border hover:border-primary/30 transition-colors shadow-lg">
-              <CardHeader className="pb-3">
-                <div className="flex items-center gap-3">
-                  <Avatar className="h-10 w-10 bg-muted">
-                    <AvatarFallback className="bg-primary/10 text-primary text-sm">
-                      {getInitials(post.author_name)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-foreground truncate">{post.author_name}</p>
-                    <p className="text-xs text-muted-foreground">{formatTime(post.created_at)}</p>
+      {/* Exchange Posts Section */}
+      {exchanges.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <ArrowRightLeft className="h-5 w-5 text-primary" />
+            <h3 className="text-lg font-semibold text-foreground">Recent Exchange Offers</h3>
+          </div>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {exchanges.slice(0, 6).map(exchange => (
+              <Card key={exchange.id} className="border border-primary/20 bg-primary/5 hover:border-primary/40 transition-colors">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3 mb-3">
+                    <Avatar className="h-8 w-8 bg-primary/10">
+                      <AvatarFallback className="text-primary text-xs">
+                        {getInitials(exchange.author_name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm text-foreground truncate">{exchange.author_name}</p>
+                      <p className="text-xs text-muted-foreground">{formatTime(exchange.created_at)}</p>
+                    </div>
+                    <Badge variant="secondary" className="bg-primary/10 text-primary">
+                      Exchange
+                    </Badge>
                   </div>
-                  {post.user_id === currentUserId && (
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                      onClick={() => handleDeletePost(post.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
+                  <div className="flex items-center justify-between gap-2 text-sm">
+                    <div className="text-center flex-1">
+                      <p className="font-medium text-foreground">{exchange.from_brand}</p>
+                      <p className="text-xs text-muted-foreground">{exchange.from_weight}</p>
+                    </div>
+                    <ArrowRightLeft className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <div className="text-center flex-1">
+                      <p className="font-medium text-foreground">{exchange.to_brand}</p>
+                      <p className="text-xs text-muted-foreground">{exchange.to_weight}</p>
+                    </div>
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-border/50 flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Qty: <span className="font-medium text-foreground">{exchange.quantity}</span></span>
+                    <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground">
+                      <Phone className="h-4 w-4" />
+                      Contact
                     </Button>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <h3 className="font-semibold text-foreground mb-2 line-clamp-2">{post.title}</h3>
-                  <p className="text-sm text-muted-foreground line-clamp-4">{post.content}</p>
-                </div>
-                
-                {/* Actions */}
-                <div className="flex items-center gap-4 pt-2 border-t border-border">
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className={`gap-2 ${post.isLiked ? 'text-primary' : 'text-muted-foreground'}`}
-                    onClick={() => handleLike(post.id, post.isLiked || false)}
-                  >
-                    <ThumbsUp className={`h-4 w-4 ${post.isLiked ? 'fill-current' : ''}`} />
-                    {post.likes_count}
-                  </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="gap-2 text-muted-foreground"
-                    onClick={() => handleExpandComments(post.id)}
-                  >
-                    <MessageCircle className="h-4 w-4" />
-                    {post.comments_count}
-                  </Button>
-                  <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground">
-                    <Phone className="h-4 w-4" />
-                  </Button>
-                </div>
-
-                {/* Comments Section */}
-                {expandedPost === post.id && (
-                  <div className="space-y-3 pt-3 border-t border-border">
-                    {loadingComments ? (
-                      <div className="flex justify-center py-4">
-                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                      </div>
-                    ) : (
-                      <>
-                        {comments[post.id]?.map(comment => (
-                          <div key={comment.id} className="flex gap-2">
-                            <Avatar className="h-7 w-7">
-                              <AvatarFallback className="text-xs bg-muted">
-                                {getInitials(comment.author_name)}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1 bg-muted/50 rounded-lg px-3 py-2">
-                              <p className="text-xs font-medium">{comment.author_name}</p>
-                              <p className="text-sm text-muted-foreground">{comment.content}</p>
-                            </div>
-                          </div>
-                        ))}
-                        <div className="flex gap-2">
-                          <Input
-                            placeholder="Write a comment..."
-                            value={newComment}
-                            onChange={(e) => setNewComment(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleAddComment(post.id)}
-                            className="flex-1"
-                          />
-                          <Button size="icon" onClick={() => handleAddComment(post.id)}>
-                            <Send className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </>
-                    )}
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </div>
       )}
+
+      {/* Posts Grid */}
+      <div className="space-y-3">
+        <h3 className="text-lg font-semibold text-foreground">Community Posts</h3>
+        {posts.length === 0 ? (
+          <Card className="border-0 shadow-lg">
+            <CardContent className="flex flex-col items-center justify-center py-16">
+              <MessageCircle className="h-16 w-16 text-muted-foreground/50 mb-4" />
+              <h3 className="text-lg font-medium text-muted-foreground">No posts yet</h3>
+              <p className="text-sm text-muted-foreground">Be the first to start a discussion!</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {posts.map(post => (
+              <Card key={post.id} className="border border-border hover:border-primary/30 transition-colors shadow-lg">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-10 w-10 bg-muted">
+                      <AvatarFallback className="bg-primary/10 text-primary text-sm">
+                        {getInitials(post.author_name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-foreground truncate">{post.author_name}</p>
+                      <p className="text-xs text-muted-foreground">{formatTime(post.created_at)}</p>
+                    </div>
+                    {post.user_id === currentUserId && (
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                        onClick={() => handleDeletePost(post.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <h3 className="font-semibold text-foreground mb-2 line-clamp-2">{post.title}</h3>
+                    <p className="text-sm text-muted-foreground line-clamp-4">{post.content}</p>
+                  </div>
+                  
+                  {/* Actions */}
+                  <div className="flex items-center gap-4 pt-2 border-t border-border">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className={`gap-2 ${post.isLiked ? 'text-primary' : 'text-muted-foreground'}`}
+                      onClick={() => handleLike(post.id, post.isLiked || false)}
+                    >
+                      <ThumbsUp className={`h-4 w-4 ${post.isLiked ? 'fill-current' : ''}`} />
+                      {post.likes_count}
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="gap-2 text-muted-foreground"
+                      onClick={() => handleExpandComments(post.id)}
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                      {post.comments_count}
+                    </Button>
+                    <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground">
+                      <Phone className="h-4 w-4" />
+                    </Button>
+                  </div>
+
+                  {/* Comments Section */}
+                  {expandedPost === post.id && (
+                    <div className="space-y-3 pt-3 border-t border-border">
+                      {loadingComments ? (
+                        <div className="flex justify-center py-4">
+                          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                        </div>
+                      ) : (
+                        <>
+                          {comments[post.id]?.map(comment => (
+                            <div key={comment.id} className="flex gap-2">
+                              <Avatar className="h-7 w-7">
+                                <AvatarFallback className="text-xs bg-muted">
+                                  {getInitials(comment.author_name)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex-1 bg-muted/50 rounded-lg px-3 py-2">
+                                <p className="text-xs font-medium">{comment.author_name}</p>
+                                <p className="text-sm text-muted-foreground">{comment.content}</p>
+                              </div>
+                            </div>
+                          ))}
+                          <div className="flex gap-2">
+                            <Input
+                              placeholder="Write a comment..."
+                              value={newComment}
+                              onChange={(e) => setNewComment(e.target.value)}
+                              onKeyDown={(e) => e.key === 'Enter' && handleAddComment(post.id)}
+                              className="flex-1"
+                            />
+                            <Button size="icon" onClick={() => handleAddComment(post.id)}>
+                              <Send className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

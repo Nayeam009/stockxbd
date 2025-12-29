@@ -203,6 +203,48 @@ export type Database = {
         }
         Relationships: []
       }
+      cylinder_exchanges: {
+        Row: {
+          author_name: string
+          created_at: string
+          from_brand: string
+          from_weight: string
+          id: string
+          quantity: number
+          status: string
+          to_brand: string
+          to_weight: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          author_name: string
+          created_at?: string
+          from_brand: string
+          from_weight: string
+          id?: string
+          quantity?: number
+          status?: string
+          to_brand: string
+          to_weight: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          author_name?: string
+          created_at?: string
+          from_brand?: string
+          from_weight?: string
+          id?: string
+          quantity?: number
+          status?: string
+          to_brand?: string
+          to_weight?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       daily_expenses: {
         Row: {
           amount: number
