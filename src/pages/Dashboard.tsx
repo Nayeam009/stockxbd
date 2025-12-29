@@ -16,6 +16,8 @@ import { CommunityModule } from "@/components/dashboard/modules/CommunityModule"
 import { ProductPricingModule } from "@/components/dashboard/modules/ProductPricingModule";
 import { VehicleCostModule } from "@/components/dashboard/modules/VehicleCostModule";
 import { StaffSalaryModule } from "@/components/dashboard/modules/StaffSalaryModule";
+import { CustomerManagementModule } from "@/components/dashboard/modules/CustomerManagementModule";
+import { SettingsModule } from "@/components/dashboard/modules/SettingsModule";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -129,31 +131,9 @@ const Dashboard = () => {
           />
         );
       case "customers":
-        return (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-3xl font-bold text-primary">Customer Management</h2>
-              <p className="text-muted-foreground">Manage customer database and records</p>
-            </div>
-            <div className="grid gap-4">
-              {customers.slice(0, 10).map((customer) => (
-                <div key={customer.id} className="p-4 bg-card rounded-lg border border-border shadow-elegant">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="font-semibold text-foreground">{customer.name}</h3>
-                      <p className="text-sm text-muted-foreground">{customer.phone}</p>
-                      <p className="text-sm text-muted-foreground">{customer.address}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-medium">{customer.totalOrders} orders</p>
-                      <p className="text-sm text-muted-foreground">৳{customer.outstanding} outstanding</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
+        return <CustomerManagementModule />;
+      case "settings":
+        return <SettingsModule />;
       case "product-pricing":
         return <ProductPricingModule />;
       case "analytics":
