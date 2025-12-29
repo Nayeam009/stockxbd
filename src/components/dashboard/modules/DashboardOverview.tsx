@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
 import { supabase } from "@/integrations/supabase/client";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface DashboardOverviewProps {
   analytics: {
@@ -48,6 +49,7 @@ interface RecentActivity {
 }
 
 export const DashboardOverview = ({ analytics, drivers, userRole, setActiveModule }: DashboardOverviewProps) => {
+  const { t, language } = useLanguage();
   const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([]);
   const [loadingActivities, setLoadingActivities] = useState(true);
 
