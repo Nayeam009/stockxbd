@@ -397,6 +397,54 @@ export type Database = {
           },
         ]
       }
+      product_prices: {
+        Row: {
+          brand_id: string | null
+          company_price: number
+          created_at: string
+          created_by: string | null
+          distributor_price: number
+          id: string
+          is_active: boolean
+          product_name: string
+          product_type: string
+          retail_price: number
+          size: string | null
+          updated_at: string
+          variant: string | null
+        }
+        Insert: {
+          brand_id?: string | null
+          company_price?: number
+          created_at?: string
+          created_by?: string | null
+          distributor_price?: number
+          id?: string
+          is_active?: boolean
+          product_name: string
+          product_type: string
+          retail_price?: number
+          size?: string | null
+          updated_at?: string
+          variant?: string | null
+        }
+        Update: {
+          brand_id?: string | null
+          company_price?: number
+          created_at?: string
+          created_by?: string | null
+          distributor_price?: number
+          id?: string
+          is_active?: boolean
+          product_name?: string
+          product_type?: string
+          retail_price?: number
+          size?: string | null
+          updated_at?: string
+          variant?: string | null
+        }
+        Relationships: []
+      }
       products: {
         Row: {
           category: Database["public"]["Enums"]["product_category"]
@@ -472,6 +520,80 @@ export type Database = {
         }
         Relationships: []
       }
+      staff: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          name: string
+          phone: string | null
+          role: string
+          salary: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          phone?: string | null
+          role?: string
+          salary?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          phone?: string | null
+          role?: string
+          salary?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      staff_payments: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          payment_date: string
+          staff_id: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          payment_date?: string
+          staff_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          payment_date?: string
+          staff_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_payments_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stoves: {
         Row: {
           brand: string
@@ -529,6 +651,77 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      vehicle_costs: {
+        Row: {
+          amount: number
+          cost_date: string
+          cost_type: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          vehicle_id: string
+        }
+        Insert: {
+          amount?: number
+          cost_date?: string
+          cost_type: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          vehicle_id: string
+        }
+        Update: {
+          amount?: number
+          cost_date?: string
+          cost_type?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          vehicle_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_costs_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vehicles: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          license_plate: string | null
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          license_plate?: string | null
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          license_plate?: string | null
+          name?: string
+          updated_at?: string
         }
         Relationships: []
       }
