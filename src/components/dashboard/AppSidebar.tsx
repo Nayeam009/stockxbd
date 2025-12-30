@@ -129,12 +129,12 @@ export const AppSidebar = ({
     return (
       <SidebarGroup>
         {label && open && (
-          <SidebarGroupLabel className="text-xs uppercase tracking-wider text-muted-foreground/70 font-semibold px-3 mb-1">
+          <SidebarGroupLabel className="text-[10px] uppercase tracking-widest text-muted-foreground/60 font-bold px-3 mb-2">
             {label}
           </SidebarGroupLabel>
         )}
         <SidebarGroupContent>
-          <SidebarMenu>
+          <SidebarMenu className="space-y-1">
             {filteredItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeModule === item.id;
@@ -145,20 +145,26 @@ export const AppSidebar = ({
                   <SidebarMenuButton 
                     onClick={() => handleModuleChange(item.id)}
                     isActive={isActive}
-                    className={`relative group transition-all duration-200 rounded-lg mx-2 ${
+                    className={`relative group transition-all duration-200 rounded-xl mx-1 h-10 ${
                       isActive 
-                        ? 'bg-primary/10 text-primary border-l-2 border-primary' 
-                        : 'hover:bg-accent/50 text-muted-foreground hover:text-foreground'
+                        ? 'bg-gradient-to-r from-primary/15 to-secondary/10 text-primary shadow-sm border-l-3 border-primary' 
+                        : 'hover:bg-muted/50 text-muted-foreground hover:text-foreground'
                     }`}
                   >
-                    <Icon className={`h-4 w-4 ${isActive ? 'text-primary' : ''}`} />
+                    <div className={`h-8 w-8 rounded-lg flex items-center justify-center transition-all duration-200 ${
+                      isActive 
+                        ? 'bg-gradient-to-br from-primary to-secondary shadow-md' 
+                        : 'bg-muted/50 group-hover:bg-primary/10'
+                    }`}>
+                      <Icon className={`h-4 w-4 ${isActive ? 'text-primary-foreground' : 'group-hover:text-primary'}`} />
+                    </div>
                     {open && (
-                      <div className="flex items-center justify-between w-full">
-                        <span className={`font-medium ${isActive ? 'text-primary' : ''}`}>{displayTitle}</span>
+                      <div className="flex items-center justify-between w-full ml-1">
+                        <span className={`text-sm font-medium ${isActive ? 'text-primary' : ''}`}>{displayTitle}</span>
                         {item.badge && (
                           <Badge 
                             variant="destructive" 
-                            className="h-5 px-1.5 text-xs animate-pulse ml-2"
+                            className="h-5 min-w-5 px-1.5 text-[10px] font-bold animate-pulse ml-2"
                           >
                             {item.badge}
                           </Badge>
@@ -168,7 +174,7 @@ export const AppSidebar = ({
                     {!open && item.badge && (
                       <Badge 
                         variant="destructive" 
-                        className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center text-xs animate-pulse"
+                        className="absolute -top-1 -right-1 h-4 min-w-4 p-0 flex items-center justify-center text-[10px] font-bold animate-pulse"
                       >
                         {item.badge}
                       </Badge>
@@ -187,63 +193,65 @@ export const AppSidebar = ({
   };
 
   return (
-    <Sidebar collapsible="icon" className="border-r border-border/50 bg-sidebar">
-      <SidebarHeader className="border-b border-border/50 p-4">
+    <Sidebar collapsible="icon" className="border-r border-border/30 bg-gradient-to-b from-sidebar to-sidebar/95 shadow-xl">
+      {/* Modern Header */}
+      <SidebarHeader className="border-b border-border/30 p-4 bg-gradient-to-r from-primary/5 to-secondary/5">
         <div className="flex items-center space-x-3">
           <div className="relative">
-            <img src={stockXLogo} alt="Stock-X Logo" className="h-10 w-10 shrink-0 rounded-lg" />
-            <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 bg-green-500 rounded-full border-2 border-sidebar"></div>
+            <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-primary to-secondary p-0.5 shadow-lg">
+              <img src={stockXLogo} alt="Stock-X Logo" className="h-full w-full rounded-[10px] bg-card object-cover" />
+            </div>
+            <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 bg-accent rounded-full border-2 border-sidebar ring-2 ring-accent/20"></div>
           </div>
           {open && (
             <div className="animate-fade-in">
-              <h2 className="text-lg font-bold bg-gradient-to-r from-primary to-orange-400 bg-clip-text text-transparent">Stock-X</h2>
-              <p className="text-xs text-muted-foreground">LPG Management System</p>
+              <h2 className="text-lg font-bold bg-gradient-to-r from-primary via-secondary to-primary bg-clip-text text-transparent">Stock-X</h2>
+              <p className="text-[11px] text-muted-foreground font-medium tracking-wide">LPG Management</p>
             </div>
           )}
         </div>
       </SidebarHeader>
 
-      <SidebarContent className="py-2">
+      <SidebarContent className="py-3 px-2">
         {renderNavGroup(mainNavItems)}
         
-        {open && <Separator className="my-2 mx-4 bg-border/50" />}
+        <div className="my-3 mx-2 h-px bg-gradient-to-r from-transparent via-border/50 to-transparent" />
         {renderNavGroup(salesItems, 'Sales & Finance')}
         
-        {open && <Separator className="my-2 mx-4 bg-border/50" />}
+        <div className="my-3 mx-2 h-px bg-gradient-to-r from-transparent via-border/50 to-transparent" />
         {renderNavGroup(inventoryItems, 'Inventory')}
         
-        {open && <Separator className="my-2 mx-4 bg-border/50" />}
+        <div className="my-3 mx-2 h-px bg-gradient-to-r from-transparent via-border/50 to-transparent" />
         {renderNavGroup(operationsItems, 'Operations')}
         
-        {open && <Separator className="my-2 mx-4 bg-border/50" />}
+        <div className="my-3 mx-2 h-px bg-gradient-to-r from-transparent via-border/50 to-transparent" />
         {renderNavGroup(managementItems, 'Management')}
         
-        {open && <Separator className="my-2 mx-4 bg-border/50" />}
+        <div className="my-3 mx-2 h-px bg-gradient-to-r from-transparent via-border/50 to-transparent" />
         {renderNavGroup(otherItems, 'Other')}
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-border/50 p-4">
+      {/* Modern Footer */}
+      <SidebarFooter className="border-t border-border/30 p-3 bg-gradient-to-r from-primary/5 to-secondary/5">
         {open ? (
           <div className="space-y-3 animate-fade-in">
-            <div className="flex items-center space-x-3 p-3 bg-accent/30 rounded-xl border border-border/50">
-              <div className="h-10 w-10 bg-gradient-to-br from-primary to-orange-400 rounded-full flex items-center justify-center shrink-0 shadow-lg">
+            <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-muted/50 to-muted/30 rounded-xl border border-border/30 backdrop-blur-sm">
+              <div className="h-11 w-11 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center shrink-0 shadow-lg ring-2 ring-primary/20">
                 <User className="h-5 w-5 text-primary-foreground" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground truncate">{userName}</p>
-                <div className="flex items-center space-x-2 mt-1">
-                  <Badge 
-                    className={`text-xs ${getRoleColor(userRole)} border-0`}
-                  >
-                    {userRole.charAt(0).toUpperCase() + userRole.slice(1)}
-                  </Badge>
-                </div>
+                <p className="text-sm font-semibold text-foreground truncate">{userName}</p>
+                <Badge 
+                  className={`mt-1 text-[10px] px-2 py-0 ${getRoleColor(userRole)} border-0 shadow-sm`}
+                >
+                  {userRole.charAt(0).toUpperCase() + userRole.slice(1)}
+                </Badge>
               </div>
             </div>
             <Button 
               variant="ghost" 
               size="sm" 
-              className="w-full justify-start text-muted-foreground hover:text-foreground hover:bg-accent/50"
+              className="w-full justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
               onClick={async () => {
                 await supabase.auth.signOut();
                 toast({ title: t("logout") });
@@ -255,13 +263,13 @@ export const AppSidebar = ({
           </div>
         ) : (
           <div className="flex flex-col items-center gap-2">
-            <div className="h-8 w-8 bg-gradient-to-br from-primary to-orange-400 rounded-full flex items-center justify-center shadow-lg">
+            <div className="h-9 w-9 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center shadow-lg">
               <User className="h-4 w-4 text-primary-foreground" />
             </div>
             <Button 
               variant="ghost" 
               size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+              className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg"
               onClick={async () => {
                 await supabase.auth.signOut();
                 toast({ title: "Signed out successfully" });
