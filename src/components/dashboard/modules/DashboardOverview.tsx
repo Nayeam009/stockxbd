@@ -1,15 +1,9 @@
-import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { 
-  Package, 
   Users, 
-  FileText, 
   Banknote, 
   TrendingUp,
-  AlertCircle,
-  CheckCircle,
-  Clock,
   Truck,
   Receipt,
   Wallet,
@@ -19,10 +13,10 @@ import {
   RefreshCw,
   Tag,
   BarChart3,
-  Settings
+  Settings,
+  Package
 } from "lucide-react";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
-import { supabase } from "@/integrations/supabase/client";
 import { useLanguage } from "@/contexts/LanguageContext";
 
 interface DashboardOverviewProps {
@@ -39,120 +33,8 @@ interface DashboardOverviewProps {
   setActiveModule?: (module: string) => void;
 }
 
-interface RecentActivity {
-  id: string;
-  title: string;
-  description: string;
-  time: string;
-  status: 'pending' | 'completed' | 'warning';
-  icon: any;
-}
-
 export const DashboardOverview = ({ analytics, drivers, userRole, setActiveModule }: DashboardOverviewProps) => {
-  const { t, language } = useLanguage();
-  const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([]);
-  const [loadingActivities, setLoadingActivities] = useState(true);
-
-  useEffect(() => {
-    const fetchRecentActivities = async () => {
-      try {
-        const activities: RecentActivity[] = [];
-
-        // Fetch recent orders
-        const { data: recentOrders } = await supabase
-          .from('orders')
-          .select('id, customer_name, total_amount, status, created_at')
-          .order('created_at', { ascending: false })
-          .limit(3);
-
-        if (recentOrders) {
-          recentOrders.forEach(order => {
-            const timeAgo = getTimeAgo(new Date(order.created_at));
-            activities.push({
-              id: `order-${order.id}`,
-              title: order.status === 'delivered' ? 'Delivery completed' : `New order from ${order.customer_name}`,
-              description: order.status === 'delivered' 
-                ? `Order delivered to ${order.customer_name}`
-                : `Order total: ${BANGLADESHI_CURRENCY_SYMBOL}${order.total_amount.toLocaleString()}`,
-              time: timeAgo,
-              status: order.status === 'delivered' ? 'completed' : order.status === 'pending' ? 'pending' : 'completed',
-              icon: order.status === 'delivered' ? CheckCircle : FileText
-            });
-          });
-        }
-
-        // Fetch recent POS transactions
-        const { data: recentTransactions } = await supabase
-          .from('pos_transactions')
-          .select('id, transaction_number, total, payment_method, created_at')
-          .order('created_at', { ascending: false })
-          .limit(2);
-
-        if (recentTransactions) {
-          recentTransactions.forEach(txn => {
-            const timeAgo = getTimeAgo(new Date(txn.created_at));
-            activities.push({
-              id: `txn-${txn.id}`,
-              title: 'Payment received',
-              description: `${BANGLADESHI_CURRENCY_SYMBOL}${Number(txn.total).toLocaleString()} via ${txn.payment_method}`,
-              time: timeAgo,
-              status: 'completed',
-              icon: Banknote
-            });
-          });
-        }
-
-        // Add low stock alert if any
-        if (analytics.lowStockItems.length > 0) {
-          activities.push({
-            id: 'low-stock',
-            title: 'Low stock alert',
-            description: `${analytics.lowStockItems.length} items below minimum stock`,
-            time: 'Now',
-            status: 'warning',
-            icon: AlertCircle
-          });
-        }
-
-        // Sort by time (most recent first)
-        setRecentActivities(activities.slice(0, 5));
-      } catch (error) {
-        console.error('Error fetching activities:', error);
-      } finally {
-        setLoadingActivities(false);
-      }
-    };
-
-    fetchRecentActivities();
-
-    // Subscribe to realtime updates
-    const channel = supabase
-      .channel('dashboard-updates')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, () => {
-        fetchRecentActivities();
-      })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pos_transactions' }, () => {
-        fetchRecentActivities();
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [analytics.lowStockItems.length]);
-
-  const getTimeAgo = (date: Date): string => {
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins} min ago`;
-    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
-    return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
-  };
+  const { t } = useLanguage();
 
   const stats = [
     {
@@ -176,7 +58,7 @@ export const DashboardOverview = ({ analytics, drivers, userRole, setActiveModul
       value: analytics.activeOrders.toString(),
       change: "+8%",
       changeType: "positive" as const,
-      icon: FileText,
+      icon: ClipboardList,
       description: "Orders in progress"
     },
     {
@@ -213,54 +95,59 @@ export const DashboardOverview = ({ analytics, drivers, userRole, setActiveModul
     }
   };
 
-  const statusColors = {
-    pending: "bg-warning/10 text-warning border-warning/20",
-    completed: "bg-accent/10 text-accent border-accent/20",
-    warning: "bg-destructive/10 text-destructive border-destructive/20"
-  };
-
   return (
-    <div className="space-y-4 sm:space-y-6 md:space-y-8 px-1 sm:px-0">
-      {/* Welcome Section */}
-      <div className="space-y-2 sm:space-y-3 animate-fade-in">
-        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-          Welcome back! 👋
-        </h1>
-        <p className="text-sm sm:text-base md:text-lg text-muted-foreground">
-          Here's what's happening with your LPG business today.
-        </p>
+    <div className="space-y-6 md:space-y-8 px-2 sm:px-0">
+      {/* Modern Welcome Section with Gradient Background */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary-dark to-secondary p-6 sm:p-8 text-primary-foreground">
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMiIvPjwvZz48L2c+PC9zdmc+')] opacity-50"></div>
+        <div className="relative z-10">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2">
+            Welcome back! 👋
+          </h1>
+          <p className="text-primary-foreground/80 text-sm sm:text-base max-w-lg">
+            Here's what's happening with your LPG business today. Manage your operations efficiently.
+          </p>
+        </div>
+        <div className="absolute -bottom-8 -right-8 h-32 w-32 rounded-full bg-secondary/20 blur-2xl"></div>
+        <div className="absolute -top-8 -left-8 h-24 w-24 rounded-full bg-primary-light/20 blur-2xl"></div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
+      {/* Stats Cards - Modern Glass Design */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         {stats.map((stat, index) => {
           const Icon = stat.icon;
+          const gradients = [
+            'from-primary/10 to-primary/5',
+            'from-secondary/10 to-secondary/5',
+            'from-accent/10 to-accent/5',
+            'from-info/10 to-info/5'
+          ];
           return (
             <Card 
               key={index} 
-              className="group border-0 shadow-elegant hover:shadow-elegant-lg transition-all duration-300 bg-gradient-to-br from-card to-muted/20 hover:scale-105 animate-fade-in"
-              style={{ animationDelay: `${index * 100}ms` }}
+              className={`group relative overflow-hidden border border-border/50 shadow-md hover:shadow-xl transition-all duration-300 bg-gradient-to-br ${gradients[index]} backdrop-blur-sm hover:-translate-y-1`}
             >
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
+              <div className="absolute top-0 right-0 h-20 w-20 bg-gradient-to-bl from-primary/5 to-transparent rounded-bl-full"></div>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">
                   {stat.title}
                 </CardTitle>
-                <div className="h-10 w-10 bg-gradient-primary rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
-                  <Icon className="h-5 w-5 text-primary-foreground" />
+                <div className="h-9 w-9 sm:h-10 sm:w-10 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  <Icon className="h-4 w-4 sm:h-5 sm:w-5 text-primary-foreground" />
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="text-3xl font-bold text-primary">{stat.value}</div>
-                  <div className="flex items-center space-x-2">
+              <CardContent className="pt-0">
+                <div className="space-y-2">
+                  <div className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground">{stat.value}</div>
+                  <div className="flex items-center gap-2 flex-wrap">
                     <Badge 
                       variant="secondary" 
-                      className={`${stat.changeType === 'positive' ? 'bg-accent/10 text-accent border-accent/20' : 'bg-destructive/10 text-destructive border-destructive/20'} font-medium`}
+                      className={`${stat.changeType === 'positive' ? 'bg-accent/20 text-accent' : 'bg-destructive/20 text-destructive'} font-medium text-xs border-0`}
                     >
                       <TrendingUp className="h-3 w-3 mr-1" />
                       {stat.change}
                     </Badge>
-                    <span className="text-sm text-muted-foreground">{stat.description}</span>
+                    <span className="text-xs text-muted-foreground hidden sm:inline">{stat.description}</span>
                   </div>
                 </div>
               </CardContent>
@@ -269,69 +156,46 @@ export const DashboardOverview = ({ analytics, drivers, userRole, setActiveModul
         })}
       </div>
 
-      <div className="grid lg:grid-cols-1 gap-6">
-        {/* Recent Activities */}
-        <Card className="border-0 shadow-elegant">
-          <CardHeader>
-            <CardTitle className="text-primary flex items-center">
-              <Clock className="h-5 w-5 mr-2" />
-              Recent Activities
-            </CardTitle>
-            <CardDescription>Latest updates from your LPG operations</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {loadingActivities ? (
-              <div className="text-center py-8 text-muted-foreground">Loading activities...</div>
-            ) : recentActivities.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">No recent activities. Start by creating orders or making sales!</div>
-            ) : (
-              recentActivities.map((activity) => {
-                const Icon = activity.icon;
-                return (
-                  <div key={activity.id} className="flex items-start space-x-3 p-4 hover:bg-surface rounded-lg transition-colors">
-                    <div className={`h-10 w-10 rounded-full flex items-center justify-center ${statusColors[activity.status]}`}>
-                      <Icon className="h-5 w-5" />
-                    </div>
-                    <div className="flex-1 space-y-1">
-                      <p className="text-sm font-medium text-foreground">{activity.title}</p>
-                      <p className="text-xs text-muted-foreground">{activity.description}</p>
-                      <p className="text-xs text-muted-foreground font-medium">{activity.time}</p>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
       {/* Driver Status - Only for owner/manager */}
       {(userRole === 'owner' || userRole === 'manager') && drivers.length > 0 && (
-        <Card className="border-0 shadow-elegant">
-          <CardHeader>
-            <CardTitle className="text-primary">Driver Status</CardTitle>
-            <CardDescription>Real-time driver performance and status</CardDescription>
+        <Card className="border border-border/50 shadow-md bg-card/80 backdrop-blur-sm">
+          <CardHeader className="pb-4">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-accent to-accent-light flex items-center justify-center">
+                <Truck className="h-5 w-5 text-accent-foreground" />
+              </div>
+              <div>
+                <CardTitle className="text-lg">Driver Status</CardTitle>
+                <CardDescription>Real-time driver performance</CardDescription>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {drivers.map((driver) => (
-                <div key={driver.id} className="p-4 bg-surface rounded-lg border border-border">
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="font-medium text-foreground">{driver.name}</h4>
+                <div key={driver.id} className="p-4 bg-muted/30 rounded-xl border border-border/50 hover:border-primary/30 transition-colors">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-semibold text-foreground">{driver.name}</h4>
                     <Badge 
                       variant="secondary"
-                      className={
-                        driver.status === 'active' ? 'bg-accent/10 text-accent border-accent/20' :
-                        driver.status === 'break' ? 'bg-warning/10 text-warning border-warning/20' :
-                        'bg-muted text-muted-foreground border-muted/20'
-                      }
+                      className={`text-xs ${
+                        driver.status === 'active' ? 'bg-accent/20 text-accent' :
+                        driver.status === 'break' ? 'bg-warning/20 text-warning' :
+                        'bg-muted text-muted-foreground'
+                      }`}
                     >
                       {driver.status}
                     </Badge>
                   </div>
-                  <div className="space-y-1 text-sm">
-                    <p className="text-muted-foreground">Today's Sales: <span className="font-medium text-foreground">{BANGLADESHI_CURRENCY_SYMBOL}{driver.todaySales.toLocaleString()}</span></p>
-                    <p className="text-muted-foreground">Deliveries: <span className="font-medium text-foreground">{driver.todayDeliveries}</span></p>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Sales</span>
+                      <span className="font-medium text-foreground">{BANGLADESHI_CURRENCY_SYMBOL}{driver.todaySales.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Deliveries</span>
+                      <span className="font-medium text-foreground">{driver.todayDeliveries}</span>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -340,29 +204,33 @@ export const DashboardOverview = ({ analytics, drivers, userRole, setActiveModul
         </Card>
       )}
 
-      {/* Full Quick Actions Grid */}
-      <Card className="border-0 shadow-elegant">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-primary text-xl">Quick Actions</CardTitle>
-              <CardDescription>Access key features of your business management.</CardDescription>
+      {/* Quick Actions Grid - Modern Design */}
+      <Card className="border border-border/50 shadow-md bg-card/80 backdrop-blur-sm">
+        <CardHeader className="pb-4">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
+              <Settings className="h-5 w-5 text-primary-foreground" />
             </div>
-            <Settings className="h-5 w-5 text-muted-foreground cursor-pointer hover:text-primary transition-colors" />
+            <div>
+              <CardTitle className="text-lg">Quick Actions</CardTitle>
+              <CardDescription>Access key features instantly</CardDescription>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-2 sm:gap-3 md:gap-4">
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-3 md:gap-4">
             {quickActions.map((action, index) => {
               const Icon = action.icon;
               return (
                 <button
                   key={index}
                   onClick={() => handleQuickAction(action.module)}
-                  className="flex flex-col items-center justify-center p-5 rounded-xl border border-border bg-card hover:bg-surface hover:border-primary/40 hover:shadow-lg transition-all duration-300 group min-h-[100px]"
+                  className="group flex flex-col items-center justify-center p-4 sm:p-5 rounded-xl border border-border/50 bg-muted/20 hover:bg-primary/10 hover:border-primary/40 transition-all duration-300 min-h-[90px] sm:min-h-[100px]"
                 >
-                  <Icon className="h-7 w-7 text-primary mb-3 group-hover:scale-110 transition-transform duration-200" />
-                  <span className="text-sm font-medium text-center text-foreground leading-tight">{action.title}</span>
+                  <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-gradient-to-br from-muted to-muted/50 group-hover:from-primary/20 group-hover:to-secondary/20 flex items-center justify-center mb-2 transition-all duration-300">
+                    <Icon className="h-5 w-5 sm:h-6 sm:w-6 text-primary group-hover:scale-110 transition-transform duration-200" />
+                  </div>
+                  <span className="text-xs sm:text-sm font-medium text-center text-foreground leading-tight">{action.title}</span>
                 </button>
               );
             })}
