@@ -537,6 +537,7 @@ export type Database = {
           distributor_price: number
           id: string
           is_active: boolean
+          package_price: number
           product_name: string
           product_type: string
           retail_price: number
@@ -552,6 +553,7 @@ export type Database = {
           distributor_price?: number
           id?: string
           is_active?: boolean
+          package_price?: number
           product_name: string
           product_type: string
           retail_price?: number
@@ -567,6 +569,7 @@ export type Database = {
           distributor_price?: number
           id?: string
           is_active?: boolean
+          package_price?: number
           product_name?: string
           product_type?: string
           retail_price?: number

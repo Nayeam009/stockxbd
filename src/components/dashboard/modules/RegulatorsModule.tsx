@@ -99,16 +99,35 @@ export const RegulatorsModule = () => {
 
     try {
       const { data: userData } = await supabase.auth.getUser();
-      const { error } = await supabase.from("regulators").insert({
-        brand: newRegulator.brand.trim(),
-        type: newRegulator.type,
-        quantity: newRegulator.quantity,
-        created_by: userData.user?.id,
-      });
+      
+      // Check if this brand + type combo already exists
+      const existing = regulators.find(
+        r => r.brand.toLowerCase() === newRegulator.brand.trim().toLowerCase() && r.type === newRegulator.type
+      );
+      
+      if (existing) {
+        // Update quantity instead
+        const newQuantity = existing.quantity + newRegulator.quantity;
+        const { error } = await supabase
+          .from("regulators")
+          .update({ quantity: newQuantity })
+          .eq("id", existing.id);
+        
+        if (error) throw error;
+        toast.success("Regulator quantity updated");
+      } else {
+        // Create new regulator
+        const { error } = await supabase.from("regulators").insert({
+          brand: newRegulator.brand.trim(),
+          type: newRegulator.type,
+          quantity: newRegulator.quantity,
+          created_by: userData.user?.id,
+        });
 
-      if (error) throw error;
+        if (error) throw error;
+        toast.success("Regulator added successfully");
+      }
 
-      toast.success("Regulator added successfully");
       setNewRegulator({ brand: "", type: "22mm", quantity: 0 });
       setIsAddDialogOpen(false);
       fetchRegulators();
@@ -229,7 +248,7 @@ export const RegulatorsModule = () => {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-foreground">Regulators Stock</h2>
-          <p className="text-muted-foreground text-sm">Manage regulator inventory by brand and type</p>
+          <p className="text-muted-foreground text-sm">Manage regulator inventory by brand and size (20mm/22mm)</p>
         </div>
 
         <div className="flex items-center gap-3 w-full sm:w-auto">
@@ -256,7 +275,7 @@ export const RegulatorsModule = () => {
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
-                  <Label>Brand Name</Label>
+                  <Label>Brand Name *</Label>
                   <Input
                     placeholder="e.g., Sena, Pamir, Bono"
                     value={newRegulator.brand}
@@ -267,7 +286,7 @@ export const RegulatorsModule = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Type</Label>
+                  <Label>Size *</Label>
                   <Select
                     value={newRegulator.type}
                     onValueChange={(value) =>
@@ -275,7 +294,7 @@ export const RegulatorsModule = () => {
                     }
                   >
                     <SelectTrigger className="bg-background border-border">
-                      <SelectValue placeholder="Select type" />
+                      <SelectValue placeholder="Select size" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="20mm">20mm</SelectItem>
@@ -298,6 +317,9 @@ export const RegulatorsModule = () => {
                     className="bg-background border-border"
                   />
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  Note: Set prices in the Product Pricing page
+                </p>
                 <Button onClick={handleAddRegulator} className="w-full">
                   Add Regulator
                 </Button>
@@ -313,7 +335,7 @@ export const RegulatorsModule = () => {
           <TableHeader>
             <TableRow className="border-border hover:bg-transparent">
               <TableHead className="text-muted-foreground font-medium">Brand</TableHead>
-              <TableHead className="text-muted-foreground font-medium">Type</TableHead>
+              <TableHead className="text-muted-foreground font-medium">Size</TableHead>
               <TableHead className="text-muted-foreground font-medium">Quantity</TableHead>
               <TableHead className="text-muted-foreground font-medium">Status</TableHead>
               <TableHead className="text-muted-foreground font-medium text-right">Actions</TableHead>
@@ -334,8 +356,10 @@ export const RegulatorsModule = () => {
                     <TableCell className="font-medium text-foreground">
                       {regulator.brand}
                     </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {regulator.type}
+                    <TableCell className="text-foreground">
+                      <Badge variant="outline" className="bg-primary/10 border-primary/20">
+                        {regulator.type}
+                      </Badge>
                     </TableCell>
                     <TableCell className="text-foreground font-semibold">
                       {regulator.quantity}
