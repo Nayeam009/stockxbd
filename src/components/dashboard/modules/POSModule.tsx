@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -20,7 +20,10 @@ import {
   Phone,
   MapPin,
   History,
-  UserPlus
+  UserPlus,
+  Search,
+  Package,
+  AlertTriangle
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -54,6 +57,14 @@ interface Regulator {
   brand: string;
   type: string;
   quantity: number;
+  price?: number;
+}
+
+interface CustomProduct {
+  id: string;
+  name: string;
+  price: number;
+  quantity: number;
 }
 
 interface Customer {
@@ -69,7 +80,7 @@ interface Customer {
 
 interface SaleItem {
   id: string;
-  type: 'lpg' | 'stove' | 'regulator';
+  type: 'lpg' | 'stove' | 'regulator' | 'custom';
   name: string;
   details: string;
   price: number;
@@ -110,6 +121,15 @@ export const POSModule = () => {
   const [stoveQuantity, setStoveQuantity] = useState("1");
   const [selectedRegulator, setSelectedRegulator] = useState("");
   const [regulatorQuantity, setRegulatorQuantity] = useState("1");
+  const [regulatorPrice, setRegulatorPrice] = useState("0");
+  
+  // Search/Filter state
+  const [productSearch, setProductSearch] = useState("");
+  
+  // Custom product state
+  const [customProductName, setCustomProductName] = useState("");
+  const [customProductPrice, setCustomProductPrice] = useState("0");
+  const [customProductQuantity, setCustomProductQuantity] = useState("1");
   
   // Data
   const [lpgBrands, setLpgBrands] = useState<LPGBrand[]>([]);
@@ -173,7 +193,52 @@ export const POSModule = () => {
     };
   }, []);
 
-  const filteredBrands = lpgBrands.filter(b => b.size === mouthSize);
+  // Filter brands by mouth size and search
+  const filteredBrands = useMemo(() => {
+    return lpgBrands.filter(b => {
+      const matchesSize = b.size === mouthSize;
+      const matchesSearch = productSearch === "" || 
+        b.name.toLowerCase().includes(productSearch.toLowerCase());
+      return matchesSize && matchesSearch;
+    });
+  }, [lpgBrands, mouthSize, productSearch]);
+
+  // Filter stoves by search
+  const filteredStoves = useMemo(() => {
+    if (productSearch === "") return stoves;
+    return stoves.filter(s => 
+      s.brand.toLowerCase().includes(productSearch.toLowerCase()) ||
+      s.model.toLowerCase().includes(productSearch.toLowerCase())
+    );
+  }, [stoves, productSearch]);
+
+  // Filter regulators by search
+  const filteredRegulators = useMemo(() => {
+    if (productSearch === "") return regulators;
+    return regulators.filter(r => 
+      r.brand.toLowerCase().includes(productSearch.toLowerCase()) ||
+      r.type.toLowerCase().includes(productSearch.toLowerCase())
+    );
+  }, [regulators, productSearch]);
+
+  // Calculate total LPG stock
+  const getLPGStock = (brandId: string, type: 'refill' | 'package') => {
+    const brand = lpgBrands.find(b => b.id === brandId);
+    if (!brand) return 0;
+    return type === 'refill' ? brand.refill_cylinder : brand.package_cylinder;
+  };
+
+  // Get stove stock
+  const getStoveStock = (stoveId: string) => {
+    const stove = stoves.find(s => s.id === stoveId);
+    return stove?.quantity || 0;
+  };
+
+  // Get regulator stock
+  const getRegulatorStock = (regulatorId: string) => {
+    const regulator = regulators.find(r => r.id === regulatorId);
+    return regulator?.quantity || 0;
+  };
 
   // Fetch customer sales history
   const fetchCustomerHistory = async (customerId: string) => {
@@ -311,6 +376,12 @@ export const POSModule = () => {
     const stove = stoves.find(s => s.id === selectedStove);
     if (!stove) return;
 
+    // Check stock
+    if (validatedQuantity > stove.quantity) {
+      toast({ title: `Only ${stove.quantity} in stock`, variant: "destructive" });
+      return;
+    }
+
     const newItem: SaleItem = {
       id: `stove-${Date.now()}`,
       type: 'stove',
@@ -328,6 +399,7 @@ export const POSModule = () => {
 
   const addRegulatorToSale = () => {
     const validatedQuantity = parsePositiveInt(regulatorQuantity, 10000);
+    const validatedPrice = parsePositiveNumber(regulatorPrice, 10000000);
     
     if (!selectedRegulator) {
       toast({ title: "Please select a regulator", variant: "destructive" });
@@ -337,19 +409,56 @@ export const POSModule = () => {
     const regulator = regulators.find(r => r.id === selectedRegulator);
     if (!regulator) return;
 
+    // Check stock
+    if (validatedQuantity > regulator.quantity) {
+      toast({ title: `Only ${regulator.quantity} in stock`, variant: "destructive" });
+      return;
+    }
+
     const newItem: SaleItem = {
       id: `reg-${Date.now()}`,
       type: 'regulator',
       name: regulator.brand,
       details: regulator.type,
-      price: 0,
+      price: validatedPrice,
       quantity: validatedQuantity
     };
 
     setSaleItems([...saleItems, newItem]);
     setSelectedRegulator("");
     setRegulatorQuantity("1");
+    setRegulatorPrice("0");
     toast({ title: "Added to sale" });
+  };
+
+  const addCustomProductToSale = () => {
+    if (!customProductName.trim()) {
+      toast({ title: "Please enter product name", variant: "destructive" });
+      return;
+    }
+
+    const validatedQuantity = parsePositiveInt(customProductQuantity, 10000);
+    const validatedPrice = parsePositiveNumber(customProductPrice, 10000000);
+
+    if (validatedPrice <= 0) {
+      toast({ title: "Price must be greater than 0", variant: "destructive" });
+      return;
+    }
+
+    const newItem: SaleItem = {
+      id: `custom-${Date.now()}`,
+      type: 'custom',
+      name: customProductName.trim(),
+      details: 'Custom Product',
+      price: validatedPrice,
+      quantity: validatedQuantity
+    };
+
+    setSaleItems([...saleItems, newItem]);
+    setCustomProductName("");
+    setCustomProductPrice("0");
+    setCustomProductQuantity("1");
+    toast({ title: "Custom product added" });
   };
 
   const removeItem = (id: string) => {
@@ -554,8 +663,23 @@ export const POSModule = () => {
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Left Side - Product Entry */}
         <div className="lg:col-span-2 space-y-4">
+          {/* Product Search Bar */}
+          <Card className="border-0 shadow-lg">
+            <CardContent className="pt-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search products by name or SKU..."
+                  value={productSearch}
+                  onChange={(e) => setProductSearch(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-3 bg-muted">
+            <TabsList className="grid w-full grid-cols-4 bg-muted">
               <TabsTrigger value="lpg" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 LPG Cylinder
               </TabsTrigger>
@@ -564,6 +688,9 @@ export const POSModule = () => {
               </TabsTrigger>
               <TabsTrigger value="regulator" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 Regulator
+              </TabsTrigger>
+              <TabsTrigger value="custom" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                Custom
               </TabsTrigger>
             </TabsList>
 
@@ -613,16 +740,32 @@ export const POSModule = () => {
                           <SelectValue placeholder="Select brand..." />
                         </SelectTrigger>
                         <SelectContent>
-                          {filteredBrands.map(brand => (
-                            <SelectItem key={brand.id} value={brand.id}>
-                              <div className="flex items-center gap-2">
-                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: brand.color }} />
-                                {brand.name}
-                              </div>
-                            </SelectItem>
-                          ))}
+                          {filteredBrands.map(brand => {
+                            const stock = cylinderType === 'refill' ? brand.refill_cylinder : brand.package_cylinder;
+                            return (
+                              <SelectItem key={brand.id} value={brand.id}>
+                                <div className="flex items-center gap-2 justify-between w-full">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: brand.color }} />
+                                    {brand.name}
+                                  </div>
+                                  <Badge variant={stock > 0 ? "secondary" : "destructive"} className="ml-2">
+                                    {stock} in stock
+                                  </Badge>
+                                </div>
+                              </SelectItem>
+                            );
+                          })}
                         </SelectContent>
                       </Select>
+                      {sellingBrand && (
+                        <div className="flex items-center gap-1 text-xs mt-1">
+                          <Package className="h-3 w-3" />
+                          <span className={getLPGStock(sellingBrand, cylinderType) > 0 ? "text-green-600" : "text-destructive"}>
+                            {getLPGStock(sellingBrand, cylinderType)} available
+                          </span>
+                        </div>
+                      )}
                     </div>
                     <div className="space-y-2">
                       <Label>Return Brand (Optional)</Label>
@@ -719,13 +862,32 @@ export const POSModule = () => {
                           <SelectValue placeholder="Select stove..." />
                         </SelectTrigger>
                         <SelectContent>
-                          {stoves.map(stove => (
+                          {filteredStoves.map(stove => (
                             <SelectItem key={stove.id} value={stove.id}>
-                              {stove.brand} {stove.model} ({stove.burners} Burner) - {BANGLADESHI_CURRENCY_SYMBOL}{stove.price}
+                              <div className="flex items-center justify-between w-full">
+                                <span>{stove.brand} {stove.model} ({stove.burners} Burner) - {BANGLADESHI_CURRENCY_SYMBOL}{stove.price}</span>
+                                <Badge variant={stove.quantity > 0 ? "secondary" : "destructive"} className="ml-2">
+                                  {stove.quantity} in stock
+                                </Badge>
+                              </div>
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
+                      {selectedStove && (
+                        <div className="flex items-center gap-1 text-xs mt-1">
+                          <Package className="h-3 w-3" />
+                          <span className={getStoveStock(selectedStove) > 0 ? "text-green-600" : "text-destructive"}>
+                            {getStoveStock(selectedStove)} available
+                          </span>
+                          {getStoveStock(selectedStove) <= 5 && getStoveStock(selectedStove) > 0 && (
+                            <span className="flex items-center text-warning ml-2">
+                              <AlertTriangle className="h-3 w-3 mr-1" />
+                              Low stock
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <div className="space-y-2">
                       <Label>Quantity</Label>
@@ -734,10 +896,11 @@ export const POSModule = () => {
                         value={stoveQuantity} 
                         onChange={(e) => setStoveQuantity(e.target.value)}
                         min="1"
+                        max={selectedStove ? getStoveStock(selectedStove) : undefined}
                       />
                     </div>
                   </div>
-                  <Button onClick={addStoveToSale} className="w-full bg-primary hover:bg-primary/90">
+                  <Button onClick={addStoveToSale} className="w-full bg-primary hover:bg-primary/90" disabled={selectedStove && getStoveStock(selectedStove) === 0}>
                     <Plus className="h-4 w-4 mr-2" />
                     Add to Sale
                   </Button>
@@ -752,7 +915,7 @@ export const POSModule = () => {
                   <CardTitle className="text-xl">Add Regulator Sale</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid md:grid-cols-2 gap-4">
+                  <div className="grid md:grid-cols-3 gap-4">
                     <div className="space-y-2">
                       <Label>Select Regulator</Label>
                       <Select value={selectedRegulator} onValueChange={setSelectedRegulator}>
@@ -760,13 +923,41 @@ export const POSModule = () => {
                           <SelectValue placeholder="Select regulator..." />
                         </SelectTrigger>
                         <SelectContent>
-                          {regulators.map(reg => (
+                          {filteredRegulators.map(reg => (
                             <SelectItem key={reg.id} value={reg.id}>
-                              {reg.brand} ({reg.type})
+                              <div className="flex items-center justify-between w-full">
+                                <span>{reg.brand} ({reg.type})</span>
+                                <Badge variant={reg.quantity > 0 ? "secondary" : "destructive"} className="ml-2">
+                                  {reg.quantity} in stock
+                                </Badge>
+                              </div>
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
+                      {selectedRegulator && (
+                        <div className="flex items-center gap-1 text-xs mt-1">
+                          <Package className="h-3 w-3" />
+                          <span className={getRegulatorStock(selectedRegulator) > 0 ? "text-green-600" : "text-destructive"}>
+                            {getRegulatorStock(selectedRegulator)} available
+                          </span>
+                          {getRegulatorStock(selectedRegulator) <= 5 && getRegulatorStock(selectedRegulator) > 0 && (
+                            <span className="flex items-center text-warning ml-2">
+                              <AlertTriangle className="h-3 w-3 mr-1" />
+                              Low stock
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Price</Label>
+                      <Input 
+                        type="number" 
+                        value={regulatorPrice} 
+                        onChange={(e) => setRegulatorPrice(e.target.value)}
+                        placeholder="0"
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label>Quantity</Label>
@@ -775,12 +966,61 @@ export const POSModule = () => {
                         value={regulatorQuantity} 
                         onChange={(e) => setRegulatorQuantity(e.target.value)}
                         min="1"
+                        max={selectedRegulator ? getRegulatorStock(selectedRegulator) : undefined}
                       />
                     </div>
                   </div>
-                  <Button onClick={addRegulatorToSale} className="w-full bg-primary hover:bg-primary/90">
+                  <Button onClick={addRegulatorToSale} className="w-full bg-primary hover:bg-primary/90" disabled={selectedRegulator && getRegulatorStock(selectedRegulator) === 0}>
                     <Plus className="h-4 w-4 mr-2" />
                     Add to Sale
+                  </Button>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Custom Product Tab */}
+            <TabsContent value="custom">
+              <Card className="border-0 shadow-lg">
+                <CardHeader>
+                  <CardTitle className="text-xl">Add Custom Product</CardTitle>
+                  <p className="text-sm text-muted-foreground">Add products not in inventory</p>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid md:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label>Product Name *</Label>
+                      <Input 
+                        value={customProductName} 
+                        onChange={(e) => setCustomProductName(e.target.value)}
+                        placeholder="Enter product name..."
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Price *</Label>
+                      <Input 
+                        type="number" 
+                        value={customProductPrice} 
+                        onChange={(e) => setCustomProductPrice(e.target.value)}
+                        placeholder="0"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Quantity</Label>
+                      <Input 
+                        type="number" 
+                        value={customProductQuantity} 
+                        onChange={(e) => setCustomProductQuantity(e.target.value)}
+                        min="1"
+                      />
+                    </div>
+                  </div>
+                  <Button 
+                    onClick={addCustomProductToSale} 
+                    className="w-full bg-primary hover:bg-primary/90"
+                    disabled={!customProductName.trim() || parseFloat(customProductPrice) <= 0}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Custom Product
                   </Button>
                 </CardContent>
               </Card>
