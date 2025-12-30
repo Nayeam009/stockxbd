@@ -1,30 +1,38 @@
 import { useRef } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { InvoiceTemplate } from "./InvoiceTemplate";
-import { Printer, Download, X } from "lucide-react";
+import { Printer } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 
 interface InvoiceItem {
   name: string;
+  description?: string;
   quantity: number;
-  price: number;
+  price?: number;
+  unitPrice?: number;
   total: number;
 }
 
 interface InvoiceData {
   invoiceNumber: string;
-  date: Date;
-  customerName: string;
+  date: Date | string;
+  customerName?: string;
+  customer?: {
+    name: string;
+    phone?: string;
+    address?: string;
+  };
   customerPhone?: string;
   customerAddress?: string;
   items: InvoiceItem[];
   subtotal: number;
   discount: number;
   total: number;
-  paid: number;
-  due: number;
+  paid?: number;
+  due?: number;
   paymentMethod?: string;
+  paymentStatus?: string;
   notes?: string;
 }
 
@@ -153,6 +161,9 @@ export const InvoiceDialog = ({
               </Button>
             </div>
           </DialogTitle>
+          <DialogDescription>
+            Invoice preview and print options
+          </DialogDescription>
         </DialogHeader>
         <div className="border rounded-lg overflow-hidden">
           <InvoiceTemplate

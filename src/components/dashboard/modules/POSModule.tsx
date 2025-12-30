@@ -491,11 +491,12 @@ export const POSModule = () => {
       }
 
       // Prepare invoice data
+      const displayName = selectedCustomer?.name || sanitizedCustomerName || "Walk-in Customer";
       setLastTransaction({
         invoiceNumber: transactionNumber,
-        date: new Date().toISOString(),
+        date: new Date(),
         customer: {
-          name: sanitizedCustomerName || "Walk-in Customer",
+          name: displayName,
           phone: selectedCustomer?.phone || undefined,
           address: selectedCustomer?.address || undefined
         },
@@ -995,13 +996,14 @@ export const POSModule = () => {
                   className="w-full"
                   disabled={saleItems.length === 0}
                   onClick={() => {
+                    const displayName = selectedCustomer?.name || customerName || "Walk-in Customer";
                     setLastTransaction({
                       invoiceNumber: 'PREVIEW',
-                      date: new Date().toISOString(),
+                      date: new Date(),
                       customer: {
-                        name: customerName || "Walk-in Customer",
-                        phone: selectedCustomer?.phone,
-                        address: selectedCustomer?.address
+                        name: displayName,
+                        phone: selectedCustomer?.phone || undefined,
+                        address: selectedCustomer?.address || undefined
                       },
                       items: saleItems.map(item => ({
                         name: item.name,

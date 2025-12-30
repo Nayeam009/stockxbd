@@ -4,24 +4,32 @@ import { format } from "date-fns";
 
 interface InvoiceItem {
   name: string;
+  description?: string;
   quantity: number;
-  price: number;
+  price?: number;
+  unitPrice?: number;
   total: number;
 }
 
 interface InvoiceData {
   invoiceNumber: string;
-  date: Date;
-  customerName: string;
+  date: Date | string;
+  customerName?: string;
+  customer?: {
+    name: string;
+    phone?: string;
+    address?: string;
+  };
   customerPhone?: string;
   customerAddress?: string;
   items: InvoiceItem[];
   subtotal: number;
   discount: number;
   total: number;
-  paid: number;
-  due: number;
+  paid?: number;
+  due?: number;
   paymentMethod?: string;
+  paymentStatus?: string;
   notes?: string;
 }
 
@@ -36,10 +44,24 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
   ({ data, businessName = "Stock-X LPG", businessPhone = "+880 1234-567890", businessAddress = "Dhaka, Bangladesh" }, ref) => {
     const { t, language } = useLanguage();
 
+    // Normalize data - handle both formats
+    const customerName = data.customerName || data.customer?.name || "Walk-in Customer";
+    const customerPhone = data.customerPhone || data.customer?.phone;
+    const customerAddress = data.customerAddress || data.customer?.address;
+    
+    // Calculate paid and due based on payment status if not provided
+    const isPaid = data.paymentStatus === 'paid' || data.paymentStatus === 'completed';
+    const paid = data.paid ?? (isPaid ? data.total : 0);
+    const due = data.due ?? (isPaid ? 0 : data.total);
+    
+    // Parse date
+    const invoiceDate = data.date instanceof Date ? data.date : new Date(data.date);
+
     const formatCurrency = (amount: number) => {
+      const safeAmount = amount || 0;
       return language === "bn" 
-        ? `৳${amount.toLocaleString("bn-BD")}`
-        : `৳${amount.toLocaleString()}`;
+        ? `৳${safeAmount.toLocaleString("bn-BD")}`
+        : `৳${safeAmount.toLocaleString()}`;
     };
 
     const toBanglaNumber = (num: number) => {
@@ -71,9 +93,9 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
         <div className="flex justify-between mb-6">
           <div>
             <p className="font-semibold">{language === "bn" ? "গ্রাহক" : "Customer"}:</p>
-            <p className="font-bold text-lg">{data.customerName}</p>
-            {data.customerPhone && <p>{data.customerPhone}</p>}
-            {data.customerAddress && <p className="text-sm text-gray-600">{data.customerAddress}</p>}
+            <p className="font-bold text-lg">{customerName}</p>
+            {customerPhone && <p>{customerPhone}</p>}
+            {customerAddress && <p className="text-sm text-gray-600">{customerAddress}</p>}
           </div>
           <div className="text-right">
             <p>
@@ -82,7 +104,7 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
             </p>
             <p>
               <span className="font-semibold">{language === "bn" ? "তারিখ" : "Date"}:</span>{" "}
-              {format(data.date, "dd/MM/yyyy")}
+              {isNaN(invoiceDate.getTime()) ? 'N/A' : format(invoiceDate, "dd/MM/yyyy")}
             </p>
           </div>
         </div>
@@ -109,15 +131,21 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
             </tr>
           </thead>
           <tbody>
-            {data.items.map((item, index) => (
-              <tr key={index}>
-                <td className="border border-black p-2 text-center">{formatNumber(index + 1)}</td>
-                <td className="border border-black p-2">{item.name}</td>
-                <td className="border border-black p-2 text-center">{formatNumber(item.quantity)}</td>
-                <td className="border border-black p-2 text-right">{formatCurrency(item.price)}</td>
-                <td className="border border-black p-2 text-right">{formatCurrency(item.total)}</td>
-              </tr>
-            ))}
+            {data.items?.map((item, index) => {
+              const unitPrice = item.price ?? item.unitPrice ?? 0;
+              const itemTotal = item.total || (unitPrice * item.quantity);
+              const itemName = item.description ? `${item.name} - ${item.description}` : item.name;
+              
+              return (
+                <tr key={index}>
+                  <td className="border border-black p-2 text-center">{formatNumber(index + 1)}</td>
+                  <td className="border border-black p-2">{itemName}</td>
+                  <td className="border border-black p-2 text-center">{formatNumber(item.quantity)}</td>
+                  <td className="border border-black p-2 text-right">{formatCurrency(unitPrice)}</td>
+                  <td className="border border-black p-2 text-right">{formatCurrency(itemTotal)}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
 
@@ -140,12 +168,12 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
             </div>
             <div className="flex justify-between py-1">
               <span>{language === "bn" ? "পরিশোধিত" : "Paid"}:</span>
-              <span className="text-green-600">{formatCurrency(data.paid)}</span>
+              <span className="text-green-600">{formatCurrency(paid)}</span>
             </div>
-            {data.due > 0 && (
+            {due > 0 && (
               <div className="flex justify-between py-1 font-bold text-red-600">
                 <span>{language === "bn" ? "বাকি" : "Due"}:</span>
-                <span>{formatCurrency(data.due)}</span>
+                <span>{formatCurrency(due)}</span>
               </div>
             )}
           </div>
@@ -156,6 +184,16 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
           <div className="mb-4">
             <span className="font-semibold">{language === "bn" ? "পেমেন্ট পদ্ধতি" : "Payment Method"}: </span>
             <span className="capitalize">{data.paymentMethod}</span>
+          </div>
+        )}
+
+        {/* Payment Status */}
+        {data.paymentStatus && (
+          <div className="mb-4">
+            <span className="font-semibold">{language === "bn" ? "স্ট্যাটাস" : "Status"}: </span>
+            <span className={`font-bold ${isPaid ? 'text-green-600' : 'text-red-600'}`}>
+              {isPaid ? (language === "bn" ? "পরিশোধিত" : "PAID") : (language === "bn" ? "বাকি" : "DUE")}
+            </span>
           </div>
         )}
 
