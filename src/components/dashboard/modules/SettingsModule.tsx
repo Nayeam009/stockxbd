@@ -34,6 +34,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ProfileSharingCard } from "@/components/settings/ProfileSharingCard";
 
 export const SettingsModule = () => {
   const { theme, setTheme } = useTheme();
@@ -166,13 +167,16 @@ export const SettingsModule = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 px-2 sm:px-0">
       <div>
-        <h2 className="text-3xl font-bold text-foreground">{t("settings")}</h2>
-        <p className="text-muted-foreground">{t("settings_desc")}</p>
+        <h2 className="text-2xl sm:text-3xl font-bold text-foreground">{t("settings")}</h2>
+        <p className="text-sm sm:text-base text-muted-foreground">{t("settings_desc")}</p>
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+        {/* Profile Sharing - Only for owners */}
+        <ProfileSharingCard />
+
         {/* Language & Theme */}
         <Card className="bg-card border-border">
           <CardHeader>
