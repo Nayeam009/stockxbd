@@ -5,12 +5,13 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { 
   Settings, 
   Building2, 
   Bell, 
   Shield, 
-  Palette, 
   Database,
   Download,
   Trash2,
@@ -20,7 +21,12 @@ import {
   Sun,
   Check,
   Loader2,
-  Lock
+  Lock,
+  User,
+  Mail,
+  Phone,
+  Calendar,
+  Camera
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -50,12 +56,58 @@ export const SettingsModule = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [changingPassword, setChangingPassword] = useState(false);
   
+  // User profile state
+  const [userEmail, setUserEmail] = useState("");
+  const [userRole, setUserRole] = useState<string>("driver");
+  const [userCreatedAt, setUserCreatedAt] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [userPhone, setUserPhone] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [savingProfile, setSavingProfile] = useState(false);
+  
   const [notifications, setNotifications] = useState({
     lowStock: true,
     newOrders: true,
     payments: true,
     dailyReports: false
   });
+
+  // Load user profile data
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUserEmail(user.email || "");
+        setUserCreatedAt(user.created_at || "");
+        
+        // Fetch role
+        const { data: roleData } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .single();
+        
+        if (roleData?.role) {
+          setUserRole(roleData.role);
+        }
+        
+        // Fetch profile
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('user_id', user.id)
+          .single();
+        
+        if (profileData) {
+          setFullName(profileData.full_name || "");
+          setUserPhone(profileData.phone || "");
+          setAvatarUrl(profileData.avatar_url);
+        }
+      }
+    };
+    
+    fetchUserProfile();
+  }, []);
 
   // Load settings from localStorage on mount
   useEffect(() => {
@@ -71,6 +123,44 @@ export const SettingsModule = () => {
       setNotifications(JSON.parse(savedNotifications));
     }
   }, []);
+
+  const handleSaveProfile = async () => {
+    setSavingProfile(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      
+      const { error } = await supabase
+        .from('profiles')
+        .upsert({
+          user_id: user.id,
+          full_name: fullName,
+          phone: userPhone,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id' });
+      
+      if (error) throw error;
+      toast({ title: "Profile updated successfully" });
+    } catch (error: any) {
+      toast({ title: error.message || "Failed to update profile", variant: "destructive" });
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  const getRoleBadgeColor = (role: string) => {
+    switch (role) {
+      case 'owner': return 'bg-gradient-to-r from-amber-500 to-orange-500 text-white border-0';
+      case 'manager': return 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white border-0';
+      case 'driver': return 'bg-gradient-to-r from-green-500 to-emerald-500 text-white border-0';
+      default: return 'bg-muted text-muted-foreground';
+    }
+  };
+
+  const getInitials = (name: string) => {
+    if (!name) return "U";
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  };
 
   const handleSaveSettings = async () => {
     setSaving(true);
@@ -174,6 +264,98 @@ export const SettingsModule = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+        {/* User Profile Card */}
+        <Card className="bg-card border-border lg:col-span-2">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <User className="h-5 w-5 text-primary" />
+              <CardTitle className="text-foreground">{t("profile")}</CardTitle>
+            </div>
+            <CardDescription>Manage your personal information and account details</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col md:flex-row gap-6">
+              {/* Avatar Section */}
+              <div className="flex flex-col items-center gap-3">
+                <Avatar className="h-24 w-24 border-4 border-primary/20">
+                  <AvatarImage src={avatarUrl || undefined} alt={fullName} />
+                  <AvatarFallback className="text-2xl font-bold bg-gradient-to-br from-primary to-primary/80 text-primary-foreground">
+                    {getInitials(fullName || userEmail)}
+                  </AvatarFallback>
+                </Avatar>
+                <Badge className={`${getRoleBadgeColor(userRole)} px-3 py-1`}>
+                  {userRole.charAt(0).toUpperCase() + userRole.slice(1)}
+                </Badge>
+              </div>
+              
+              {/* Profile Form */}
+              <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="fullName" className="flex items-center gap-2">
+                    <User className="h-4 w-4 text-muted-foreground" />
+                    Full Name
+                  </Label>
+                  <Input
+                    id="fullName"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    placeholder="Enter your full name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="userEmail" className="flex items-center gap-2">
+                    <Mail className="h-4 w-4 text-muted-foreground" />
+                    Email
+                  </Label>
+                  <Input
+                    id="userEmail"
+                    value={userEmail}
+                    disabled
+                    className="bg-muted"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="userPhone" className="flex items-center gap-2">
+                    <Phone className="h-4 w-4 text-muted-foreground" />
+                    Phone Number
+                  </Label>
+                  <Input
+                    id="userPhone"
+                    value={userPhone}
+                    onChange={(e) => setUserPhone(e.target.value)}
+                    placeholder="+880 1XXX-XXXXXX"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    Member Since
+                  </Label>
+                  <Input
+                    value={userCreatedAt ? new Date(userCreatedAt).toLocaleDateString() : "N/A"}
+                    disabled
+                    className="bg-muted"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <Button 
+                    onClick={handleSaveProfile}
+                    disabled={savingProfile}
+                    className="w-full md:w-auto"
+                  >
+                    {savingProfile ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Save className="h-4 w-4 mr-2" />
+                    )}
+                    Save Profile
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Profile Sharing - Only for owners */}
         <ProfileSharingCard />
 
