@@ -220,19 +220,19 @@ export const DashboardOverview = ({ analytics, drivers, userRole, setActiveModul
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4 sm:space-y-6 md:space-y-8 px-1 sm:px-0">
       {/* Welcome Section */}
-      <div className="space-y-3 animate-fade-in">
-        <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+      <div className="space-y-2 sm:space-y-3 animate-fade-in">
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
           Welcome back! 👋
         </h1>
-        <p className="text-lg text-muted-foreground">
-          Here's what's happening with your LPG business in Bangladesh today.
+        <p className="text-sm sm:text-base md:text-lg text-muted-foreground">
+          Here's what's happening with your LPG business today.
         </p>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
         {stats.map((stat, index) => {
           const Icon = stat.icon;
           return (
@@ -352,7 +352,7 @@ export const DashboardOverview = ({ analytics, drivers, userRole, setActiveModul
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-8 gap-4">
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-2 sm:gap-3 md:gap-4">
             {quickActions.map((action, index) => {
               const Icon = action.icon;
               return (

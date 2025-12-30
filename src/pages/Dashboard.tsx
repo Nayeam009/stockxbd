@@ -179,7 +179,7 @@ const Dashboard = () => {
   };
 
   return (
-    <SidebarProvider defaultOpen={true}>
+    <SidebarProvider defaultOpen={false}>
       <div className="min-h-screen flex w-full bg-background">
         <AppSidebar
           activeModule={activeModule}
@@ -189,7 +189,7 @@ const Dashboard = () => {
           analytics={analytics}
         />
 
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 flex flex-col overflow-hidden min-w-0">
           <DashboardHeader
             searchQuery={searchQuery}
             setSearchQuery={setSearchQuery}
@@ -201,7 +201,7 @@ const Dashboard = () => {
 
           {/* Main Content */}
           <main className="flex-1 overflow-auto bg-gradient-to-b from-background to-muted/30">
-            <div className="container mx-auto p-6 animate-fade-in">
+            <div className="container mx-auto p-3 sm:p-4 md:p-6 animate-fade-in max-w-7xl">
               {renderActiveModule()}
             </div>
           </main>
