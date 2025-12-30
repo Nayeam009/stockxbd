@@ -15,14 +15,21 @@ import {
   Loader2,
   FileText,
   Clock,
-  X
+  X,
+  User,
+  Phone,
+  MapPin,
+  History,
+  UserPlus
 } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
 import { supabase } from "@/integrations/supabase/client";
 import { parsePositiveNumber, parsePositiveInt, sanitizeString, posTransactionSchema, customerSchema } from "@/lib/validationSchemas";
+import { InvoiceDialog } from "@/components/invoice/InvoiceDialog";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface LPGBrand {
   id: string;
@@ -53,6 +60,11 @@ interface Customer {
   id: string;
   name: string;
   phone: string | null;
+  address: string | null;
+  total_due: number;
+  cylinders_due: number;
+  billing_status: string;
+  last_order_date: string | null;
 }
 
 interface SaleItem {
@@ -63,12 +75,22 @@ interface SaleItem {
   price: number;
   quantity: number;
   returnBrand?: string;
+  cylinderType?: 'refill' | 'package';
+}
+
+interface CustomerSalesHistory {
+  id: string;
+  date: string;
+  items: string;
+  total: number;
+  status: string;
 }
 
 const lpgWeights = ["5.5", "12", "22.7", "35"];
 const mouthSizes = ["20mm", "22mm"];
 
 export const POSModule = () => {
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState("lpg");
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
@@ -99,12 +121,24 @@ export const POSModule = () => {
   const [saleItems, setSaleItems] = useState<SaleItem[]>([]);
   const [customerName, setCustomerName] = useState("");
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [discount, setDiscount] = useState("0");
   
-  // Receipt
-  const [showReceiptModal, setShowReceiptModal] = useState(false);
-  const [lastReceipt, setLastReceipt] = useState<any>(null);
+  // Customer dialogs
+  const [showAddCustomerDialog, setShowAddCustomerDialog] = useState(false);
+  const [showCustomerHistoryDialog, setShowCustomerHistoryDialog] = useState(false);
+  const [customerHistory, setCustomerHistory] = useState<CustomerSalesHistory[]>([]);
+  const [newCustomer, setNewCustomer] = useState({
+    name: "",
+    phone: "",
+    address: ""
+  });
+  
+  // Invoice
+  const [showInvoiceDialog, setShowInvoiceDialog] = useState(false);
+  const [lastTransaction, setLastTransaction] = useState<any>(null);
 
+  // Fetch data
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
@@ -125,9 +159,107 @@ export const POSModule = () => {
     };
 
     fetchData();
+
+    // Real-time subscription for customers
+    const channel = supabase
+      .channel('pos-customers')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'customers' }, () => {
+        fetchData();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const filteredBrands = lpgBrands.filter(b => b.size === mouthSize);
+
+  // Fetch customer sales history
+  const fetchCustomerHistory = async (customerId: string) => {
+    const { data } = await supabase
+      .from('pos_transactions')
+      .select(`
+        id,
+        created_at,
+        total,
+        payment_status,
+        pos_transaction_items (product_name, quantity)
+      `)
+      .eq('customer_id', customerId)
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    if (data) {
+      const history: CustomerSalesHistory[] = data.map(t => ({
+        id: t.id,
+        date: new Date(t.created_at).toLocaleDateString('en-BD'),
+        items: t.pos_transaction_items?.map((i: any) => `${i.quantity}x ${i.product_name}`).join(', ') || 'N/A',
+        total: Number(t.total),
+        status: t.payment_status
+      }));
+      setCustomerHistory(history);
+    }
+  };
+
+  // Handle customer selection
+  const handleCustomerSelect = (customerId: string) => {
+    if (customerId === "walkin") {
+      setSelectedCustomerId("walkin");
+      setSelectedCustomer(null);
+      setCustomerName("");
+      return;
+    }
+
+    if (customerId === "new") {
+      setShowAddCustomerDialog(true);
+      return;
+    }
+
+    const customer = customers.find(c => c.id === customerId);
+    if (customer) {
+      setSelectedCustomerId(customerId);
+      setSelectedCustomer(customer);
+      setCustomerName(customer.name);
+    }
+  };
+
+  // Add new customer
+  const handleAddCustomer = async () => {
+    if (!newCustomer.name.trim()) {
+      toast({ title: "Customer name is required", variant: "destructive" });
+      return;
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    const { data, error } = await supabase
+      .from('customers')
+      .insert({
+        name: sanitizeString(newCustomer.name),
+        phone: newCustomer.phone || null,
+        address: newCustomer.address || null,
+        created_by: user?.id
+      })
+      .select()
+      .single();
+
+    if (error) {
+      toast({ title: "Error adding customer", description: error.message, variant: "destructive" });
+      return;
+    }
+
+    toast({ title: "Customer added successfully" });
+    setShowAddCustomerDialog(false);
+    setNewCustomer({ name: "", phone: "", address: "" });
+    
+    if (data) {
+      setSelectedCustomerId(data.id);
+      setSelectedCustomer(data);
+      setCustomerName(data.name);
+      setCustomers([...customers, data]);
+    }
+  };
 
   const addLPGToSale = () => {
     if (!sellingBrand || !weight) {
@@ -140,10 +272,6 @@ export const POSModule = () => {
 
     if (validatedPrice <= 0) {
       toast({ title: "Price must be greater than 0", variant: "destructive" });
-      return;
-    }
-    if (validatedQuantity < 1) {
-      toast({ title: "Quantity must be at least 1", variant: "destructive" });
       return;
     }
 
@@ -159,18 +287,16 @@ export const POSModule = () => {
       details: `${weight}kg, ${mouthSize}, ${saleType}${returnBrandName ? `, Return: ${returnBrandName}` : ''}`,
       price: validatedPrice,
       quantity: validatedQuantity,
-      returnBrand: returnBrandName
+      returnBrand: returnBrandName,
+      cylinderType
     };
 
     setSaleItems([...saleItems, newItem]);
-    
-    // Reset form
     setSellingBrand("");
     setReturnBrand("");
     setWeight("");
     setPrice("0");
     setQuantity("1");
-    
     toast({ title: "Added to sale" });
   };
 
@@ -179,10 +305,6 @@ export const POSModule = () => {
     
     if (!selectedStove) {
       toast({ title: "Please select a stove", variant: "destructive" });
-      return;
-    }
-    if (validatedQuantity < 1) {
-      toast({ title: "Quantity must be at least 1", variant: "destructive" });
       return;
     }
 
@@ -201,7 +323,6 @@ export const POSModule = () => {
     setSaleItems([...saleItems, newItem]);
     setSelectedStove("");
     setStoveQuantity("1");
-    
     toast({ title: "Added to sale" });
   };
 
@@ -210,10 +331,6 @@ export const POSModule = () => {
     
     if (!selectedRegulator) {
       toast({ title: "Please select a regulator", variant: "destructive" });
-      return;
-    }
-    if (validatedQuantity < 1) {
-      toast({ title: "Quantity must be at least 1", variant: "destructive" });
       return;
     }
 
@@ -225,14 +342,13 @@ export const POSModule = () => {
       type: 'regulator',
       name: regulator.brand,
       details: regulator.type,
-      price: 0, // Can set price manually
+      price: 0,
       quantity: validatedQuantity
     };
 
     setSaleItems([...saleItems, newItem]);
     setSelectedRegulator("");
     setRegulatorQuantity("1");
-    
     toast({ title: "Added to sale" });
   };
 
@@ -255,30 +371,18 @@ export const POSModule = () => {
   const discountAmount = parseFloat(discount) || 0;
   const total = Math.max(0, subtotal - discountAmount);
 
+  // Count cylinders for package sales (to track cylinder dues)
+  const packageCylinderCount = saleItems
+    .filter(item => item.type === 'lpg' && item.cylinderType === 'package')
+    .reduce((sum, item) => sum + item.quantity, 0);
+
   const handleCompleteSale = async (paymentStatus: 'completed' | 'pending') => {
     if (saleItems.length === 0) {
       toast({ title: "No items in sale", variant: "destructive" });
       return;
     }
 
-    // Validate transaction data
     const validatedDiscount = parsePositiveNumber(discount, 10000000);
-    const validatedItems = saleItems.map(item => ({
-      price: Math.max(0, Math.min(item.price, 10000000)),
-      quantity: Math.max(1, Math.min(item.quantity, 10000))
-    }));
-
-    const transactionValidation = posTransactionSchema.safeParse({
-      customerName: customerName ? sanitizeString(customerName) : undefined,
-      discount: validatedDiscount,
-      items: validatedItems
-    });
-
-    if (!transactionValidation.success) {
-      const firstError = transactionValidation.error.errors[0];
-      toast({ title: "Validation Error", description: firstError.message, variant: "destructive" });
-      return;
-    }
 
     setProcessing(true);
 
@@ -294,27 +398,24 @@ export const POSModule = () => {
       const { data: txnNum } = await supabase.rpc('generate_transaction_number');
       const transactionNumber = txnNum || `TXN-${Date.now()}`;
 
-      // Sanitize customer name for storage
       const sanitizedCustomerName = customerName ? sanitizeString(customerName) : '';
-
-      // Create or get customer
       let customerId = selectedCustomerId === "walkin" ? null : selectedCustomerId;
+
+      // If new customer name entered without selecting, create customer
       if (!customerId && sanitizedCustomerName) {
-        // Validate customer data
         const customerValidation = customerSchema.safeParse({ name: sanitizedCustomerName });
-        if (!customerValidation.success) {
-          toast({ title: "Invalid customer name", variant: "destructive" });
-          setProcessing(false);
-          return;
+        if (customerValidation.success) {
+          const { data: newCust } = await supabase
+            .from('customers')
+            .insert({ name: sanitizedCustomerName, created_by: user.id })
+            .select()
+            .single();
+          
+          if (newCust) {
+            customerId = newCust.id;
+            setCustomers([...customers, newCust]);
+          }
         }
-        
-        const { data: customer, error } = await supabase
-          .from('customers')
-          .insert({ name: sanitizedCustomerName, created_by: user.id })
-          .select()
-          .single();
-        
-        if (!error && customer) customerId = customer.id;
       }
 
       // Create transaction
@@ -335,14 +436,14 @@ export const POSModule = () => {
 
       if (txnError) throw txnError;
 
-      // Get first product for items (simplified - in production, map properly)
+      // Get a product to link items
       const { data: defaultProduct } = await supabase
         .from('products')
         .select('id')
         .limit(1)
         .single();
 
-      // Insert items
+      // Insert transaction items
       if (transaction && defaultProduct) {
         const items = saleItems.map(item => ({
           transaction_id: transaction.id,
@@ -357,25 +458,68 @@ export const POSModule = () => {
         await supabase.from('pos_transaction_items').insert(items);
       }
 
-      // Create receipt
-      const receipt = {
-        id: transactionNumber,
-        date: new Date().toLocaleString('en-BD'),
-        customer: sanitizedCustomerName || "Walk-in Customer",
-        items: saleItems,
+      // Update customer dues if sale is marked as pending (due)
+      if (customerId && paymentStatus === 'pending') {
+        const currentCustomer = customers.find(c => c.id === customerId);
+        if (currentCustomer) {
+          const newTotalDue = (currentCustomer.total_due || 0) + total;
+          const newCylindersDue = (currentCustomer.cylinders_due || 0) + packageCylinderCount;
+
+          await supabase
+            .from('customers')
+            .update({
+              total_due: newTotalDue,
+              cylinders_due: newCylindersDue,
+              billing_status: 'pending',
+              last_order_date: new Date().toISOString()
+            })
+            .eq('id', customerId);
+
+          // Update local state
+          setCustomers(customers.map(c => 
+            c.id === customerId 
+              ? { ...c, total_due: newTotalDue, cylinders_due: newCylindersDue, billing_status: 'pending' }
+              : c
+          ));
+        }
+      } else if (customerId) {
+        // Update last order date for paid sales
+        await supabase
+          .from('customers')
+          .update({ last_order_date: new Date().toISOString() })
+          .eq('id', customerId);
+      }
+
+      // Prepare invoice data
+      setLastTransaction({
+        invoiceNumber: transactionNumber,
+        date: new Date().toISOString(),
+        customer: {
+          name: sanitizedCustomerName || "Walk-in Customer",
+          phone: selectedCustomer?.phone || undefined,
+          address: selectedCustomer?.address || undefined
+        },
+        items: saleItems.map(item => ({
+          name: item.name,
+          description: item.details,
+          quantity: item.quantity,
+          unitPrice: item.price,
+          total: item.price * item.quantity
+        })),
         subtotal,
         discount: validatedDiscount,
         total: Math.max(0, subtotal - validatedDiscount),
-        status: paymentStatus === 'completed' ? 'Paid' : 'Due'
-      };
+        paymentStatus: paymentStatus === 'completed' ? 'paid' : 'due',
+        paymentMethod: 'cash'
+      });
 
-      setLastReceipt(receipt);
-      setShowReceiptModal(true);
+      setShowInvoiceDialog(true);
       
       // Clear form
       setSaleItems([]);
       setCustomerName("");
       setSelectedCustomerId(null);
+      setSelectedCustomer(null);
       setDiscount("0");
 
       toast({ 
@@ -387,73 +531,6 @@ export const POSModule = () => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } finally {
       setProcessing(false);
-    }
-  };
-
-  const printReceipt = () => {
-    if (!lastReceipt) return;
-
-    const receiptContent = `
-      <html>
-        <head>
-          <style>
-            body { font-family: 'Courier New', monospace; width: 80mm; margin: 0; padding: 10px; font-size: 12px; }
-            .header { text-align: center; border-bottom: 1px dashed #000; padding-bottom: 10px; margin-bottom: 10px; }
-            .header h1 { margin: 0; font-size: 18px; }
-            .info p { margin: 2px 0; }
-            table { width: 100%; border-collapse: collapse; margin: 10px 0; }
-            th, td { text-align: left; padding: 4px 0; font-size: 11px; }
-            th:last-child, td:last-child { text-align: right; }
-            .totals { border-top: 1px dashed #000; padding-top: 10px; }
-            .totals p { display: flex; justify-content: space-between; margin: 4px 0; }
-            .total-row { font-weight: bold; font-size: 14px; }
-            .status { text-align: center; font-weight: bold; margin-top: 10px; padding: 5px; border: 1px solid #000; }
-            .footer { text-align: center; margin-top: 15px; border-top: 1px dashed #000; padding-top: 10px; font-size: 10px; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <h1>Stock-X LPG</h1>
-            <p>LPG Dealer & Distributor</p>
-          </div>
-          <div class="info">
-            <p><strong>Invoice:</strong> ${lastReceipt.id}</p>
-            <p><strong>Date:</strong> ${lastReceipt.date}</p>
-            <p><strong>Customer:</strong> ${lastReceipt.customer}</p>
-          </div>
-          <table>
-            <tr><th>Item</th><th>Qty</th><th>Rate</th><th>Total</th></tr>
-            ${lastReceipt.items.map((item: SaleItem) => `
-              <tr>
-                <td>${item.name}</td>
-                <td>${item.quantity}</td>
-                <td>${BANGLADESHI_CURRENCY_SYMBOL}${item.price}</td>
-                <td>${BANGLADESHI_CURRENCY_SYMBOL}${item.price * item.quantity}</td>
-              </tr>
-            `).join('')}
-          </table>
-          <div class="totals">
-            <p><span>Subtotal:</span><span>${BANGLADESHI_CURRENCY_SYMBOL}${lastReceipt.subtotal}</span></p>
-            ${lastReceipt.discount > 0 ? `<p><span>Discount:</span><span>-${BANGLADESHI_CURRENCY_SYMBOL}${lastReceipt.discount}</span></p>` : ''}
-            <p class="total-row"><span>Total:</span><span>${BANGLADESHI_CURRENCY_SYMBOL}${lastReceipt.total}</span></p>
-          </div>
-          <div class="status">${lastReceipt.status}</div>
-          <div class="footer">
-            <p>Thank you for your business!</p>
-            <p>ধন্যবাদ!</p>
-          </div>
-        </body>
-      </html>
-    `;
-
-    const printWindow = window.open('', '_blank', 'width=300,height=600');
-    if (printWindow) {
-      printWindow.document.write(receiptContent);
-      printWindow.document.close();
-      setTimeout(() => {
-        printWindow.print();
-        printWindow.close();
-      }, 250);
     }
   };
 
@@ -469,23 +546,22 @@ export const POSModule = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-3xl font-bold text-foreground">Point of Sale</h2>
-        <p className="text-muted-foreground">Quick sales and billing system</p>
+        <h2 className="text-3xl font-bold text-foreground">{t('pos')}</h2>
+        <p className="text-muted-foreground">Quick sales and billing system with customer integration</p>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Left Side - Product Entry */}
         <div className="lg:col-span-2 space-y-4">
-          {/* Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-3 bg-muted">
               <TabsTrigger value="lpg" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 LPG Cylinder
               </TabsTrigger>
-              <TabsTrigger value="stove" className="data-[state=active]:bg-muted-foreground/20">
+              <TabsTrigger value="stove" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 Gas Stove
               </TabsTrigger>
-              <TabsTrigger value="regulator" className="data-[state=active]:bg-muted-foreground/20">
+              <TabsTrigger value="regulator" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 Regulator
               </TabsTrigger>
             </TabsList>
@@ -508,7 +584,7 @@ export const POSModule = () => {
                         </div>
                         <div className="flex items-center space-x-2">
                           <RadioGroupItem value="package" id="package" />
-                          <Label htmlFor="package" className="cursor-pointer">Package</Label>
+                          <Label htmlFor="package" className="cursor-pointer">Package (New Cylinder)</Label>
                         </div>
                       </RadioGroup>
                     </div>
@@ -533,7 +609,7 @@ export const POSModule = () => {
                       <Label>Selling Brand</Label>
                       <Select value={sellingBrand} onValueChange={setSellingBrand}>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select or type brand..." />
+                          <SelectValue placeholder="Select brand..." />
                         </SelectTrigger>
                         <SelectContent>
                           {filteredBrands.map(brand => (
@@ -551,7 +627,7 @@ export const POSModule = () => {
                       <Label>Return Brand (Optional)</Label>
                       <Select value={returnBrand} onValueChange={setReturnBrand}>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select or type brand..." />
+                          <SelectValue placeholder="Select brand..." />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="none">None</SelectItem>
@@ -574,7 +650,7 @@ export const POSModule = () => {
                       <Label>Weight (kg)</Label>
                       <Select value={weight} onValueChange={setWeight}>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select weight" />
+                          <SelectValue placeholder="Select" />
                         </SelectTrigger>
                         <SelectContent>
                           {lpgWeights.map(w => (
@@ -587,7 +663,7 @@ export const POSModule = () => {
                       <Label>Mouth Size</Label>
                       <Select value={mouthSize} onValueChange={setMouthSize}>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select size" />
+                          <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                           {mouthSizes.map(s => (
@@ -715,7 +791,7 @@ export const POSModule = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <ShoppingCart className="h-5 w-5" />
-                Sale Items
+                Sale Items ({saleItems.length})
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -756,49 +832,103 @@ export const POSModule = () => {
 
         {/* Right Side - Customer & Summary */}
         <div className="space-y-4">
-          {/* Customer */}
+          {/* Customer Selection */}
           <Card className="border-0 shadow-lg">
             <CardHeader>
-              <CardTitle>Customer</CardTitle>
-              <p className="text-sm text-muted-foreground">Select an existing customer or type a new name.</p>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <User className="h-5 w-5" />
+                  Customer
+                </CardTitle>
+                <Button variant="outline" size="sm" onClick={() => setShowAddCustomerDialog(true)}>
+                  <UserPlus className="h-4 w-4 mr-1" />
+                  New
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label>Customer Name</Label>
+                <Label>Select Customer</Label>
                 <Select
                   value={selectedCustomerId || "walkin"}
-                  onValueChange={(v) => {
-                    if (v === "walkin") {
-                      setSelectedCustomerId("walkin");
-                      setCustomerName("");
-                      return;
-                    }
-
-                    if (v) {
-                      setSelectedCustomerId(v);
-                      const customer = customers.find((c) => c.id === v);
-                      if (customer) setCustomerName(customer.name);
-                    } else {
-                      setSelectedCustomerId(null);
-                    }
-                  }}
+                  onValueChange={handleCustomerSelect}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select or type customer name..." />
+                    <SelectValue placeholder="Select customer..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="walkin">Walk-in Customer</SelectItem>
+                    <SelectItem value="walkin">
+                      <div className="flex items-center gap-2">
+                        <User className="h-4 w-4 text-muted-foreground" />
+                        Walk-in Customer
+                      </div>
+                    </SelectItem>
                     {customers.map(customer => (
                       <SelectItem key={customer.id} value={customer.id}>
-                        {customer.name} {customer.phone && `(${customer.phone})`}
+                        <div className="flex items-center justify-between w-full">
+                          <span>{customer.name}</span>
+                          {customer.total_due > 0 && (
+                            <Badge variant="destructive" className="ml-2 text-xs">
+                              Due: ৳{customer.total_due}
+                            </Badge>
+                          )}
+                        </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-              {(selectedCustomerId === null || selectedCustomerId === "walkin") && (
+
+              {/* Selected Customer Info */}
+              {selectedCustomer && (
+                <div className="p-3 bg-muted/50 rounded-lg space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="font-medium">{selectedCustomer.name}</p>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => {
+                        fetchCustomerHistory(selectedCustomer.id);
+                        setShowCustomerHistoryDialog(true);
+                      }}
+                    >
+                      <History className="h-4 w-4 mr-1" />
+                      History
+                    </Button>
+                  </div>
+                  {selectedCustomer.phone && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Phone className="h-3 w-3" />
+                      {selectedCustomer.phone}
+                    </div>
+                  )}
+                  {selectedCustomer.address && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <MapPin className="h-3 w-3" />
+                      {selectedCustomer.address}
+                    </div>
+                  )}
+                  <div className="flex gap-4 pt-2 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Due Amount:</span>
+                      <span className={`ml-1 font-medium ${selectedCustomer.total_due > 0 ? 'text-destructive' : 'text-green-500'}`}>
+                        ৳{selectedCustomer.total_due || 0}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Cylinders Due:</span>
+                      <span className={`ml-1 font-medium ${selectedCustomer.cylinders_due > 0 ? 'text-warning' : 'text-green-500'}`}>
+                        {selectedCustomer.cylinders_due || 0}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* New customer name input for walk-in */}
+              {selectedCustomerId === "walkin" && (
                 <Input
-                  placeholder="Or type new customer name..."
+                  placeholder="Enter customer name (optional)..."
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
                 />
@@ -809,7 +939,7 @@ export const POSModule = () => {
           {/* Summary */}
           <Card className="border-0 shadow-lg">
             <CardHeader>
-              <CardTitle>Summary & Actions</CardTitle>
+              <CardTitle>Summary</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-3">
@@ -820,6 +950,7 @@ export const POSModule = () => {
                 <div className="flex items-center justify-between">
                   <Label className="text-muted-foreground">Discount</Label>
                   <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground">{BANGLADESHI_CURRENCY_SYMBOL}</span>
                     <Input
                       type="number"
                       value={discount}
@@ -827,9 +958,14 @@ export const POSModule = () => {
                       className="w-24 text-right"
                       min="0"
                     />
-                    <span className="text-muted-foreground">{BANGLADESHI_CURRENCY_SYMBOL}</span>
                   </div>
                 </div>
+                {packageCylinderCount > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Cylinders (Package)</span>
+                    <span className="font-medium text-warning">{packageCylinderCount} pcs</span>
+                  </div>
+                )}
                 <div className="border-t pt-3 flex justify-between">
                   <span className="text-lg font-bold">Total</span>
                   <span className="text-lg font-bold text-primary">{BANGLADESHI_CURRENCY_SYMBOL}{total.toFixed(2)}</span>
@@ -848,7 +984,7 @@ export const POSModule = () => {
                 <Button 
                   onClick={() => handleCompleteSale('pending')}
                   variant="secondary"
-                  className="w-full bg-amber-500 hover:bg-amber-600 text-white"
+                  className="w-full bg-warning hover:bg-warning/90 text-warning-foreground"
                   disabled={processing || saleItems.length === 0}
                 >
                   <Clock className="h-4 w-4 mr-2" />
@@ -859,22 +995,32 @@ export const POSModule = () => {
                   className="w-full"
                   disabled={saleItems.length === 0}
                   onClick={() => {
-                    // Just show print preview without completing
-                    setLastReceipt({
-                      id: 'PREVIEW',
-                      date: new Date().toLocaleString('en-BD'),
-                      customer: customerName || "Walk-in Customer",
-                      items: saleItems,
+                    setLastTransaction({
+                      invoiceNumber: 'PREVIEW',
+                      date: new Date().toISOString(),
+                      customer: {
+                        name: customerName || "Walk-in Customer",
+                        phone: selectedCustomer?.phone,
+                        address: selectedCustomer?.address
+                      },
+                      items: saleItems.map(item => ({
+                        name: item.name,
+                        description: item.details,
+                        quantity: item.quantity,
+                        unitPrice: item.price,
+                        total: item.price * item.quantity
+                      })),
                       subtotal,
                       discount: discountAmount,
                       total,
-                      status: 'Preview'
+                      paymentStatus: 'preview',
+                      paymentMethod: 'cash'
                     });
-                    printReceipt();
+                    setShowInvoiceDialog(true);
                   }}
                 >
                   <Printer className="h-4 w-4 mr-2" />
-                  Print Memo
+                  Preview Invoice
                 </Button>
               </div>
             </CardContent>
@@ -882,37 +1028,88 @@ export const POSModule = () => {
         </div>
       </div>
 
-      {/* Receipt Modal */}
-      <Dialog open={showReceiptModal} onOpenChange={setShowReceiptModal}>
-        <DialogContent className="max-w-md">
+      {/* Add Customer Dialog */}
+      <Dialog open={showAddCustomerDialog} onOpenChange={setShowAddCustomerDialog}>
+        <DialogContent className="bg-card border-border">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5 text-primary" />
-              Sale Complete
+              <UserPlus className="h-5 w-5" />
+              Add New Customer
             </DialogTitle>
           </DialogHeader>
-          {lastReceipt && (
-            <div className="space-y-4">
-              <div className="text-center py-4">
-                <Badge variant={lastReceipt.status === 'Paid' ? 'default' : 'secondary'} className="text-lg px-4 py-2">
-                  {lastReceipt.status}
-                </Badge>
-                <p className="mt-2 text-2xl font-bold">{BANGLADESHI_CURRENCY_SYMBOL}{lastReceipt.total}</p>
-                <p className="text-sm text-muted-foreground">Invoice: {lastReceipt.id}</p>
-              </div>
-              <div className="flex gap-3">
-                <Button onClick={printReceipt} className="flex-1">
-                  <Printer className="h-4 w-4 mr-2" />
-                  Print Receipt
-                </Button>
-                <Button variant="outline" onClick={() => setShowReceiptModal(false)} className="flex-1">
-                  Close
-                </Button>
-              </div>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Customer Name *</Label>
+              <Input
+                value={newCustomer.name}
+                onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })}
+                placeholder="Enter customer name"
+              />
             </div>
-          )}
+            <div className="space-y-2">
+              <Label>Phone Number</Label>
+              <Input
+                value={newCustomer.phone}
+                onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })}
+                placeholder="+880 1XXX-XXXXXX"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Address</Label>
+              <Input
+                value={newCustomer.address}
+                onChange={(e) => setNewCustomer({ ...newCustomer, address: e.target.value })}
+                placeholder="Enter address"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddCustomerDialog(false)}>Cancel</Button>
+            <Button onClick={handleAddCustomer} disabled={!newCustomer.name.trim()}>
+              Add Customer
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Customer History Dialog */}
+      <Dialog open={showCustomerHistoryDialog} onOpenChange={setShowCustomerHistoryDialog}>
+        <DialogContent className="bg-card border-border max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <History className="h-5 w-5" />
+              Purchase History - {selectedCustomer?.name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 max-h-96 overflow-y-auto">
+            {customerHistory.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">No purchase history found</p>
+            ) : (
+              customerHistory.map(record => (
+                <div key={record.id} className="p-3 bg-muted/50 rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm text-muted-foreground">{record.date}</span>
+                    <Badge variant={record.status === 'completed' ? 'default' : 'destructive'}>
+                      {record.status === 'completed' ? 'Paid' : 'Due'}
+                    </Badge>
+                  </div>
+                  <p className="text-sm">{record.items}</p>
+                  <p className="font-medium mt-1">Total: ৳{record.total}</p>
+                </div>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Invoice Dialog */}
+      {lastTransaction && (
+        <InvoiceDialog
+          open={showInvoiceDialog}
+          onOpenChange={setShowInvoiceDialog}
+          invoiceData={lastTransaction}
+        />
+      )}
     </div>
   );
 };

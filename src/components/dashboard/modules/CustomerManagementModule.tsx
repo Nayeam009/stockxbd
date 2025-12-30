@@ -19,6 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   UserX, 
   UserCheck, 
@@ -28,11 +29,15 @@ import {
   Banknote, 
   Package, 
   History,
-  Plus
+  Plus,
+  ShoppingCart,
+  Receipt
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
 
 interface Customer {
   id: string;
@@ -47,6 +52,14 @@ interface Customer {
   created_at: string;
 }
 
+interface SalesRecord {
+  id: string;
+  date: string;
+  items: string;
+  total: number;
+  status: string;
+}
+
 interface CustomerPayment {
   id: string;
   customer_id: string;
@@ -58,18 +71,31 @@ interface CustomerPayment {
 
 type ViewMode = 'main' | 'due' | 'paid';
 
+interface POSTransaction {
+  id: string;
+  transaction_number: string;
+  created_at: string;
+  total: number;
+  payment_status: string;
+  items?: string;
+}
+
 export const CustomerManagementModule = () => {
+  const { t } = useLanguage();
   const [viewMode, setViewMode] = useState<ViewMode>('main');
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [payments, setPayments] = useState<CustomerPayment[]>([]);
+  const [salesHistory, setSalesHistory] = useState<POSTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [settleDialogOpen, setSettleDialogOpen] = useState(false);
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
+  const [salesHistoryDialogOpen, setSalesHistoryDialogOpen] = useState(false);
   const [addCustomerDialogOpen, setAddCustomerDialogOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [paymentAmount, setPaymentAmount] = useState("");
   const [cylindersToCollect, setCylindersToCollect] = useState("");
+  const [historyTab, setHistoryTab] = useState<'payments' | 'sales'>('sales');
   const [newCustomer, setNewCustomer] = useState({
     name: "",
     email: "",
@@ -82,6 +108,23 @@ export const CustomerManagementModule = () => {
   useEffect(() => {
     fetchCustomers();
     fetchPayments();
+
+    // Real-time subscription
+    const channel = supabase
+      .channel('customer-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'customers' }, () => {
+        fetchCustomers();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pos_transactions' }, () => {
+        if (selectedCustomer) {
+          fetchCustomerSalesHistory(selectedCustomer.id);
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const fetchCustomers = async () => {
@@ -107,6 +150,35 @@ export const CustomerManagementModule = () => {
 
     if (!error) {
       setPayments(data || []);
+    }
+  };
+
+  // Fetch customer sales history from POS transactions
+  const fetchCustomerSalesHistory = async (customerId: string) => {
+    const { data } = await supabase
+      .from('pos_transactions')
+      .select(`
+        id,
+        transaction_number,
+        created_at,
+        total,
+        payment_status,
+        pos_transaction_items (product_name, quantity)
+      `)
+      .eq('customer_id', customerId)
+      .order('created_at', { ascending: false })
+      .limit(20);
+
+    if (data) {
+      const history: POSTransaction[] = data.map(t => ({
+        id: t.id,
+        transaction_number: t.transaction_number,
+        created_at: t.created_at,
+        total: Number(t.total),
+        payment_status: t.payment_status,
+        items: t.pos_transaction_items?.map((i: any) => `${i.quantity}x ${i.product_name}`).join(', ') || 'N/A'
+      }));
+      setSalesHistory(history);
     }
   };
 
@@ -504,6 +576,7 @@ export const CustomerManagementModule = () => {
                           className="text-muted-foreground hover:text-foreground"
                           onClick={() => {
                             setSelectedCustomer(customer);
+                            fetchCustomerSalesHistory(customer.id);
                             setHistoryDialogOpen(true);
                           }}
                         >
