@@ -40,6 +40,8 @@ interface LPGBrand {
   size: string;
   refill_cylinder: number;
   package_cylinder: number;
+  empty_cylinder: number;
+  problem_cylinder: number;
   color: string;
 }
 
@@ -86,7 +88,11 @@ interface SaleItem {
   price: number;
   quantity: number;
   returnBrand?: string;
+  returnBrandId?: string;
   cylinderType?: 'refill' | 'package';
+  brandId?: string;  // LPG brand ID for inventory tracking
+  stoveId?: string;  // Stove ID for inventory tracking
+  regulatorId?: string;  // Regulator ID for inventory tracking
 }
 
 interface CustomerSalesHistory {
@@ -343,17 +349,26 @@ export const POSModule = () => {
     const brand = lpgBrands.find(b => b.id === sellingBrand);
     if (!brand) return;
 
-    const returnBrandName = returnBrand && returnBrand !== "none" ? lpgBrands.find(b => b.id === returnBrand)?.name : undefined;
+    // Check stock availability
+    const availableStock = cylinderType === 'refill' ? brand.refill_cylinder : brand.package_cylinder;
+    if (validatedQuantity > availableStock) {
+      toast({ title: `Only ${availableStock} cylinders available in stock`, variant: "destructive" });
+      return;
+    }
+
+    const returnBrandObj = returnBrand && returnBrand !== "none" ? lpgBrands.find(b => b.id === returnBrand) : undefined;
     
     const newItem: SaleItem = {
       id: `lpg-${Date.now()}`,
       type: 'lpg',
       name: `${brand.name} - ${cylinderType === 'refill' ? 'Refill' : 'Package'}`,
-      details: `${weight}kg, ${mouthSize}, ${saleType}${returnBrandName ? `, Return: ${returnBrandName}` : ''}`,
+      details: `${weight}kg, ${mouthSize}, ${saleType}${returnBrandObj ? `, Return: ${returnBrandObj.name}` : ''}`,
       price: validatedPrice,
       quantity: validatedQuantity,
-      returnBrand: returnBrandName,
-      cylinderType
+      returnBrand: returnBrandObj?.name,
+      returnBrandId: returnBrandObj?.id,
+      cylinderType,
+      brandId: sellingBrand
     };
 
     setSaleItems([...saleItems, newItem]);
@@ -388,7 +403,8 @@ export const POSModule = () => {
       name: `${stove.brand} ${stove.model}`,
       details: `${stove.burners} Burner`,
       price: stove.price,
-      quantity: validatedQuantity
+      quantity: validatedQuantity,
+      stoveId: stove.id
     };
 
     setSaleItems([...saleItems, newItem]);
@@ -421,7 +437,8 @@ export const POSModule = () => {
       name: regulator.brand,
       details: regulator.type,
       price: validatedPrice,
-      quantity: validatedQuantity
+      quantity: validatedQuantity,
+      regulatorId: regulator.id
     };
 
     setSaleItems([...saleItems, newItem]);
@@ -565,6 +582,87 @@ export const POSModule = () => {
         }));
 
         await supabase.from('pos_transaction_items').insert(items);
+      }
+
+      // === UPDATE INVENTORY AFTER SALE ===
+      
+      // Update LPG Stock
+      for (const item of saleItems.filter(i => i.type === 'lpg' && i.brandId)) {
+        const brand = lpgBrands.find(b => b.id === item.brandId);
+        if (!brand) continue;
+
+        if (item.cylinderType === 'refill') {
+          // Refill sale: deduct from refill_cylinder
+          const newRefillCount = Math.max(0, brand.refill_cylinder - item.quantity);
+          await supabase
+            .from('lpg_brands')
+            .update({ refill_cylinder: newRefillCount })
+            .eq('id', item.brandId);
+          
+          // Update local state
+          setLpgBrands(prev => prev.map(b => 
+            b.id === item.brandId ? { ...b, refill_cylinder: newRefillCount } : b
+          ));
+
+          // If return brand specified, add to empty_cylinder of return brand
+          if (item.returnBrandId) {
+            const returnBrand = lpgBrands.find(b => b.id === item.returnBrandId);
+            if (returnBrand) {
+              const newEmptyCount = returnBrand.empty_cylinder + item.quantity;
+              await supabase
+                .from('lpg_brands')
+                .update({ empty_cylinder: newEmptyCount })
+                .eq('id', item.returnBrandId);
+              
+              setLpgBrands(prev => prev.map(b => 
+                b.id === item.returnBrandId ? { ...b, empty_cylinder: newEmptyCount } : b
+              ));
+            }
+          }
+        } else if (item.cylinderType === 'package') {
+          // Package sale (new connection): deduct from package_cylinder
+          const newPackageCount = Math.max(0, brand.package_cylinder - item.quantity);
+          await supabase
+            .from('lpg_brands')
+            .update({ package_cylinder: newPackageCount })
+            .eq('id', item.brandId);
+          
+          setLpgBrands(prev => prev.map(b => 
+            b.id === item.brandId ? { ...b, package_cylinder: newPackageCount } : b
+          ));
+        }
+      }
+
+      // Update Stove Stock
+      for (const item of saleItems.filter(i => i.type === 'stove' && i.stoveId)) {
+        const stove = stoves.find(s => s.id === item.stoveId);
+        if (!stove) continue;
+
+        const newQuantity = Math.max(0, stove.quantity - item.quantity);
+        await supabase
+          .from('stoves')
+          .update({ quantity: newQuantity })
+          .eq('id', item.stoveId);
+        
+        setStoves(prev => prev.map(s => 
+          s.id === item.stoveId ? { ...s, quantity: newQuantity } : s
+        ));
+      }
+
+      // Update Regulator Stock
+      for (const item of saleItems.filter(i => i.type === 'regulator' && i.regulatorId)) {
+        const regulator = regulators.find(r => r.id === item.regulatorId);
+        if (!regulator) continue;
+
+        const newQuantity = Math.max(0, regulator.quantity - item.quantity);
+        await supabase
+          .from('regulators')
+          .update({ quantity: newQuantity })
+          .eq('id', item.regulatorId);
+        
+        setRegulators(prev => prev.map(r => 
+          r.id === item.regulatorId ? { ...r, quantity: newQuantity } : r
+        ));
       }
 
       // Update customer dues if sale is marked as pending (due)
