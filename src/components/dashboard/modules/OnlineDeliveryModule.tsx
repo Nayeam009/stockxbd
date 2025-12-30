@@ -409,20 +409,20 @@ export const OnlineDeliveryModule = ({ orders, setOrders, drivers, userRole }: O
                         <div>
                           <p className="font-medium">{order.customerName}</p>
                           <p className="text-xs text-muted-foreground">
-                            {new Date(order.orderDate).toLocaleDateString()}
+                            {order.orderDate ? new Date(order.orderDate).toLocaleDateString() : 'N/A'}
                           </p>
                         </div>
                       </TableCell>
                       <TableCell>
                         <div className="space-y-1">
-                          {order.items.map((item, idx) => (
+                          {order.items?.map((item, idx) => (
                             <p key={idx} className="text-sm">
                               {item.quantity}x {item.productName}
                             </p>
-                          ))}
+                          )) || <p className="text-sm text-muted-foreground">No items</p>}
                         </div>
                       </TableCell>
-                      <TableCell className="font-semibold">{BANGLADESHI_CURRENCY_SYMBOL}{order.totalAmount.toLocaleString()}</TableCell>
+                      <TableCell className="font-semibold">{BANGLADESHI_CURRENCY_SYMBOL}{(order.totalAmount || 0).toLocaleString()}</TableCell>
                       <TableCell>
                         <Badge variant="secondary" className={getStatusColor(order.status)}>
                           {order.status.toUpperCase()}
