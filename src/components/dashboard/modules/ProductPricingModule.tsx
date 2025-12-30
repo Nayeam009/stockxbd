@@ -22,6 +22,7 @@ interface ProductPrice {
   company_price: number;
   distributor_price: number;
   retail_price: number;
+  package_price: number;
   is_active: boolean;
 }
 
@@ -49,6 +50,7 @@ export const ProductPricingModule = () => {
     company_price: 0,
     distributor_price: 0,
     retail_price: 0,
+    package_price: 0,
   });
 
   useEffect(() => {
@@ -114,6 +116,7 @@ export const ProductPricingModule = () => {
         company_price: 0,
         distributor_price: 0,
         retail_price: 0,
+        package_price: 0,
       });
       fetchData();
     }
@@ -251,7 +254,7 @@ export const ProductPricingModule = () => {
                     </Select>
                   </div>
                 </div>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Company Price</Label>
                     <Input 
@@ -269,11 +272,19 @@ export const ProductPricingModule = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Retail Price</Label>
+                    <Label>Retail Price (Refill)</Label>
                     <Input 
                       type="number"
                       value={newProduct.retail_price}
                       onChange={e => setNewProduct({...newProduct, retail_price: Number(e.target.value)})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Package Price (New Connection)</Label>
+                    <Input 
+                      type="number"
+                      value={newProduct.package_price}
+                      onChange={e => setNewProduct({...newProduct, package_price: Number(e.target.value)})}
                     />
                   </div>
                 </div>
@@ -344,10 +355,11 @@ export const ProductPricingModule = () => {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-[40%]">Product Name</TableHead>
-                        <TableHead className="text-center">Company Price (/-)</TableHead>
-                        <TableHead className="text-center">Distributor Price (/-)</TableHead>
-                        <TableHead className="text-center">Retail Price (/-)</TableHead>
+                        <TableHead className="w-[30%]">Product Name</TableHead>
+                        <TableHead className="text-center">Company (/-)</TableHead>
+                        <TableHead className="text-center">Distributor (/-)</TableHead>
+                        <TableHead className="text-center">Retail/Refill (/-)</TableHead>
+                        <TableHead className="text-center">Package (/-)</TableHead>
                         <TableHead className="text-center">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -372,7 +384,7 @@ export const ProductPricingModule = () => {
                               type="number"
                               value={getValue(product, "company_price") as number}
                               onChange={e => handlePriceChange(product.id, "company_price", Number(e.target.value))}
-                              className="w-24 text-center mx-auto"
+                              className="w-20 text-center mx-auto"
                             />
                           </TableCell>
                           <TableCell>
@@ -380,7 +392,7 @@ export const ProductPricingModule = () => {
                               type="number"
                               value={getValue(product, "distributor_price") as number}
                               onChange={e => handlePriceChange(product.id, "distributor_price", Number(e.target.value))}
-                              className="w-24 text-center mx-auto"
+                              className="w-20 text-center mx-auto"
                             />
                           </TableCell>
                           <TableCell>
@@ -388,7 +400,15 @@ export const ProductPricingModule = () => {
                               type="number"
                               value={getValue(product, "retail_price") as number}
                               onChange={e => handlePriceChange(product.id, "retail_price", Number(e.target.value))}
-                              className="w-24 text-center mx-auto"
+                              className="w-20 text-center mx-auto"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              type="number"
+                              value={getValue(product, "package_price") as number}
+                              onChange={e => handlePriceChange(product.id, "package_price", Number(e.target.value))}
+                              className="w-20 text-center mx-auto"
                             />
                           </TableCell>
                           <TableCell className="text-center">

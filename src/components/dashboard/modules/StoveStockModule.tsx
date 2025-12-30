@@ -50,10 +50,8 @@ export const StoveStockModule = () => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newStove, setNewStove] = useState({
     brand: "",
-    model: "",
-    burners: 2,
+    burners: 1, // 1 = Single, 2 = Double
     quantity: 0,
-    price: 0,
   });
 
   const fetchStoves = async () => {
@@ -82,8 +80,7 @@ export const StoveStockModule = () => {
   // Filter stoves based on search
   const filteredStoves = stoves.filter(
     (stove) =>
-      stove.brand.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      stove.model.toLowerCase().includes(searchQuery.toLowerCase())
+      stove.brand.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   // Calculate summary stats
@@ -99,27 +96,50 @@ export const StoveStockModule = () => {
     return { label: "In Stock", color: "success" };
   };
 
+  const getBurnerLabel = (burners: number) => {
+    return burners === 1 ? "Single Burner" : "Double Burner";
+  };
+
   const handleAddStove = async () => {
-    if (!newStove.brand.trim() || !newStove.model.trim()) {
-      toast.error("Please enter brand and model");
+    if (!newStove.brand.trim()) {
+      toast.error("Please enter brand name");
       return;
     }
 
     try {
       const { data: userData } = await supabase.auth.getUser();
-      const { error } = await supabase.from("stoves").insert({
-        brand: newStove.brand.trim(),
-        model: newStove.model.trim(),
-        burners: newStove.burners,
-        quantity: newStove.quantity,
-        price: newStove.price,
-        created_by: userData.user?.id,
-      });
+      
+      // Check if this brand + burner combo already exists
+      const existing = stoves.find(
+        s => s.brand.toLowerCase() === newStove.brand.trim().toLowerCase() && s.burners === newStove.burners
+      );
+      
+      if (existing) {
+        // Update quantity instead
+        const newQuantity = existing.quantity + newStove.quantity;
+        const { error } = await supabase
+          .from("stoves")
+          .update({ quantity: newQuantity })
+          .eq("id", existing.id);
+        
+        if (error) throw error;
+        toast.success("Stove quantity updated");
+      } else {
+        // Create new stove
+        const { error } = await supabase.from("stoves").insert({
+          brand: newStove.brand.trim(),
+          model: getBurnerLabel(newStove.burners), // Use burner type as model
+          burners: newStove.burners,
+          quantity: newStove.quantity,
+          price: 0, // Price will be set in Product Pricing
+          created_by: userData.user?.id,
+        });
 
-      if (error) throw error;
+        if (error) throw error;
+        toast.success("Stove added successfully");
+      }
 
-      toast.success("Stove added successfully");
-      setNewStove({ brand: "", model: "", burners: 2, quantity: 0, price: 0 });
+      setNewStove({ brand: "", burners: 1, quantity: 0 });
       setIsAddDialogOpen(false);
       fetchStoves();
     } catch (error) {
@@ -252,7 +272,7 @@ export const StoveStockModule = () => {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-foreground">Gas Stove Stock</h2>
-          <p className="text-muted-foreground text-sm">Manage gas stove inventory by brand and model</p>
+          <p className="text-muted-foreground text-sm">Manage gas stove inventory by brand and burner type</p>
         </div>
 
         <div className="flex items-center gap-3 w-full sm:w-auto">
@@ -279,7 +299,7 @@ export const StoveStockModule = () => {
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
-                  <Label>Brand Name</Label>
+                  <Label>Brand Name *</Label>
                   <Input
                     placeholder="e.g., Walton, RFL, Minister"
                     value={newStove.brand}
@@ -290,18 +310,7 @@ export const StoveStockModule = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Model</Label>
-                  <Input
-                    placeholder="e.g., WGS-2B100"
-                    value={newStove.model}
-                    onChange={(e) =>
-                      setNewStove({ ...newStove, model: e.target.value })
-                    }
-                    className="bg-background border-border"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Burners</Label>
+                  <Label>Burner Type *</Label>
                   <Select
                     value={newStove.burners.toString()}
                     onValueChange={(value) =>
@@ -309,49 +318,32 @@ export const StoveStockModule = () => {
                     }
                   >
                     <SelectTrigger className="bg-background border-border">
-                      <SelectValue placeholder="Select burners" />
+                      <SelectValue placeholder="Select burner type" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="1">1 Burner</SelectItem>
-                      <SelectItem value="2">2 Burners</SelectItem>
-                      <SelectItem value="3">3 Burners</SelectItem>
-                      <SelectItem value="4">4 Burners</SelectItem>
-                      <SelectItem value="5">5 Burners</SelectItem>
+                      <SelectItem value="1">Single Burner</SelectItem>
+                      <SelectItem value="2">Double Burner</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Price ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={newStove.price}
-                      onChange={(e) =>
-                        setNewStove({
-                          ...newStove,
-                          price: parseFloat(e.target.value) || 0,
-                        })
-                      }
-                      className="bg-background border-border"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Initial Quantity</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={newStove.quantity}
-                      onChange={(e) =>
-                        setNewStove({
-                          ...newStove,
-                          quantity: parseInt(e.target.value) || 0,
-                        })
-                      }
-                      className="bg-background border-border"
-                    />
-                  </div>
+                <div className="space-y-2">
+                  <Label>Initial Quantity</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={newStove.quantity}
+                    onChange={(e) =>
+                      setNewStove({
+                        ...newStove,
+                        quantity: parseInt(e.target.value) || 0,
+                      })
+                    }
+                    className="bg-background border-border"
+                  />
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  Note: Set prices in the Product Pricing page
+                </p>
                 <Button onClick={handleAddStove} className="w-full">
                   Add Stove
                 </Button>
@@ -367,9 +359,7 @@ export const StoveStockModule = () => {
           <TableHeader>
             <TableRow className="border-border hover:bg-transparent">
               <TableHead className="text-muted-foreground font-medium">Brand</TableHead>
-              <TableHead className="text-muted-foreground font-medium">Model</TableHead>
-              <TableHead className="text-muted-foreground font-medium">Burners</TableHead>
-              <TableHead className="text-muted-foreground font-medium">Price</TableHead>
+              <TableHead className="text-muted-foreground font-medium">Burner Type</TableHead>
               <TableHead className="text-muted-foreground font-medium">Quantity</TableHead>
               <TableHead className="text-muted-foreground font-medium">Status</TableHead>
               <TableHead className="text-muted-foreground font-medium text-right">Actions</TableHead>
@@ -378,7 +368,7 @@ export const StoveStockModule = () => {
           <TableBody>
             {filteredStoves.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                   {searchQuery ? "No stoves found matching your search" : "No stoves added yet"}
                 </TableCell>
               </TableRow>
@@ -390,14 +380,10 @@ export const StoveStockModule = () => {
                     <TableCell className="font-medium text-foreground">
                       {stove.brand}
                     </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {stove.model}
-                    </TableCell>
                     <TableCell className="text-foreground">
-                      {stove.burners} Burner{stove.burners > 1 ? 's' : ''}
-                    </TableCell>
-                    <TableCell className="text-foreground">
-                      {BANGLADESHI_CURRENCY_SYMBOL}{stove.price.toLocaleString()}
+                      <Badge variant="outline" className="bg-primary/10 border-primary/20">
+                        {getBurnerLabel(stove.burners)}
+                      </Badge>
                     </TableCell>
                     <TableCell className="text-foreground font-semibold">
                       {stove.quantity}

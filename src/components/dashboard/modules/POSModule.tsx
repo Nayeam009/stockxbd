@@ -62,6 +62,19 @@ interface Regulator {
   price?: number;
 }
 
+interface ProductPrice {
+  id: string;
+  product_type: string;
+  brand_id: string | null;
+  product_name: string;
+  size: string | null;
+  variant: string | null;
+  company_price: number;
+  distributor_price: number;
+  retail_price: number;
+  package_price: number;
+}
+
 interface CustomProduct {
   id: string;
   name: string;
@@ -142,6 +155,7 @@ export const POSModule = () => {
   const [stoves, setStoves] = useState<Stove[]>([]);
   const [regulators, setRegulators] = useState<Regulator[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [productPrices, setProductPrices] = useState<ProductPrice[]>([]);
   
   // Cart & Customer
   const [saleItems, setSaleItems] = useState<SaleItem[]>([]);
@@ -169,17 +183,19 @@ export const POSModule = () => {
     const fetchData = async () => {
       setLoading(true);
       
-      const [brandsRes, stovesRes, regulatorsRes, customersRes] = await Promise.all([
+      const [brandsRes, stovesRes, regulatorsRes, customersRes, pricesRes] = await Promise.all([
         supabase.from('lpg_brands').select('*').eq('is_active', true),
         supabase.from('stoves').select('*').eq('is_active', true),
         supabase.from('regulators').select('*').eq('is_active', true),
-        supabase.from('customers').select('*').order('name')
+        supabase.from('customers').select('*').order('name'),
+        supabase.from('product_prices').select('*').eq('is_active', true)
       ]);
 
       if (brandsRes.data) setLpgBrands(brandsRes.data);
       if (stovesRes.data) setStoves(stovesRes.data);
       if (regulatorsRes.data) setRegulators(regulatorsRes.data);
       if (customersRes.data) setCustomers(customersRes.data);
+      if (pricesRes.data) setProductPrices(pricesRes.data);
       
       setLoading(false);
     };
@@ -198,6 +214,29 @@ export const POSModule = () => {
       supabase.removeChannel(channel);
     };
   }, []);
+
+  // Auto-populate LPG price when brand/weight/type changes
+  useEffect(() => {
+    if (sellingBrand && weight && productPrices.length > 0) {
+      const autoPrice = getLPGPrice(sellingBrand, weight, cylinderType, saleType);
+      if (autoPrice > 0) {
+        setPrice(autoPrice.toString());
+      }
+    }
+  }, [sellingBrand, weight, cylinderType, saleType, productPrices]);
+
+  // Auto-populate regulator price when selected
+  useEffect(() => {
+    if (selectedRegulator && productPrices.length > 0) {
+      const regulator = regulators.find(r => r.id === selectedRegulator);
+      if (regulator) {
+        const autoPrice = getRegulatorPrice(regulator.brand, regulator.type);
+        if (autoPrice > 0) {
+          setRegulatorPrice(autoPrice.toString());
+        }
+      }
+    }
+  }, [selectedRegulator, regulators, productPrices]);
 
   // Filter brands by mouth size and search
   const filteredBrands = useMemo(() => {
@@ -244,6 +283,44 @@ export const POSModule = () => {
   const getRegulatorStock = (regulatorId: string) => {
     const regulator = regulators.find(r => r.id === regulatorId);
     return regulator?.quantity || 0;
+  };
+
+  // Get price from product_prices table
+  const getStovePrice = (brand: string, burners: number) => {
+    const burnerType = burners === 1 ? 'Single' : 'Double';
+    const priceEntry = productPrices.find(
+      p => p.product_type === 'stove' && 
+           p.product_name.toLowerCase().includes(brand.toLowerCase()) &&
+           p.product_name.toLowerCase().includes(burnerType.toLowerCase())
+    );
+    return priceEntry?.retail_price || 0;
+  };
+
+  const getRegulatorPrice = (brand: string, type: string) => {
+    const priceEntry = productPrices.find(
+      p => p.product_type === 'regulator' && 
+           p.product_name.toLowerCase().includes(brand.toLowerCase()) &&
+           p.product_name.toLowerCase().includes(type.toLowerCase())
+    );
+    return priceEntry?.retail_price || 0;
+  };
+
+  const getLPGPrice = (brandId: string, weight: string, cylinderType: 'refill' | 'package', saleType: 'retail' | 'wholesale') => {
+    const brand = lpgBrands.find(b => b.id === brandId);
+    if (!brand) return 0;
+    
+    const priceEntry = productPrices.find(
+      p => p.product_type === 'lpg' && 
+           p.brand_id === brandId &&
+           p.size?.includes(weight)
+    );
+    
+    if (!priceEntry) return 0;
+    
+    if (cylinderType === 'package') {
+      return priceEntry.package_price || priceEntry.retail_price;
+    }
+    return saleType === 'wholesale' ? priceEntry.distributor_price : priceEntry.retail_price;
   };
 
   // Fetch customer sales history
