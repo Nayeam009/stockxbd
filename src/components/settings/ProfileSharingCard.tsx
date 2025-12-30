@@ -11,7 +11,6 @@ import {
   Copy, 
   Check, 
   Loader2,
-  UserPlus,
   Shield,
   Trash2,
   RefreshCw
@@ -37,14 +36,14 @@ import {
 
 interface TeamMember {
   id: string;
-  user_id: string;
-  email: string;
+  member_user_id: string;
+  member_email: string;
   role: 'manager' | 'driver';
   created_at: string;
 }
 
 export const ProfileSharingCard = () => {
-  const { t, language } = useLanguage();
+  const { language } = useLanguage();
   const [loading, setLoading] = useState(false);
   const [showQRDialog, setShowQRDialog] = useState(false);
   const [inviteCode, setInviteCode] = useState("");
@@ -56,8 +55,13 @@ export const ProfileSharingCard = () => {
 
   useEffect(() => {
     checkUserRole();
-    fetchTeamMembers();
   }, []);
+
+  useEffect(() => {
+    if (currentUserId && userRole === 'owner') {
+      fetchTeamMembers();
+    }
+  }, [currentUserId, userRole]);
 
   const checkUserRole = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -76,36 +80,59 @@ export const ProfileSharingCard = () => {
   };
 
   const fetchTeamMembers = async () => {
-    // For now, we'll store team info in localStorage as a simple solution
-    // In production, this would be a separate table
-    const saved = localStorage.getItem('team-members');
-    if (saved) {
-      setTeamMembers(JSON.parse(saved));
+    const { data, error } = await supabase
+      .from('team_members')
+      .select('id, member_user_id, member_email, role, created_at')
+      .eq('owner_id', currentUserId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching team members:', error);
+      return;
+    }
+
+    if (data) {
+      setTeamMembers(data as TeamMember[]);
     }
   };
 
-  const generateInviteCode = () => {
+  const generateInviteCode = async () => {
     setLoading(true);
     
-    // Generate a unique invite code
-    const code = `SX-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+    try {
+      // Generate a unique invite code
+      const code = `SX-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+      
+      // Store invite in database
+      const { error } = await supabase
+        .from('team_invites')
+        .insert({
+          code,
+          role: inviteRole,
+          created_by: currentUserId,
+          expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 hours
+        });
+
+      if (error) {
+        console.error('Error creating invite:', error);
+        toast({ 
+          title: language === 'bn' ? 'ত্রুটি হয়েছে' : 'Error creating invite',
+          variant: 'destructive'
+        });
+        setLoading(false);
+        return;
+      }
+
+      setInviteCode(code);
+      setShowQRDialog(true);
+    } catch (err) {
+      console.error('Error generating invite:', err);
+      toast({ 
+        title: language === 'bn' ? 'ত্রুটি হয়েছে' : 'Error creating invite',
+        variant: 'destructive'
+      });
+    }
     
-    // Store invite info
-    const inviteData = {
-      code,
-      role: inviteRole,
-      createdAt: new Date().toISOString(),
-      createdBy: currentUserId,
-      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 hours
-    };
-    
-    // Save to localStorage (in production, this would be in the database)
-    const existingInvites = JSON.parse(localStorage.getItem('pending-invites') || '[]');
-    existingInvites.push(inviteData);
-    localStorage.setItem('pending-invites', JSON.stringify(existingInvites));
-    
-    setInviteCode(code);
-    setShowQRDialog(true);
     setLoading(false);
   };
 
@@ -117,10 +144,22 @@ export const ProfileSharingCard = () => {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const removeTeamMember = (memberId: string) => {
-    const updated = teamMembers.filter(m => m.id !== memberId);
-    setTeamMembers(updated);
-    localStorage.setItem('team-members', JSON.stringify(updated));
+  const removeTeamMember = async (memberId: string) => {
+    const { error } = await supabase
+      .from('team_members')
+      .delete()
+      .eq('id', memberId);
+
+    if (error) {
+      console.error('Error removing team member:', error);
+      toast({ 
+        title: language === 'bn' ? 'ত্রুটি হয়েছে' : 'Error removing member',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setTeamMembers(prev => prev.filter(m => m.id !== memberId));
     toast({ title: language === 'bn' ? 'সদস্য সরানো হয়েছে' : 'Team member removed' });
   };
 
@@ -230,7 +269,7 @@ export const ProfileSharingCard = () => {
                         <Shield className="h-4 w-4 text-primary" />
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-foreground">{member.email}</p>
+                        <p className="text-sm font-medium text-foreground">{member.member_email}</p>
                         <Badge className={`text-xs mt-1 ${getRoleBadgeColor(member.role)}`}>
                           {getRoleLabel(member.role)}
                         </Badge>
