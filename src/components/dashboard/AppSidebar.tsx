@@ -19,12 +19,10 @@ import {
   Package,
   ChefHat,
   Users,
-  UserCheck,
   Banknote,
   Truck,
   Search,
   Home,
-  User,
   Receipt,
   Wallet,
   ClipboardList,
@@ -34,7 +32,7 @@ import {
   Settings,
   LogOut,
   Flame,
-  Sparkles
+  ChevronRight
 } from "lucide-react";
 import stockXLogo from "@/assets/stock-x-logo.png";
 import { supabase } from "@/integrations/supabase/client";
@@ -109,9 +107,9 @@ export const AppSidebar = ({
     if (filteredItems.length === 0) return null;
 
     return (
-      <SidebarGroup>
+      <SidebarGroup className="py-0">
         {label && open && (
-          <SidebarGroupLabel className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground/70 font-semibold px-4 mb-1">
+          <SidebarGroupLabel className="text-[10px] uppercase tracking-wider text-muted-foreground/50 font-medium px-3 py-2">
             {label}
           </SidebarGroupLabel>
         )}
@@ -127,36 +125,33 @@ export const AppSidebar = ({
                   <SidebarMenuButton 
                     onClick={() => handleModuleChange(item.id)}
                     isActive={isActive}
-                    className={`relative group transition-all duration-300 rounded-lg h-10 ${
+                    className={`relative group transition-all duration-200 rounded-lg h-9 ${
                       isActive 
-                        ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/25' 
-                        : 'hover:bg-muted/80 text-muted-foreground hover:text-foreground'
+                        ? 'bg-primary text-primary-foreground' 
+                        : 'hover:bg-muted text-muted-foreground hover:text-foreground'
                     }`}
                   >
-                    <div className={`h-7 w-7 rounded-md flex items-center justify-center transition-all duration-200 ${
-                      isActive 
-                        ? 'bg-primary-foreground/20' 
-                        : 'bg-transparent group-hover:bg-primary/10'
-                    }`}>
-                      <Icon className={`h-4 w-4 ${isActive ? 'text-primary-foreground' : 'group-hover:text-primary'}`} />
-                    </div>
+                    <Icon className={`h-4 w-4 flex-shrink-0 ${isActive ? '' : 'opacity-70 group-hover:opacity-100'}`} />
                     {open && (
-                      <div className="flex items-center justify-between w-full">
-                        <span className={`text-sm font-medium ${isActive ? 'text-primary-foreground' : ''}`}>{displayTitle}</span>
-                        {item.badge && (
-                          <Badge 
-                            variant="destructive" 
-                            className="h-5 min-w-5 px-1.5 text-[10px] font-bold ml-2"
-                          >
-                            {item.badge}
-                          </Badge>
-                        )}
+                      <div className="flex items-center justify-between w-full ml-1">
+                        <span className="text-[13px] font-medium truncate">{displayTitle}</span>
+                        <div className="flex items-center gap-1">
+                          {item.badge && (
+                            <Badge 
+                              variant="destructive" 
+                              className="h-4.5 min-w-5 px-1.5 text-[10px] font-semibold"
+                            >
+                              {item.badge}
+                            </Badge>
+                          )}
+                          {isActive && <ChevronRight className="h-3 w-3 opacity-50" />}
+                        </div>
                       </div>
                     )}
                     {!open && item.badge && (
                       <Badge 
                         variant="destructive" 
-                        className="absolute -top-1 -right-1 h-4 min-w-4 p-0 flex items-center justify-center text-[10px] font-bold"
+                        className="absolute -top-1 -right-1 h-4 min-w-4 p-0 flex items-center justify-center text-[9px] font-bold"
                       >
                         {item.badge}
                       </Badge>
@@ -172,57 +167,57 @@ export const AppSidebar = ({
   };
 
   return (
-    <Sidebar collapsible="icon" className="border-r border-border/40 bg-card/50 backdrop-blur-xl">
-      {/* Clean Header */}
-      <SidebarHeader className="border-b border-border/40 p-4">
+    <Sidebar collapsible="icon" className="border-r border-border/50 bg-background">
+      {/* Header */}
+      <SidebarHeader className="p-4 border-b border-border/50">
         <div className="flex items-center gap-3">
-          <div className="relative">
-            <div className="h-10 w-10 rounded-full border-2 border-foreground/80 flex items-center justify-center bg-card shadow-sm">
-              <img src={stockXLogo} alt="Stock-X" className="h-6 w-6 object-contain opacity-70" />
+          <div className="relative flex-shrink-0">
+            <div className="h-9 w-9 rounded-full border-2 border-foreground/20 flex items-center justify-center bg-muted/50">
+              <img src={stockXLogo} alt="Stock-X" className="h-5 w-5 object-contain opacity-80" />
             </div>
-            <div className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 bg-green-500 rounded-full border-2 border-card"></div>
+            <div className="absolute -bottom-0.5 -right-0.5 h-2 w-2 bg-green-500 rounded-full border-2 border-background" />
           </div>
           {open && (
-            <div className="animate-fade-in">
-              <h2 className="text-base font-semibold text-foreground tracking-tight">Stock-X</h2>
-              <p className="text-[11px] text-muted-foreground">LPG Management</p>
+            <div className="min-w-0">
+              <h2 className="text-sm font-semibold text-foreground truncate">Stock-X</h2>
+              <p className="text-[10px] text-muted-foreground truncate">LPG Management</p>
             </div>
           )}
         </div>
       </SidebarHeader>
 
-      <SidebarContent className="py-4">
+      <SidebarContent className="py-3 overflow-x-hidden">
         {renderNavGroup(mainNavItems)}
         
-        <div className="my-2 mx-4 h-px bg-border/50" />
-        {renderNavGroup(salesItems, 'Sales & Finance')}
+        <div className="my-2 mx-3 h-px bg-border/30" />
+        {renderNavGroup(salesItems, 'Sales')}
         
-        <div className="my-2 mx-4 h-px bg-border/50" />
+        <div className="my-2 mx-3 h-px bg-border/30" />
         {renderNavGroup(inventoryItems, 'Inventory')}
         
-        <div className="my-2 mx-4 h-px bg-border/50" />
+        <div className="my-2 mx-3 h-px bg-border/30" />
         {renderNavGroup(operationsItems, 'Operations')}
         
-        <div className="my-2 mx-4 h-px bg-border/50" />
-        {renderNavGroup(managementItems, 'Management')}
+        <div className="my-2 mx-3 h-px bg-border/30" />
+        {renderNavGroup(managementItems, 'Manage')}
         
-        <div className="my-2 mx-4 h-px bg-border/50" />
-        {renderNavGroup(otherItems, 'Other')}
+        <div className="my-2 mx-3 h-px bg-border/30" />
+        {renderNavGroup(otherItems)}
       </SidebarContent>
 
-      {/* Clean Footer - Just Sign Out */}
-      <SidebarFooter className="border-t border-border/40 p-3">
+      {/* Footer */}
+      <SidebarFooter className="border-t border-border/50 p-2">
         <Button 
           variant="ghost" 
-          size={open ? "default" : "icon"}
-          className={`text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors ${open ? 'w-full justify-start' : 'w-9 h-9 mx-auto'}`}
+          size={open ? "sm" : "icon"}
+          className={`text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors rounded-lg ${open ? 'w-full justify-start h-9' : 'w-8 h-8 mx-auto'}`}
           onClick={async () => {
             await supabase.auth.signOut();
             toast({ title: t("logout") });
           }}
         >
           <LogOut className="h-4 w-4" />
-          {open && <span className="ml-2">{t("logout")}</span>}
+          {open && <span className="ml-2 text-[13px]">{t("logout")}</span>}
         </Button>
       </SidebarFooter>
     </Sidebar>
