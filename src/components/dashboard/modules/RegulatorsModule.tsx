@@ -81,13 +81,13 @@ export const RegulatorsModule = () => {
 
   // Calculate summary stats
   const totalQuantity = regulators.reduce((sum, r) => sum + r.quantity, 0);
-  const inStockCount = regulators.filter((r) => r.quantity > 50).length;
-  const lowStockCount = regulators.filter((r) => r.quantity > 0 && r.quantity <= 50).length;
+  const inStockCount = regulators.filter((r) => r.quantity >= 30).length;
+  const lowStockCount = regulators.filter((r) => r.quantity > 0 && r.quantity < 30).length;
   const outOfStockCount = regulators.filter((r) => r.quantity === 0).length;
 
   const getStatus = (quantity: number) => {
     if (quantity === 0) return { label: "Out of Stock", color: "destructive" };
-    if (quantity <= 50) return { label: "Low Stock", color: "warning" };
+    if (quantity < 30) return { label: "Low Stock", color: "warning" };
     return { label: "In Stock", color: "success" };
   };
 
