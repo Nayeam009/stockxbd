@@ -180,7 +180,7 @@ const Dashboard = () => {
 
   return (
     <SidebarProvider defaultOpen={false}>
-      <div className="min-h-screen flex w-full bg-background">
+      <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-background to-muted/30">
         <AppSidebar
           activeModule={activeModule}
           setActiveModule={setActiveModule}
@@ -200,7 +200,7 @@ const Dashboard = () => {
           />
 
           {/* Main Content */}
-          <main className="flex-1 overflow-auto bg-gradient-to-b from-background to-muted/30">
+          <main className="flex-1 overflow-auto">
             <div className="container mx-auto p-3 sm:p-4 md:p-6 animate-fade-in max-w-7xl">
               {renderActiveModule()}
             </div>

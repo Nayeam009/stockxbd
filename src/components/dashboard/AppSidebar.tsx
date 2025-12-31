@@ -125,33 +125,31 @@ export const AppSidebar = ({
                   <SidebarMenuButton 
                     onClick={() => handleModuleChange(item.id)}
                     isActive={isActive}
-                    className={`relative group transition-all duration-200 rounded-lg h-9 ${
+                    className={`relative group transition-all duration-300 rounded-xl h-10 ${
                       isActive 
-                        ? 'bg-primary text-primary-foreground' 
-                        : 'hover:bg-muted text-muted-foreground hover:text-foreground'
+                        ? 'bg-gradient-to-r from-primary to-primary-light text-primary-foreground shadow-md' 
+                        : 'hover:bg-primary/10 text-muted-foreground hover:text-primary'
                     }`}
                   >
-                    <Icon className={`h-4 w-4 flex-shrink-0 ${isActive ? '' : 'opacity-70 group-hover:opacity-100'}`} />
+                    <Icon className={`h-4 w-4 flex-shrink-0 transition-transform duration-200 ${isActive ? '' : 'opacity-70 group-hover:opacity-100 group-hover:scale-110'}`} />
                     {open && (
-                      <div className="flex items-center justify-between w-full ml-1">
+                      <div className="flex items-center justify-between w-full ml-2">
                         <span className="text-[13px] font-medium truncate">{displayTitle}</span>
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1.5">
                           {item.badge && (
                             <Badge 
-                              variant="destructive" 
-                              className="h-4.5 min-w-5 px-1.5 text-[10px] font-semibold"
+                              className="h-5 min-w-5 px-1.5 text-[10px] font-bold bg-secondary text-secondary-foreground border-0"
                             >
                               {item.badge}
                             </Badge>
                           )}
-                          {isActive && <ChevronRight className="h-3 w-3 opacity-50" />}
+                          {isActive && <ChevronRight className="h-3.5 w-3.5 opacity-70" />}
                         </div>
                       </div>
                     )}
                     {!open && item.badge && (
                       <Badge 
-                        variant="destructive" 
-                        className="absolute -top-1 -right-1 h-4 min-w-4 p-0 flex items-center justify-center text-[9px] font-bold"
+                        className="absolute -top-1 -right-1 h-4 min-w-4 p-0 flex items-center justify-center text-[9px] font-bold bg-secondary text-secondary-foreground border-0"
                       >
                         {item.badge}
                       </Badge>
@@ -167,19 +165,19 @@ export const AppSidebar = ({
   };
 
   return (
-    <Sidebar collapsible="icon" className="border-r border-border/50 bg-background">
+    <Sidebar collapsible="icon" className="border-r border-border/40 bg-card shadow-lg">
       {/* Header */}
-      <SidebarHeader className="p-4 border-b border-border/50">
+      <SidebarHeader className="p-4 border-b border-border/40 bg-gradient-to-r from-primary/5 to-transparent">
         <div className="flex items-center gap-3">
           <div className="relative flex-shrink-0">
-            <div className="h-9 w-9 rounded-full border-2 border-foreground/20 flex items-center justify-center bg-muted/50">
-              <img src={stockXLogo} alt="Stock-X" className="h-5 w-5 object-contain opacity-80" />
+            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary to-primary-light flex items-center justify-center shadow-md">
+              <img src={stockXLogo} alt="Stock-X" className="h-6 w-6 object-contain brightness-0 invert" />
             </div>
-            <div className="absolute -bottom-0.5 -right-0.5 h-2 w-2 bg-green-500 rounded-full border-2 border-background" />
+            <div className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 bg-success rounded-full border-2 border-card shadow-sm" />
           </div>
           {open && (
             <div className="min-w-0">
-              <h2 className="text-sm font-semibold text-foreground truncate">Stock-X</h2>
+              <h2 className="text-sm font-bold text-primary truncate tracking-tight">STOCK X</h2>
               <p className="text-[10px] text-muted-foreground truncate">LPG Management</p>
             </div>
           )}
@@ -189,35 +187,35 @@ export const AppSidebar = ({
       <SidebarContent className="py-3 overflow-x-hidden">
         {renderNavGroup(mainNavItems)}
         
-        <div className="my-2 mx-3 h-px bg-border/30" />
+        <div className="my-2 mx-3 h-px bg-gradient-to-r from-transparent via-border/50 to-transparent" />
         {renderNavGroup(salesItems, 'Sales')}
         
-        <div className="my-2 mx-3 h-px bg-border/30" />
+        <div className="my-2 mx-3 h-px bg-gradient-to-r from-transparent via-border/50 to-transparent" />
         {renderNavGroup(inventoryItems, 'Inventory')}
         
-        <div className="my-2 mx-3 h-px bg-border/30" />
+        <div className="my-2 mx-3 h-px bg-gradient-to-r from-transparent via-border/50 to-transparent" />
         {renderNavGroup(operationsItems, 'Operations')}
         
-        <div className="my-2 mx-3 h-px bg-border/30" />
+        <div className="my-2 mx-3 h-px bg-gradient-to-r from-transparent via-border/50 to-transparent" />
         {renderNavGroup(managementItems, 'Manage')}
         
-        <div className="my-2 mx-3 h-px bg-border/30" />
+        <div className="my-2 mx-3 h-px bg-gradient-to-r from-transparent via-border/50 to-transparent" />
         {renderNavGroup(otherItems)}
       </SidebarContent>
 
       {/* Footer */}
-      <SidebarFooter className="border-t border-border/50 p-2">
+      <SidebarFooter className="border-t border-border/40 p-3 bg-gradient-to-r from-muted/30 to-transparent">
         <Button 
           variant="ghost" 
           size={open ? "sm" : "icon"}
-          className={`text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors rounded-lg ${open ? 'w-full justify-start h-9' : 'w-8 h-8 mx-auto'}`}
+          className={`text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all duration-300 rounded-xl ${open ? 'w-full justify-start h-10' : 'w-9 h-9 mx-auto'}`}
           onClick={async () => {
             await supabase.auth.signOut();
             toast({ title: t("logout") });
           }}
         >
           <LogOut className="h-4 w-4" />
-          {open && <span className="ml-2 text-[13px]">{t("logout")}</span>}
+          {open && <span className="ml-2 text-[13px] font-medium">{t("logout")}</span>}
         </Button>
       </SidebarFooter>
     </Sidebar>
