@@ -2,7 +2,7 @@ import { useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { InvoiceTemplate } from "./InvoiceTemplate";
-import { Printer } from "lucide-react";
+import { Printer, FileDown } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 
 interface InvoiceItem {
@@ -43,6 +43,7 @@ interface InvoiceDialogProps {
   businessName?: string;
   businessPhone?: string;
   businessAddress?: string;
+  onExportPDF?: () => void;
 }
 
 export const InvoiceDialog = ({
@@ -52,6 +53,7 @@ export const InvoiceDialog = ({
   businessName,
   businessPhone,
   businessAddress,
+  onExportPDF,
 }: InvoiceDialogProps) => {
   const invoiceRef = useRef<HTMLDivElement>(null);
   const { t } = useLanguage();
@@ -155,6 +157,12 @@ export const InvoiceDialog = ({
           <DialogTitle className="flex items-center justify-between">
             <span>{t("invoice")} - {invoiceData.invoiceNumber}</span>
             <div className="flex gap-2">
+              {onExportPDF && (
+                <Button onClick={onExportPDF} size="sm" variant="outline" className="gap-2">
+                  <FileDown className="h-4 w-4" />
+                  PDF
+                </Button>
+              )}
               <Button onClick={handlePrint} size="sm" className="gap-2">
                 <Printer className="h-4 w-4" />
                 {t("print_receipt")}
