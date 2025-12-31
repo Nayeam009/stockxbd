@@ -289,6 +289,7 @@ export type Database = {
           refill_cylinder: number
           size: string
           updated_at: string
+          weight: string | null
         }
         Insert: {
           color?: string
@@ -303,6 +304,7 @@ export type Database = {
           refill_cylinder?: number
           size?: string
           updated_at?: string
+          weight?: string | null
         }
         Update: {
           color?: string
@@ -317,6 +319,7 @@ export type Database = {
           refill_cylinder?: number
           size?: string
           updated_at?: string
+          weight?: string | null
         }
         Relationships: []
       }
