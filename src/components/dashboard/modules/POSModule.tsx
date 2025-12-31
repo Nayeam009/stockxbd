@@ -23,8 +23,12 @@ import {
   UserPlus,
   Search,
   Package,
-  AlertTriangle
+  AlertTriangle,
+  ScanLine,
+  Download
 } from "lucide-react";
+import { BarcodeScanner } from "@/components/pos/BarcodeScanner";
+import { generateInvoicePDF } from "@/lib/pdfExport";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
@@ -180,6 +184,9 @@ export const POSModule = () => {
   // Invoice
   const [showInvoiceDialog, setShowInvoiceDialog] = useState(false);
   const [lastTransaction, setLastTransaction] = useState<any>(null);
+
+  // Barcode Scanner
+  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
 
   // Fetch data
   useEffect(() => {
@@ -559,6 +566,36 @@ export const POSModule = () => {
     toast({ title: "Custom product added" });
   };
 
+  // Handle barcode scanner product found
+  const handleBarcodeProductFound = (product: any) => {
+    if (product.type === 'lpg') {
+      // Set up LPG form with scanned product
+      setActiveTab('lpg');
+      setSellingBrand(product.id);
+      toast({ title: "LPG product selected", description: `${product.name} - Select weight and quantity` });
+    } else if (product.type === 'stove') {
+      setActiveTab('stove');
+      setSelectedStove(product.id);
+      toast({ title: "Stove selected", description: product.name });
+    } else if (product.type === 'regulator') {
+      setActiveTab('regulator');
+      setSelectedRegulator(product.id);
+      toast({ title: "Regulator selected", description: product.name });
+    }
+    setShowBarcodeScanner(false);
+  };
+
+  // Export invoice to PDF
+  const handleExportPDF = async () => {
+    if (!lastTransaction) return;
+    try {
+      await generateInvoicePDF(lastTransaction);
+      toast({ title: "PDF exported successfully" });
+    } catch (error) {
+      toast({ title: "Failed to export PDF", variant: "destructive" });
+    }
+  };
+
   const removeItem = (id: string) => {
     setSaleItems(saleItems.filter(item => item.id !== id));
   };
@@ -842,17 +879,23 @@ export const POSModule = () => {
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Left Side - Product Entry */}
         <div className="lg:col-span-2 space-y-4">
-          {/* Product Search Bar */}
+          {/* Product Search Bar with Barcode Scanner */}
           <Card className="border-0 shadow-lg">
             <CardContent className="pt-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search products by name or SKU..."
-                  value={productSearch}
-                  onChange={(e) => setProductSearch(e.target.value)}
-                  className="pl-10"
-                />
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search products by name or SKU..."
+                    value={productSearch}
+                    onChange={(e) => setProductSearch(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                <Button onClick={() => setShowBarcodeScanner(true)} variant="outline" className="gap-2">
+                  <ScanLine className="h-4 w-4" />
+                  Scan
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -1536,8 +1579,16 @@ export const POSModule = () => {
           open={showInvoiceDialog}
           onOpenChange={setShowInvoiceDialog}
           invoiceData={lastTransaction}
+          onExportPDF={handleExportPDF}
         />
       )}
+
+      {/* Barcode Scanner */}
+      <BarcodeScanner
+        open={showBarcodeScanner}
+        onOpenChange={setShowBarcodeScanner}
+        onProductFound={handleBarcodeProductFound}
+      />
     </div>
   );
 };
