@@ -86,13 +86,13 @@ export const StoveStockModule = () => {
   // Calculate summary stats
   const totalQuantity = stoves.reduce((sum, s) => sum + s.quantity, 0);
   const totalValue = stoves.reduce((sum, s) => sum + s.quantity * s.price, 0);
-  const inStockCount = stoves.filter((s) => s.quantity > 10).length;
-  const lowStockCount = stoves.filter((s) => s.quantity > 0 && s.quantity <= 10).length;
+  const inStockCount = stoves.filter((s) => s.quantity >= 30).length;
+  const lowStockCount = stoves.filter((s) => s.quantity > 0 && s.quantity < 30).length;
   const outOfStockCount = stoves.filter((s) => s.quantity === 0).length;
 
   const getStatus = (quantity: number) => {
     if (quantity === 0) return { label: "Out of Stock", color: "destructive" };
-    if (quantity <= 10) return { label: "Low Stock", color: "warning" };
+    if (quantity < 30) return { label: "Low Stock", color: "warning" };
     return { label: "In Stock", color: "success" };
   };
 
