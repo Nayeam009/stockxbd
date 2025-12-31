@@ -51,12 +51,11 @@ export const BarcodeScanner = ({ open, onOpenChange, onProductFound }: BarcodeSc
   // Handle camera mode
   useEffect(() => {
     if (!open) {
-      // Clean up camera when dialog closes
       stopCamera();
       return;
     }
 
-    if (scanMode === 'camera' && open) {
+    if (scanMode === 'camera') {
       startCamera();
     } else {
       stopCamera();
@@ -65,6 +64,7 @@ export const BarcodeScanner = ({ open, onOpenChange, onProductFound }: BarcodeSc
     return () => {
       stopCamera();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scanMode, open]);
 
   const startCamera = async () => {
