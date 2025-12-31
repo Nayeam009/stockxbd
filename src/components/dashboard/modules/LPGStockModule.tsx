@@ -38,6 +38,7 @@ interface LPGBrand {
   name: string;
   color: string;
   size: string;
+  weight: string;
   package_cylinder: number;
   refill_cylinder: number;
   empty_cylinder: number;
@@ -53,7 +54,6 @@ interface LPGStockModuleProps {
 
 // Cylinder weight options
 const WEIGHT_OPTIONS_22MM = [
-  { value: "all", label: "All Weights", shortLabel: "All" },
   { value: "5.5kg", label: "5.5 KG", shortLabel: "5.5" },
   { value: "12kg", label: "12 KG", shortLabel: "12" },
   { value: "12.5kg", label: "12.5 KG", shortLabel: "12.5" },
@@ -63,7 +63,6 @@ const WEIGHT_OPTIONS_22MM = [
 ];
 
 const WEIGHT_OPTIONS_20MM = [
-  { value: "all", label: "All Weights", shortLabel: "All" },
   { value: "5kg", label: "5 KG", shortLabel: "5" },
   { value: "10kg", label: "10 KG", shortLabel: "10" },
   { value: "12kg", label: "12 KG", shortLabel: "12" },
@@ -76,7 +75,7 @@ export const LPGStockModule = ({ size = "22mm" }: LPGStockModuleProps) => {
   const [brands, setBrands] = useState<LPGBrand[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedWeight, setSelectedWeight] = useState("all");
+  const [selectedWeight, setSelectedWeight] = useState("12kg");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingCell, setEditingCell] = useState<{id: string, field: string} | null>(null);
@@ -87,20 +86,23 @@ export const LPGStockModule = ({ size = "22mm" }: LPGStockModuleProps) => {
     name: "",
     color: "#22c55e",
     size: size,
+    weight: selectedWeight,
     package_cylinder: 0,
     refill_cylinder: 0,
     empty_cylinder: 0,
     problem_cylinder: 0,
   });
 
-  // Fetch LPG brands
+  // Fetch LPG brands filtered by size and weight
   const fetchBrands = async () => {
     try {
+      setLoading(true);
       const { data, error } = await supabase
         .from("lpg_brands")
         .select("*")
         .eq("is_active", true)
         .eq("size", size)
+        .eq("weight", selectedWeight)
         .order("created_at", { ascending: true });
 
       if (error) throw error;
@@ -115,7 +117,12 @@ export const LPGStockModule = ({ size = "22mm" }: LPGStockModuleProps) => {
 
   useEffect(() => {
     fetchBrands();
-  }, [size]);
+  }, [size, selectedWeight]);
+
+  // Update newBrand weight when selectedWeight changes
+  useEffect(() => {
+    setNewBrand(prev => ({ ...prev, weight: selectedWeight }));
+  }, [selectedWeight]);
 
   // Filter brands based on search
   const filteredBrands = brands.filter(brand =>
@@ -165,6 +172,7 @@ export const LPGStockModule = ({ size = "22mm" }: LPGStockModuleProps) => {
         name: "",
         color: "#22c55e",
         size: size,
+        weight: selectedWeight,
         package_cylinder: 0,
         refill_cylinder: 0,
         empty_cylinder: 0,
@@ -322,13 +330,11 @@ export const LPGStockModule = ({ size = "22mm" }: LPGStockModuleProps) => {
         <div>
           <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
             LPG Stock ({size})
-            {selectedWeight !== "all" && (
-              <Badge className="bg-primary/10 text-primary border-0 text-sm font-medium">
-                {selectedWeight}
-              </Badge>
-            )}
+            <Badge className="bg-primary/10 text-primary border-0 text-sm font-medium">
+              {selectedWeight}
+            </Badge>
           </h2>
-          <p className="text-muted-foreground text-sm">Manage cylinder inventory by brand</p>
+          <p className="text-muted-foreground text-sm">Manage cylinder inventory for {selectedWeight} cylinders</p>
         </div>
         
         <div className="flex items-center gap-3 w-full sm:w-auto">
@@ -351,9 +357,12 @@ export const LPGStockModule = ({ size = "22mm" }: LPGStockModuleProps) => {
             </DialogTrigger>
             <DialogContent className="sm:max-w-[500px]">
               <DialogHeader>
-                <DialogTitle>Add New LPG Brand</DialogTitle>
+                <DialogTitle className="flex items-center gap-2">
+                  Add New LPG Brand
+                  <Badge variant="outline">{selectedWeight}</Badge>
+                </DialogTitle>
                 <DialogDescription>
-                  Enter the brand details and initial cylinder counts.
+                  Enter the brand details and initial cylinder counts for {selectedWeight} cylinders.
                 </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
