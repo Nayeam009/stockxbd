@@ -16,44 +16,97 @@ export const useNotifications = () => {
   const [loading, setLoading] = useState(true);
 
   const checkLowStock = useCallback(async () => {
-    const { data: brands } = await supabase
-      .from("lpg_brands")
-      .select("*")
-      .eq("is_active", true);
+    const [lpgResult, stoveResult, regulatorResult] = await Promise.all([
+      supabase.from("lpg_brands").select("*").eq("is_active", true),
+      supabase.from("stoves").select("*").eq("is_active", true),
+      supabase.from("regulators").select("*").eq("is_active", true)
+    ]);
 
-    if (brands) {
-      const lowStockNotifications: Notification[] = [];
-      brands.forEach((brand) => {
-        const totalStock = brand.package_cylinder + brand.refill_cylinder;
-        const brandInfo = `${brand.name} (${brand.size} - ${brand.weight})`;
-        
-        if (totalStock === 0) {
-          // Out of Stock - Red
-          lowStockNotifications.push({
-            id: `out_of_stock_${brand.id}`,
-            type: "low_stock",
-            title: "🔴 Out of Stock",
-            message: `${brandInfo} is out of stock!`,
-            read: false,
-            createdAt: new Date(),
-            data: { brandId: brand.id, brandName: brand.name, stock: totalStock, status: "out_of_stock" },
-          });
-        } else if (totalStock < 30) {
-          // Low Stock - Yellow
-          lowStockNotifications.push({
-            id: `low_stock_${brand.id}`,
-            type: "low_stock",
-            title: "🟡 Low Stock Alert",
-            message: `${brandInfo} has only ${totalStock} cylinders remaining`,
-            read: false,
-            createdAt: new Date(),
-            data: { brandId: brand.id, brandName: brand.name, stock: totalStock, status: "low_stock" },
-          });
-        }
-      });
-      return lowStockNotifications;
-    }
-    return [];
+    const lowStockNotifications: Notification[] = [];
+
+    // Check LPG cylinders
+    lpgResult.data?.forEach((brand) => {
+      const totalStock = brand.package_cylinder + brand.refill_cylinder;
+      const brandInfo = `${brand.name} (${brand.size} - ${brand.weight})`;
+      
+      if (totalStock === 0) {
+        lowStockNotifications.push({
+          id: `out_of_stock_lpg_${brand.id}`,
+          type: "low_stock",
+          title: "🔴 Out of Stock",
+          message: `${brandInfo} is out of stock!`,
+          read: false,
+          createdAt: new Date(),
+          data: { brandId: brand.id, brandName: brand.name, stock: totalStock, status: "out_of_stock", category: "lpg" },
+        });
+      } else if (totalStock < 30) {
+        lowStockNotifications.push({
+          id: `low_stock_lpg_${brand.id}`,
+          type: "low_stock",
+          title: "🟡 Low Stock Alert",
+          message: `${brandInfo} has only ${totalStock} cylinders remaining`,
+          read: false,
+          createdAt: new Date(),
+          data: { brandId: brand.id, brandName: brand.name, stock: totalStock, status: "low_stock", category: "lpg" },
+        });
+      }
+    });
+
+    // Check Stoves
+    stoveResult.data?.forEach((stove) => {
+      const stoveInfo = `${stove.brand} (${stove.burners === 1 ? 'Single' : 'Double'} Burner)`;
+      
+      if (stove.quantity === 0) {
+        lowStockNotifications.push({
+          id: `out_of_stock_stove_${stove.id}`,
+          type: "low_stock",
+          title: "🔴 Stove Out of Stock",
+          message: `${stoveInfo} is out of stock!`,
+          read: false,
+          createdAt: new Date(),
+          data: { stoveId: stove.id, stoveName: stove.brand, stock: stove.quantity, status: "out_of_stock", category: "stove" },
+        });
+      } else if (stove.quantity < 30) {
+        lowStockNotifications.push({
+          id: `low_stock_stove_${stove.id}`,
+          type: "low_stock",
+          title: "🟡 Stove Low Stock",
+          message: `${stoveInfo} has only ${stove.quantity} units remaining`,
+          read: false,
+          createdAt: new Date(),
+          data: { stoveId: stove.id, stoveName: stove.brand, stock: stove.quantity, status: "low_stock", category: "stove" },
+        });
+      }
+    });
+
+    // Check Regulators
+    regulatorResult.data?.forEach((regulator) => {
+      const regulatorInfo = `${regulator.brand} (${regulator.type})`;
+      
+      if (regulator.quantity === 0) {
+        lowStockNotifications.push({
+          id: `out_of_stock_regulator_${regulator.id}`,
+          type: "low_stock",
+          title: "🔴 Regulator Out of Stock",
+          message: `${regulatorInfo} is out of stock!`,
+          read: false,
+          createdAt: new Date(),
+          data: { regulatorId: regulator.id, regulatorName: regulator.brand, stock: regulator.quantity, status: "out_of_stock", category: "regulator" },
+        });
+      } else if (regulator.quantity < 30) {
+        lowStockNotifications.push({
+          id: `low_stock_regulator_${regulator.id}`,
+          type: "low_stock",
+          title: "🟡 Regulator Low Stock",
+          message: `${regulatorInfo} has only ${regulator.quantity} units remaining`,
+          read: false,
+          createdAt: new Date(),
+          data: { regulatorId: regulator.id, regulatorName: regulator.brand, stock: regulator.quantity, status: "low_stock", category: "regulator" },
+        });
+      }
+    });
+
+    return lowStockNotifications;
   }, []);
 
   const checkNewOrders = useCallback(async () => {
