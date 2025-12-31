@@ -38,6 +38,7 @@ interface LPGBrand {
   id: string;
   name: string;
   size: string;
+  weight: string;
   refill_cylinder: number;
   package_cylinder: number;
   empty_cylinder: number;
@@ -116,7 +117,9 @@ interface CustomerSalesHistory {
   status: string;
 }
 
-const lpgWeights = ["5.5", "12", "22.7", "35"];
+// Weight options for 22mm and 20mm
+const WEIGHT_OPTIONS_22MM = ["5.5kg", "12kg", "12.5kg", "25kg", "35kg", "45kg"];
+const WEIGHT_OPTIONS_20MM = ["5kg", "10kg", "12kg", "15kg", "21kg", "35kg"];
 const mouthSizes = ["20mm", "22mm"];
 
 export const POSModule = () => {
@@ -238,15 +241,16 @@ export const POSModule = () => {
     }
   }, [selectedRegulator, regulators, productPrices]);
 
-  // Filter brands by mouth size and search
+  // Filter brands by mouth size, weight, and search
   const filteredBrands = useMemo(() => {
     return lpgBrands.filter(b => {
       const matchesSize = b.size === mouthSize;
+      const matchesWeight = !weight || b.weight === weight;
       const matchesSearch = productSearch === "" || 
         b.name.toLowerCase().includes(productSearch.toLowerCase());
-      return matchesSize && matchesSearch;
+      return matchesSize && matchesWeight && matchesSearch;
     });
-  }, [lpgBrands, mouthSize, productSearch]);
+  }, [lpgBrands, mouthSize, weight, productSearch]);
 
   // Filter stoves by search
   const filteredStoves = useMemo(() => {
@@ -966,27 +970,34 @@ export const POSModule = () => {
                   {/* Weight, Size, Price, Quantity */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div className="space-y-2">
-                      <Label>Weight (kg)</Label>
-                      <Select value={weight} onValueChange={setWeight}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {lpgWeights.map(w => (
-                            <SelectItem key={w} value={w}>{w} kg</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
                       <Label>Mouth Size</Label>
-                      <Select value={mouthSize} onValueChange={setMouthSize}>
+                      <Select value={mouthSize} onValueChange={(val) => {
+                        setMouthSize(val);
+                        setWeight(""); // Reset weight when mouth size changes
+                        setSellingBrand(""); // Reset brand
+                      }}>
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                           {mouthSizes.map(s => (
                             <SelectItem key={s} value={s}>{s}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Weight</Label>
+                      <Select value={weight} onValueChange={(val) => {
+                        setWeight(val);
+                        setSellingBrand(""); // Reset brand when weight changes
+                      }}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(mouthSize === "22mm" ? WEIGHT_OPTIONS_22MM : WEIGHT_OPTIONS_20MM).map(w => (
+                            <SelectItem key={w} value={w}>{w}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
