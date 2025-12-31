@@ -98,51 +98,52 @@ export const DashboardOverview = ({ analytics, drivers, userRole, setActiveModul
   return (
     <div className="space-y-6 md:space-y-8 px-2 sm:px-0">
       {/* Modern Welcome Section with Gradient Background */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary-dark to-secondary p-6 sm:p-8 text-primary-foreground">
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMiIvPjwvZz48L2c+PC9zdmc+')] opacity-50"></div>
+      <div className="relative overflow-hidden rounded-2xl hero-gradient p-6 sm:p-8 text-primary-foreground shadow-xl">
+        <div className="absolute inset-0 opacity-20" style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.3'%3E%3Cpath d='M36 34c0-2.21-1.79-4-4-4s-4 1.79-4 4 1.79 4 4 4 4-1.79 4-4z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
+        }} />
         <div className="relative z-10">
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold mb-2">
             Welcome back! 👋
           </h1>
-          <p className="text-primary-foreground/80 text-sm sm:text-base max-w-lg">
+          <p className="text-white/80 text-sm sm:text-base max-w-lg">
             Here's what's happening with your LPG business today. Manage your operations efficiently.
           </p>
         </div>
-        <div className="absolute -bottom-8 -right-8 h-32 w-32 rounded-full bg-secondary/20 blur-2xl"></div>
-        <div className="absolute -top-8 -left-8 h-24 w-24 rounded-full bg-primary-light/20 blur-2xl"></div>
+        <div className="absolute -bottom-12 -right-12 h-40 w-40 rounded-full bg-secondary/30 blur-3xl float-animation"></div>
+        <div className="absolute -top-12 -left-12 h-32 w-32 rounded-full bg-accent/20 blur-3xl float-animation" style={{ animationDelay: '3s' }}></div>
       </div>
 
       {/* Stats Cards - Modern Glass Design */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         {stats.map((stat, index) => {
           const Icon = stat.icon;
-          const gradients = [
-            'from-primary/10 to-primary/5',
-            'from-secondary/10 to-secondary/5',
-            'from-accent/10 to-accent/5',
-            'from-info/10 to-info/5'
+          const iconGradients = [
+            'from-primary to-primary-light',
+            'from-secondary to-secondary-light',
+            'from-accent to-accent-light',
+            'from-success to-accent'
           ];
           return (
             <Card 
               key={index} 
-              className={`group relative overflow-hidden border border-border/50 shadow-md hover:shadow-xl transition-all duration-300 bg-gradient-to-br ${gradients[index]} backdrop-blur-sm hover:-translate-y-1`}
+              className="group relative overflow-hidden border border-border/40 shadow-lg hover:shadow-xl transition-all duration-500 bg-card hover:-translate-y-2"
             >
-              <div className="absolute top-0 right-0 h-20 w-20 bg-gradient-to-bl from-primary/5 to-transparent rounded-bl-full"></div>
+              <div className="absolute top-0 right-0 h-24 w-24 bg-gradient-to-bl from-primary/5 to-transparent rounded-bl-full transition-all duration-500 group-hover:from-primary/10"></div>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">
                   {stat.title}
                 </CardTitle>
-                <div className="h-9 w-9 sm:h-10 sm:w-10 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
-                  <Icon className="h-4 w-4 sm:h-5 sm:w-5 text-primary-foreground" />
+                <div className={`h-10 w-10 sm:h-12 sm:w-12 bg-gradient-to-br ${iconGradients[index]} rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 group-hover:rotate-3 transition-all duration-500`}>
+                  <Icon className="h-5 w-5 sm:h-6 sm:w-6 text-primary-foreground" />
                 </div>
               </CardHeader>
               <CardContent className="pt-0">
                 <div className="space-y-2">
-                  <div className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground">{stat.value}</div>
+                  <div className="text-xl sm:text-2xl md:text-3xl font-extrabold text-foreground">{stat.value}</div>
                   <div className="flex items-center gap-2 flex-wrap">
                     <Badge 
-                      variant="secondary" 
-                      className={`${stat.changeType === 'positive' ? 'bg-accent/20 text-accent' : 'bg-destructive/20 text-destructive'} font-medium text-xs border-0`}
+                      className={`${stat.changeType === 'positive' ? 'bg-success/15 text-success border-success/30' : 'bg-destructive/15 text-destructive border-destructive/30'} font-semibold text-xs border`}
                     >
                       <TrendingUp className="h-3 w-3 mr-1" />
                       {stat.change}
@@ -158,30 +159,29 @@ export const DashboardOverview = ({ analytics, drivers, userRole, setActiveModul
 
       {/* Driver Status - Only for owner/manager */}
       {(userRole === 'owner' || userRole === 'manager') && drivers.length > 0 && (
-        <Card className="border border-border/50 shadow-md bg-card/80 backdrop-blur-sm">
-          <CardHeader className="pb-4">
+        <Card className="border border-border/40 shadow-lg bg-card overflow-hidden">
+          <CardHeader className="pb-4 bg-gradient-to-r from-accent/5 to-transparent border-b border-border/40">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-accent to-accent-light flex items-center justify-center">
+              <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-accent to-accent-light flex items-center justify-center shadow-md">
                 <Truck className="h-5 w-5 text-accent-foreground" />
               </div>
               <div>
-                <CardTitle className="text-lg">Driver Status</CardTitle>
+                <CardTitle className="text-lg font-bold">Driver Status</CardTitle>
                 <CardDescription>Real-time driver performance</CardDescription>
               </div>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {drivers.map((driver) => (
-                <div key={driver.id} className="p-4 bg-muted/30 rounded-xl border border-border/50 hover:border-primary/30 transition-colors">
+                <div key={driver.id} className="p-4 bg-muted/30 rounded-xl border border-border/40 hover:border-primary/40 hover:shadow-md transition-all duration-300 group">
                   <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-semibold text-foreground">{driver.name}</h4>
+                    <h4 className="font-semibold text-foreground group-hover:text-primary transition-colors">{driver.name}</h4>
                     <Badge 
-                      variant="secondary"
-                      className={`text-xs ${
-                        driver.status === 'active' ? 'bg-accent/20 text-accent' :
-                        driver.status === 'break' ? 'bg-warning/20 text-warning' :
-                        'bg-muted text-muted-foreground'
+                      className={`text-xs font-semibold border ${
+                        driver.status === 'active' ? 'bg-success/15 text-success border-success/30' :
+                        driver.status === 'break' ? 'bg-warning/15 text-warning border-warning/30' :
+                        'bg-muted text-muted-foreground border-border'
                       }`}
                     >
                       {driver.status}
@@ -190,11 +190,11 @@ export const DashboardOverview = ({ analytics, drivers, userRole, setActiveModul
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Sales</span>
-                      <span className="font-medium text-foreground">{BANGLADESHI_CURRENCY_SYMBOL}{driver.todaySales.toLocaleString()}</span>
+                      <span className="font-bold text-foreground">{BANGLADESHI_CURRENCY_SYMBOL}{driver.todaySales.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Deliveries</span>
-                      <span className="font-medium text-foreground">{driver.todayDeliveries}</span>
+                      <span className="font-bold text-foreground">{driver.todayDeliveries}</span>
                     </div>
                   </div>
                 </div>
@@ -205,19 +205,19 @@ export const DashboardOverview = ({ analytics, drivers, userRole, setActiveModul
       )}
 
       {/* Quick Actions Grid - Modern Design */}
-      <Card className="border border-border/50 shadow-md bg-card/80 backdrop-blur-sm">
-        <CardHeader className="pb-4">
+      <Card className="border border-border/40 shadow-lg bg-card overflow-hidden">
+        <CardHeader className="pb-4 bg-gradient-to-r from-primary/5 to-transparent border-b border-border/40">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
+            <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-primary to-primary-light flex items-center justify-center shadow-md">
               <Settings className="h-5 w-5 text-primary-foreground" />
             </div>
             <div>
-              <CardTitle className="text-lg">Quick Actions</CardTitle>
+              <CardTitle className="text-lg font-bold">Quick Actions</CardTitle>
               <CardDescription>Access key features instantly</CardDescription>
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-6">
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-3 md:gap-4">
             {quickActions.map((action, index) => {
               const Icon = action.icon;
@@ -225,10 +225,10 @@ export const DashboardOverview = ({ analytics, drivers, userRole, setActiveModul
                 <button
                   key={index}
                   onClick={() => handleQuickAction(action.module)}
-                  className="group flex flex-col items-center justify-center p-4 sm:p-5 rounded-xl border border-border/50 bg-muted/20 hover:bg-primary/10 hover:border-primary/40 transition-all duration-300 min-h-[90px] sm:min-h-[100px]"
+                  className="group flex flex-col items-center justify-center p-4 sm:p-5 rounded-xl border border-border/40 bg-muted/20 hover:bg-primary/10 hover:border-primary/40 hover:shadow-lg transition-all duration-300 min-h-[90px] sm:min-h-[100px]"
                 >
-                  <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-gradient-to-br from-muted to-muted/50 group-hover:from-primary/20 group-hover:to-secondary/20 flex items-center justify-center mb-2 transition-all duration-300">
-                    <Icon className="h-5 w-5 sm:h-6 sm:w-6 text-primary group-hover:scale-110 transition-transform duration-200" />
+                  <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-gradient-to-br from-muted to-muted/30 group-hover:from-primary/20 group-hover:to-secondary/20 flex items-center justify-center mb-2 transition-all duration-300 group-hover:scale-110">
+                    <Icon className="h-5 w-5 sm:h-6 sm:w-6 text-primary transition-transform duration-200" />
                   </div>
                   <span className="text-xs sm:text-sm font-medium text-center text-foreground leading-tight">{action.title}</span>
                 </button>
