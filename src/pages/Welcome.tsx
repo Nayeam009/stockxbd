@@ -18,97 +18,94 @@ import {
   Search,
   CheckCircle2,
   Star,
-  Zap
+  Zap,
+  Phone,
+  Mail,
+  MapPin,
+  Play,
+  Menu,
+  X
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useState } from "react";
 import stockXLogo from "@/assets/stock-x-logo.png";
 import heroBanner from "@/assets/hero-banner.jpg";
 
 const Welcome = () => {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   const services = [
     {
-      icon: Package,
-      title: "Inventory Tracking",
-      description: "Real-time tracking of cylinder and gas inventory levels with automated alerts.",
-      features: ["Real-time monitoring", "Stock alerts", "Auto reordering"],
-      gradient: "from-primary to-primary-light"
-    },
-    {
-      icon: Users,
-      title: "Customer Management",
-      description: "Comprehensive customer database with contact info and purchase history.",
-      features: ["Customer profiles", "Purchase history", "Preferences"],
-      gradient: "from-secondary to-secondary-light"
-    },
-    {
-      icon: FileText,
-      title: "Order Management",
-      description: "Streamlined order processing with delivery scheduling capabilities.",
-      features: ["Order processing", "Scheduling", "Status tracking"],
-      gradient: "from-accent to-accent-light"
-    },
-    {
-      icon: CreditCard,
-      title: "Automated Billing",
-      description: "Automated billing and invoicing system with payment tracking.",
-      features: ["Auto invoices", "Payment tracking", "Receipts"],
-      gradient: "from-info to-info"
-    },
-    {
-      icon: BarChart3,
-      title: "Analytics & Reports",
-      description: "Comprehensive reporting on operations and delivery performance.",
-      features: ["Performance metrics", "Custom dashboards", "Insights"],
-      gradient: "from-warning to-warning"
-    },
-    {
-      icon: Clock,
-      title: "Smart ETA",
-      description: "AI-powered tool providing accurate ETAs for all LPG deliveries.",
-      features: ["AI predictions", "Route optimization", "Live updates"],
-      gradient: "from-primary to-secondary"
-    },
-    {
       icon: PieChart,
-      title: "Daily Sales",
-      description: "Monitor and record day-to-day sales with performance insights.",
-      features: ["Sales tracking", "Daily reports", "Trends"],
-      gradient: "from-secondary to-accent"
+      title: "Daily Sales Management",
+      description: "Efficiently track and manage all your daily sales activities with comprehensive reporting.",
+      features: ["Add, edit & view daily sales", "Track by staff/driver", "Multiple payment methods", "Export PDF/Excel"],
+    },
+    {
+      icon: Package,
+      title: "LPG Stock Management",
+      description: "Track your LPG cylinder inventory in real-time with automated alerts and comprehensive tracking.",
+      features: ["Real-time cylinder tracking", "Low-stock alerts", "QR code tracking", "Stock movement history"],
+    },
+    {
+      icon: Flame,
+      title: "Gas Stove Inventory",
+      description: "Comprehensive inventory management for LPG stoves and accessories with real-time tracking.",
+      features: ["Track by model/brand", "Auto-update on sale", "Accessory management", "Usage history"],
     },
     {
       icon: Truck,
-      title: "Driver Management",
-      description: "Track driver sales, performance, and delivery efficiency.",
-      features: ["Driver profiles", "Performance", "Analytics"],
-      gradient: "from-accent to-primary"
-    },
-    {
-      icon: DollarSign,
-      title: "Financial Management",
-      description: "Handle staff salary, vehicle costs, and financial tracking.",
-      features: ["Payroll", "Cost tracking", "Reports"],
-      gradient: "from-info to-primary"
-    },
-    {
-      icon: Globe,
-      title: "Online Delivery",
-      description: "Manage online orders and deliveries with notifications.",
-      features: ["Online orders", "Tracking", "Updates"],
-      gradient: "from-primary to-info"
+      title: "Driver's Sales",
+      description: "Monitor and analyze individual driver performance with detailed sales tracking and reporting.",
+      features: ["Driver performance", "Payment tracking", "Daily/weekly reports", "Commission calculation"],
     },
     {
       icon: Users,
       title: "LPG Community",
-      description: "Manage customer relationships and community engagement.",
-      features: ["Community", "Engagement", "Feedback"],
-      gradient: "from-secondary to-primary"
+      description: "Build and manage your customer database with comprehensive tracking and communication tools.",
+      features: ["Customer database", "Order history", "SMS/Email alerts", "Loyalty tracking"],
+    },
+    {
+      icon: DollarSign,
+      title: "Staff Salary",
+      description: "Streamline your payroll process with automated calculations and comprehensive salary management.",
+      features: ["Payroll automation", "Salary slips", "Commission calculation", "Bank transfer integration"],
+    },
+    {
+      icon: CreditCard,
+      title: "Vehicle Cost",
+      description: "Track and manage all vehicle-related expenses to optimize your fleet operations and costs.",
+      features: ["Fuel tracking", "Maintenance logs", "Cost analysis", "Vehicle performance"],
+    },
+    {
+      icon: FileText,
+      title: "Daily Expenses",
+      description: "Monitor and control daily operational expenses with detailed categorization and reporting.",
+      features: ["Expense categories", "Receipt tracking", "Budget alerts", "Monthly summaries"],
+    },
+    {
+      icon: Globe,
+      title: "Online Delivery",
+      description: "Manage online orders and deliveries with real-time notifications and tracking.",
+      features: ["Online order management", "Delivery tracking", "Customer notifications", "Route optimization"],
+    },
+    {
+      icon: BarChart3,
+      title: "Analytics & Reports",
+      description: "Comprehensive reporting on operations and delivery performance with actionable insights.",
+      features: ["Performance metrics", "Custom dashboards", "Trend analysis", "Export options"],
     },
     {
       icon: Search,
       title: "Smart Search",
-      description: "Quickly find records and information across the platform.",
-      features: ["Global search", "Navigation", "Filtering"],
-      gradient: "from-accent to-secondary"
+      description: "Quickly find records and information across the entire platform with intelligent filtering.",
+      features: ["Global search", "Quick navigation", "Advanced filters", "Recent history"],
+    },
+    {
+      icon: Clock,
+      title: "Smart ETA",
+      description: "AI-powered tool providing accurate ETAs for all LPG deliveries with route optimization.",
+      features: ["AI predictions", "Route optimization", "Live tracking", "Delay notifications"],
     }
   ];
 
@@ -119,187 +116,161 @@ const Welcome = () => {
     { value: "24/7", label: "Support" }
   ];
 
+  const highlights = [
+    { icon: Truck, title: "Smart Delivery", description: "AI-powered ETA predictions and real-time delivery tracking for optimal route management." },
+    { icon: BarChart3, title: "Inventory Control", description: "Real-time tracking of cylinders, gas stoves, and stock levels to prevent shortages." },
+    { icon: Users, title: "Customer Management", description: "Comprehensive customer database with purchase history and delivery preferences." }
+  ];
+
   return (
     <div className="min-h-screen bg-background overflow-hidden">
-      {/* Animated Background */}
-      <div className="fixed inset-0 -z-10">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-secondary/5" />
-        <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-secondary/8 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-primary/8 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-accent/5 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }} />
-      </div>
-
       {/* Header */}
-      <header className="sticky top-0 z-50 backdrop-blur-xl bg-background/80 border-b border-border/50">
+      <header className="sticky top-0 z-50 bg-card/95 backdrop-blur-xl border-b border-border/50 shadow-sm">
         <div className="container mx-auto px-4 py-4">
           <nav className="flex items-center justify-between">
+            {/* Logo */}
             <div className="flex items-center space-x-3 group cursor-pointer">
               <div className="relative">
                 <img 
                   src={stockXLogo} 
                   alt="Stock-X Logo" 
-                  className="h-12 w-12 rounded-xl shadow-lg transition-transform duration-300 group-hover:scale-110" 
+                  className="h-12 w-12 rounded-xl shadow-lg transition-transform duration-300 group-hover:scale-105" 
                 />
-                <div className="absolute inset-0 bg-secondary/20 rounded-xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-primary tracking-tight">Stock-X</h1>
+                <h1 className="text-xl font-bold text-primary tracking-tight">STOCK X</h1>
                 <span className="text-xs text-muted-foreground font-medium">LPG Management</span>
               </div>
             </div>
+
+            {/* Desktop Navigation */}
             <div className="hidden md:flex items-center space-x-8">
               <a href="#features" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">Features</a>
-              <a href="#services" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">Services</a>
-              <a href="#stats" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">Why Us</a>
+              <a href="#services" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">How It Works</a>
+              <a href="#stats" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">Success Stories</a>
             </div>
-            <Link to="/auth">
-              <Button className="bg-gradient-to-r from-primary to-primary-light text-primary-foreground shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-0.5">
-                Get Started
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </Link>
+
+            {/* CTA Buttons */}
+            <div className="hidden md:flex items-center gap-3">
+              <Link to="/auth">
+                <Button variant="outline" className="border-primary/20 text-primary hover:bg-primary hover:text-primary-foreground transition-all duration-300">
+                  Free Demo
+                </Button>
+              </Link>
+              <Link to="/auth">
+                <Button className="btn-cta text-secondary-foreground font-semibold">
+                  Get Started
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </Link>
+            </div>
+
+            {/* Mobile Menu Button */}
+            <button 
+              className="md:hidden p-2 rounded-lg hover:bg-muted transition-colors"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            >
+              {mobileMenuOpen ? <X className="h-6 w-6 text-primary" /> : <Menu className="h-6 w-6 text-primary" />}
+            </button>
           </nav>
+
+          {/* Mobile Menu */}
+          {mobileMenuOpen && (
+            <div className="md:hidden absolute top-full left-0 right-0 bg-card border-b border-border shadow-lg py-4 px-4 space-y-4">
+              <a href="#features" className="block py-2 text-sm font-medium text-muted-foreground hover:text-primary transition-colors">Features</a>
+              <a href="#services" className="block py-2 text-sm font-medium text-muted-foreground hover:text-primary transition-colors">How It Works</a>
+              <a href="#stats" className="block py-2 text-sm font-medium text-muted-foreground hover:text-primary transition-colors">Success Stories</a>
+              <Link to="/auth" className="block">
+                <Button className="w-full btn-cta text-secondary-foreground font-semibold">
+                  Request Free Demo
+                </Button>
+              </Link>
+            </div>
+          )}
         </div>
       </header>
 
       {/* Hero Section */}
-      <section className="container mx-auto px-4 py-16 lg:py-24">
-        <div className="grid lg:grid-cols-2 gap-16 items-center">
-          <div className="space-y-8">
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-secondary/10 border border-secondary/20 rounded-full">
-              <Flame className="h-4 w-4 text-secondary" />
-              <span className="text-sm font-medium text-secondary">Bangladesh's #1 LPG Solution</span>
-            </div>
-
-            <div className="space-y-6">
-              <h2 className="text-5xl lg:text-7xl font-bold leading-tight">
-                <span className="text-foreground">Simplify Your</span>
-                <br />
-                <span className="bg-gradient-to-r from-primary via-primary-light to-secondary bg-clip-text text-transparent">
-                  LPG Business
-                </span>
-              </h2>
-              <p className="text-xl text-muted-foreground leading-relaxed max-w-lg">
-                All-in-one platform to manage inventory, track deliveries, and grow your LPG distribution business with powerful analytics.
-              </p>
-            </div>
+      <section className="relative hero-gradient text-primary-foreground py-20 lg:py-28 overflow-hidden">
+        {/* Background Pattern */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute inset-0" style={{
+            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.4'%3E%3Cpath d='M36 34c0-2.21-1.79-4-4-4s-4 1.79-4 4 1.79 4 4 4 4-1.79 4-4z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
+          }} />
+        </div>
+        
+        <div className="container mx-auto px-4 relative">
+          <div className="max-w-4xl mx-auto text-center space-y-8">
+            <Badge className="bg-white/10 text-white border-white/20 hover:bg-white/15 px-4 py-2 text-sm font-medium">
+              <Flame className="h-4 w-4 mr-2" />
+              Complete LPG Business Management
+            </Badge>
             
-            <div className="flex flex-col sm:flex-row gap-4">
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold leading-tight">
+              Complete Feature Set for
+              <br />
+              <span className="text-secondary">LPG Business Excellence</span>
+            </h1>
+            
+            <p className="text-lg md:text-xl text-white/80 max-w-2xl mx-auto leading-relaxed">
+              From daily sales to delivery tracking, STOCK X has every tool you need to streamline your LPG operations
+            </p>
+
+            <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
               <Link to="/auth">
-                <Button size="lg" className="w-full sm:w-auto bg-gradient-to-r from-primary to-primary-light text-primary-foreground shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 text-lg px-8 py-6">
-                  <Zap className="mr-2 h-5 w-5" />
+                <Button size="lg" className="btn-cta text-secondary-foreground font-bold text-lg px-8 py-6 w-full sm:w-auto">
+                  <Play className="mr-2 h-5 w-5" />
                   Start Free Trial
                 </Button>
               </Link>
               <a href="#services">
-                <Button size="lg" variant="outline" className="w-full sm:w-auto border-2 border-primary/20 text-primary hover:bg-primary hover:text-primary-foreground transition-all duration-300 text-lg px-8 py-6">
+                <Button size="lg" variant="outline" className="bg-white/10 border-white/30 text-white hover:bg-white/20 hover:border-white/40 transition-all duration-300 text-lg px-8 py-6 w-full sm:w-auto">
                   Explore Features
                 </Button>
               </a>
             </div>
-
-            <div className="flex items-center gap-8 pt-6 border-t border-border/50">
-              <div className="flex items-center gap-2">
-                <Shield className="h-5 w-5 text-accent" />
-                <span className="text-sm text-muted-foreground">Secure & Reliable</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Clock className="h-5 w-5 text-info" />
-                <span className="text-sm text-muted-foreground">24/7 Support</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Star className="h-5 w-5 text-warning" />
-                <span className="text-sm text-muted-foreground">Top Rated</span>
-              </div>
-            </div>
           </div>
+        </div>
 
-          <div className="relative lg:pl-8">
-            <div className="absolute -top-8 -left-8 w-32 h-32 bg-gradient-to-br from-secondary to-secondary-light rounded-3xl opacity-20 blur-2xl" />
-            <div className="absolute -bottom-8 -right-8 w-40 h-40 bg-gradient-to-br from-primary to-primary-light rounded-3xl opacity-20 blur-2xl" />
-            
-            <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-border/20">
-              <img 
-                src={heroBanner} 
-                alt="LPG Delivery Management" 
-                className="w-full aspect-[4/3] object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-primary/70 via-primary/20 to-transparent" />
-              
-              <div className="absolute bottom-6 left-6 right-6 bg-card/95 backdrop-blur-md rounded-2xl p-6 shadow-2xl border border-border/50">
-                <div className="grid grid-cols-3 gap-4 text-center">
-                  <div>
-                    <div className="text-3xl font-bold text-secondary">24/7</div>
-                    <div className="text-xs text-muted-foreground mt-1">Real-time Tracking</div>
-                  </div>
-                  <div className="border-x border-border/50">
-                    <div className="text-3xl font-bold text-accent">Smart</div>
-                    <div className="text-xs text-muted-foreground mt-1">AI Predictions</div>
-                  </div>
-                  <div>
-                    <div className="text-3xl font-bold text-info">100%</div>
-                    <div className="text-xs text-muted-foreground mt-1">Auto Billing</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+        {/* Wave Bottom */}
+        <div className="absolute bottom-0 left-0 right-0">
+          <svg viewBox="0 0 1440 120" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full">
+            <path d="M0 120L60 110C120 100 240 80 360 70C480 60 600 60 720 65C840 70 960 80 1080 85C1200 90 1320 90 1380 90L1440 90V120H1380C1320 120 1200 120 1080 120C960 120 840 120 720 120C600 120 480 120 360 120C240 120 120 120 60 120H0Z" fill="hsl(var(--background))"/>
+          </svg>
         </div>
       </section>
 
       {/* Feature Highlights */}
-      <section id="features" className="container mx-auto px-4 py-16">
+      <section id="features" className="container mx-auto px-4 py-16 -mt-8 relative z-10">
         <div className="grid md:grid-cols-3 gap-6">
-          <Card className="group p-8 border-0 bg-card/50 backdrop-blur-sm shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 rounded-3xl overflow-hidden relative">
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-            <div className="relative space-y-4">
-              <div className="h-16 w-16 bg-gradient-to-br from-primary to-primary-light rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
-                <Truck className="h-8 w-8 text-primary-foreground" />
-              </div>
-              <h3 className="text-xl font-bold text-foreground">Smart Delivery</h3>
-              <p className="text-muted-foreground leading-relaxed">
-                AI-powered ETA predictions and real-time delivery tracking for optimal route management.
-              </p>
-            </div>
-          </Card>
-
-          <Card className="group p-8 border-0 bg-card/50 backdrop-blur-sm shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 rounded-3xl overflow-hidden relative">
-            <div className="absolute inset-0 bg-gradient-to-br from-secondary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-            <div className="relative space-y-4">
-              <div className="h-16 w-16 bg-gradient-to-br from-secondary to-secondary-light rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
-                <BarChart3 className="h-8 w-8 text-secondary-foreground" />
-              </div>
-              <h3 className="text-xl font-bold text-foreground">Inventory Control</h3>
-              <p className="text-muted-foreground leading-relaxed">
-                Real-time tracking of cylinders, gas stoves, and stock levels to prevent shortages.
-              </p>
-            </div>
-          </Card>
-
-          <Card className="group p-8 border-0 bg-card/50 backdrop-blur-sm shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 rounded-3xl overflow-hidden relative">
-            <div className="absolute inset-0 bg-gradient-to-br from-accent/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-            <div className="relative space-y-4">
-              <div className="h-16 w-16 bg-gradient-to-br from-accent to-accent-light rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
-                <Users className="h-8 w-8 text-accent-foreground" />
-              </div>
-              <h3 className="text-xl font-bold text-foreground">Customer Management</h3>
-              <p className="text-muted-foreground leading-relaxed">
-                Comprehensive customer database with purchase history and delivery preferences.
-              </p>
-            </div>
-          </Card>
+          {highlights.map((item, index) => {
+            const Icon = item.icon;
+            return (
+              <Card key={index} className="feature-card p-8 shadow-lg hover:shadow-2xl">
+                <div className="space-y-4">
+                  <div className="feature-icon">
+                    <Icon className="h-7 w-7 text-primary transition-colors duration-300 group-hover:text-primary-foreground" />
+                  </div>
+                  <h3 className="text-xl font-bold text-foreground">{item.title}</h3>
+                  <p className="text-muted-foreground leading-relaxed">{item.description}</p>
+                </div>
+              </Card>
+            );
+          })}
         </div>
       </section>
 
       {/* Stats Section */}
       <section id="stats" className="container mx-auto px-4 py-16">
-        <div className="relative rounded-3xl overflow-hidden bg-gradient-to-r from-primary via-primary-light to-secondary p-12">
-          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4xIj48cGF0aCBkPSJNMzYgMzRjMC0yLjIxLTEuNzktNC00LTRzLTQgMS43OS00IDQgMS43OSA0IDQgNCA0LTEuNzkgNC00eiIvPjwvZz48L2c+PC9zdmc+')] opacity-30" />
+        <div className="relative rounded-3xl overflow-hidden hero-gradient p-12">
+          <div className="absolute inset-0 opacity-20" style={{
+            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.3'%3E%3Cpath d='M36 34c0-2.21-1.79-4-4-4s-4 1.79-4 4 1.79 4 4 4 4-1.79 4-4z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
+          }} />
           <div className="relative grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             {stats.map((stat, index) => (
               <div key={index} className="space-y-2">
-                <div className="text-4xl lg:text-5xl font-bold text-primary-foreground">{stat.value}</div>
-                <div className="text-primary-foreground/80 font-medium">{stat.label}</div>
+                <div className="text-4xl lg:text-5xl font-extrabold text-white">{stat.value}</div>
+                <div className="text-white/80 font-medium">{stat.label}</div>
               </div>
             ))}
           </div>
@@ -309,12 +280,15 @@ const Welcome = () => {
       {/* Services Grid */}
       <section id="services" className="container mx-auto px-4 py-16">
         <div className="text-center space-y-4 mb-12">
-          <Badge variant="secondary" className="px-4 py-2 text-sm">Complete Solution</Badge>
-          <h2 className="text-4xl lg:text-5xl font-bold text-foreground">
-            Everything You Need
+          <Badge className="bg-secondary/10 text-secondary border-secondary/20 px-4 py-2 text-sm font-medium">
+            Complete Solution
+          </Badge>
+          <h2 className="text-3xl lg:text-4xl font-extrabold text-foreground">
+            Everything You Need to Manage Your
+            <span className="gradient-text-hero block mt-2">LPG Business</span>
           </h2>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Comprehensive suite of tools to manage your LPG delivery business efficiently
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+            Comprehensive suite of tools designed specifically for LPG distributors
           </p>
         </div>
 
@@ -322,13 +296,10 @@ const Welcome = () => {
           {services.map((service, index) => {
             const Icon = service.icon;
             return (
-              <Card 
-                key={index} 
-                className="group border-0 bg-card/50 backdrop-blur-sm shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 rounded-2xl overflow-hidden"
-              >
+              <Card key={index} className="feature-card group overflow-hidden">
                 <CardContent className="p-6 space-y-4">
-                  <div className={`h-12 w-12 bg-gradient-to-br ${service.gradient} rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300`}>
-                    <Icon className="h-6 w-6 text-primary-foreground" />
+                  <div className="feature-icon">
+                    <Icon className="h-6 w-6 text-primary group-hover:text-primary-foreground transition-colors duration-300" />
                   </div>
                   <div>
                     <h3 className="text-lg font-bold text-foreground mb-2">{service.title}</h3>
@@ -337,7 +308,7 @@ const Welcome = () => {
                   <ul className="space-y-2">
                     {service.features.map((feature, idx) => (
                       <li key={idx} className="text-xs text-muted-foreground flex items-center gap-2">
-                        <CheckCircle2 className="h-3 w-3 text-secondary flex-shrink-0" />
+                        <CheckCircle2 className="h-3.5 w-3.5 text-accent flex-shrink-0" />
                         {feature}
                       </li>
                     ))}
@@ -349,22 +320,84 @@ const Welcome = () => {
         </div>
       </section>
 
+      {/* Testimonial / Success Section */}
+      <section className="container mx-auto px-4 py-16">
+        <div className="relative rounded-3xl overflow-hidden bg-muted/50 border border-border/50 p-12 lg:p-16">
+          <div className="grid lg:grid-cols-2 gap-12 items-center">
+            <div className="space-y-6">
+              <Badge className="bg-success/10 text-success border-success/20 px-4 py-2">
+                <Star className="h-4 w-4 mr-2" />
+                Customer Success
+              </Badge>
+              <h2 className="text-3xl lg:text-4xl font-bold text-foreground">
+                Trusted by LPG Businesses Across Bangladesh
+              </h2>
+              <p className="text-lg text-muted-foreground">
+                Join hundreds of distributors who have transformed their operations with Stock-X.
+              </p>
+              
+              <div className="grid grid-cols-2 gap-6 pt-4">
+                <div className="space-y-1">
+                  <div className="text-3xl font-bold text-secondary">+45%</div>
+                  <div className="text-sm text-muted-foreground">Efficiency Increase</div>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-3xl font-bold text-accent">-30%</div>
+                  <div className="text-sm text-muted-foreground">Operational Costs</div>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-3xl font-bold text-success">99%</div>
+                  <div className="text-sm text-muted-foreground">Stock Accuracy</div>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-3xl font-bold text-primary">2x</div>
+                  <div className="text-sm text-muted-foreground">Faster Deliveries</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="relative">
+              <div className="bg-card rounded-2xl p-8 shadow-xl border border-border/50">
+                <div className="flex items-start gap-4 mb-6">
+                  <div className="h-12 w-12 rounded-full bg-gradient-to-br from-primary to-primary-light flex items-center justify-center text-primary-foreground font-bold text-lg">
+                    RK
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-foreground">Rajesh Kumar</h4>
+                    <p className="text-sm text-muted-foreground">CityGas Distributors, Dhaka</p>
+                  </div>
+                </div>
+                <blockquote className="text-muted-foreground italic leading-relaxed">
+                  "With STOCK X's sales management, we reduced reporting time by 80% and increased our sales team's productivity by 35%. The real-time tracking has been a game-changer for our delivery operations."
+                </blockquote>
+                <div className="flex items-center gap-1 mt-4">
+                  {[...Array(5)].map((_, i) => (
+                    <Star key={i} className="h-5 w-5 fill-warning text-warning" />
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* CTA Section */}
       <section className="container mx-auto px-4 py-16">
-        <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-card via-card to-muted/50 border border-border/50 p-12 lg:p-16 text-center">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl" />
-          <div className="absolute bottom-0 left-0 w-64 h-64 bg-secondary/10 rounded-full blur-3xl" />
+        <div className="relative rounded-3xl overflow-hidden hero-gradient p-12 lg:p-16 text-center">
+          <div className="absolute inset-0 opacity-10" style={{
+            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.4'%3E%3Cpath d='M36 34c0-2.21-1.79-4-4-4s-4 1.79-4 4 1.79 4 4 4 4-1.79 4-4z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
+          }} />
           
           <div className="relative space-y-6 max-w-2xl mx-auto">
-            <h2 className="text-3xl lg:text-4xl font-bold text-foreground">
-              Ready to Transform Your Business?
+            <h2 className="text-3xl lg:text-4xl font-bold text-white">
+              Ready to Transform Your LPG Business?
             </h2>
-            <p className="text-lg text-muted-foreground">
+            <p className="text-lg text-white/80">
               Join hundreds of LPG businesses already using Stock-X to streamline their operations and boost efficiency.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
               <Link to="/auth">
-                <Button size="lg" className="bg-gradient-to-r from-primary to-primary-light text-primary-foreground shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 text-lg px-10 py-6">
+                <Button size="lg" className="btn-cta text-secondary-foreground font-bold text-lg px-10 py-6 w-full sm:w-auto">
                   Get Started Free
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
@@ -375,21 +408,72 @@ const Welcome = () => {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-border/50 bg-card/50 backdrop-blur-sm">
-        <div className="container mx-auto px-4 py-12">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="flex items-center space-x-3">
-              <img src={stockXLogo} alt="Stock-X Logo" className="h-10 w-10 rounded-lg" />
-              <div>
-                <h3 className="text-lg font-bold text-primary">Stock-X</h3>
-                <p className="text-xs text-muted-foreground">LPG Management Platform</p>
+      <footer className="footer-gradient text-white">
+        <div className="container mx-auto px-4 py-16">
+          <div className="grid md:grid-cols-4 gap-12">
+            {/* Company Info */}
+            <div className="md:col-span-2 space-y-6">
+              <div className="flex items-center space-x-3">
+                <img src={stockXLogo} alt="Stock-X Logo" className="h-12 w-12 rounded-xl bg-white/10 p-1" />
+                <div>
+                  <h3 className="text-xl font-bold">STOCK X</h3>
+                  <p className="text-sm text-white/60">LPG Management Platform</p>
+                </div>
+              </div>
+              <p className="text-white/70 leading-relaxed max-w-md">
+                Bangladesh's leading LPG business management solution. Streamline your operations, boost efficiency, and grow your business with our comprehensive platform.
+              </p>
+              <div className="flex items-center gap-4">
+                <div className="social-icon">
+                  <Mail className="h-5 w-5" />
+                </div>
+                <div className="social-icon">
+                  <Phone className="h-5 w-5" />
+                </div>
+                <div className="social-icon">
+                  <Globe className="h-5 w-5" />
+                </div>
               </div>
             </div>
-            <p className="text-sm text-muted-foreground">© 2024 Stock-X. All rights reserved.</p>
-            <div className="flex items-center gap-6 text-sm text-muted-foreground">
-              <span className="hover:text-primary transition-colors cursor-pointer">Privacy</span>
-              <span className="hover:text-primary transition-colors cursor-pointer">Terms</span>
-              <span className="hover:text-primary transition-colors cursor-pointer">Contact</span>
+
+            {/* Quick Links */}
+            <div className="space-y-4">
+              <h4 className="font-bold text-lg">Quick Links</h4>
+              <ul className="space-y-3 text-white/70">
+                <li><a href="#features" className="hover:text-secondary transition-colors">Features</a></li>
+                <li><a href="#services" className="hover:text-secondary transition-colors">How It Works</a></li>
+                <li><a href="#stats" className="hover:text-secondary transition-colors">Success Stories</a></li>
+                <li><Link to="/auth" className="hover:text-secondary transition-colors">Get Started</Link></li>
+              </ul>
+            </div>
+
+            {/* Contact */}
+            <div className="space-y-4">
+              <h4 className="font-bold text-lg">Contact Us</h4>
+              <ul className="space-y-3 text-white/70">
+                <li className="flex items-center gap-3">
+                  <MapPin className="h-5 w-5 text-secondary" />
+                  <span>Dhaka, Bangladesh</span>
+                </li>
+                <li className="flex items-center gap-3">
+                  <Phone className="h-5 w-5 text-secondary" />
+                  <span>+880 1XXX-XXXXXX</span>
+                </li>
+                <li className="flex items-center gap-3">
+                  <Mail className="h-5 w-5 text-secondary" />
+                  <span>support@stockx.com</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          {/* Bottom Bar */}
+          <div className="border-t border-white/10 mt-12 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
+            <p className="text-sm text-white/60">© 2024 STOCK X. All rights reserved.</p>
+            <div className="flex items-center gap-6 text-sm text-white/60">
+              <span className="hover:text-secondary transition-colors cursor-pointer">Privacy Policy</span>
+              <span className="hover:text-secondary transition-colors cursor-pointer">Terms of Service</span>
+              <span className="hover:text-secondary transition-colors cursor-pointer">Contact</span>
             </div>
           </div>
         </div>
