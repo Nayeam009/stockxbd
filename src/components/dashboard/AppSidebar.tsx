@@ -1,6 +1,7 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { 
   Sidebar,
   SidebarContent,
@@ -32,7 +33,8 @@ import {
   Settings,
   LogOut,
   Flame,
-  ChevronRight
+  ChevronRight,
+  Sparkles
 } from "lucide-react";
 import stockXLogo from "@/assets/stock-x-logo.png";
 import { supabase } from "@/integrations/supabase/client";
@@ -102,6 +104,19 @@ export const AppSidebar = ({
     setActiveModule(moduleId);
   };
 
+  const getInitials = (name: string) => {
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'U';
+  };
+
+  const getRoleBadgeColor = (role: string) => {
+    switch (role) {
+      case 'owner': return 'bg-secondary/20 text-secondary border-secondary/30';
+      case 'manager': return 'bg-accent/20 text-accent border-accent/30';
+      case 'driver': return 'bg-primary/20 text-primary border-primary/30';
+      default: return 'bg-muted text-muted-foreground';
+    }
+  };
+
   const renderNavGroup = (items: { id: string; titleKey: string; titleSuffix?: string; icon: any; roles: string[]; badge?: number | null }[], label?: string) => {
     const filteredItems = items.filter(item => item.roles.includes(userRole));
     if (filteredItems.length === 0) return null;
@@ -109,12 +124,13 @@ export const AppSidebar = ({
     return (
       <SidebarGroup className="py-0">
         {label && open && (
-          <SidebarGroupLabel className="text-[10px] uppercase tracking-wider text-muted-foreground/50 font-medium px-3 py-2">
+          <SidebarGroupLabel className="text-[10px] uppercase tracking-widest text-muted-foreground/60 font-semibold px-4 py-2.5 flex items-center gap-2">
+            <div className="h-1 w-1 rounded-full bg-secondary" />
             {label}
           </SidebarGroupLabel>
         )}
         <SidebarGroupContent>
-          <SidebarMenu className="space-y-0.5 px-2">
+          <SidebarMenu className="space-y-1 px-2">
             {filteredItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeModule === item.id;
@@ -125,31 +141,37 @@ export const AppSidebar = ({
                   <SidebarMenuButton 
                     onClick={() => handleModuleChange(item.id)}
                     isActive={isActive}
-                    className={`relative group transition-all duration-300 rounded-xl h-10 ${
+                    className={`relative group rounded-xl h-11 transition-all duration-300 ${
                       isActive 
-                        ? 'bg-gradient-to-r from-primary to-primary-light text-primary-foreground shadow-md' 
-                        : 'hover:bg-primary/10 text-muted-foreground hover:text-primary'
+                        ? 'bg-gradient-to-r from-primary via-primary to-primary-light text-primary-foreground shadow-lg shadow-primary/25' 
+                        : 'hover:bg-muted/80 text-muted-foreground hover:text-foreground'
                     }`}
                   >
-                    <Icon className={`h-4 w-4 flex-shrink-0 transition-transform duration-200 ${isActive ? '' : 'opacity-70 group-hover:opacity-100 group-hover:scale-110'}`} />
+                    <div className={`flex items-center justify-center h-8 w-8 rounded-lg transition-all duration-300 ${
+                      isActive 
+                        ? 'bg-white/20' 
+                        : 'bg-muted/50 group-hover:bg-primary/10 group-hover:scale-105'
+                    }`}>
+                      <Icon className={`h-4 w-4 transition-all duration-200 ${isActive ? '' : 'group-hover:text-primary'}`} />
+                    </div>
                     {open && (
-                      <div className="flex items-center justify-between w-full ml-2">
+                      <div className="flex items-center justify-between w-full ml-1">
                         <span className="text-[13px] font-medium truncate">{displayTitle}</span>
                         <div className="flex items-center gap-1.5">
                           {item.badge && (
                             <Badge 
-                              className="h-5 min-w-5 px-1.5 text-[10px] font-bold bg-secondary text-secondary-foreground border-0"
+                              className="h-5 min-w-5 px-1.5 text-[10px] font-bold bg-secondary text-secondary-foreground border-0 shadow-sm animate-pulse"
                             >
                               {item.badge}
                             </Badge>
                           )}
-                          {isActive && <ChevronRight className="h-3.5 w-3.5 opacity-70" />}
+                          {isActive && <ChevronRight className="h-4 w-4 opacity-80" />}
                         </div>
                       </div>
                     )}
                     {!open && item.badge && (
                       <Badge 
-                        className="absolute -top-1 -right-1 h-4 min-w-4 p-0 flex items-center justify-center text-[9px] font-bold bg-secondary text-secondary-foreground border-0"
+                        className="absolute -top-1.5 -right-1.5 h-5 min-w-5 p-0 flex items-center justify-center text-[10px] font-bold bg-secondary text-secondary-foreground border-0 shadow-md"
                       >
                         {item.badge}
                       </Badge>
@@ -165,56 +187,82 @@ export const AppSidebar = ({
   };
 
   return (
-    <Sidebar collapsible="icon" className="border-r border-border/40 bg-card shadow-lg">
-      {/* Header */}
-      <SidebarHeader className="p-4 border-b border-border/40 bg-gradient-to-r from-primary/5 to-transparent">
+    <Sidebar collapsible="icon" className="border-r border-border/30 bg-gradient-to-b from-card via-card to-muted/20 shadow-xl">
+      {/* Header with Logo */}
+      <SidebarHeader className="p-4 border-b border-border/30">
         <div className="flex items-center gap-3">
-          <div className="relative flex-shrink-0">
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary to-primary-light flex items-center justify-center shadow-md">
-              <img src={stockXLogo} alt="Stock-X" className="h-6 w-6 object-contain brightness-0 invert" />
+          <div className="relative flex-shrink-0 group cursor-pointer">
+            <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-primary via-primary-light to-secondary flex items-center justify-center shadow-lg transition-transform duration-300 group-hover:scale-105 overflow-hidden">
+              <img src={stockXLogo} alt="Stock-X" className="h-8 w-8 object-contain" />
             </div>
-            <div className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 bg-success rounded-full border-2 border-card shadow-sm" />
+            <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 bg-success rounded-full border-2 border-card shadow-sm" />
+            <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
           </div>
           {open && (
-            <div className="min-w-0">
-              <h2 className="text-sm font-bold text-primary truncate tracking-tight">STOCK X</h2>
-              <p className="text-[10px] text-muted-foreground truncate">LPG Management</p>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <h2 className="text-base font-extrabold text-foreground truncate tracking-tight">STOCK X</h2>
+                <Sparkles className="h-3.5 w-3.5 text-secondary" />
+              </div>
+              <p className="text-[11px] text-muted-foreground truncate font-medium">LPG Management System</p>
             </div>
           )}
         </div>
       </SidebarHeader>
 
-      <SidebarContent className="py-3 overflow-x-hidden">
+      {/* User Profile Card */}
+      {open && (
+        <div className="px-3 py-3 border-b border-border/30">
+          <div className="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-muted/50 to-muted/30 border border-border/40">
+            <Avatar className="h-10 w-10 border-2 border-primary/30 shadow-md">
+              <AvatarImage src="" />
+              <AvatarFallback className="bg-gradient-to-br from-primary to-secondary text-primary-foreground font-bold text-sm">
+                {getInitials(userName)}
+              </AvatarFallback>
+            </Avatar>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-foreground truncate">{userName}</p>
+              <Badge className={`mt-1 text-[9px] px-2 py-0 h-4 font-semibold border capitalize ${getRoleBadgeColor(userRole)}`}>
+                {userRole}
+              </Badge>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <SidebarContent className="py-4 overflow-x-hidden">
         {renderNavGroup(mainNavItems)}
         
-        <div className="my-2 mx-3 h-px bg-gradient-to-r from-transparent via-border/50 to-transparent" />
+        <div className="my-3 mx-4 h-px bg-gradient-to-r from-transparent via-border/60 to-transparent" />
         {renderNavGroup(salesItems, 'Sales')}
         
-        <div className="my-2 mx-3 h-px bg-gradient-to-r from-transparent via-border/50 to-transparent" />
+        <div className="my-3 mx-4 h-px bg-gradient-to-r from-transparent via-border/60 to-transparent" />
         {renderNavGroup(inventoryItems, 'Inventory')}
         
-        <div className="my-2 mx-3 h-px bg-gradient-to-r from-transparent via-border/50 to-transparent" />
+        <div className="my-3 mx-4 h-px bg-gradient-to-r from-transparent via-border/60 to-transparent" />
         {renderNavGroup(operationsItems, 'Operations')}
         
-        <div className="my-2 mx-3 h-px bg-gradient-to-r from-transparent via-border/50 to-transparent" />
+        <div className="my-3 mx-4 h-px bg-gradient-to-r from-transparent via-border/60 to-transparent" />
         {renderNavGroup(managementItems, 'Manage')}
         
-        <div className="my-2 mx-3 h-px bg-gradient-to-r from-transparent via-border/50 to-transparent" />
+        <div className="my-3 mx-4 h-px bg-gradient-to-r from-transparent via-border/60 to-transparent" />
         {renderNavGroup(otherItems)}
       </SidebarContent>
 
       {/* Footer */}
-      <SidebarFooter className="border-t border-border/40 p-3 bg-gradient-to-r from-muted/30 to-transparent">
+      <SidebarFooter className="border-t border-border/30 p-3 bg-gradient-to-r from-destructive/5 to-transparent">
         <Button 
           variant="ghost" 
           size={open ? "sm" : "icon"}
-          className={`text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all duration-300 rounded-xl ${open ? 'w-full justify-start h-10' : 'w-9 h-9 mx-auto'}`}
+          className={`text-muted-foreground hover:text-destructive hover:bg-destructive/15 transition-all duration-300 rounded-xl group ${open ? 'w-full justify-start h-11' : 'w-10 h-10 mx-auto'}`}
           onClick={async () => {
             await supabase.auth.signOut();
             toast({ title: t("logout") });
           }}
         >
-          <LogOut className="h-4 w-4" />
+          <div className={`flex items-center justify-center h-8 w-8 rounded-lg transition-all duration-300 ${open ? 'bg-destructive/10 group-hover:bg-destructive/20' : ''}`}>
+            <LogOut className="h-4 w-4" />
+          </div>
           {open && <span className="ml-2 text-[13px] font-medium">{t("logout")}</span>}
         </Button>
       </SidebarFooter>
