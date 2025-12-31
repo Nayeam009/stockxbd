@@ -177,14 +177,14 @@ export const AppSidebar = ({
       <SidebarHeader className="border-b border-border/40 p-4">
         <div className="flex items-center gap-3">
           <div className="relative">
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary to-primary/80 p-0.5 shadow-lg shadow-primary/20">
-              <img src={stockXLogo} alt="Stock-X" className="h-full w-full rounded-[10px] bg-card object-cover" />
+            <div className="h-10 w-10 rounded-full border-2 border-foreground/80 flex items-center justify-center bg-card shadow-sm">
+              <img src={stockXLogo} alt="Stock-X" className="h-6 w-6 object-contain opacity-70" />
             </div>
-            <div className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 bg-accent rounded-full border-2 border-card"></div>
+            <div className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 bg-green-500 rounded-full border-2 border-card"></div>
           </div>
           {open && (
             <div className="animate-fade-in">
-              <h2 className="text-base font-bold text-foreground">Stock-X</h2>
+              <h2 className="text-base font-semibold text-foreground tracking-tight">Stock-X</h2>
               <p className="text-[11px] text-muted-foreground">LPG Management</p>
             </div>
           )}
