@@ -8,9 +8,9 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { 
   Search, 
   Settings, 
-  User,
   Sun,
-  Moon
+  Moon,
+  Command
 } from "lucide-react";
 
 interface DashboardHeaderProps {
@@ -35,9 +35,9 @@ export const DashboardHeader = ({
 
   const getRoleColor = (role: string) => {
     switch (role) {
-      case 'owner': return 'bg-gradient-to-r from-primary to-primary-light text-primary-foreground shadow-md';
-      case 'manager': return 'bg-gradient-to-r from-secondary to-secondary-light text-secondary-foreground shadow-md';
-      case 'driver': return 'bg-gradient-to-r from-accent to-accent-light text-accent-foreground shadow-md';
+      case 'owner': return 'bg-primary/10 text-primary border-primary/20';
+      case 'manager': return 'bg-secondary/10 text-secondary border-secondary/20';
+      case 'driver': return 'bg-accent/10 text-accent border-accent/20';
       default: return 'bg-muted text-muted-foreground';
     }
   };
@@ -51,48 +51,43 @@ export const DashboardHeader = ({
     }
   };
 
+  const getInitials = (name: string) => {
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  };
+
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border bg-background/80 backdrop-blur-lg supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-16 items-center justify-between px-4 gap-4">
+    <header className="sticky top-0 z-50 w-full bg-background/95 backdrop-blur-md border-b border-border/50">
+      <div className="flex h-14 items-center justify-between px-4 gap-4">
         {/* Left Section */}
-        <div className="flex items-center gap-4">
-          <SidebarTrigger className="hover:bg-accent/10 hover:text-accent transition-colors rounded-lg" />
-          
-          <div className="hidden md:flex items-center gap-3">
-            <div className="h-9 w-9 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center shadow-md">
-              <span className="text-primary-foreground font-bold text-sm">SX</span>
-            </div>
-            <div>
-              <h1 className="text-lg font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                Stock-X
-              </h1>
-              <p className="text-[10px] text-muted-foreground -mt-0.5">
-                {language === 'bn' ? 'এলপিজি ম্যানেজমেন্ট' : 'LPG Management'}
-              </p>
-            </div>
-          </div>
+        <div className="flex items-center gap-3">
+          <SidebarTrigger className="h-8 w-8 hover:bg-muted rounded-lg transition-colors" />
         </div>
 
         {/* Center Section - Search */}
-        <div className="flex-1 max-w-md hidden lg:block">
+        <div className="flex-1 max-w-xl hidden md:block">
           <div className="relative group">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder={language === 'bn' ? 'গ্রাহক, অর্ডার, পণ্য খুঁজুন...' : 'Search customers, orders, products...'}
+              placeholder={language === 'bn' ? 'খুঁজুন...' : 'Search...'}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 bg-muted/30 border-border hover:border-primary/50 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all rounded-xl"
+              className="pl-9 pr-20 h-9 bg-muted/50 border-0 focus-visible:ring-1 focus-visible:ring-primary/30 rounded-lg text-sm"
             />
+            <div className="absolute right-2 top-1/2 transform -translate-y-1/2 hidden lg:flex items-center gap-1 text-muted-foreground/60">
+              <kbd className="h-5 px-1.5 flex items-center gap-0.5 bg-background border border-border rounded text-[10px] font-medium">
+                <Command className="h-2.5 w-2.5" />K
+              </kbd>
+            </div>
           </div>
         </div>
 
         {/* Right Section */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           {/* Mobile Search */}
           <Button 
             variant="ghost" 
             size="icon" 
-            className="lg:hidden hover:bg-primary/10 rounded-xl"
+            className="md:hidden h-8 w-8 rounded-lg"
           >
             <Search className="h-4 w-4" />
           </Button>
@@ -102,12 +97,12 @@ export const DashboardHeader = ({
             variant="ghost" 
             size="icon"
             onClick={toggleTheme}
-            className="hover:bg-primary/10 rounded-xl transition-colors"
+            className="h-8 w-8 rounded-lg hover:bg-muted transition-colors"
           >
             {theme === 'dark' ? (
-              <Sun className="h-4 w-4 text-warning" />
+              <Sun className="h-4 w-4" />
             ) : (
-              <Moon className="h-4 w-4 text-primary" />
+              <Moon className="h-4 w-4" />
             )}
           </Button>
 
@@ -119,30 +114,28 @@ export const DashboardHeader = ({
             variant="ghost" 
             size="icon"
             onClick={onSettingsClick}
-            className="hover:bg-primary/10 rounded-xl transition-colors"
+            className="h-8 w-8 rounded-lg hover:bg-muted transition-colors"
           >
             <Settings className="h-4 w-4" />
           </Button>
 
+          {/* Divider */}
+          <div className="h-6 w-px bg-border mx-2 hidden sm:block" />
+
           {/* User Profile */}
           <div 
-            className="flex items-center gap-3 pl-3 border-l border-border cursor-pointer hover:opacity-80 transition-opacity"
+            className="flex items-center gap-2.5 cursor-pointer hover:opacity-80 transition-opacity"
             onClick={onProfileClick}
           >
-            <Badge 
-              className={`${getRoleColor(userRole)} border-0 font-medium`}
-            >
-              {getRoleLabel(userRole)}
-            </Badge>
-            
-            <div className="hidden sm:flex items-center gap-3">
-              <div className="h-9 w-9 bg-gradient-to-br from-primary via-secondary to-accent rounded-xl flex items-center justify-center shadow-md ring-2 ring-background">
-                <User className="h-4 w-4 text-primary-foreground" />
+            <div className="hidden sm:block text-right">
+              <p className="text-sm font-medium text-foreground leading-none">{userName}</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">{getRoleLabel(userRole)}</p>
+            </div>
+            <div className="relative">
+              <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-primary-foreground text-xs font-semibold">
+                {getInitials(userName)}
               </div>
-              <div className="text-right">
-                <p className="text-sm font-semibold text-foreground leading-tight">{userName}</p>
-                <p className="text-[10px] text-muted-foreground">{getRoleLabel(userRole)}</p>
-              </div>
+              <div className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 bg-green-500 rounded-full border-2 border-background" />
             </div>
           </div>
         </div>
