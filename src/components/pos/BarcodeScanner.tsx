@@ -4,10 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { ScanLine, Camera, X, Keyboard, Package, AlertCircle, CheckCircle2 } from "lucide-react";
+import { ScanLine, Camera, X, Keyboard, Package, AlertCircle, CheckCircle2, Loader2, XCircle } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
+import { Html5Qrcode } from "html5-qrcode";
 
 interface ScannedProduct {
   id: string;
@@ -31,8 +32,14 @@ export const BarcodeScanner = ({ open, onOpenChange, onProductFound }: BarcodeSc
   const [isSearching, setIsSearching] = useState(false);
   const [lastScanned, setLastScanned] = useState<ScannedProduct | null>(null);
   const [scanBuffer, setScanBuffer] = useState("");
+  const [cameraReady, setCameraReady] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [isCameraStarting, setIsCameraStarting] = useState(false);
+  
   const inputRef = useRef<HTMLInputElement>(null);
   const scanTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const html5QrCodeRef = useRef<Html5Qrcode | null>(null);
+  const scannerContainerId = "barcode-scanner-container";
 
   // Focus input when dialog opens
   useEffect(() => {
@@ -41,12 +48,95 @@ export const BarcodeScanner = ({ open, onOpenChange, onProductFound }: BarcodeSc
     }
   }, [open, scanMode]);
 
+  // Handle camera mode
+  useEffect(() => {
+    if (!open) {
+      // Clean up camera when dialog closes
+      stopCamera();
+      return;
+    }
+
+    if (scanMode === 'camera' && open) {
+      startCamera();
+    } else {
+      stopCamera();
+    }
+
+    return () => {
+      stopCamera();
+    };
+  }, [scanMode, open]);
+
+  const startCamera = async () => {
+    setIsCameraStarting(true);
+    setCameraError(null);
+
+    try {
+      // Wait for DOM element to be available
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      const container = document.getElementById(scannerContainerId);
+      if (!container) {
+        throw new Error("Scanner container not found");
+      }
+
+      // Create new scanner instance
+      html5QrCodeRef.current = new Html5Qrcode(scannerContainerId);
+
+      const config = {
+        fps: 10,
+        qrbox: { width: 250, height: 150 },
+        aspectRatio: 1.5,
+      };
+
+      await html5QrCodeRef.current.start(
+        { facingMode: "environment" },
+        config,
+        (decodedText) => {
+          // On successful scan
+          handleSearch(decodedText);
+          // Provide haptic feedback if available
+          if (navigator.vibrate) {
+            navigator.vibrate(100);
+          }
+        },
+        () => {
+          // Ignore QR code not found errors
+        }
+      );
+
+      setCameraReady(true);
+      setIsCameraStarting(false);
+    } catch (err: any) {
+      console.error("Camera error:", err);
+      setCameraError(err.message || "Failed to start camera. Please ensure camera permissions are granted.");
+      setIsCameraStarting(false);
+      setCameraReady(false);
+    }
+  };
+
+  const stopCamera = async () => {
+    if (html5QrCodeRef.current) {
+      try {
+        if (html5QrCodeRef.current.isScanning) {
+          await html5QrCodeRef.current.stop();
+        }
+        html5QrCodeRef.current.clear();
+      } catch (err) {
+        console.error("Error stopping camera:", err);
+      }
+      html5QrCodeRef.current = null;
+    }
+    setCameraReady(false);
+    setCameraError(null);
+  };
+
   // Handle barcode scanner input (fast sequential keypresses)
   useEffect(() => {
     if (!open || scanMode !== 'keyboard') return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Only capture if dialog is open and no input is focused (except our scanner input)
+      // Only capture if dialog is open and our input is focused
       if (document.activeElement !== inputRef.current) return;
 
       // Clear previous timeout
@@ -109,12 +199,13 @@ export const BarcodeScanner = ({ open, onOpenChange, onProductFound }: BarcodeSc
           type: 'lpg',
           name: brand.name,
           details: `${brand.weight} - ${brand.size}`,
-          price: 0, // Price comes from product_prices
+          price: 0,
           stock: brand.refill_cylinder + brand.package_cylinder,
           sku: brand.name.toUpperCase().replace(/\s+/g, '-')
         };
         setLastScanned(product);
         setIsSearching(false);
+        toast({ title: "Product found!", description: product.name });
         return;
       }
 
@@ -138,6 +229,7 @@ export const BarcodeScanner = ({ open, onOpenChange, onProductFound }: BarcodeSc
         };
         setLastScanned(product);
         setIsSearching(false);
+        toast({ title: "Product found!", description: product.name });
         return;
       }
 
@@ -161,6 +253,7 @@ export const BarcodeScanner = ({ open, onOpenChange, onProductFound }: BarcodeSc
         };
         setLastScanned(product);
         setIsSearching(false);
+        toast({ title: "Product found!", description: product.name });
         return;
       }
 
@@ -195,6 +288,12 @@ export const BarcodeScanner = ({ open, onOpenChange, onProductFound }: BarcodeSc
     inputRef.current?.focus();
   };
 
+  const handleModeChange = (mode: 'keyboard' | 'camera') => {
+    setLastScanned(null);
+    setManualCode("");
+    setScanMode(mode);
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
@@ -204,7 +303,7 @@ export const BarcodeScanner = ({ open, onOpenChange, onProductFound }: BarcodeSc
             Barcode Scanner
           </DialogTitle>
           <DialogDescription>
-            Scan product barcode or enter code manually for quick lookup
+            Scan product barcode using camera or enter code manually
           </DialogDescription>
         </DialogHeader>
 
@@ -214,21 +313,20 @@ export const BarcodeScanner = ({ open, onOpenChange, onProductFound }: BarcodeSc
             <Button
               variant={scanMode === 'keyboard' ? 'default' : 'outline'}
               size="sm"
-              onClick={() => setScanMode('keyboard')}
+              onClick={() => handleModeChange('keyboard')}
               className="flex-1"
             >
               <Keyboard className="h-4 w-4 mr-2" />
-              Scanner / Manual
+              Manual / Scanner
             </Button>
             <Button
               variant={scanMode === 'camera' ? 'default' : 'outline'}
               size="sm"
-              onClick={() => setScanMode('camera')}
+              onClick={() => handleModeChange('camera')}
               className="flex-1"
-              disabled
             >
               <Camera className="h-4 w-4 mr-2" />
-              Camera (Soon)
+              Camera Scan
             </Button>
           </div>
 
@@ -266,7 +364,10 @@ export const BarcodeScanner = ({ open, onOpenChange, onProductFound }: BarcodeSc
                 className="w-full"
               >
                 {isSearching ? (
-                  <>Searching...</>
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Searching...
+                  </>
                 ) : (
                   <>
                     <ScanLine className="h-4 w-4 mr-2" />
@@ -277,16 +378,65 @@ export const BarcodeScanner = ({ open, onOpenChange, onProductFound }: BarcodeSc
             </div>
           )}
 
-          {/* Camera Mode Placeholder */}
+          {/* Camera Mode */}
           {scanMode === 'camera' && (
-            <Card className="border-dashed">
-              <CardContent className="py-12 text-center">
-                <Camera className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">
-                  Camera scanning coming soon
-                </p>
-              </CardContent>
-            </Card>
+            <div className="space-y-3">
+              {/* Camera View */}
+              <div className="relative rounded-lg overflow-hidden bg-black aspect-video">
+                <div 
+                  id={scannerContainerId} 
+                  className="w-full h-full"
+                />
+                
+                {isCameraStarting && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/80">
+                    <div className="text-center text-white">
+                      <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
+                      <p className="text-sm">Starting camera...</p>
+                    </div>
+                  </div>
+                )}
+
+                {cameraError && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/90 p-4">
+                    <div className="text-center text-white">
+                      <XCircle className="h-10 w-10 mx-auto mb-3 text-red-400" />
+                      <p className="text-sm mb-3">{cameraError}</p>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={startCamera}
+                        className="bg-white/10 text-white border-white/20 hover:bg-white/20"
+                      >
+                        Retry
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {cameraReady && !isSearching && (
+                  <div className="absolute bottom-2 left-0 right-0 text-center">
+                    <Badge variant="secondary" className="bg-black/50 text-white border-0">
+                      <Camera className="h-3 w-3 mr-1" />
+                      Point camera at barcode
+                    </Badge>
+                  </div>
+                )}
+
+                {isSearching && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+                    <div className="text-center text-white">
+                      <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
+                      <p className="text-sm">Looking up product...</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <p className="text-xs text-center text-muted-foreground">
+                Hold barcode steady within the frame for best results
+              </p>
+            </div>
           )}
 
           {/* Scanned Product Result */}
