@@ -40,11 +40,17 @@ interface LPGBrand {
   id: string;
   name: string;
   size: string;
+  weight: string;
 }
 
 interface ExchangeModuleProps {
   onBack?: () => void;
 }
+
+// Weight options matching inventory system
+const WEIGHT_OPTIONS_22MM = ["5.5kg", "12kg", "12.5kg", "25kg", "35kg", "45kg"];
+const WEIGHT_OPTIONS_20MM = ["5kg", "10kg", "12kg", "15kg", "21kg", "35kg"];
+const ALL_WEIGHTS = [...new Set([...WEIGHT_OPTIONS_22MM, ...WEIGHT_OPTIONS_20MM])];
 
 export const ExchangeModule = ({ onBack }: ExchangeModuleProps) => {
   const [exchanges, setExchanges] = useState<Exchange[]>([]);
@@ -59,8 +65,6 @@ export const ExchangeModule = ({ onBack }: ExchangeModuleProps) => {
   const [toBrand, setToBrand] = useState("");
   const [toWeight, setToWeight] = useState("");
   const [quantity, setQuantity] = useState(1);
-
-  const weights = ["12kg", "22kg", "35kg", "45kg"];
 
   useEffect(() => {
     const init = async () => {
@@ -104,7 +108,7 @@ export const ExchangeModule = ({ onBack }: ExchangeModuleProps) => {
   const fetchBrands = async () => {
     const { data } = await supabase
       .from('lpg_brands')
-      .select('id, name, size')
+      .select('id, name, size, weight')
       .eq('is_active', true)
       .order('name');
     
@@ -217,7 +221,7 @@ export const ExchangeModule = ({ onBack }: ExchangeModuleProps) => {
                     <SelectValue placeholder="Weight" />
                   </SelectTrigger>
                   <SelectContent>
-                    {weights.map(w => (
+                    {ALL_WEIGHTS.map(w => (
                       <SelectItem key={w} value={w}>{w}</SelectItem>
                     ))}
                   </SelectContent>
@@ -251,7 +255,7 @@ export const ExchangeModule = ({ onBack }: ExchangeModuleProps) => {
                     <SelectValue placeholder="Weight" />
                   </SelectTrigger>
                   <SelectContent>
-                    {weights.map(w => (
+                    {ALL_WEIGHTS.map(w => (
                       <SelectItem key={w} value={w}>{w}</SelectItem>
                     ))}
                   </SelectContent>
