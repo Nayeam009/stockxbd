@@ -143,9 +143,9 @@ export const LPGStockModule = ({ size = "22mm" }: LPGStockModuleProps) => {
   // Get status based on stock levels
   const getStatus = (brand: LPGBrand) => {
     const total = brand.package_cylinder + brand.refill_cylinder;
-    if (total === 0) return { label: "Out of Stock", variant: "destructive" as const };
-    if (brand.problem_cylinder > 10) return { label: "Issues", variant: "secondary" as const };
-    return { label: "In Stock", variant: "default" as const };
+    if (total === 0) return { label: "Out of Stock", variant: "destructive" as const, color: "bg-red-500" };
+    if (total < 30) return { label: "Low Stock", variant: "warning" as const, color: "bg-yellow-500" };
+    return { label: "In Stock", variant: "success" as const, color: "bg-green-500" };
   };
 
   // Add new brand
@@ -539,8 +539,7 @@ export const LPGStockModule = ({ size = "22mm" }: LPGStockModuleProps) => {
                         </TableCell>
                         <TableCell>
                           <Badge 
-                            variant={status.variant}
-                            className={status.variant === "default" ? "bg-green-500 hover:bg-green-600 text-white" : ""}
+                            className={`${status.color} hover:opacity-90 text-white border-0`}
                           >
                             {status.label}
                           </Badge>

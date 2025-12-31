@@ -25,15 +25,29 @@ export const useNotifications = () => {
       const lowStockNotifications: Notification[] = [];
       brands.forEach((brand) => {
         const totalStock = brand.package_cylinder + brand.refill_cylinder;
-        if (totalStock < 5) {
+        const brandInfo = `${brand.name} (${brand.size} - ${brand.weight})`;
+        
+        if (totalStock === 0) {
+          // Out of Stock - Red
+          lowStockNotifications.push({
+            id: `out_of_stock_${brand.id}`,
+            type: "low_stock",
+            title: "🔴 Out of Stock",
+            message: `${brandInfo} is out of stock!`,
+            read: false,
+            createdAt: new Date(),
+            data: { brandId: brand.id, brandName: brand.name, stock: totalStock, status: "out_of_stock" },
+          });
+        } else if (totalStock < 30) {
+          // Low Stock - Yellow
           lowStockNotifications.push({
             id: `low_stock_${brand.id}`,
             type: "low_stock",
-            title: "Low Stock Alert",
-            message: `${brand.name} has only ${totalStock} cylinders in stock`,
+            title: "🟡 Low Stock Alert",
+            message: `${brandInfo} has only ${totalStock} cylinders remaining`,
             read: false,
             createdAt: new Date(),
-            data: { brandId: brand.id, brandName: brand.name, stock: totalStock },
+            data: { brandId: brand.id, brandName: brand.name, stock: totalStock, status: "low_stock" },
           });
         }
       });
