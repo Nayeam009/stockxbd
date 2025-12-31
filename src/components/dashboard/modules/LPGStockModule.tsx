@@ -27,7 +27,8 @@ import {
   Trash2,
   Package,
   AlertTriangle,
-  Loader2
+  Loader2,
+  Cylinder
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -50,14 +51,38 @@ interface LPGStockModuleProps {
   size?: "22mm" | "20mm";
 }
 
+// Cylinder weight options
+const WEIGHT_OPTIONS_22MM = [
+  { value: "all", label: "All Weights", shortLabel: "All" },
+  { value: "5.5kg", label: "5.5 KG", shortLabel: "5.5" },
+  { value: "12kg", label: "12 KG", shortLabel: "12" },
+  { value: "12.5kg", label: "12.5 KG", shortLabel: "12.5" },
+  { value: "25kg", label: "25 KG", shortLabel: "25" },
+  { value: "35kg", label: "35 KG", shortLabel: "35" },
+  { value: "45kg", label: "45 KG", shortLabel: "45" },
+];
+
+const WEIGHT_OPTIONS_20MM = [
+  { value: "all", label: "All Weights", shortLabel: "All" },
+  { value: "5kg", label: "5 KG", shortLabel: "5" },
+  { value: "10kg", label: "10 KG", shortLabel: "10" },
+  { value: "12kg", label: "12 KG", shortLabel: "12" },
+  { value: "15kg", label: "15 KG", shortLabel: "15" },
+  { value: "21kg", label: "21 KG", shortLabel: "21" },
+  { value: "35kg", label: "35 KG", shortLabel: "35" },
+];
+
 export const LPGStockModule = ({ size = "22mm" }: LPGStockModuleProps) => {
   const [brands, setBrands] = useState<LPGBrand[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedWeight, setSelectedWeight] = useState("all");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingCell, setEditingCell] = useState<{id: string, field: string} | null>(null);
   
+  const weightOptions = size === "22mm" ? WEIGHT_OPTIONS_22MM : WEIGHT_OPTIONS_20MM;
+
   const [newBrand, setNewBrand] = useState({
     name: "",
     color: "#22c55e",
@@ -260,10 +285,49 @@ export const LPGStockModule = ({ size = "22mm" }: LPGStockModuleProps) => {
 
   return (
     <div className="space-y-6">
+      {/* Weight Selection */}
+      <Card className="border-0 shadow-sm bg-gradient-to-r from-primary/5 via-background to-secondary/5">
+        <CardContent className="p-4">
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-2">
+              <Cylinder className="h-5 w-5 text-primary" />
+              <h3 className="text-sm font-semibold text-foreground">Select Cylinder Weight</h3>
+              <Badge variant="outline" className="ml-2 text-xs">
+                {size}
+              </Badge>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {weightOptions.map((option) => (
+                <Button
+                  key={option.value}
+                  variant={selectedWeight === option.value ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setSelectedWeight(option.value)}
+                  className={`transition-all duration-200 ${
+                    selectedWeight === option.value 
+                      ? "bg-primary text-primary-foreground shadow-md" 
+                      : "hover:bg-primary/10 hover:border-primary/50"
+                  }`}
+                >
+                  {option.label}
+                </Button>
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-foreground">LPG Stock ({size})</h2>
+          <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
+            LPG Stock ({size})
+            {selectedWeight !== "all" && (
+              <Badge className="bg-primary/10 text-primary border-0 text-sm font-medium">
+                {selectedWeight}
+              </Badge>
+            )}
+          </h2>
           <p className="text-muted-foreground text-sm">Manage cylinder inventory by brand</p>
         </div>
         
