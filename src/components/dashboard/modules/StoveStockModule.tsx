@@ -30,6 +30,7 @@ import {
 import { Plus, Minus, Trash2, Search, ChefHat, Package, DollarSign, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
+import { InventoryPricingCard } from "./InventoryPricingCard";
 
 interface Stove {
   id: string;
@@ -437,6 +438,13 @@ export const StoveStockModule = () => {
           </TableBody>
         </Table>
       </Card>
+
+      {/* Pricing Card */}
+      <InventoryPricingCard
+        productType="stove"
+        title="Gas Stove Pricing"
+        description="Quick access to view and edit stove prices"
+      />
     </div>
   );
 };

@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/select";
 import { Plus, Minus, Trash2, Search, Wrench, Package } from "lucide-react";
 import { toast } from "sonner";
+import { InventoryPricingCard } from "./InventoryPricingCard";
 
 interface Regulator {
   id: string;
@@ -413,6 +414,13 @@ export const RegulatorsModule = () => {
           </TableBody>
         </Table>
       </Card>
+
+      {/* Pricing Card */}
+      <InventoryPricingCard
+        productType="regulator"
+        title="Regulator Pricing"
+        description="Quick access to view and edit regulator prices"
+      />
     </div>
   );
 };
