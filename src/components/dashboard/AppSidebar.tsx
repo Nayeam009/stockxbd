@@ -124,13 +124,13 @@ export const AppSidebar = ({
     return (
       <SidebarGroup className="py-0">
         {label && open && (
-          <SidebarGroupLabel className="text-[10px] uppercase tracking-widest text-muted-foreground/60 font-semibold px-4 py-2.5 flex items-center gap-2">
+          <SidebarGroupLabel className="text-[9px] sm:text-[10px] uppercase tracking-widest text-muted-foreground/60 font-semibold px-3 sm:px-4 py-2 sm:py-2.5 flex items-center gap-1.5 sm:gap-2">
             <div className="h-1 w-1 rounded-full bg-secondary" />
             {label}
           </SidebarGroupLabel>
         )}
         <SidebarGroupContent>
-          <SidebarMenu className="space-y-1 px-2">
+          <SidebarMenu className="space-y-0.5 sm:space-y-1 px-1.5 sm:px-2">
             {filteredItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeModule === item.id;
@@ -141,37 +141,37 @@ export const AppSidebar = ({
                   <SidebarMenuButton 
                     onClick={() => handleModuleChange(item.id)}
                     isActive={isActive}
-                    className={`relative group rounded-xl h-11 transition-all duration-300 ${
+                    className={`relative group rounded-lg sm:rounded-xl h-9 sm:h-10 lg:h-11 transition-all duration-300 ${
                       isActive 
                         ? 'bg-gradient-to-r from-primary via-primary to-primary-light text-primary-foreground shadow-lg shadow-primary/25' 
                         : 'hover:bg-muted/80 text-muted-foreground hover:text-foreground'
                     }`}
                   >
-                    <div className={`flex items-center justify-center h-8 w-8 rounded-lg transition-all duration-300 ${
+                    <div className={`flex items-center justify-center h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8 rounded-md sm:rounded-lg transition-all duration-300 ${
                       isActive 
                         ? 'bg-white/20' 
                         : 'bg-muted/50 group-hover:bg-primary/10 group-hover:scale-105'
                     }`}>
-                      <Icon className={`h-4 w-4 transition-all duration-200 ${isActive ? '' : 'group-hover:text-primary'}`} />
+                      <Icon className={`h-3.5 w-3.5 sm:h-4 sm:w-4 transition-all duration-200 ${isActive ? '' : 'group-hover:text-primary'}`} />
                     </div>
                     {open && (
                       <div className="flex items-center justify-between w-full ml-1">
-                        <span className="text-[13px] font-medium truncate">{displayTitle}</span>
-                        <div className="flex items-center gap-1.5">
+                        <span className="text-[11px] sm:text-xs lg:text-[13px] font-medium truncate">{displayTitle}</span>
+                        <div className="flex items-center gap-1 sm:gap-1.5">
                           {item.badge && (
                             <Badge 
-                              className="h-5 min-w-5 px-1.5 text-[10px] font-bold bg-secondary text-secondary-foreground border-0 shadow-sm animate-pulse"
+                              className="h-4 sm:h-5 min-w-4 sm:min-w-5 px-1 sm:px-1.5 text-[9px] sm:text-[10px] font-bold bg-secondary text-secondary-foreground border-0 shadow-sm animate-pulse"
                             >
                               {item.badge}
                             </Badge>
                           )}
-                          {isActive && <ChevronRight className="h-4 w-4 opacity-80" />}
+                          {isActive && <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4 opacity-80" />}
                         </div>
                       </div>
                     )}
                     {!open && item.badge && (
                       <Badge 
-                        className="absolute -top-1.5 -right-1.5 h-5 min-w-5 p-0 flex items-center justify-center text-[10px] font-bold bg-secondary text-secondary-foreground border-0 shadow-md"
+                        className="absolute -top-1 -right-1 sm:-top-1.5 sm:-right-1.5 h-4 sm:h-5 min-w-4 sm:min-w-5 p-0 flex items-center justify-center text-[9px] sm:text-[10px] font-bold bg-secondary text-secondary-foreground border-0 shadow-md"
                       >
                         {item.badge}
                       </Badge>
@@ -189,22 +189,22 @@ export const AppSidebar = ({
   return (
     <Sidebar collapsible="icon" className="border-r border-border/30 bg-gradient-to-b from-card via-card to-muted/20 shadow-xl">
       {/* Header with Logo */}
-      <SidebarHeader className="p-4 border-b border-border/30">
-        <div className="flex items-center gap-3">
+      <SidebarHeader className="p-2 sm:p-3 lg:p-4 border-b border-border/30">
+        <div className="flex items-center gap-2 sm:gap-3">
           <div className="relative flex-shrink-0 group cursor-pointer">
-            <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-primary via-primary-light to-secondary flex items-center justify-center shadow-lg transition-transform duration-300 group-hover:scale-105 overflow-hidden">
-              <img src={stockXLogo} alt="Stock-X" className="h-8 w-8 object-contain" />
+            <div className="h-9 w-9 sm:h-10 sm:w-10 lg:h-11 lg:w-11 rounded-xl sm:rounded-2xl bg-gradient-to-br from-primary via-primary-light to-secondary flex items-center justify-center shadow-lg transition-transform duration-300 group-hover:scale-105 overflow-hidden">
+              <img src={stockXLogo} alt="Stock-X" className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8 object-contain" />
             </div>
-            <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 bg-success rounded-full border-2 border-card shadow-sm" />
-            <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 sm:h-3 sm:w-3 bg-success rounded-full border-2 border-card shadow-sm" />
+            <div className="absolute inset-0 rounded-xl sm:rounded-2xl bg-gradient-to-br from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
           </div>
           {open && (
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5">
-                <h2 className="text-base font-extrabold text-foreground truncate tracking-tight">STOCK X</h2>
-                <Sparkles className="h-3.5 w-3.5 text-secondary" />
+              <div className="flex items-center gap-1 sm:gap-1.5">
+                <h2 className="text-sm sm:text-base font-extrabold text-foreground truncate tracking-tight">STOCK X</h2>
+                <Sparkles className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-secondary flex-shrink-0" />
               </div>
-              <p className="text-[11px] text-muted-foreground truncate font-medium">LPG Management System</p>
+              <p className="text-[10px] sm:text-[11px] text-muted-foreground truncate font-medium">LPG Management</p>
             </div>
           )}
         </div>
@@ -212,17 +212,17 @@ export const AppSidebar = ({
 
       {/* User Profile Card */}
       {open && (
-        <div className="px-3 py-3 border-b border-border/30">
-          <div className="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-muted/50 to-muted/30 border border-border/40">
-            <Avatar className="h-10 w-10 border-2 border-primary/30 shadow-md">
+        <div className="px-2 sm:px-3 py-2 sm:py-3 border-b border-border/30">
+          <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg sm:rounded-xl bg-gradient-to-r from-muted/50 to-muted/30 border border-border/40">
+            <Avatar className="h-8 w-8 sm:h-10 sm:w-10 border-2 border-primary/30 shadow-md flex-shrink-0">
               <AvatarImage src="" />
-              <AvatarFallback className="bg-gradient-to-br from-primary to-secondary text-primary-foreground font-bold text-sm">
+              <AvatarFallback className="bg-gradient-to-br from-primary to-secondary text-primary-foreground font-bold text-xs sm:text-sm">
                 {getInitials(userName)}
               </AvatarFallback>
             </Avatar>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-foreground truncate">{userName}</p>
-              <Badge className={`mt-1 text-[9px] px-2 py-0 h-4 font-semibold border capitalize ${getRoleBadgeColor(userRole)}`}>
+              <p className="text-xs sm:text-sm font-semibold text-foreground truncate">{userName}</p>
+              <Badge className={`mt-0.5 sm:mt-1 text-[8px] sm:text-[9px] px-1.5 sm:px-2 py-0 h-3.5 sm:h-4 font-semibold border capitalize ${getRoleBadgeColor(userRole)}`}>
                 {userRole}
               </Badge>
             </div>
