@@ -33,6 +33,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { InventoryPricingCard } from "./InventoryPricingCard";
+import { syncLpgBrandToPricing } from "@/hooks/useInventoryPricingSync";
 
 interface LPGBrand {
   id: string;
@@ -160,12 +161,22 @@ export const LPGStockModule = ({ size = "22mm" }: LPGStockModuleProps) => {
     try {
       const { data: userData } = await supabase.auth.getUser();
       
-      const { error } = await supabase.from("lpg_brands").insert({
+      const { data: insertedBrand, error } = await supabase.from("lpg_brands").insert({
         ...newBrand,
         created_by: userData.user?.id,
-      });
+      }).select().single();
 
       if (error) throw error;
+
+      // Auto-sync to product pricing
+      if (insertedBrand) {
+        await syncLpgBrandToPricing(
+          newBrand.name.trim(),
+          insertedBrand.id,
+          newBrand.size,
+          newBrand.weight
+        );
+      }
 
       toast.success("Brand added successfully");
       setIsAddDialogOpen(false);

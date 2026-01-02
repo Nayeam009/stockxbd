@@ -30,6 +30,7 @@ import {
 import { Plus, Minus, Trash2, Search, Wrench, Package } from "lucide-react";
 import { toast } from "sonner";
 import { InventoryPricingCard } from "./InventoryPricingCard";
+import { syncRegulatorToPricing } from "@/hooks/useInventoryPricingSync";
 
 interface Regulator {
   id: string;
@@ -126,6 +127,10 @@ export const RegulatorsModule = () => {
         });
 
         if (error) throw error;
+        
+        // Auto-sync to product pricing
+        await syncRegulatorToPricing(newRegulator.brand.trim(), newRegulator.type);
+        
         toast.success("Regulator added successfully");
       }
 

@@ -31,6 +31,7 @@ import { Plus, Minus, Trash2, Search, ChefHat, Package, DollarSign, AlertTriangl
 import { toast } from "sonner";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
 import { InventoryPricingCard } from "./InventoryPricingCard";
+import { syncStoveToPricing } from "@/hooks/useInventoryPricingSync";
 
 interface Stove {
   id: string;
@@ -127,9 +128,10 @@ export const StoveStockModule = () => {
         toast.success("Stove quantity updated");
       } else {
         // Create new stove
+        const burnerLabel = getBurnerLabel(newStove.burners);
         const { error } = await supabase.from("stoves").insert({
           brand: newStove.brand.trim(),
-          model: getBurnerLabel(newStove.burners), // Use burner type as model
+          model: burnerLabel, // Use burner type as model
           burners: newStove.burners,
           quantity: newStove.quantity,
           price: 0, // Price will be set in Product Pricing
@@ -137,6 +139,10 @@ export const StoveStockModule = () => {
         });
 
         if (error) throw error;
+        
+        // Auto-sync to product pricing
+        await syncStoveToPricing(newStove.brand.trim(), burnerLabel);
+        
         toast.success("Stove added successfully");
       }
 
