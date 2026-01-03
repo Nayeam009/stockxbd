@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, TouchEvent } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/dashboard/AppSidebar";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
@@ -22,7 +22,9 @@ import { ProfileModule } from "@/components/dashboard/modules/ProfileModule";
 import { ExchangeModule } from "@/components/dashboard/modules/ExchangeModule";
 import { MobileBottomNav } from "@/components/dashboard/MobileBottomNav";
 import { useDashboardData } from "@/hooks/useDashboardData";
+import { getNextModule } from "@/hooks/useSwipeNavigation";
 import { supabase } from "@/integrations/supabase/client";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const Dashboard = () => {
   const [activeModule, setActiveModule] = useState("overview");
@@ -30,6 +32,38 @@ const Dashboard = () => {
   const [userRole, setUserRole] = useState<'owner' | 'manager' | 'driver'>('driver');
   const [userName, setUserName] = useState("");
   const [authLoading, setAuthLoading] = useState(true);
+  const isMobile = useIsMobile();
+
+  // Swipe gesture state
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+  const minSwipeDistance = 80;
+
+  const onTouchStart = useCallback((e: TouchEvent<HTMLElement>) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  }, []);
+
+  const onTouchMove = useCallback((e: TouchEvent<HTMLElement>) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  }, []);
+
+  const onTouchEnd = useCallback(() => {
+    if (!touchStart || !touchEnd) return;
+    
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+
+    if (isLeftSwipe) {
+      const nextModule = getNextModule(activeModule, 'left', userRole);
+      setActiveModule(nextModule);
+    }
+    if (isRightSwipe) {
+      const nextModule = getNextModule(activeModule, 'right', userRole);
+      setActiveModule(nextModule);
+    }
+  }, [touchStart, touchEnd, activeModule, userRole]);
 
   // Fetch user role from database
   useEffect(() => {
@@ -200,8 +234,13 @@ const Dashboard = () => {
             onProfileClick={() => setActiveModule("profile")}
           />
 
-          {/* Main Content */}
-          <main className="flex-1 overflow-auto pb-20 md:pb-0">
+          {/* Main Content with Swipe Support */}
+          <main 
+            className="flex-1 overflow-auto pb-24 md:pb-0"
+            onTouchStart={isMobile ? onTouchStart : undefined}
+            onTouchMove={isMobile ? onTouchMove : undefined}
+            onTouchEnd={isMobile ? onTouchEnd : undefined}
+          >
             <div className="container mx-auto p-3 sm:p-4 md:p-6 animate-fade-in max-w-7xl">
               {renderActiveModule()}
             </div>

@@ -1,4 +1,4 @@
-import { Home, Receipt, Package, BarChart3, Menu } from "lucide-react";
+import { Home, Receipt, Package, BarChart3, Menu, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/contexts/LanguageContext";
 import {
@@ -8,7 +8,8 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { useState } from "react";
+import { useState, useCallback, TouchEvent as ReactTouchEvent } from "react";
+import { getNextModule, getModuleNavigationOrder } from "@/hooks/useSwipeNavigation";
 
 interface MobileBottomNavProps {
   activeModule: string;
@@ -26,6 +27,7 @@ const navItems = [
 const moreItems = [
   { id: 'daily-sales', labelKey: 'daily_sales', roles: ['owner', 'manager'] },
   { id: 'daily-expenses', labelKey: 'daily_expenses', roles: ['owner', 'manager'] },
+  { id: 'lpg-stock-20mm', labelKey: 'lpg_stock', suffix: ' (20mm)', roles: ['owner', 'manager'] },
   { id: 'stove-stock', labelKey: 'stove_stock', roles: ['owner', 'manager'] },
   { id: 'regulators', labelKey: 'regulators', roles: ['owner', 'manager'] },
   { id: 'product-pricing', labelKey: 'product_pricing', roles: ['owner', 'manager'] },
@@ -50,9 +52,56 @@ export const MobileBottomNav = ({ activeModule, setActiveModule, userRole }: Mob
     setSheetOpen(false);
   };
 
+  const handlePrevModule = () => {
+    const nextModule = getNextModule(activeModule, 'right', userRole);
+    setActiveModule(nextModule);
+  };
+
+  const handleNextModule = () => {
+    const nextModule = getNextModule(activeModule, 'left', userRole);
+    setActiveModule(nextModule);
+  };
+
+  // Get current module position for indicator
+  const modules = getModuleNavigationOrder(userRole);
+  const currentIndex = modules.indexOf(activeModule);
+  const totalModules = modules.length;
+
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-card/95 backdrop-blur-xl border-t border-border/50 shadow-[0_-4px_20px_rgba(0,0,0,0.1)]">
-      <div className="flex items-center justify-around h-16 px-2 safe-area-pb">
+      {/* Swipe indicator */}
+      <div className="flex items-center justify-between px-4 py-1.5 border-b border-border/30 bg-muted/30">
+        <button 
+          onClick={handlePrevModule}
+          className="p-1 rounded-full hover:bg-muted active:scale-95 transition-all"
+        >
+          <ChevronLeft className="h-4 w-4 text-muted-foreground" />
+        </button>
+        <div className="flex items-center gap-1">
+          {modules.slice(Math.max(0, currentIndex - 2), currentIndex + 3).map((_, idx) => {
+            const actualIdx = Math.max(0, currentIndex - 2) + idx;
+            return (
+              <div 
+                key={actualIdx}
+                className={cn(
+                  "h-1.5 rounded-full transition-all",
+                  actualIdx === currentIndex 
+                    ? "w-4 bg-primary" 
+                    : "w-1.5 bg-muted-foreground/30"
+                )}
+              />
+            );
+          })}
+        </div>
+        <button 
+          onClick={handleNextModule}
+          className="p-1 rounded-full hover:bg-muted active:scale-95 transition-all"
+        >
+          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+        </button>
+      </div>
+
+      <div className="flex items-center justify-around h-14 px-2 safe-area-pb">
         {filteredNavItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeModule === item.id;
@@ -62,26 +111,26 @@ export const MobileBottomNav = ({ activeModule, setActiveModule, userRole }: Mob
               key={item.id}
               onClick={() => handleModuleChange(item.id)}
               className={cn(
-                "flex flex-col items-center justify-center flex-1 h-full py-1.5 px-1 transition-all duration-200 relative group",
+                "flex flex-col items-center justify-center flex-1 h-full py-1 px-1 transition-all duration-200 relative group",
                 isActive ? "text-primary" : "text-muted-foreground"
               )}
             >
               {isActive && (
-                <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-1 bg-primary rounded-b-full" />
+                <span className="absolute top-0 left-1/2 -translate-x-1/2 w-6 h-0.5 bg-primary rounded-b-full" />
               )}
               <div className={cn(
-                "flex items-center justify-center h-8 w-8 rounded-xl transition-all duration-200",
+                "flex items-center justify-center h-7 w-7 rounded-lg transition-all duration-200",
                 isActive 
-                  ? "bg-primary/15 scale-110" 
-                  : "group-hover:bg-muted/50 group-active:scale-95"
+                  ? "bg-primary/15 scale-105" 
+                  : "group-active:scale-90"
               )}>
                 <Icon className={cn(
-                  "h-5 w-5 transition-all",
+                  "h-4 w-4 transition-all",
                   isActive && "stroke-[2.5px]"
                 )} />
               </div>
               <span className={cn(
-                "text-[10px] font-medium mt-0.5 truncate max-w-[60px]",
+                "text-[9px] font-medium mt-0.5 truncate max-w-[55px]",
                 isActive && "font-semibold"
               )}>
                 {t(item.labelKey)}
@@ -95,37 +144,37 @@ export const MobileBottomNav = ({ activeModule, setActiveModule, userRole }: Mob
           <SheetTrigger asChild>
             <button
               className={cn(
-                "flex flex-col items-center justify-center flex-1 h-full py-1.5 px-1 transition-all duration-200 relative group",
+                "flex flex-col items-center justify-center flex-1 h-full py-1 px-1 transition-all duration-200 relative group",
                 sheetOpen ? "text-primary" : "text-muted-foreground"
               )}
             >
               {sheetOpen && (
-                <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-1 bg-primary rounded-b-full" />
+                <span className="absolute top-0 left-1/2 -translate-x-1/2 w-6 h-0.5 bg-primary rounded-b-full" />
               )}
               <div className={cn(
-                "flex items-center justify-center h-8 w-8 rounded-xl transition-all duration-200",
+                "flex items-center justify-center h-7 w-7 rounded-lg transition-all duration-200",
                 sheetOpen 
-                  ? "bg-primary/15 scale-110" 
-                  : "group-hover:bg-muted/50 group-active:scale-95"
+                  ? "bg-primary/15 scale-105" 
+                  : "group-active:scale-90"
               )}>
                 <Menu className={cn(
-                  "h-5 w-5 transition-all",
+                  "h-4 w-4 transition-all",
                   sheetOpen && "stroke-[2.5px]"
                 )} />
               </div>
               <span className={cn(
-                "text-[10px] font-medium mt-0.5",
+                "text-[9px] font-medium mt-0.5",
                 sheetOpen && "font-semibold"
               )}>
                 {t('more') || 'More'}
               </span>
             </button>
           </SheetTrigger>
-          <SheetContent side="bottom" className="h-[70vh] rounded-t-3xl">
-            <SheetHeader className="pb-4 border-b border-border/50">
-              <SheetTitle className="text-left">{t('all_modules') || 'All Modules'}</SheetTitle>
+          <SheetContent side="bottom" className="h-[65vh] rounded-t-3xl">
+            <SheetHeader className="pb-3 border-b border-border/50">
+              <SheetTitle className="text-left text-base">{t('all_modules') || 'All Modules'}</SheetTitle>
             </SheetHeader>
-            <div className="grid grid-cols-3 gap-3 py-4 overflow-y-auto max-h-[calc(70vh-80px)]">
+            <div className="grid grid-cols-3 gap-2.5 py-3 overflow-y-auto max-h-[calc(65vh-70px)]">
               {filteredMoreItems.map((item) => {
                 const isActive = activeModule === item.id;
                 return (
@@ -133,17 +182,17 @@ export const MobileBottomNav = ({ activeModule, setActiveModule, userRole }: Mob
                     key={item.id}
                     onClick={() => handleModuleChange(item.id)}
                     className={cn(
-                      "flex flex-col items-center justify-center p-4 rounded-2xl transition-all duration-200 border",
+                      "flex flex-col items-center justify-center p-3 rounded-xl transition-all duration-200 border",
                       isActive 
                         ? "bg-primary/10 border-primary/30 text-primary" 
                         : "bg-muted/30 border-border/30 text-foreground hover:bg-muted/50 active:scale-95"
                     )}
                   >
                     <span className={cn(
-                      "text-xs font-medium text-center line-clamp-2",
+                      "text-[11px] font-medium text-center line-clamp-2",
                       isActive && "font-semibold"
                     )}>
-                      {t(item.labelKey)}
+                      {t(item.labelKey)}{item.suffix || ''}
                     </span>
                   </button>
                 );
