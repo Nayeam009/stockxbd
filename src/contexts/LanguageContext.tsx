@@ -98,7 +98,8 @@ export const translations: Translations = {
   "search": { en: "Search & Reports", bn: "অনুসন্ধান ও রিপোর্ট" },
   "logout": { en: "Sign Out", bn: "সাইন আউট" },
   "exchange": { en: "Exchange", bn: "এক্সচেঞ্জ" },
-
+  "more": { en: "More", bn: "আরও" },
+  "all_modules": { en: "All Modules", bn: "সব মডিউল" },
   // ==================== Dashboard Overview ====================
   "welcome_back": { en: "Welcome back!", bn: "স্বাগতম!" },
   "dashboard_subtitle": { en: "Here's what's happening with your LPG business in Bangladesh today.", bn: "আজ আপনার বাংলাদেশে এলপিজি ব্যবসার অবস্থা এখানে দেখুন।" },
