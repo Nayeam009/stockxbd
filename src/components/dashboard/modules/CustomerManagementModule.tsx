@@ -302,59 +302,119 @@ export const CustomerManagementModule = () => {
   if (viewMode === 'main') {
     return (
       <div className="space-y-6">
-        <div className="flex justify-between items-start">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h2 className="text-3xl font-bold text-foreground">Customer Management</h2>
-            <p className="text-muted-foreground">Select a category to view customer details.</p>
+            <h2 className="text-2xl sm:text-3xl font-bold text-foreground">Customer Management</h2>
+            <p className="text-muted-foreground">Manage your customer accounts and track dues</p>
           </div>
-          <Button onClick={() => setAddCustomerDialogOpen(true)} className="bg-primary hover:bg-primary/90">
+          <Button onClick={() => setAddCustomerDialogOpen(true)} size="sm" className="bg-primary hover:bg-primary/90">
             <Plus className="h-4 w-4 mr-2" />
             Add Customer
           </Button>
         </div>
 
+        {/* Summary Stats */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card className="border-border">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
+                  <Users className="h-5 w-5 text-muted-foreground" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{customers.length}</p>
+                  <p className="text-xs text-muted-foreground">Total Customers</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-destructive/10 via-card to-card border-destructive/20">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-destructive/20 flex items-center justify-center">
+                  <UserX className="h-5 w-5 text-destructive" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{dueCustomers.length}</p>
+                  <p className="text-xs text-muted-foreground">Due Accounts</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-border">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
+                  <Banknote className="h-5 w-5 text-muted-foreground" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-destructive">{BANGLADESHI_CURRENCY_SYMBOL}{totalAmountDue.toLocaleString()}</p>
+                  <p className="text-xs text-muted-foreground">Total Due</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-green-500/10 via-card to-card border-green-500/20">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-green-500/20 flex items-center justify-center">
+                  <UserCheck className="h-5 w-5 text-green-500" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{paidCustomers.length}</p>
+                  <p className="text-xs text-muted-foreground">Clear Accounts</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Action Cards */}
         <div className="grid md:grid-cols-2 gap-6">
           {/* Due Customers Card */}
-          <Card className="bg-card border-border hover:border-destructive/50 transition-colors cursor-pointer group">
+          <Card className="bg-card border-border hover:border-destructive/50 transition-all duration-300 cursor-pointer group overflow-hidden">
             <CardContent className="p-6">
               <div className="flex items-start gap-4 mb-6">
-                <div className="p-3 rounded-xl bg-destructive/20">
+                <div className="p-3 rounded-xl bg-destructive/20 group-hover:scale-110 transition-transform">
                   <UserX className="h-8 w-8 text-destructive" />
                 </div>
                 <div>
                   <h3 className="text-xl font-bold text-foreground">Due Customers</h3>
-                  <p className="text-muted-foreground text-sm">View customers with outstanding payments.</p>
+                  <p className="text-muted-foreground text-sm">View customers with outstanding payments</p>
+                  <p className="text-2xl font-bold text-destructive mt-2">{BANGLADESHI_CURRENCY_SYMBOL}{totalAmountDue.toLocaleString()}</p>
                 </div>
               </div>
               <Button 
-                className="w-full bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+                className="w-full bg-destructive hover:bg-destructive/90 text-destructive-foreground group-hover:shadow-lg transition-shadow"
                 onClick={() => setViewMode('due')}
               >
                 Manage Due Customers
-                <ArrowRight className="h-4 w-4 ml-2" />
+                <ArrowRight className="h-4 w-4 ml-2 group-hover:translate-x-1 transition-transform" />
               </Button>
             </CardContent>
           </Card>
 
           {/* Paid Customers Card */}
-          <Card className="bg-card border-border hover:border-green-500/50 transition-colors cursor-pointer group">
+          <Card className="bg-card border-border hover:border-green-500/50 transition-all duration-300 cursor-pointer group overflow-hidden">
             <CardContent className="p-6">
               <div className="flex items-start gap-4 mb-6">
-                <div className="p-3 rounded-xl bg-green-500/20">
+                <div className="p-3 rounded-xl bg-green-500/20 group-hover:scale-110 transition-transform">
                   <UserCheck className="h-8 w-8 text-green-500" />
                 </div>
                 <div>
                   <h3 className="text-xl font-bold text-foreground">Paid Customers</h3>
-                  <p className="text-muted-foreground text-sm">View customers with settled accounts.</p>
+                  <p className="text-muted-foreground text-sm">View customers with settled accounts</p>
+                  <p className="text-2xl font-bold text-green-500 mt-2">{paidCustomers.length} customers</p>
                 </div>
               </div>
               <Button 
                 variant="outline"
-                className="w-full border-border hover:bg-accent"
+                className="w-full border-green-500/30 hover:bg-green-500/10 group-hover:shadow-lg transition-shadow"
                 onClick={() => setViewMode('paid')}
               >
                 View Paid Customers
-                <ArrowRight className="h-4 w-4 ml-2" />
+                <ArrowRight className="h-4 w-4 ml-2 group-hover:translate-x-1 transition-transform" />
               </Button>
             </CardContent>
           </Card>

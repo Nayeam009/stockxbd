@@ -367,15 +367,14 @@ export const CommunityModule = () => {
   }
 
   return (
-    <div className="space-y-4 sm:space-y-6 px-2 sm:px-0">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h2 className="text-2xl sm:text-3xl font-bold text-foreground">LPG Community</h2>
-            <p className="text-sm sm:text-base text-muted-foreground">Connect, share, and learn with other LPG professionals.</p>
-          </div>
-          <div className="flex gap-2 sm:gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl sm:text-3xl font-bold text-foreground">LPG Community</h2>
+          <p className="text-muted-foreground">Connect, share, and learn with other LPG professionals</p>
+        </div>
+        <div className="flex gap-2 sm:gap-3">
             <Button variant="outline" onClick={() => setShowExchange(true)} className="flex-1 sm:flex-none">
               <RefreshCcw className="h-4 w-4 mr-2" />
               <span className="hidden xs:inline">Exchange</span>
@@ -418,7 +417,6 @@ export const CommunityModule = () => {
             </Dialog>
           </div>
         </div>
-
         {/* Search Bar */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -466,7 +464,6 @@ export const CommunityModule = () => {
             </CardContent>
           </Card>
         </div>
-      </div>
 
       {/* Exchange Posts Section */}
       {exchanges.length > 0 && (

@@ -305,64 +305,23 @@ export const LPGStockModule = ({ size = "22mm" }: LPGStockModuleProps) => {
 
   return (
     <div className="space-y-6">
-      {/* Weight Selection */}
-      <Card className="border-0 shadow-sm bg-gradient-to-r from-primary/5 via-background to-secondary/5">
-        <CardContent className="p-4">
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center gap-2">
-              <Cylinder className="h-5 w-5 text-primary" />
-              <h3 className="text-sm font-semibold text-foreground">Select Cylinder Weight</h3>
-              <Badge variant="outline" className="ml-2 text-xs">
-                {size}
-              </Badge>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {weightOptions.map((option) => (
-                <Button
-                  key={option.value}
-                  variant={selectedWeight === option.value ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setSelectedWeight(option.value)}
-                  className={`transition-all duration-200 ${
-                    selectedWeight === option.value 
-                      ? "bg-primary text-primary-foreground shadow-md" 
-                      : "hover:bg-primary/10 hover:border-primary/50"
-                  }`}
-                >
-                  {option.label}
-                </Button>
-              ))}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
+          <h2 className="text-2xl sm:text-3xl font-bold text-foreground flex items-center gap-3">
+            <Cylinder className="h-7 w-7 text-primary" />
             LPG Stock ({size})
-            <Badge className="bg-primary/10 text-primary border-0 text-sm font-medium">
-              {selectedWeight}
-            </Badge>
           </h2>
-          <p className="text-muted-foreground text-sm">Manage cylinder inventory for {selectedWeight} cylinders</p>
+          <p className="text-muted-foreground mt-1">Manage your cylinder inventory efficiently</p>
         </div>
-        
-        <div className="flex items-center gap-3 w-full sm:w-auto">
-          <div className="relative flex-1 sm:flex-initial">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search Brands..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 w-full sm:w-64 bg-muted/50"
-            />
-          </div>
-          
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={fetchBrands}>
+            <Loader2 className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : 'hidden'}`} />
+            Refresh
+          </Button>
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="bg-orange-500 hover:bg-orange-600 text-white shrink-0">
+              <Button size="sm" className="bg-primary hover:bg-primary/90">
                 <Plus className="h-4 w-4 mr-2" />
                 New Brand
               </Button>
@@ -460,50 +419,105 @@ export const LPGStockModule = ({ size = "22mm" }: LPGStockModuleProps) => {
         </div>
       </div>
 
+      {/* Weight Selection Pills */}
+      <Card className="border-border bg-gradient-to-r from-primary/5 via-card to-accent/5">
+        <CardContent className="p-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-muted-foreground">Cylinder Weight:</span>
+              <Badge className="bg-primary/10 text-primary border-primary/20">{size}</Badge>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {weightOptions.map((option) => (
+                <Button
+                  key={option.value}
+                  variant={selectedWeight === option.value ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setSelectedWeight(option.value)}
+                  className={`transition-all duration-200 ${
+                    selectedWeight === option.value 
+                      ? "bg-primary text-primary-foreground shadow-md scale-105" 
+                      : "hover:bg-primary/10 hover:border-primary/50"
+                  }`}
+                >
+                  {option.label}
+                </Button>
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Search */}
+      <div className="relative max-w-md">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search brands..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-9 bg-muted/50"
+        />
+      </div>
+
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="border-0 shadow-sm bg-card">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <Package className="h-4 w-4" />
-              Package Cylinders
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-primary">{totals.package.toLocaleString()}</p>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="bg-gradient-to-br from-green-500/10 via-card to-card border-green-500/20">
+          <CardContent className="p-4 sm:p-6">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <p className="text-xs sm:text-sm text-muted-foreground font-medium">Package Cylinders</p>
+                <p className="text-xl sm:text-3xl font-bold text-foreground">{totals.package.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">New with cylinder</p>
+              </div>
+              <div className="h-12 w-12 rounded-full bg-green-500/20 flex items-center justify-center">
+                <Package className="h-6 w-6 text-green-500" />
+              </div>
+            </div>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm bg-card">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <Package className="h-4 w-4" />
-              Refill Cylinders
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-accent">{totals.refill.toLocaleString()}</p>
+        
+        <Card className="bg-gradient-to-br from-blue-500/10 via-card to-card border-blue-500/20">
+          <CardContent className="p-4 sm:p-6">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <p className="text-xs sm:text-sm text-muted-foreground font-medium">Refill Cylinders</p>
+                <p className="text-xl sm:text-3xl font-bold text-foreground">{totals.refill.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">Ready for sale</p>
+              </div>
+              <div className="h-12 w-12 rounded-full bg-blue-500/20 flex items-center justify-center">
+                <Cylinder className="h-6 w-6 text-blue-500" />
+              </div>
+            </div>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm bg-card">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <Package className="h-4 w-4" />
-              Empty Cylinders
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-muted-foreground">{totals.empty.toLocaleString()}</p>
+        
+        <Card className="border-border">
+          <CardContent className="p-4 sm:p-6">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <p className="text-xs sm:text-sm text-muted-foreground font-medium">Empty Cylinders</p>
+                <p className="text-xl sm:text-3xl font-bold text-foreground">{totals.empty.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">Need refilling</p>
+              </div>
+              <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
+                <Package className="h-6 w-6 text-muted-foreground" />
+              </div>
+            </div>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm bg-card">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-destructive" />
-              Problem Cylinders
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-destructive">{totals.problem.toLocaleString()}</p>
+        
+        <Card className="bg-gradient-to-br from-destructive/10 via-card to-card border-destructive/20">
+          <CardContent className="p-4 sm:p-6">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <p className="text-xs sm:text-sm text-muted-foreground font-medium">Problem Cylinders</p>
+                <p className="text-xl sm:text-3xl font-bold text-destructive">{totals.problem.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">Need attention</p>
+              </div>
+              <div className="h-12 w-12 rounded-full bg-destructive/20 flex items-center justify-center">
+                <AlertTriangle className="h-6 w-6 text-destructive" />
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
