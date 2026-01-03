@@ -20,6 +20,7 @@ import { CustomerManagementModule } from "@/components/dashboard/modules/Custome
 import { SettingsModule } from "@/components/dashboard/modules/SettingsModule";
 import { ProfileModule } from "@/components/dashboard/modules/ProfileModule";
 import { ExchangeModule } from "@/components/dashboard/modules/ExchangeModule";
+import { MobileBottomNav } from "@/components/dashboard/MobileBottomNav";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -200,11 +201,18 @@ const Dashboard = () => {
           />
 
           {/* Main Content */}
-          <main className="flex-1 overflow-auto">
+          <main className="flex-1 overflow-auto pb-20 md:pb-0">
             <div className="container mx-auto p-3 sm:p-4 md:p-6 animate-fade-in max-w-7xl">
               {renderActiveModule()}
             </div>
           </main>
+
+          {/* Mobile Bottom Navigation */}
+          <MobileBottomNav
+            activeModule={activeModule}
+            setActiveModule={setActiveModule}
+            userRole={userRole}
+          />
         </div>
       </div>
     </SidebarProvider>
