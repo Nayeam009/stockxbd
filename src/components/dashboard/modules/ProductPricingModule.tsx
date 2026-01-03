@@ -169,20 +169,20 @@ export const ProductPricingModule = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold text-foreground">Product Pricing</h2>
-          <p className="text-muted-foreground">View and edit prices for all your products.</p>
+          <h2 className="text-2xl sm:text-3xl font-bold text-foreground">Product Pricing</h2>
+          <p className="text-muted-foreground">Manage and update prices for all your products</p>
         </div>
         <div className="flex items-center gap-3">
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
-              <Button variant="outline" className="gap-2">
+              <Button variant="outline" size="sm" className="gap-2">
                 <Plus className="h-4 w-4" />
                 Add Product
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="sm:max-w-lg">
               <DialogHeader>
                 <DialogTitle>Add New Product</DialogTitle>
               </DialogHeader>
@@ -295,39 +295,44 @@ export const ProductPricingModule = () => {
           <Button 
             onClick={saveChanges} 
             disabled={!hasChanges}
-            className="gap-2"
+            size="sm"
+            className="gap-2 bg-primary hover:bg-primary/90"
           >
             <Save className="h-4 w-4" />
             Save Changes
+            {hasChanges && <Badge variant="secondary" className="ml-1 text-xs">{Object.keys(editedPrices).length}</Badge>}
           </Button>
         </div>
       </div>
 
       {/* Tabs and Search */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full md:w-auto">
-          <TabsList>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full sm:w-auto">
+          <TabsList className="grid w-full grid-cols-3 sm:w-auto sm:inline-grid">
             <TabsTrigger value="lpg" className="gap-2">
               <Package className="h-4 w-4" />
-              LPG Cylinders
+              <span className="hidden sm:inline">LPG Cylinders</span>
+              <span className="sm:hidden">LPG</span>
             </TabsTrigger>
             <TabsTrigger value="stove" className="gap-2">
               <ChefHat className="h-4 w-4" />
-              Gas Stoves
+              <span className="hidden sm:inline">Gas Stoves</span>
+              <span className="sm:hidden">Stoves</span>
             </TabsTrigger>
             <TabsTrigger value="regulator" className="gap-2">
               <Wrench className="h-4 w-4" />
-              Regulators
+              <span className="hidden sm:inline">Regulators</span>
+              <span className="sm:hidden">Reg.</span>
             </TabsTrigger>
           </TabsList>
         </Tabs>
-        <div className="relative w-full md:w-80">
+        <div className="relative w-full sm:w-80">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input 
-            placeholder="Search by name or brand in this tab..."
+            placeholder="Search products..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            className="pl-10"
+            className="pl-10 bg-muted/50"
           />
         </div>
       </div>
