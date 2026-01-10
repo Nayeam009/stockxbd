@@ -147,6 +147,7 @@ const Welcome = () => {
             <div className="hidden lg:flex items-center space-x-6 xl:space-x-8">
               <a href="#features" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">Features</a>
               <a href="#services" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">How It Works</a>
+              <a href="#pricing" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">Pricing</a>
               <a href="#stats" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">Success Stories</a>
             </div>
 
@@ -180,6 +181,7 @@ const Welcome = () => {
             <div className="md:hidden absolute top-full left-0 right-0 bg-card border-b border-border shadow-xl py-4 px-4 space-y-3 animate-fade-in">
               <a href="#features" className="block py-2.5 px-3 text-sm font-medium text-muted-foreground hover:text-primary hover:bg-muted/50 rounded-lg transition-colors">Features</a>
               <a href="#services" className="block py-2.5 px-3 text-sm font-medium text-muted-foreground hover:text-primary hover:bg-muted/50 rounded-lg transition-colors">How It Works</a>
+              <a href="#pricing" className="block py-2.5 px-3 text-sm font-medium text-muted-foreground hover:text-primary hover:bg-muted/50 rounded-lg transition-colors">Pricing</a>
               <a href="#stats" className="block py-2.5 px-3 text-sm font-medium text-muted-foreground hover:text-primary hover:bg-muted/50 rounded-lg transition-colors">Success Stories</a>
               <div className="pt-2 space-y-2">
                 <Link to="/auth" className="block">
@@ -387,6 +389,121 @@ const Welcome = () => {
               </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Pricing Section */}
+      <section id="pricing" className="container mx-auto px-4 sm:px-6 py-10 sm:py-12 lg:py-16">
+        <div className="text-center space-y-3 sm:space-y-4 mb-8 sm:mb-10 lg:mb-12">
+          <Badge className="bg-primary/10 text-primary border-primary/20 px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium">
+            <Zap className="h-3 w-3 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
+            Simple Pricing
+          </Badge>
+          <h2 className="text-xl sm:text-2xl lg:text-3xl xl:text-4xl font-extrabold text-foreground px-4">
+            Choose Your Plan
+          </h2>
+          <p className="text-sm sm:text-base lg:text-lg text-muted-foreground max-w-2xl mx-auto px-4">
+            Affordable plans designed to grow with your LPG business
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8 max-w-4xl mx-auto">
+          {/* Pro Plan */}
+          <Card className="relative overflow-hidden border-2 border-border hover:border-primary/50 transition-all duration-300 hover:shadow-xl">
+            <CardContent className="p-6 sm:p-8 space-y-6">
+              <div className="space-y-2">
+                <h3 className="text-xl sm:text-2xl font-bold text-foreground">Pro</h3>
+                <p className="text-sm text-muted-foreground">Perfect for small businesses</p>
+              </div>
+              
+              <div className="flex items-baseline gap-1">
+                <span className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-primary">৳500</span>
+                <span className="text-muted-foreground">/month</span>
+              </div>
+
+              <ul className="space-y-3">
+                <li className="flex items-center gap-3 text-sm sm:text-base">
+                  <CheckCircle2 className="h-5 w-5 text-success flex-shrink-0" />
+                  <span>Daily Sales Management</span>
+                </li>
+                <li className="flex items-center gap-3 text-sm sm:text-base">
+                  <CheckCircle2 className="h-5 w-5 text-success flex-shrink-0" />
+                  <span>LPG Stock Tracking</span>
+                </li>
+                <li className="flex items-center gap-3 text-sm sm:text-base">
+                  <CheckCircle2 className="h-5 w-5 text-success flex-shrink-0" />
+                  <span>Customer Management</span>
+                </li>
+                <li className="flex items-center gap-3 text-sm sm:text-base">
+                  <CheckCircle2 className="h-5 w-5 text-success flex-shrink-0" />
+                  <span>Basic Reports</span>
+                </li>
+                <li className="flex items-center gap-3 text-sm sm:text-base">
+                  <CheckCircle2 className="h-5 w-5 text-success flex-shrink-0" />
+                  <span>Up to 3 Staff Accounts</span>
+                </li>
+              </ul>
+
+              <Link to="/auth" className="block">
+                <Button variant="outline" className="w-full py-5 sm:py-6 text-sm sm:text-base font-semibold border-primary text-primary hover:bg-primary hover:text-primary-foreground transition-all">
+                  Get Started
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+
+          {/* Premium Plan */}
+          <Card className="relative overflow-hidden border-2 border-primary shadow-xl bg-gradient-to-br from-primary/5 to-secondary/5">
+            <div className="absolute top-0 right-0 bg-secondary text-secondary-foreground px-3 py-1 text-xs sm:text-sm font-bold rounded-bl-lg">
+              Most Popular
+            </div>
+            <CardContent className="p-6 sm:p-8 space-y-6">
+              <div className="space-y-2">
+                <h3 className="text-xl sm:text-2xl font-bold text-foreground">Premium</h3>
+                <p className="text-sm text-muted-foreground">For growing businesses</p>
+              </div>
+              
+              <div className="flex items-baseline gap-1">
+                <span className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-primary">৳1000</span>
+                <span className="text-muted-foreground">/month</span>
+              </div>
+
+              <ul className="space-y-3">
+                <li className="flex items-center gap-3 text-sm sm:text-base">
+                  <CheckCircle2 className="h-5 w-5 text-success flex-shrink-0" />
+                  <span>Everything in Pro</span>
+                </li>
+                <li className="flex items-center gap-3 text-sm sm:text-base">
+                  <CheckCircle2 className="h-5 w-5 text-success flex-shrink-0" />
+                  <span>Online Delivery Module</span>
+                </li>
+                <li className="flex items-center gap-3 text-sm sm:text-base">
+                  <CheckCircle2 className="h-5 w-5 text-success flex-shrink-0" />
+                  <span>Advanced Analytics</span>
+                </li>
+                <li className="flex items-center gap-3 text-sm sm:text-base">
+                  <CheckCircle2 className="h-5 w-5 text-success flex-shrink-0" />
+                  <span>Vehicle Cost Tracking</span>
+                </li>
+                <li className="flex items-center gap-3 text-sm sm:text-base">
+                  <CheckCircle2 className="h-5 w-5 text-success flex-shrink-0" />
+                  <span>Unlimited Staff Accounts</span>
+                </li>
+                <li className="flex items-center gap-3 text-sm sm:text-base">
+                  <CheckCircle2 className="h-5 w-5 text-success flex-shrink-0" />
+                  <span>Priority Support</span>
+                </li>
+              </ul>
+
+              <Link to="/auth" className="block">
+                <Button className="w-full py-5 sm:py-6 text-sm sm:text-base font-bold btn-cta text-secondary-foreground">
+                  Get Premium
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
         </div>
       </section>
 
