@@ -11,6 +11,26 @@ export interface Notification {
   data?: Record<string, any>;
 }
 
+// Helper to send browser push notification
+const sendBrowserNotification = (title: string, body: string, tag: string) => {
+  const isEnabled = localStorage.getItem("push-notifications-enabled") === "true";
+  
+  if (!isEnabled || !("Notification" in window) || Notification.permission !== "granted") {
+    return;
+  }
+  
+  try {
+    new Notification(title, {
+      body,
+      icon: "/favicon.ico",
+      badge: "/favicon.ico",
+      tag,
+    });
+  } catch (error) {
+    console.error("Error sending notification:", error);
+  }
+};
+
 export const useNotifications = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
@@ -106,6 +126,20 @@ export const useNotifications = () => {
       }
     });
 
+    // Send push notifications for critical stock levels
+    const notifSettings = JSON.parse(localStorage.getItem("notification-settings") || "{}");
+    if (notifSettings.lowStock !== false) {
+      // Only send push for out of stock items (avoid spam for low stock)
+      const outOfStock = lowStockNotifications.filter(n => n.data?.status === "out_of_stock");
+      outOfStock.forEach(n => {
+        sendBrowserNotification(
+          "🔴 Out of Stock Alert",
+          n.message,
+          n.id
+        );
+      });
+    }
+
     return lowStockNotifications;
   }, []);
 
@@ -195,8 +229,8 @@ export const useNotifications = () => {
     loadNotifications();
 
     // Set up realtime subscription for new orders
-    const channel = supabase
-      .channel("notifications")
+    const ordersChannel = supabase
+      .channel("notifications-orders")
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "orders" },
@@ -212,6 +246,58 @@ export const useNotifications = () => {
             data: { orderId: order.id, orderNumber: order.order_number },
           };
           setNotifications((prev) => [newNotification, ...prev]);
+          
+          // Send browser push notification
+          const notifSettings = JSON.parse(localStorage.getItem("notification-settings") || "{}");
+          if (notifSettings.newOrders !== false) {
+            sendBrowserNotification(
+              "🛒 New Order Received",
+              `Order #${order.order_number} from ${order.customer_name} - ৳${order.total_amount}`,
+              `order-${order.id}`
+            );
+          }
+        }
+      )
+      .subscribe();
+
+    // Set up realtime subscription for customer payments
+    const paymentsChannel = supabase
+      .channel("notifications-payments")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "customer_payments" },
+        async (payload) => {
+          const payment = payload.new as any;
+          
+          // Fetch customer name
+          const { data: customer } = await supabase
+            .from("customers")
+            .select("name")
+            .eq("id", payment.customer_id)
+            .single();
+          
+          const customerName = customer?.name || "Customer";
+          
+          const newNotification: Notification = {
+            id: `payment_${payment.id}`,
+            type: "payment",
+            title: "Payment Received!",
+            message: `${customerName} paid ৳${payment.amount}`,
+            read: false,
+            createdAt: new Date(),
+            data: { paymentId: payment.id, customerId: payment.customer_id, amount: payment.amount },
+          };
+          setNotifications((prev) => [newNotification, ...prev]);
+          
+          // Send browser push notification
+          const notifSettings = JSON.parse(localStorage.getItem("notification-settings") || "{}");
+          if (notifSettings.payments !== false) {
+            sendBrowserNotification(
+              "💰 Payment Received",
+              `${customerName} paid ৳${payment.amount}`,
+              `payment-${payment.id}`
+            );
+          }
         }
       )
       .subscribe();
@@ -220,7 +306,8 @@ export const useNotifications = () => {
     const interval = setInterval(loadNotifications, 5 * 60 * 1000);
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(ordersChannel);
+      supabase.removeChannel(paymentsChannel);
       clearInterval(interval);
     };
   }, [loadNotifications]);

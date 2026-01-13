@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
@@ -10,10 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { 
   Settings, 
   Building2, 
-  Bell, 
   Shield, 
-  Database,
-  Download,
   Trash2,
   Save,
   Globe,
@@ -26,7 +22,6 @@ import {
   Mail,
   Phone,
   Calendar,
-  Camera
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -41,6 +36,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ProfileSharingCard } from "@/components/settings/ProfileSharingCard";
+import { BackupRestoreCard } from "@/components/settings/BackupRestoreCard";
+import { PushNotificationCard } from "@/components/settings/PushNotificationCard";
 
 export const SettingsModule = () => {
   const { theme, setTheme } = useTheme();
@@ -187,29 +184,9 @@ export const SettingsModule = () => {
     toast({ title: t("settings_saved") });
   };
 
-  const handleExportData = async () => {
-    toast({ title: t("export_started") });
-    // Simulate export
-    setTimeout(() => {
-      const data = {
-        businessName,
-        businessPhone,
-        businessAddress,
-        exportedAt: new Date().toISOString()
-      };
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "stock-x-settings.json";
-      a.click();
-      URL.revokeObjectURL(url);
-    }, 1000);
-  };
+  // Removed - now handled by BackupRestoreCard
 
-  const handleBackup = () => {
-    toast({ title: t("backup_created") });
-  };
+  // Removed - now handled by BackupRestoreCard
 
   const handleClearCache = () => {
     // Clear specific caches, not all localStorage
@@ -474,61 +451,11 @@ export const SettingsModule = () => {
           </CardContent>
         </Card>
 
-        {/* Notifications */}
-        <Card className="bg-card border-border">
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Bell className="h-5 w-5 text-primary" />
-              <CardTitle className="text-foreground">{t("notifications")}</CardTitle>
-            </div>
-            <CardDescription>{t("notifications_desc")}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <Label>{t("low_stock_alerts")}</Label>
-                <p className="text-sm text-muted-foreground">{t("low_stock_desc")}</p>
-              </div>
-              <Switch
-                checked={notifications.lowStock}
-                onCheckedChange={(checked) => handleNotificationChange("lowStock", checked)}
-              />
-            </div>
-            <Separator className="bg-border" />
-            <div className="flex items-center justify-between">
-              <div>
-                <Label>{t("new_order_alerts")}</Label>
-                <p className="text-sm text-muted-foreground">{t("new_order_desc")}</p>
-              </div>
-              <Switch
-                checked={notifications.newOrders}
-                onCheckedChange={(checked) => handleNotificationChange("newOrders", checked)}
-              />
-            </div>
-            <Separator className="bg-border" />
-            <div className="flex items-center justify-between">
-              <div>
-                <Label>{t("payment_alerts")}</Label>
-                <p className="text-sm text-muted-foreground">{t("payment_desc")}</p>
-              </div>
-              <Switch
-                checked={notifications.payments}
-                onCheckedChange={(checked) => handleNotificationChange("payments", checked)}
-              />
-            </div>
-            <Separator className="bg-border" />
-            <div className="flex items-center justify-between">
-              <div>
-                <Label>{t("daily_reports")}</Label>
-                <p className="text-sm text-muted-foreground">{t("daily_reports_desc")}</p>
-              </div>
-              <Switch
-                checked={notifications.dailyReports}
-                onCheckedChange={(checked) => handleNotificationChange("dailyReports", checked)}
-              />
-            </div>
-          </CardContent>
-        </Card>
+        {/* Push Notifications */}
+        <PushNotificationCard
+          notifications={notifications}
+          onNotificationChange={handleNotificationChange}
+        />
 
         {/* Security */}
         <Card className="bg-card border-border">
@@ -563,42 +490,27 @@ export const SettingsModule = () => {
           </CardContent>
         </Card>
 
-        {/* Data Management */}
-        <Card className="bg-card border-border lg:col-span-2">
+        {/* Backup & Restore */}
+        <BackupRestoreCard />
+
+        {/* Cache Management */}
+        <Card className="bg-card border-border">
           <CardHeader>
             <div className="flex items-center gap-2">
-              <Database className="h-5 w-5 text-primary" />
+              <Trash2 className="h-5 w-5 text-primary" />
               <CardTitle className="text-foreground">{t("data_management")}</CardTitle>
             </div>
             <CardDescription>{t("data_management_desc")}</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid md:grid-cols-3 gap-4">
-              <Button 
-                variant="outline" 
-                className="h-20 flex flex-col items-center justify-center gap-2"
-                onClick={handleExportData}
-              >
-                <Download className="h-5 w-5" />
-                <span>{t("export_data")}</span>
-              </Button>
-              <Button 
-                variant="outline" 
-                className="h-20 flex flex-col items-center justify-center gap-2"
-                onClick={handleBackup}
-              >
-                <Database className="h-5 w-5" />
-                <span>{t("backup_database")}</span>
-              </Button>
-              <Button 
-                variant="outline" 
-                className="h-20 flex flex-col items-center justify-center gap-2 text-destructive hover:text-destructive"
-                onClick={handleClearCache}
-              >
-                <Trash2 className="h-5 w-5" />
-                <span>{t("clear_cache")}</span>
-              </Button>
-            </div>
+            <Button 
+              variant="outline" 
+              className="w-full h-16 flex flex-col items-center justify-center gap-2 text-destructive hover:text-destructive"
+              onClick={handleClearCache}
+            >
+              <Trash2 className="h-5 w-5" />
+              <span>{t("clear_cache")}</span>
+            </Button>
           </CardContent>
         </Card>
       </div>
