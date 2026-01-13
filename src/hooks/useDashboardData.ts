@@ -262,6 +262,21 @@ export const useDashboardData = () => {
           .eq('role', 'driver');
 
         if (userRoles && userRoles.length > 0) {
+          // Fetch profile names for drivers
+          const driverUserIds = userRoles.map(ur => ur.user_id);
+          const { data: driverProfiles } = await supabase
+            .from('profiles')
+            .select('user_id, full_name, phone')
+            .in('user_id', driverUserIds);
+
+          const profileMap: Record<string, { name: string; phone: string }> = {};
+          driverProfiles?.forEach(p => {
+            profileMap[p.user_id] = {
+              name: p.full_name || '',
+              phone: p.phone || ''
+            };
+          });
+
           // Get today's deliveries per driver
           const today = new Date().toISOString().split('T')[0];
           const { data: todayOrders } = await supabase
@@ -285,8 +300,8 @@ export const useDashboardData = () => {
 
           const formattedDrivers: Driver[] = userRoles.map((ur, index) => ({
             id: ur.user_id,
-            name: `Driver ${index + 1}`,
-            phone: '01700-000000',
+            name: profileMap[ur.user_id]?.name || `Driver ${index + 1}`,
+            phone: profileMap[ur.user_id]?.phone || '01700-000000',
             vehicleId: `VH-00${index + 1}`,
             todaySales: driverStats[ur.user_id]?.sales || 0,
             todayDeliveries: driverStats[ur.user_id]?.deliveries || 0,

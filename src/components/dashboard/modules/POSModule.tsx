@@ -680,18 +680,23 @@ export const POSModule = () => {
 
       if (txnError) throw txnError;
 
-      // Get a product to link items
+      // Get a product to link items (or use a fallback)
+      let productId: string | null = null;
       const { data: defaultProduct } = await supabase
         .from('products')
         .select('id')
         .limit(1)
         .single();
 
+      if (defaultProduct) {
+        productId = defaultProduct.id;
+      }
+
       // Insert transaction items
-      if (transaction && defaultProduct) {
+      if (transaction) {
         const items = saleItems.map(item => ({
           transaction_id: transaction.id,
-          product_id: defaultProduct.id,
+          product_id: productId || item.brandId || item.stoveId || item.regulatorId || transaction.id,
           product_name: `${item.name} - ${item.details}`,
           quantity: item.quantity,
           unit_price: item.price,
@@ -699,7 +704,11 @@ export const POSModule = () => {
           created_by: user.id
         }));
 
-        await supabase.from('pos_transaction_items').insert(items);
+        const { error: itemsError } = await supabase.from('pos_transaction_items').insert(items);
+        if (itemsError) {
+          console.error('Error inserting transaction items:', itemsError);
+          // Don't throw - transaction is already saved, items are optional for history
+        }
       }
 
       // === UPDATE INVENTORY AFTER SALE ===
