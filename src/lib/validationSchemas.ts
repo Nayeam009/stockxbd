@@ -7,9 +7,10 @@ export const customerSchema = z.object({
     .min(1, "Customer name is required")
     .max(100, "Customer name must be less than 100 characters"),
   phone: z.string()
-    .regex(/^[+]?[0-9]{10,15}$/, "Invalid phone number format")
+    .regex(/^[+]?[\d\s\-().]{7,20}$/, "Invalid phone number format")
     .optional()
-    .nullable(),
+    .nullable()
+    .or(z.literal('')),
   address: z.string()
     .max(500, "Address must be less than 500 characters")
     .optional()

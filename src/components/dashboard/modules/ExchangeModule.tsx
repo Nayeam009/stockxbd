@@ -128,6 +128,46 @@ export const ExchangeModule = ({ onBack }: ExchangeModuleProps) => {
 
     setSubmitting(true);
     try {
+      // Find the brand records to update inventory
+      const fromBrandRecord = brands.find(b => b.name === fromBrand);
+      const toBrandRecord = brands.find(b => b.name === toBrand);
+
+      // Update inventory: deduct from "from" brand's empty, add to "to" brand's empty
+      if (fromBrandRecord) {
+        // Get current empty count
+        const { data: fromData } = await supabase
+          .from('lpg_brands')
+          .select('empty_cylinder')
+          .eq('id', fromBrandRecord.id)
+          .single();
+        
+        if (fromData) {
+          const newEmptyCount = Math.max(0, (fromData.empty_cylinder || 0) - quantity);
+          await supabase
+            .from('lpg_brands')
+            .update({ empty_cylinder: newEmptyCount })
+            .eq('id', fromBrandRecord.id);
+        }
+      }
+
+      if (toBrandRecord) {
+        // Get current empty count
+        const { data: toData } = await supabase
+          .from('lpg_brands')
+          .select('empty_cylinder')
+          .eq('id', toBrandRecord.id)
+          .single();
+        
+        if (toData) {
+          const newEmptyCount = (toData.empty_cylinder || 0) + quantity;
+          await supabase
+            .from('lpg_brands')
+            .update({ empty_cylinder: newEmptyCount })
+            .eq('id', toBrandRecord.id);
+        }
+      }
+
+      // Record the exchange
       const { error } = await supabase.from('cylinder_exchanges').insert({
         user_id: currentUserId,
         author_name: userName,
@@ -140,7 +180,7 @@ export const ExchangeModule = ({ onBack }: ExchangeModuleProps) => {
 
       if (error) throw error;
 
-      toast.success("Exchange posted to community!");
+      toast.success("Exchange completed & inventory updated!");
       setFromBrand("");
       setFromWeight("");
       setToBrand("");

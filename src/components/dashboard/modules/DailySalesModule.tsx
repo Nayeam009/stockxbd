@@ -272,7 +272,14 @@ export const DailySalesModule = ({ salesData: propSalesData, setSalesData }: Dai
             <RefreshCcw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
-          <Button size="sm" className="bg-primary hover:bg-primary/90">
+          <Button 
+            size="sm" 
+            className="bg-primary hover:bg-primary/90"
+            onClick={() => {
+              // Navigate to POS module - dispatch custom event
+              window.dispatchEvent(new CustomEvent('navigate-module', { detail: 'pos' }));
+            }}
+          >
             <Plus className="h-4 w-4 mr-2" />
             Add Sale
           </Button>

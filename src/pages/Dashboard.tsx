@@ -89,6 +89,20 @@ const Dashboard = () => {
     fetchUserRole();
   }, []);
 
+  // Listen for module navigation events from other components
+  useEffect(() => {
+    const handleNavigate = (e: CustomEvent) => {
+      if (e.detail && typeof e.detail === 'string') {
+        setActiveModule(e.detail);
+      }
+    };
+
+    window.addEventListener('navigate-module', handleNavigate as EventListener);
+    return () => {
+      window.removeEventListener('navigate-module', handleNavigate as EventListener);
+    };
+  }, []);
+
   const {
     salesData,
     stockData,
