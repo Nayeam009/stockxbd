@@ -4,15 +4,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, Shield, Users, Truck, Loader2 } from "lucide-react";
+import { ArrowLeft, Shield, Truck, Loader2 } from "lucide-react";
 import stockXLogo from "@/assets/stock-x-logo.png";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
 const Auth = () => {
-  const [userType, setUserType] = useState<string>("manager");
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -20,29 +18,13 @@ const Auth = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const userTypes = [
-    {
-      id: "owner",
-      title: "Owner",
-      description: "Full system access and management",
-      icon: Shield,
-      access: "Complete dashboard access, reporting, financial management"
-    },
-    {
-      id: "manager",
-      title: "Manager",
-      description: "Operations and staff management",
-      icon: Users,
-      access: "Inventory, orders, customer management, staff oversight"
-    },
-    {
-      id: "driver",
-      title: "Driver/Staff",
-      description: "Field operations and deliveries",
-      icon: Truck,
-      access: "Delivery management, customer updates, sales recording"
-    }
-  ];
+  // Role information for display only - roles are assigned by the server
+  const roleInfo = {
+    title: "Driver/Staff",
+    icon: Truck,
+    description: "New accounts start with driver access. Owners can upgrade roles via team management.",
+    access: "Delivery management, customer updates, sales recording"
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,19 +58,23 @@ const Auth = () => {
         toast({ title: "Welcome back!", description: "Successfully signed in" });
         navigate('/dashboard');
       } else {
+        // SECURITY FIX: Do NOT pass role in signup data
+        // All new users are assigned 'driver' role by the database trigger
+        // Owners must manually upgrade roles via team management
         const { error } = await supabase.auth.signUp({
           email,
           password,
           options: {
-            data: {
-              role: userType,
-            }
+            emailRedirectTo: window.location.origin
           }
         });
 
         if (error) throw error;
 
-        toast({ title: "Account created!", description: "Welcome to Stock-X" });
+        toast({ 
+          title: "Account created!", 
+          description: "You've been assigned driver access. Contact an owner for role upgrades." 
+        });
         navigate('/dashboard');
       }
     } catch (error: any) {
@@ -129,37 +115,37 @@ const Auth = () => {
           </div>
 
           <div className="grid lg:grid-cols-2 gap-8">
-            {/* User Type Selection */}
+            {/* Role Information - Display Only */}
             <Card className="border-0 shadow-elegant">
               <CardHeader>
-                <CardTitle className="text-primary">Select Your Role</CardTitle>
+                <CardTitle className="text-primary">Account Information</CardTitle>
                 <CardDescription>
-                  Different roles have access to different features and capabilities
+                  All new accounts are assigned driver access for security
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <RadioGroup value={userType} onValueChange={setUserType}>
-                  {userTypes.map((type) => {
-                    const Icon = type.icon;
-                    return (
-                      <div key={type.id} className="flex items-start space-x-3 p-4 border rounded-lg hover:bg-surface/50 transition-colors">
-                        <RadioGroupItem value={type.id} id={type.id} className="mt-1" />
-                        <div className="flex-1 space-y-2">
-                          <div className="flex items-center space-x-3">
-                            <Icon className="h-5 w-5 text-primary" />
-                            <Label htmlFor={type.id} className="font-semibold text-primary cursor-pointer">
-                              {type.title}
-                            </Label>
-                          </div>
-                          <p className="text-sm text-muted-foreground">{type.description}</p>
-                          <p className="text-xs text-muted-foreground bg-surface p-2 rounded">
-                            <span className="font-medium">Access:</span> {type.access}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </RadioGroup>
+                <div className="p-4 border rounded-lg bg-surface/50">
+                  <div className="flex items-start space-x-3">
+                    <roleInfo.icon className="h-6 w-6 text-primary mt-1" />
+                    <div className="flex-1 space-y-2">
+                      <h3 className="font-semibold text-primary">{roleInfo.title}</h3>
+                      <p className="text-sm text-muted-foreground">{roleInfo.description}</p>
+                      <p className="text-xs text-muted-foreground bg-background p-2 rounded">
+                        <span className="font-medium">Initial Access:</span> {roleInfo.access}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="space-y-3 p-4 border rounded-lg border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800">
+                  <div className="flex items-center space-x-2">
+                    <Shield className="h-5 w-5 text-amber-600" />
+                    <h4 className="font-medium text-amber-800 dark:text-amber-200">Role Upgrades</h4>
+                  </div>
+                  <p className="text-sm text-amber-700 dark:text-amber-300">
+                    Need manager or owner access? Contact your team owner to upgrade your role through the team management feature.
+                  </p>
+                </div>
               </CardContent>
             </Card>
 
@@ -251,15 +237,15 @@ const Auth = () => {
             </Card>
           </div>
 
-          {/* Role Information */}
+          {/* Security Notice */}
           <Card className="mt-8 border-0 bg-gradient-hero shadow-elegant">
             <CardContent className="p-6">
               <div className="text-center space-y-2">
                 <h3 className="text-lg font-semibold text-primary-foreground">
-                  Access Level: {userTypes.find(u => u.id === userType)?.title}
+                  Secure Role Management
                 </h3>
                 <p className="text-primary-foreground/80 text-sm">
-                  {userTypes.find(u => u.id === userType)?.access}
+                  Roles are assigned server-side for security. All new users start as drivers and can be promoted by team owners.
                 </p>
               </div>
             </CardContent>
