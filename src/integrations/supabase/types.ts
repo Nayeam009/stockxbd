@@ -983,6 +983,18 @@ export type Database = {
         Returns: string
       }
       owners_exist: { Args: never; Returns: boolean }
+      remove_team_member: {
+        Args: { _member_id: string; _owner_id: string }
+        Returns: boolean
+      }
+      update_team_member_role: {
+        Args: {
+          _member_id: string
+          _new_role: Database["public"]["Enums"]["app_role"]
+          _owner_id: string
+        }
+        Returns: boolean
+      }
       validate_invite: {
         Args: { _code: string }
         Returns: {

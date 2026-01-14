@@ -445,6 +445,33 @@ export const translations: Translations = {
   "view_history": { en: "View History", bn: "ইতিহাস দেখুন" },
   "sales_history": { en: "Sales History", bn: "বিক্রয় ইতিহাস" },
   "no_sales_history": { en: "No sales history found", bn: "কোন বিক্রয় ইতিহাস পাওয়া যায়নি" },
+  
+  // ==================== Team Management ====================
+  "team_management": { en: "Team Management", bn: "টিম ম্যানেজমেন্ট" },
+  "team_management_desc": { en: "View and manage your team members", bn: "আপনার টিম সদস্যদের দেখুন এবং পরিচালনা করুন" },
+  "team_members": { en: "Team Members", bn: "টিম সদস্য" },
+  "no_team_members": { en: "No team members yet", bn: "এখনো কোন টিম সদস্য নেই" },
+  "invite_team_members_hint": { en: "Use Profile Sharing to invite team members", bn: "টিম সদস্যদের আমন্ত্রণ জানাতে প্রোফাইল শেয়ারিং ব্যবহার করুন" },
+  "change_role": { en: "Change Role", bn: "ভূমিকা পরিবর্তন" },
+  "confirm_role_change": { en: "Confirm Role Change", bn: "ভূমিকা পরিবর্তন নিশ্চিত করুন" },
+  "role_updated": { en: "Role updated successfully", bn: "ভূমিকা সফলভাবে আপডেট হয়েছে" },
+  "remove_from_team": { en: "Remove from Team", bn: "টিম থেকে সরান" },
+  "remove_member_confirm": { en: "Are you sure you want to remove this member from your team?", bn: "আপনি কি নিশ্চিত যে আপনি এই সদস্যকে আপনার টিম থেকে সরাতে চান?" },
+  "member_removed": { en: "Team member removed", bn: "টিম সদস্য সরানো হয়েছে" },
+  "pending_invites": { en: "Pending Invites", bn: "অপেক্ষমাণ আমন্ত্রণ" },
+  "no_pending_invites": { en: "No pending invites", bn: "কোন অপেক্ষমাণ আমন্ত্রণ নেই" },
+  "revoke_invite": { en: "Revoke Invite", bn: "আমন্ত্রণ বাতিল করুন" },
+  "revoke_invite_confirm": { en: "Are you sure you want to revoke this invite? The invite link will no longer work.", bn: "আপনি কি নিশ্চিত যে আপনি এই আমন্ত্রণ বাতিল করতে চান? আমন্ত্রণ লিঙ্কটি আর কাজ করবে না।" },
+  "invite_revoked": { en: "Invite revoked", bn: "আমন্ত্রণ বাতিল হয়েছে" },
+  "revoke": { en: "Revoke", bn: "বাতিল" },
+  "joined_on": { en: "Joined", bn: "যোগদান" },
+  "expires": { en: "Expires", bn: "মেয়াদ শেষ" },
+  "expired": { en: "Expired", bn: "মেয়াদ শেষ হয়েছে" },
+  "manager": { en: "Manager", bn: "ম্যানেজার" },
+  "driver": { en: "Driver", bn: "ড্রাইভার" },
+  "full_access": { en: "Full access to all features", bn: "সব বৈশিষ্ট্যে সম্পূর্ণ অ্যাক্সেস" },
+  "limited_access": { en: "Limited access for deliveries", bn: "ডেলিভারির জন্য সীমিত অ্যাক্সেস" },
+  "remove": { en: "Remove", bn: "সরান" },
 };
 
 interface LanguageContextType {
