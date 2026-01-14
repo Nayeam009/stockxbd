@@ -1,5 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { 
   Users, 
   Banknote, 
@@ -14,7 +15,8 @@ import {
   Tag,
   BarChart3,
   Settings,
-  Package
+  Package,
+  HelpCircle
 } from "lucide-react";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -39,9 +41,10 @@ interface DashboardOverviewProps {
   selectedTimeframe?: string;
   userRole: string;
   setActiveModule?: (module: string) => void;
+  onShowGuide?: () => void;
 }
 
-export const DashboardOverview = ({ analytics, drivers, userRole, setActiveModule }: DashboardOverviewProps) => {
+export const DashboardOverview = ({ analytics, drivers, userRole, setActiveModule, onShowGuide }: DashboardOverviewProps) => {
   const { t } = useLanguage();
 
   const stats = [
@@ -117,6 +120,17 @@ export const DashboardOverview = ({ analytics, drivers, userRole, setActiveModul
           <p className="text-white/80 text-xs sm:text-sm md:text-base max-w-lg">
             Here's what's happening with your LPG business today. Manage your operations efficiently.
           </p>
+          {userRole === 'owner' && onShowGuide && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={onShowGuide}
+              className="mt-3 bg-white/20 hover:bg-white/30 text-white border-0"
+            >
+              <HelpCircle className="h-4 w-4 mr-2" />
+              Quick Start Guide
+            </Button>
+          )}
         </div>
         <div className="absolute -bottom-12 -right-12 h-28 sm:h-40 w-28 sm:w-40 rounded-full bg-secondary/30 blur-3xl float-animation"></div>
         <div className="absolute -top-12 -left-12 h-24 sm:h-32 w-24 sm:w-32 rounded-full bg-accent/20 blur-3xl float-animation" style={{ animationDelay: '3s' }}></div>
