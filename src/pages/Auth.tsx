@@ -159,10 +159,16 @@ const Auth = () => {
           title: "Welcome to the Team!", 
           description: `You've joined as ${getRoleLabel(inviteRole)}` 
         });
-      } else if (!ownersExist) {
+      } else if (data.user) {
+        // New shop owner signup - assign owner role
+        await supabase.from('user_roles').insert({
+          user_id: data.user.id,
+          role: 'owner'
+        });
+        
         toast({ 
-          title: "Owner Account Created!", 
-          description: "You're now the owner of this Stock-X installation" 
+          title: "Account Created!", 
+          description: "You're now the owner of your Stock-X shop" 
         });
       }
       
@@ -326,6 +332,17 @@ const Auth = () => {
                     Set up your business by creating the first owner account
                   </p>
                 </>
+              ) : authMode === 'signup' && ownersExist ? (
+                <>
+                  <Badge variant="secondary" className="px-4 py-2 bg-primary/10 text-primary">
+                    <UserPlus className="h-3 w-3 mr-1" />
+                    New Shop Owner
+                  </Badge>
+                  <h1 className="text-3xl font-bold text-primary">Create Your Shop</h1>
+                  <p className="text-muted-foreground">
+                    Sign up to start managing your LPG business
+                  </p>
+                </>
               ) : (
                 <>
                   <Badge variant="secondary" className="px-4 py-2">Secure Login</Badge>
@@ -399,7 +416,7 @@ const Auth = () => {
                   </Alert>
                 )}
 
-                {ownersExist && authMode === 'login' && !inviteCode && (
+                {authMode === 'login' && !inviteCode && (
                   <div className="space-y-3 p-4 border rounded-lg border-border bg-muted/30">
                     <div className="flex items-center space-x-2">
                       <Shield className="h-5 w-5 text-primary" />
@@ -408,6 +425,20 @@ const Auth = () => {
                     <p className="text-sm text-muted-foreground">
                       New team members need an invite link from the business owner. If you're a new member, ask your owner to share an invite QR code or link.
                     </p>
+                  </div>
+                )}
+
+                {authMode === 'signup' && ownersExist && !inviteCode && (
+                  <div className="p-4 border rounded-lg bg-primary/5 border-primary/20">
+                    <div className="flex items-start space-x-3">
+                      <Crown className="h-6 w-6 text-primary mt-1" />
+                      <div className="flex-1 space-y-2">
+                        <h3 className="font-semibold text-primary">New Shop Owner</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Create your own independent shop account with full owner access to all features
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 )}
               </CardContent>
@@ -543,10 +574,37 @@ const Auth = () => {
                         </Button>
                       </p>
                     </div>
-                  ) : ownersExist && (
-                    <div className="text-center">
+                  ) : authMode === 'login' ? (
+                    <div className="text-center space-y-2">
+                      <p className="text-sm text-muted-foreground">
+                        Don't have an account?
+                        <Button 
+                          variant="link" 
+                          className="p-0 ml-1 h-auto text-primary"
+                          onClick={() => setAuthMode('signup')}
+                          type="button"
+                          disabled={loading}
+                        >
+                          Sign up as new shop owner
+                        </Button>
+                      </p>
                       <p className="text-xs text-muted-foreground">
-                        New team members need an invite link from the business owner
+                        Team members need an invite link from the business owner
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="text-center space-y-2">
+                      <p className="text-sm text-muted-foreground">
+                        Already have an account?
+                        <Button 
+                          variant="link" 
+                          className="p-0 ml-1 h-auto text-primary"
+                          onClick={() => setAuthMode('login')}
+                          type="button"
+                          disabled={loading}
+                        >
+                          Sign in instead
+                        </Button>
                       </p>
                     </div>
                   )}
