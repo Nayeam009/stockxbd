@@ -5,23 +5,24 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Shield, Truck, Loader2, Users, Crown, AlertCircle, UserPlus } from "lucide-react";
+import { ArrowLeft, Shield, Truck, Loader2, Users, Crown, AlertCircle, UserPlus, LogIn } from "lucide-react";
 import stockXLogo from "@/assets/stock-x-logo.png";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
-type AuthMode = 'login' | 'signup' | 'invite';
+type AuthMode = 'signin' | 'signup' | 'invite';
 
 const Auth = () => {
   const [searchParams] = useSearchParams();
   const inviteCode = searchParams.get('invite');
   const inviteRoleParam = searchParams.get('role');
   
-  const [authMode, setAuthMode] = useState<AuthMode>('login');
+  const [authMode, setAuthMode] = useState<AuthMode>('signin');
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
   const [checkingSystem, setCheckingSystem] = useState(true);
   const [ownersExist, setOwnersExist] = useState(true);
@@ -82,7 +83,7 @@ const Auth = () => {
           
           if (error || !inviteData || inviteData.length === 0) {
             setInviteValid(false);
-            setAuthMode('login');
+            setAuthMode('signin');
             toast({
               title: "Invalid Invite",
               description: "This invite link is invalid or expired",
@@ -99,11 +100,11 @@ const Auth = () => {
           
           if (error) {
             console.error('Error checking owners:', error);
-            setOwnersExist(true); // Assume owners exist if check fails
+            setOwnersExist(true);
           } else {
             setOwnersExist(hasOwners || false);
-            // If no owners, show signup; otherwise show login
-            setAuthMode(hasOwners ? 'login' : 'signup');
+            // If no owners exist, default to signup for first user
+            setAuthMode(hasOwners ? 'signin' : 'signup');
           }
         }
       } catch (err) {
@@ -116,7 +117,7 @@ const Auth = () => {
     checkSystemState();
   }, [inviteCode, navigate, inviteRoleParam]);
 
-  const handleEmailSignUp = async () => {
+  const handleSignUp = async () => {
     if (!email || !password) {
       toast({ title: "Please fill in all fields", variant: "destructive" });
       return;
@@ -141,41 +142,46 @@ const Auth = () => {
         options: {
           emailRedirectTo: inviteCode 
             ? `${window.location.origin}/auth?invite=${inviteCode}&role=${inviteRoleParam || inviteRole}`
-            : window.location.origin
+            : window.location.origin,
+          data: {
+            full_name: fullName || undefined
+          }
         }
       });
 
       if (error) throw error;
 
-      // If invite code present, mark it as used
-      if (inviteCode && data.user) {
-        await supabase.rpc('mark_invite_used', {
-          _code: inviteCode,
-          _user_id: data.user.id,
-          _email: email
-        });
+      if (data.user) {
+        // If invite code present, mark it as used (team member signup)
+        if (inviteCode) {
+          await supabase.rpc('mark_invite_used', {
+            _code: inviteCode,
+            _user_id: data.user.id,
+            _email: email
+          });
+          
+          toast({ 
+            title: "Welcome to the Team!", 
+            description: `You've successfully joined as ${getRoleLabel(inviteRole)}` 
+          });
+        } else {
+          // New shop owner signup - assign owner role
+          await supabase.from('user_roles').insert({
+            user_id: data.user.id,
+            role: 'owner'
+          });
+          
+          toast({ 
+            title: "Account Created Successfully!", 
+            description: "Welcome! You're now the owner of your Stock-X shop" 
+          });
+        }
         
-        toast({ 
-          title: "Welcome to the Team!", 
-          description: `You've joined as ${getRoleLabel(inviteRole)}` 
-        });
-      } else if (data.user) {
-        // New shop owner signup - assign owner role
-        await supabase.from('user_roles').insert({
-          user_id: data.user.id,
-          role: 'owner'
-        });
-        
-        toast({ 
-          title: "Account Created!", 
-          description: "You're now the owner of your Stock-X shop" 
-        });
+        navigate('/dashboard');
       }
-      
-      navigate('/dashboard');
     } catch (error: any) {
       toast({ 
-        title: "Sign up failed", 
+        title: "Registration Failed", 
         description: error.message, 
         variant: "destructive" 
       });
@@ -184,7 +190,7 @@ const Auth = () => {
     }
   };
 
-  const handleEmailSignIn = async () => {
+  const handleSignIn = async () => {
     if (!email || !password) {
       toast({ title: "Please fill in all fields", variant: "destructive" });
       return;
@@ -200,7 +206,7 @@ const Auth = () => {
 
       if (error) throw error;
 
-      // If invite code present, process it
+      // If invite code present, process it for existing user signing in
       if (inviteCode && data.user) {
         await supabase.rpc('mark_invite_used', {
           _code: inviteCode,
@@ -219,7 +225,7 @@ const Auth = () => {
       navigate('/dashboard');
     } catch (error: any) {
       toast({ 
-        title: "Sign in failed", 
+        title: "Sign In Failed", 
         description: error.message, 
         variant: "destructive" 
       });
@@ -228,7 +234,7 @@ const Auth = () => {
     }
   };
 
-  const handleGoogleSignIn = async () => {
+  const handleGoogleAuth = async () => {
     setLoading(true);
     try {
       const redirectUrl = inviteCode 
@@ -245,7 +251,7 @@ const Auth = () => {
       if (error) throw error;
     } catch (error: any) {
       toast({ 
-        title: "Google sign in failed", 
+        title: "Google authentication failed", 
         description: error.message, 
         variant: "destructive" 
       });
@@ -256,10 +262,10 @@ const Auth = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (authMode === 'login') {
-      await handleEmailSignIn();
+    if (authMode === 'signin') {
+      await handleSignIn();
     } else {
-      await handleEmailSignUp();
+      await handleSignUp();
     }
   };
 
@@ -279,6 +285,8 @@ const Auth = () => {
       default: return Truck;
     }
   };
+
+  const isSignUpMode = authMode === 'signup' || authMode === 'invite';
 
   if (checkingSystem) {
     return (
@@ -327,28 +335,31 @@ const Auth = () => {
                     <Crown className="h-3 w-3 mr-1" />
                     First Time Setup
                   </Badge>
-                  <h1 className="text-3xl font-bold text-primary">Create Owner Account</h1>
+                  <h1 className="text-3xl font-bold text-primary">Create Your Account</h1>
                   <p className="text-muted-foreground">
                     Set up your business by creating the first owner account
                   </p>
                 </>
-              ) : authMode === 'signup' && ownersExist ? (
+              ) : authMode === 'signup' ? (
                 <>
                   <Badge variant="secondary" className="px-4 py-2 bg-primary/10 text-primary">
                     <UserPlus className="h-3 w-3 mr-1" />
-                    New Shop Owner
+                    New Account
                   </Badge>
-                  <h1 className="text-3xl font-bold text-primary">Create Your Shop</h1>
+                  <h1 className="text-3xl font-bold text-primary">Sign Up</h1>
                   <p className="text-muted-foreground">
-                    Sign up to start managing your LPG business
+                    Create your account to start managing your LPG business
                   </p>
                 </>
               ) : (
                 <>
-                  <Badge variant="secondary" className="px-4 py-2">Secure Login</Badge>
-                  <h1 className="text-3xl font-bold text-primary">Welcome to Stock-X</h1>
+                  <Badge variant="secondary" className="px-4 py-2">
+                    <LogIn className="h-3 w-3 mr-1" />
+                    Welcome Back
+                  </Badge>
+                  <h1 className="text-3xl font-bold text-primary">Sign In</h1>
                   <p className="text-muted-foreground">
-                    Sign in to access your dashboard
+                    Enter your credentials to access your dashboard
                   </p>
                 </>
               )}
@@ -356,23 +367,28 @@ const Auth = () => {
           </div>
 
           <div className="grid lg:grid-cols-2 gap-8">
-            {/* Role Information Card */}
+            {/* Information Card */}
             <Card className="border-0 shadow-elegant">
               <CardHeader>
                 <CardTitle className="text-primary">
-                  {authMode === 'invite' ? 'Your Role' : 'Account Information'}
+                  {authMode === 'invite' 
+                    ? 'Your Role' 
+                    : isSignUpMode 
+                      ? 'What You Get'
+                      : 'Access Your Business'
+                  }
                 </CardTitle>
                 <CardDescription>
                   {authMode === 'invite' 
                     ? `You'll be joining as ${getRoleLabel(inviteRole)}`
-                    : !ownersExist 
-                      ? 'As the first user, you\'ll have full owner access'
-                      : 'Sign in to access your assigned role'
+                    : isSignUpMode
+                      ? 'Full access to all Stock-X features'
+                      : 'Sign in to manage your inventory and sales'
                   }
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                {/* Role Display */}
+                {/* Invite Role Display */}
                 {authMode === 'invite' && inviteValid && (
                   <div className="p-4 border rounded-lg bg-primary/5 border-primary/20">
                     <div className="flex items-start space-x-3">
@@ -381,7 +397,7 @@ const Auth = () => {
                         return <RoleIcon className="h-6 w-6 text-primary mt-1" />;
                       })()}
                       <div className="flex-1 space-y-2">
-                        <h3 className="font-semibold text-primary">{getRoleLabel(inviteRole)}</h3>
+                        <h3 className="font-semibold text-primary">{getRoleLabel(inviteRole)} Role</h3>
                         <p className="text-sm text-muted-foreground">
                           {inviteRole === 'manager' 
                             ? 'Full access to inventory, sales, and team management'
@@ -393,6 +409,7 @@ const Auth = () => {
                   </div>
                 )}
 
+                {/* First Owner Setup */}
                 {!ownersExist && authMode === 'signup' && (
                   <div className="p-4 border rounded-lg bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800">
                     <div className="flex items-start space-x-3">
@@ -407,6 +424,22 @@ const Auth = () => {
                   </div>
                 )}
 
+                {/* New Shop Owner Signup */}
+                {authMode === 'signup' && ownersExist && !inviteCode && (
+                  <div className="p-4 border rounded-lg bg-primary/5 border-primary/20">
+                    <div className="flex items-start space-x-3">
+                      <Crown className="h-6 w-6 text-primary mt-1" />
+                      <div className="flex-1 space-y-2">
+                        <h3 className="font-semibold text-primary">Shop Owner Account</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Create your own independent shop with full owner access to all features
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Invalid Invite Alert */}
                 {inviteCode && !inviteValid && (
                   <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
@@ -416,29 +449,57 @@ const Auth = () => {
                   </Alert>
                 )}
 
-                {authMode === 'login' && !inviteCode && (
-                  <div className="space-y-3 p-4 border rounded-lg border-border bg-muted/30">
-                    <div className="flex items-center space-x-2">
-                      <Shield className="h-5 w-5 text-primary" />
-                      <h4 className="font-medium text-foreground">Secure Access</h4>
+                {/* Sign In Info */}
+                {authMode === 'signin' && !inviteCode && (
+                  <div className="space-y-4">
+                    <div className="space-y-3 p-4 border rounded-lg border-border bg-muted/30">
+                      <div className="flex items-center space-x-2">
+                        <Shield className="h-5 w-5 text-primary" />
+                        <h4 className="font-medium text-foreground">Secure Access</h4>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Your data is protected with industry-standard encryption and secure authentication.
+                      </p>
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      New team members need an invite link from the business owner. If you're a new member, ask your owner to share an invite QR code or link.
-                    </p>
+
+                    <div className="space-y-3 p-4 border rounded-lg border-border bg-muted/30">
+                      <div className="flex items-center space-x-2">
+                        <Users className="h-5 w-5 text-primary" />
+                        <h4 className="font-medium text-foreground">Team Members</h4>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Joining as a team member? Ask your shop owner for an invite link or QR code.
+                      </p>
+                    </div>
                   </div>
                 )}
 
-                {authMode === 'signup' && ownersExist && !inviteCode && (
-                  <div className="p-4 border rounded-lg bg-primary/5 border-primary/20">
-                    <div className="flex items-start space-x-3">
-                      <Crown className="h-6 w-6 text-primary mt-1" />
-                      <div className="flex-1 space-y-2">
-                        <h3 className="font-semibold text-primary">New Shop Owner</h3>
-                        <p className="text-sm text-muted-foreground">
-                          Create your own independent shop account with full owner access to all features
-                        </p>
-                      </div>
-                    </div>
+                {/* Sign Up Features */}
+                {isSignUpMode && !inviteCode && (
+                  <div className="space-y-3">
+                    <h4 className="font-medium text-foreground">What's included:</h4>
+                    <ul className="space-y-2 text-sm text-muted-foreground">
+                      <li className="flex items-center space-x-2">
+                        <div className="w-1.5 h-1.5 bg-primary rounded-full" />
+                        <span>Inventory & Stock Management</span>
+                      </li>
+                      <li className="flex items-center space-x-2">
+                        <div className="w-1.5 h-1.5 bg-primary rounded-full" />
+                        <span>Point of Sale (POS) System</span>
+                      </li>
+                      <li className="flex items-center space-x-2">
+                        <div className="w-1.5 h-1.5 bg-primary rounded-full" />
+                        <span>Customer Management</span>
+                      </li>
+                      <li className="flex items-center space-x-2">
+                        <div className="w-1.5 h-1.5 bg-primary rounded-full" />
+                        <span>Team & Staff Management</span>
+                      </li>
+                      <li className="flex items-center space-x-2">
+                        <div className="w-1.5 h-1.5 bg-primary rounded-full" />
+                        <span>Analytics & Reports</span>
+                      </li>
+                    </ul>
                   </div>
                 )}
               </CardContent>
@@ -448,25 +509,40 @@ const Auth = () => {
             <Card className="border-0 shadow-elegant">
               <CardHeader>
                 <CardTitle className="text-primary">
-                  {authMode === 'login' ? 'Sign In' : 'Create Account'}
+                  {authMode === 'signin' ? 'Sign In' : 'Sign Up'}
                 </CardTitle>
                 <CardDescription>
                   {authMode === 'invite' 
-                    ? 'Create an account or sign in to accept the invitation'
+                    ? 'Create an account to accept the team invitation'
                     : authMode === 'signup'
-                      ? 'Create your owner account to get started'
-                      : 'Enter your credentials to access the dashboard'
+                      ? 'Fill in your details to create your account'
+                      : 'Enter your email and password to continue'
                   }
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-4">
+                  {/* Full Name - Only for Sign Up */}
+                  {isSignUpMode && (
+                    <div className="space-y-2">
+                      <Label htmlFor="fullName">Full Name (Optional)</Label>
+                      <Input 
+                        id="fullName" 
+                        type="text" 
+                        placeholder="Enter your full name"
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        disabled={loading}
+                      />
+                    </div>
+                  )}
+
                   <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
+                    <Label htmlFor="email">Email Address</Label>
                     <Input 
                       id="email" 
                       type="email" 
-                      placeholder="Enter your email"
+                      placeholder="your@email.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
@@ -479,7 +555,7 @@ const Auth = () => {
                     <Input 
                       id="password" 
                       type="password" 
-                      placeholder="Enter your password"
+                      placeholder={isSignUpMode ? "Create a password (min 6 characters)" : "Enter your password"}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
@@ -487,13 +563,14 @@ const Auth = () => {
                     />
                   </div>
 
-                  {(authMode === 'signup' || authMode === 'invite') && (
+                  {/* Confirm Password - Only for Sign Up */}
+                  {isSignUpMode && (
                     <div className="space-y-2">
                       <Label htmlFor="confirmPassword">Confirm Password</Label>
                       <Input 
                         id="confirmPassword" 
                         type="password" 
-                        placeholder="Confirm your password"
+                        placeholder="Re-enter your password"
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
                         required
@@ -511,10 +588,22 @@ const Auth = () => {
                     {loading ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        {authMode === 'login' ? 'Signing In...' : 'Creating Account...'}
+                        {authMode === 'signin' ? 'Signing In...' : 'Creating Account...'}
                       </>
                     ) : (
-                      authMode === 'login' ? 'Sign In' : 'Create Account'
+                      <>
+                        {authMode === 'signin' ? (
+                          <>
+                            <LogIn className="mr-2 h-4 w-4" />
+                            Sign In
+                          </>
+                        ) : (
+                          <>
+                            <UserPlus className="mr-2 h-4 w-4" />
+                            Sign Up
+                          </>
+                        )}
+                      </>
                     )}
                   </Button>
 
@@ -534,7 +623,7 @@ const Auth = () => {
                     variant="outline"
                     className="w-full"
                     size="lg"
-                    onClick={handleGoogleSignIn}
+                    onClick={handleGoogleAuth}
                     disabled={loading}
                   >
                     <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
@@ -558,56 +647,61 @@ const Auth = () => {
                     Continue with Google
                   </Button>
 
-                  {/* Toggle Auth Mode */}
-                  {authMode === 'invite' ? (
-                    <div className="text-center space-y-2">
-                      <p className="text-sm text-muted-foreground">
-                        Already have an account?
+                  {/* Toggle Between Sign In and Sign Up */}
+                  <div className="pt-4 border-t border-border">
+                    {authMode === 'invite' ? (
+                      <div className="text-center space-y-2">
+                        <p className="text-sm text-muted-foreground">
+                          Already have an account?
+                        </p>
                         <Button 
-                          variant="link" 
-                          className="p-0 ml-1 h-auto text-primary"
-                          onClick={() => setAuthMode('login')}
+                          variant="outline" 
+                          className="w-full"
+                          onClick={() => setAuthMode('signin')}
                           type="button"
                           disabled={loading}
                         >
-                          Sign in instead
+                          <LogIn className="mr-2 h-4 w-4" />
+                          Sign In Instead
                         </Button>
-                      </p>
-                    </div>
-                  ) : authMode === 'login' ? (
-                    <div className="text-center space-y-2">
-                      <p className="text-sm text-muted-foreground">
-                        Don't have an account?
+                      </div>
+                    ) : authMode === 'signin' ? (
+                      <div className="text-center space-y-3">
+                        <p className="text-sm text-muted-foreground">
+                          Don't have an account yet?
+                        </p>
                         <Button 
-                          variant="link" 
-                          className="p-0 ml-1 h-auto text-primary"
+                          variant="outline" 
+                          className="w-full"
                           onClick={() => setAuthMode('signup')}
                           type="button"
                           disabled={loading}
                         >
-                          Sign up as new shop owner
+                          <UserPlus className="mr-2 h-4 w-4" />
+                          Create New Account
                         </Button>
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Team members need an invite link from the business owner
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="text-center space-y-2">
-                      <p className="text-sm text-muted-foreground">
-                        Already have an account?
+                        <p className="text-xs text-muted-foreground">
+                          Team members? Ask your owner for an invite link
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="text-center space-y-3">
+                        <p className="text-sm text-muted-foreground">
+                          Already have an account?
+                        </p>
                         <Button 
-                          variant="link" 
-                          className="p-0 ml-1 h-auto text-primary"
-                          onClick={() => setAuthMode('login')}
+                          variant="outline" 
+                          className="w-full"
+                          onClick={() => setAuthMode('signin')}
                           type="button"
                           disabled={loading}
                         >
-                          Sign in instead
+                          <LogIn className="mr-2 h-4 w-4" />
+                          Sign In Instead
                         </Button>
-                      </p>
-                    </div>
-                  )}
+                      </div>
+                    )}
+                  </div>
                 </form>
               </CardContent>
             </Card>
@@ -620,17 +714,17 @@ const Auth = () => {
                 <h3 className="text-lg font-semibold text-primary-foreground">
                   {authMode === 'invite' 
                     ? 'Joining a Team'
-                    : !ownersExist 
-                      ? 'First Time Setup'
-                      : 'Team Access'
+                    : isSignUpMode
+                      ? 'Getting Started'
+                      : 'Need Help?'
                   }
                 </h3>
                 <p className="text-primary-foreground/80 text-sm">
                   {authMode === 'invite' 
                     ? 'After joining, your team owner can manage your access level from Settings.'
-                    : !ownersExist 
-                      ? 'After creating your account, you can invite team members from the Settings page.'
-                      : 'Team members join via invite links shared by the business owner through QR codes or direct links.'
+                    : isSignUpMode
+                      ? 'After signing up, you can invite team members from the Settings page.'
+                      : 'Contact your shop owner if you need an invite link or have forgotten your password.'
                   }
                 </p>
               </div>
