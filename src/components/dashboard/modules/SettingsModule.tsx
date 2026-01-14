@@ -22,6 +22,8 @@ import {
   Mail,
   Phone,
   Calendar,
+  AlertTriangle,
+  UserX,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -35,6 +37,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { ProfileSharingCard } from "@/components/settings/ProfileSharingCard";
 import { BackupRestoreCard } from "@/components/settings/BackupRestoreCard";
 import { PushNotificationCard } from "@/components/settings/PushNotificationCard";
@@ -62,6 +74,13 @@ export const SettingsModule = () => {
   const [userPhone, setUserPhone] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [savingProfile, setSavingProfile] = useState(false);
+  
+  // Account deletion state
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showDeletePasswordDialog, setShowDeletePasswordDialog] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
   
   const [notifications, setNotifications] = useState({
     lowStock: true,
@@ -185,10 +204,6 @@ export const SettingsModule = () => {
     toast({ title: t("settings_saved") });
   };
 
-  // Removed - now handled by BackupRestoreCard
-
-  // Removed - now handled by BackupRestoreCard
-
   const handleClearCache = () => {
     // Clear specific caches, not all localStorage
     const keysToKeep = ["app-theme", "app-language", "business-settings", "notification-settings"];
@@ -234,6 +249,74 @@ export const SettingsModule = () => {
     }
   };
 
+  const handleDeleteAccountRequest = () => {
+    if (userRole === 'owner') {
+      // Owners need password verification
+      setShowDeletePasswordDialog(true);
+    } else {
+      // Non-owners see a simple confirmation
+      setShowDeleteConfirm(true);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (userRole === 'owner' && deleteConfirmText !== 'DELETE') {
+      toast({ title: "Please type DELETE to confirm", variant: "destructive" });
+      return;
+    }
+
+    setDeletingAccount(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("No user found");
+
+      // For owners, verify password first
+      if (userRole === 'owner') {
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: userEmail,
+          password: deletePassword
+        });
+
+        if (signInError) {
+          toast({ title: "Incorrect password", variant: "destructive" });
+          setDeletingAccount(false);
+          return;
+        }
+      }
+
+      // Delete user's profile data
+      await supabase.from('profiles').delete().eq('user_id', user.id);
+      
+      // Delete user's role
+      await supabase.from('user_roles').delete().eq('user_id', user.id);
+
+      // If owner, delete team memberships
+      if (userRole === 'owner') {
+        await supabase.from('team_members').delete().eq('owner_id', user.id);
+        await supabase.from('team_invites').delete().eq('created_by', user.id);
+      }
+
+      // Sign out the user
+      await supabase.auth.signOut();
+      
+      toast({ title: language === 'bn' ? 'অ্যাকাউন্ট মুছে ফেলা হয়েছে' : 'Account deleted successfully' });
+      
+      // Redirect to home
+      window.location.href = '/';
+    } catch (error: any) {
+      toast({ 
+        title: error.message || "Failed to delete account", 
+        variant: "destructive" 
+      });
+    } finally {
+      setDeletingAccount(false);
+      setShowDeleteConfirm(false);
+      setShowDeletePasswordDialog(false);
+      setDeletePassword("");
+      setDeleteConfirmText("");
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -242,105 +325,108 @@ export const SettingsModule = () => {
         <p className="text-muted-foreground">{t("settings_desc")}</p>
       </div>
 
+      {/* User Profile Card - Full Width */}
+      <Card className="bg-card border-border">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <User className="h-5 w-5 text-primary" />
+            <CardTitle className="text-foreground">{t("profile")}</CardTitle>
+          </div>
+          <CardDescription>Manage your personal information and account details</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col md:flex-row gap-6">
+            {/* Avatar Section */}
+            <div className="flex flex-col items-center gap-3">
+              <Avatar className="h-24 w-24 border-4 border-primary/20">
+                <AvatarImage src={avatarUrl || undefined} alt={fullName} />
+                <AvatarFallback className="text-2xl font-bold bg-gradient-to-br from-primary to-primary/80 text-primary-foreground">
+                  {getInitials(fullName || userEmail)}
+                </AvatarFallback>
+              </Avatar>
+              <Badge className={`${getRoleBadgeColor(userRole)} px-3 py-1`}>
+                {userRole.charAt(0).toUpperCase() + userRole.slice(1)}
+              </Badge>
+            </div>
+            
+            {/* Profile Form */}
+            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="fullName" className="flex items-center gap-2">
+                  <User className="h-4 w-4 text-muted-foreground" />
+                  Full Name
+                </Label>
+                <Input
+                  id="fullName"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Enter your full name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="userEmail" className="flex items-center gap-2">
+                  <Mail className="h-4 w-4 text-muted-foreground" />
+                  Email
+                </Label>
+                <Input
+                  id="userEmail"
+                  value={userEmail}
+                  disabled
+                  className="bg-muted"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="userPhone" className="flex items-center gap-2">
+                  <Phone className="h-4 w-4 text-muted-foreground" />
+                  Phone Number
+                </Label>
+                <Input
+                  id="userPhone"
+                  value={userPhone}
+                  onChange={(e) => setUserPhone(e.target.value)}
+                  placeholder="+880 1XXX-XXXXXX"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  Member Since
+                </Label>
+                <Input
+                  value={userCreatedAt ? new Date(userCreatedAt).toLocaleDateString() : "N/A"}
+                  disabled
+                  className="bg-muted"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <Button 
+                  onClick={handleSaveProfile}
+                  disabled={savingProfile}
+                  className="w-full md:w-auto"
+                >
+                  {savingProfile ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4 mr-2" />
+                  )}
+                  Save Profile
+                </Button>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Owner-only Cards Row */}
+      {userRole === 'owner' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+          <ProfileSharingCard />
+          <TeamManagementCard />
+        </div>
+      )}
+
+      {/* Main Settings Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-        {/* User Profile Card */}
-        <Card className="bg-card border-border lg:col-span-2">
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <User className="h-5 w-5 text-primary" />
-              <CardTitle className="text-foreground">{t("profile")}</CardTitle>
-            </div>
-            <CardDescription>Manage your personal information and account details</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-col md:flex-row gap-6">
-              {/* Avatar Section */}
-              <div className="flex flex-col items-center gap-3">
-                <Avatar className="h-24 w-24 border-4 border-primary/20">
-                  <AvatarImage src={avatarUrl || undefined} alt={fullName} />
-                  <AvatarFallback className="text-2xl font-bold bg-gradient-to-br from-primary to-primary/80 text-primary-foreground">
-                    {getInitials(fullName || userEmail)}
-                  </AvatarFallback>
-                </Avatar>
-                <Badge className={`${getRoleBadgeColor(userRole)} px-3 py-1`}>
-                  {userRole.charAt(0).toUpperCase() + userRole.slice(1)}
-                </Badge>
-              </div>
-              
-              {/* Profile Form */}
-              <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="fullName" className="flex items-center gap-2">
-                    <User className="h-4 w-4 text-muted-foreground" />
-                    Full Name
-                  </Label>
-                  <Input
-                    id="fullName"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder="Enter your full name"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="userEmail" className="flex items-center gap-2">
-                    <Mail className="h-4 w-4 text-muted-foreground" />
-                    Email
-                  </Label>
-                  <Input
-                    id="userEmail"
-                    value={userEmail}
-                    disabled
-                    className="bg-muted"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="userPhone" className="flex items-center gap-2">
-                    <Phone className="h-4 w-4 text-muted-foreground" />
-                    Phone Number
-                  </Label>
-                  <Input
-                    id="userPhone"
-                    value={userPhone}
-                    onChange={(e) => setUserPhone(e.target.value)}
-                    placeholder="+880 1XXX-XXXXXX"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-muted-foreground" />
-                    Member Since
-                  </Label>
-                  <Input
-                    value={userCreatedAt ? new Date(userCreatedAt).toLocaleDateString() : "N/A"}
-                    disabled
-                    className="bg-muted"
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <Button 
-                    onClick={handleSaveProfile}
-                    disabled={savingProfile}
-                    className="w-full md:w-auto"
-                  >
-                    {savingProfile ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Save className="h-4 w-4 mr-2" />
-                    )}
-                    Save Profile
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Profile Sharing - Only for owners */}
-        <ProfileSharingCard />
-
-        {/* Team Management - Only for owners */}
-        <TeamManagementCard />
-
         {/* Language & Theme */}
         <Card className="bg-card border-border">
           <CardHeader>
@@ -357,7 +443,7 @@ export const SettingsModule = () => {
               <div className="grid grid-cols-2 gap-3">
                 <Button
                   variant={language === "en" ? "default" : "outline"}
-                  className={`h-16 flex flex-col gap-1 ${language === "en" ? "bg-primary" : ""}`}
+                  className={`h-16 flex flex-col gap-1 relative ${language === "en" ? "bg-primary" : ""}`}
                   onClick={() => setLanguage("en")}
                 >
                   <span className="text-lg font-bold">EN</span>
@@ -366,7 +452,7 @@ export const SettingsModule = () => {
                 </Button>
                 <Button
                   variant={language === "bn" ? "default" : "outline"}
-                  className={`h-16 flex flex-col gap-1 ${language === "bn" ? "bg-primary" : ""}`}
+                  className={`h-16 flex flex-col gap-1 relative ${language === "bn" ? "bg-primary" : ""}`}
                   onClick={() => setLanguage("bn")}
                 >
                   <span className="text-lg font-bold">বাং</span>
@@ -497,7 +583,7 @@ export const SettingsModule = () => {
         {/* Backup & Restore */}
         <BackupRestoreCard />
 
-        {/* Cache Management */}
+        {/* Cache & Data Management */}
         <Card className="bg-card border-border">
           <CardHeader>
             <div className="flex items-center gap-2">
@@ -506,10 +592,10 @@ export const SettingsModule = () => {
             </div>
             <CardDescription>{t("data_management_desc")}</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
             <Button 
               variant="outline" 
-              className="w-full h-16 flex flex-col items-center justify-center gap-2 text-destructive hover:text-destructive"
+              className="w-full h-16 flex flex-col items-center justify-center gap-2 text-muted-foreground hover:text-foreground"
               onClick={handleClearCache}
             >
               <Trash2 className="h-5 w-5" />
@@ -518,6 +604,45 @@ export const SettingsModule = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Danger Zone - Account Deletion */}
+      <Card className="bg-card border-destructive/50">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-destructive" />
+            <CardTitle className="text-destructive">
+              {language === 'bn' ? 'বিপদ অঞ্চল' : 'Danger Zone'}
+            </CardTitle>
+          </div>
+          <CardDescription>
+            {language === 'bn' 
+              ? 'এই কাজগুলি পূর্বাবস্থায় ফেরানো যাবে না। অনুগ্রহ করে সাবধানে এগিয়ে যান।'
+              : 'These actions are irreversible. Please proceed with caution.'}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 border border-destructive/30 rounded-lg bg-destructive/5">
+            <div className="space-y-1">
+              <p className="font-medium text-foreground">
+                {language === 'bn' ? 'অ্যাকাউন্ট মুছে ফেলুন' : 'Delete Account'}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {language === 'bn' 
+                  ? 'আপনার অ্যাকাউন্ট এবং সমস্ত ডেটা স্থায়ীভাবে মুছে ফেলুন'
+                  : 'Permanently delete your account and all associated data'}
+              </p>
+            </div>
+            <Button 
+              variant="destructive"
+              onClick={handleDeleteAccountRequest}
+              className="shrink-0"
+            >
+              <UserX className="h-4 w-4 mr-2" />
+              {language === 'bn' ? 'অ্যাকাউন্ট মুছুন' : 'Delete Account'}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Change Password Dialog */}
       <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
@@ -559,6 +684,105 @@ export const SettingsModule = () => {
             <Button onClick={handleChangePassword} disabled={changingPassword}>
               {changingPassword && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               {t("save")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Account Confirmation (Non-owner) */}
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              {language === 'bn' ? 'অ্যাকাউন্ট মুছে ফেলবেন?' : 'Delete Account?'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {language === 'bn'
+                ? 'এই কাজটি পূর্বাবস্থায় ফেরানো যাবে না। আপনার অ্যাকাউন্ট এবং সমস্ত ডেটা স্থায়ীভাবে মুছে ফেলা হবে।'
+                : 'This action cannot be undone. Your account and all associated data will be permanently deleted.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteAccount}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deletingAccount}
+            >
+              {deletingAccount && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {language === 'bn' ? 'হ্যাঁ, মুছুন' : 'Yes, Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Account with Password (Owner) */}
+      <Dialog open={showDeletePasswordDialog} onOpenChange={setShowDeletePasswordDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              {language === 'bn' ? 'অ্যাকাউন্ট মুছে ফেলুন' : 'Delete Account'}
+            </DialogTitle>
+            <DialogDescription>
+              {language === 'bn'
+                ? 'এই কাজটি স্থায়ী এবং পূর্বাবস্থায় ফেরানো যাবে না। নিশ্চিত করতে আপনার পাসওয়ার্ড দিন এবং DELETE লিখুন।'
+                : 'This action is permanent and cannot be undone. Enter your password and type DELETE to confirm.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="p-4 bg-destructive/10 rounded-lg text-sm text-destructive border border-destructive/20">
+              <p className="font-medium mb-2">
+                {language === 'bn' ? 'সতর্কতা: এটি নিম্নলিখিতগুলি মুছে ফেলবে:' : 'Warning: This will delete:'}
+              </p>
+              <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                <li>{language === 'bn' ? 'আপনার অ্যাকাউন্ট এবং প্রোফাইল' : 'Your account and profile'}</li>
+                <li>{language === 'bn' ? 'সমস্ত টিম সদস্য এবং আমন্ত্রণ' : 'All team members and invites'}</li>
+                <li>{language === 'bn' ? 'অ্যাপে অ্যাক্সেস' : 'Access to the application'}</li>
+              </ul>
+            </div>
+            <div>
+              <Label htmlFor="deletePassword">
+                {language === 'bn' ? 'পাসওয়ার্ড' : 'Password'}
+              </Label>
+              <Input
+                id="deletePassword"
+                type="password"
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+                className="mt-1"
+                placeholder={language === 'bn' ? 'আপনার পাসওয়ার্ড দিন' : 'Enter your password'}
+              />
+            </div>
+            <div>
+              <Label htmlFor="deleteConfirm">
+                {language === 'bn' ? 'নিশ্চিত করতে DELETE লিখুন' : 'Type DELETE to confirm'}
+              </Label>
+              <Input
+                id="deleteConfirm"
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value.toUpperCase())}
+                className="mt-1 font-mono"
+                placeholder="DELETE"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowDeletePasswordDialog(false);
+              setDeletePassword("");
+              setDeleteConfirmText("");
+            }}>
+              {t("cancel")}
+            </Button>
+            <Button 
+              variant="destructive"
+              onClick={handleDeleteAccount}
+              disabled={deletingAccount || deleteConfirmText !== 'DELETE' || !deletePassword}
+            >
+              {deletingAccount && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {language === 'bn' ? 'স্থায়ীভাবে মুছুন' : 'Permanently Delete'}
             </Button>
           </DialogFooter>
         </DialogContent>

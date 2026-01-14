@@ -250,8 +250,8 @@ export const TeamManagementCard = () => {
   // Only render for owners
   if (loading) {
     return (
-      <Card className="bg-card border-border lg:col-span-2">
-        <CardContent className="p-6 flex items-center justify-center">
+      <Card className="bg-card border-border">
+        <CardContent className="p-6 flex items-center justify-center min-h-[200px]">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </CardContent>
       </Card>
@@ -264,7 +264,7 @@ export const TeamManagementCard = () => {
 
   return (
     <>
-      <Card className="bg-card border-border lg:col-span-2">
+      <Card className="bg-card border-border">
         <CardHeader>
           <div className="flex items-center gap-2">
             <Users className="h-5 w-5 text-primary" />
