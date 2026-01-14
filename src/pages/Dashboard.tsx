@@ -164,15 +164,6 @@ const Dashboard = () => {
         return <ExchangeModule />;
       case "profile":
         return <ProfileModule />;
-      case "deliveries":
-        return (
-          <OnlineDeliveryModule
-            orders={orders}
-            setOrders={setOrders}
-            drivers={drivers}
-            userRole={userRole}
-          />
-        );
       case "customers":
         return <CustomerManagementModule />;
       case "settings":
