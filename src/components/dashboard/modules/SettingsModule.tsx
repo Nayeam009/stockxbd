@@ -38,6 +38,7 @@ import {
 import { ProfileSharingCard } from "@/components/settings/ProfileSharingCard";
 import { BackupRestoreCard } from "@/components/settings/BackupRestoreCard";
 import { PushNotificationCard } from "@/components/settings/PushNotificationCard";
+import { TeamManagementCard } from "@/components/settings/TeamManagementCard";
 
 export const SettingsModule = () => {
   const { theme, setTheme } = useTheme();
@@ -336,6 +337,9 @@ export const SettingsModule = () => {
 
         {/* Profile Sharing - Only for owners */}
         <ProfileSharingCard />
+
+        {/* Team Management - Only for owners */}
+        <TeamManagementCard />
 
         {/* Language & Theme */}
         <Card className="bg-card border-border">
