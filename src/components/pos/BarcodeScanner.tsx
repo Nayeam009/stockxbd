@@ -131,50 +131,6 @@ export const BarcodeScanner = ({ open, onOpenChange, onProductFound }: BarcodeSc
     setCameraError(null);
   };
 
-  // Handle barcode scanner input (fast sequential keypresses)
-  useEffect(() => {
-    if (!open || scanMode !== 'keyboard') return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Only capture if dialog is open and our input is focused
-      if (document.activeElement !== inputRef.current) return;
-
-      // Clear previous timeout
-      if (scanTimeoutRef.current) {
-        clearTimeout(scanTimeoutRef.current);
-      }
-
-      // If Enter is pressed, process the buffer
-      if (e.key === 'Enter' && scanBuffer.length > 0) {
-        handleSearch(scanBuffer);
-        setScanBuffer("");
-        return;
-      }
-
-      // Only capture alphanumeric keys
-      if (e.key.length === 1 && /[a-zA-Z0-9-_]/.test(e.key)) {
-        setScanBuffer(prev => prev + e.key);
-        setManualCode(prev => prev + e.key);
-      }
-
-      // Set timeout to process buffer (for scanner that doesn't send Enter)
-      scanTimeoutRef.current = setTimeout(() => {
-        if (scanBuffer.length >= 6) {
-          handleSearch(scanBuffer);
-        }
-        setScanBuffer("");
-      }, 300);
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      if (scanTimeoutRef.current) {
-        clearTimeout(scanTimeoutRef.current);
-      }
-    };
-  }, [open, scanMode, scanBuffer, handleSearch]);
-
   const handleSearch = useCallback(async (code: string) => {
     if (!code.trim() || code.length < 3) {
       toast({ title: "Please enter a valid code", variant: "destructive" });
@@ -268,6 +224,49 @@ export const BarcodeScanner = ({ open, onOpenChange, onProductFound }: BarcodeSc
     }
   }, []);
 
+  // Handle barcode scanner input (fast sequential keypresses)
+  useEffect(() => {
+    if (!open || scanMode !== 'keyboard') return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only capture if dialog is open and our input is focused
+      if (document.activeElement !== inputRef.current) return;
+
+      // Clear previous timeout
+      if (scanTimeoutRef.current) {
+        clearTimeout(scanTimeoutRef.current);
+      }
+
+      // If Enter is pressed, process the buffer
+      if (e.key === 'Enter' && scanBuffer.length > 0) {
+        handleSearch(scanBuffer);
+        setScanBuffer("");
+        return;
+      }
+
+      // Only capture alphanumeric keys
+      if (e.key.length === 1 && /[a-zA-Z0-9-_]/.test(e.key)) {
+        setScanBuffer(prev => prev + e.key);
+        setManualCode(prev => prev + e.key);
+      }
+
+      // Set timeout to process buffer (for scanner that doesn't send Enter)
+      scanTimeoutRef.current = setTimeout(() => {
+        if (scanBuffer.length >= 6) {
+          handleSearch(scanBuffer);
+        }
+        setScanBuffer("");
+      }, 300);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      if (scanTimeoutRef.current) {
+        clearTimeout(scanTimeoutRef.current);
+      }
+    };
+  }, [open, scanMode, scanBuffer, handleSearch]);
   const handleManualSearch = () => {
     handleSearch(manualCode);
   };
