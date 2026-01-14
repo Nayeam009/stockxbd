@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,11 +42,7 @@ export const InventoryPricingCard = ({
   const [editedPrices, setEditedPrices] = useState<Record<string, Partial<ProductPrice>>>({});
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    fetchProducts();
-  }, [productType, brandFilter, sizeFilter, fetchProducts]);
-
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
     try {
       setLoading(true);
       let query = supabase
@@ -68,7 +64,11 @@ export const InventoryPricingCard = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [productType, sizeFilter]);
+
+  useEffect(() => {
+    fetchProducts();
+  }, [fetchProducts]);
 
   const handlePriceChange = (productId: string, field: keyof ProductPrice, value: number) => {
     setEditedPrices(prev => ({

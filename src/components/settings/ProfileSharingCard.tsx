@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,6 +53,25 @@ export const ProfileSharingCard = () => {
   const [userRole, setUserRole] = useState<string>('');
   const [currentUserId, setCurrentUserId] = useState<string>('');
 
+  const fetchTeamMembers = useCallback(async () => {
+    if (!currentUserId) return;
+    
+    const { data, error } = await supabase
+      .from('team_members')
+      .select('id, member_user_id, member_email, role, created_at')
+      .eq('owner_id', currentUserId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching team members:', error);
+      return;
+    }
+
+    if (data) {
+      setTeamMembers(data as TeamMember[]);
+    }
+  }, [currentUserId]);
+
   useEffect(() => {
     checkUserRole();
   }, []);
@@ -76,23 +95,6 @@ export const ProfileSharingCard = () => {
       if (roleData) {
         setUserRole(roleData.role);
       }
-    }
-  };
-
-  const fetchTeamMembers = async () => {
-    const { data, error } = await supabase
-      .from('team_members')
-      .select('id, member_user_id, member_email, role, created_at')
-      .eq('owner_id', currentUserId)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Error fetching team members:', error);
-      return;
-    }
-
-    if (data) {
-      setTeamMembers(data as TeamMember[]);
     }
   };
 
