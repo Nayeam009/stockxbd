@@ -10,8 +10,10 @@ import stockXLogo from "@/assets/stock-x-logo.png";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type AuthMode = 'signin' | 'signup' | 'invite';
+type UserRole = 'owner' | 'manager' | 'driver';
 
 const Auth = () => {
   const [searchParams] = useSearchParams();
@@ -23,6 +25,7 @@ const Auth = () => {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [fullName, setFullName] = useState("");
+  const [selectedRole, setSelectedRole] = useState<UserRole>('owner');
   const [loading, setLoading] = useState(false);
   const [checkingSystem, setCheckingSystem] = useState(true);
   const [ownersExist, setOwnersExist] = useState(true);
@@ -165,15 +168,15 @@ const Auth = () => {
             description: `You've successfully joined as ${getRoleLabel(inviteRole)}` 
           });
         } else {
-          // New shop owner signup - assign owner role
+          // New user signup - assign selected role
           await supabase.from('user_roles').insert({
             user_id: data.user.id,
-            role: 'owner'
+            role: selectedRole
           });
           
           toast({ 
             title: "Account Created Successfully!", 
-            description: "Welcome! You're now the owner of your Stock-X shop" 
+            description: `Welcome! You've signed up as ${getRoleLabel(selectedRole)}` 
           });
         }
         
@@ -576,6 +579,47 @@ const Auth = () => {
                         required
                         disabled={loading}
                       />
+                    </div>
+                  )}
+
+                  {/* Role Selection - Only for Sign Up without invite */}
+                  {authMode === 'signup' && !inviteCode && (
+                    <div className="space-y-2">
+                      <Label htmlFor="role">Select Your Role</Label>
+                      <Select 
+                        value={selectedRole} 
+                        onValueChange={(value: UserRole) => setSelectedRole(value)}
+                        disabled={loading}
+                      >
+                        <SelectTrigger id="role" className="w-full">
+                          <SelectValue placeholder="Select a role" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="owner">
+                            <div className="flex items-center space-x-2">
+                              <Crown className="h-4 w-4 text-amber-600" />
+                              <span>Owner - Full business control</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="manager">
+                            <div className="flex items-center space-x-2">
+                              <Users className="h-4 w-4 text-primary" />
+                              <span>Manager - Inventory & sales access</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="driver">
+                            <div className="flex items-center space-x-2">
+                              <Truck className="h-4 w-4 text-muted-foreground" />
+                              <span>Driver - Delivery access</span>
+                            </div>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        {selectedRole === 'owner' && 'Full control over business settings, team, and all features'}
+                        {selectedRole === 'manager' && 'Access to inventory, sales, customers, and team coordination'}
+                        {selectedRole === 'driver' && 'Access to deliveries, customer updates, and sales recording'}
+                      </p>
                     </div>
                   )}
 
