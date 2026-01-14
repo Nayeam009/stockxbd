@@ -147,7 +147,9 @@ const Auth = () => {
             ? `${window.location.origin}/auth?invite=${inviteCode}&role=${inviteRoleParam || inviteRole}`
             : window.location.origin,
           data: {
-            full_name: fullName || undefined
+            full_name: fullName || undefined,
+            // Pass selected role to database trigger (only for non-invite signups)
+            requested_role: inviteCode ? undefined : selectedRole
           }
         }
       });
@@ -168,12 +170,7 @@ const Auth = () => {
             description: `You've successfully joined as ${getRoleLabel(inviteRole)}` 
           });
         } else {
-          // New user signup - assign selected role
-          await supabase.from('user_roles').insert({
-            user_id: data.user.id,
-            role: selectedRole
-          });
-          
+          // Role is now assigned by database trigger using requested_role from metadata
           toast({ 
             title: "Account Created Successfully!", 
             description: `Welcome! You've signed up as ${getRoleLabel(selectedRole)}` 
