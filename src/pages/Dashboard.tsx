@@ -25,7 +25,6 @@ import { useDashboardData } from "@/hooks/useDashboardData";
 import { getNextModule } from "@/hooks/useSwipeNavigation";
 import { supabase } from "@/integrations/supabase/client";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { QuickStartGuide, useQuickStartGuide } from "@/components/onboarding/QuickStartGuide";
 
 const Dashboard = () => {
   const [activeModule, setActiveModule] = useState("overview");
@@ -34,7 +33,7 @@ const Dashboard = () => {
   const [userName, setUserName] = useState("");
   const [authLoading, setAuthLoading] = useState(true);
   const isMobile = useIsMobile();
-  const { showGuide, openGuide, closeGuide } = useQuickStartGuide();
+
   // Swipe gesture state
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
@@ -144,7 +143,6 @@ const Dashboard = () => {
             drivers={drivers}
             userRole={userRole}
             setActiveModule={setActiveModule}
-            onShowGuide={openGuide}
           />
         );
       case "pos":
@@ -270,14 +268,6 @@ const Dashboard = () => {
           />
         </div>
       </div>
-
-      {/* Quick Start Guide for new owners */}
-      {showGuide && (
-        <QuickStartGuide 
-          onClose={closeGuide} 
-          onNavigate={setActiveModule} 
-        />
-      )}
     </SidebarProvider>
   );
 };

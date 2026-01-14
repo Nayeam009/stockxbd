@@ -167,10 +167,8 @@ export type Database = {
           cylinders_due: number | null
           email: string | null
           id: string
-          is_demo: boolean | null
           last_order_date: string | null
           name: string
-          owner_id: string | null
           phone: string | null
           total_due: number | null
           updated_at: string | null
@@ -183,10 +181,8 @@ export type Database = {
           cylinders_due?: number | null
           email?: string | null
           id?: string
-          is_demo?: boolean | null
           last_order_date?: string | null
           name: string
-          owner_id?: string | null
           phone?: string | null
           total_due?: number | null
           updated_at?: string | null
@@ -199,10 +195,8 @@ export type Database = {
           cylinders_due?: number | null
           email?: string | null
           id?: string
-          is_demo?: boolean | null
           last_order_date?: string | null
           name?: string
-          owner_id?: string | null
           phone?: string | null
           total_due?: number | null
           updated_at?: string | null
@@ -260,8 +254,6 @@ export type Database = {
           description: string | null
           expense_date: string
           id: string
-          is_demo: boolean | null
-          owner_id: string | null
         }
         Insert: {
           amount?: number
@@ -271,8 +263,6 @@ export type Database = {
           description?: string | null
           expense_date?: string
           id?: string
-          is_demo?: boolean | null
-          owner_id?: string | null
         }
         Update: {
           amount?: number
@@ -282,8 +272,6 @@ export type Database = {
           description?: string | null
           expense_date?: string
           id?: string
-          is_demo?: boolean | null
-          owner_id?: string | null
         }
         Relationships: []
       }
@@ -319,9 +307,7 @@ export type Database = {
           empty_cylinder: number
           id: string
           is_active: boolean
-          is_demo: boolean | null
           name: string
-          owner_id: string | null
           package_cylinder: number
           problem_cylinder: number
           refill_cylinder: number
@@ -336,9 +322,7 @@ export type Database = {
           empty_cylinder?: number
           id?: string
           is_active?: boolean
-          is_demo?: boolean | null
           name: string
-          owner_id?: string | null
           package_cylinder?: number
           problem_cylinder?: number
           refill_cylinder?: number
@@ -353,9 +337,7 @@ export type Database = {
           empty_cylinder?: number
           id?: string
           is_active?: boolean
-          is_demo?: boolean | null
           name?: string
-          owner_id?: string | null
           package_cylinder?: number
           problem_cylinder?: number
           refill_cylinder?: number
@@ -420,11 +402,9 @@ export type Database = {
           delivery_date: string | null
           driver_id: string | null
           id: string
-          is_demo: boolean | null
           notes: string | null
           order_date: string
           order_number: string
-          owner_id: string | null
           payment_status: string
           status: string
           total_amount: number
@@ -439,11 +419,9 @@ export type Database = {
           delivery_date?: string | null
           driver_id?: string | null
           id?: string
-          is_demo?: boolean | null
           notes?: string | null
           order_date?: string
           order_number: string
-          owner_id?: string | null
           payment_status?: string
           status?: string
           total_amount?: number
@@ -458,11 +436,9 @@ export type Database = {
           delivery_date?: string | null
           driver_id?: string | null
           id?: string
-          is_demo?: boolean | null
           notes?: string | null
           order_date?: string
           order_number?: string
-          owner_id?: string | null
           payment_status?: string
           status?: string
           total_amount?: number
@@ -536,9 +512,7 @@ export type Database = {
           customer_id: string | null
           discount: number
           id: string
-          is_demo: boolean | null
           notes: string | null
-          owner_id: string | null
           payment_method: Database["public"]["Enums"]["payment_method"]
           payment_status: string
           subtotal: number
@@ -551,9 +525,7 @@ export type Database = {
           customer_id?: string | null
           discount?: number
           id?: string
-          is_demo?: boolean | null
           notes?: string | null
-          owner_id?: string | null
           payment_method: Database["public"]["Enums"]["payment_method"]
           payment_status?: string
           subtotal: number
@@ -566,9 +538,7 @@ export type Database = {
           customer_id?: string | null
           discount?: number
           id?: string
-          is_demo?: boolean | null
           notes?: string | null
-          owner_id?: string | null
           payment_method?: Database["public"]["Enums"]["payment_method"]
           payment_status?: string
           subtotal?: number
@@ -594,8 +564,6 @@ export type Database = {
           distributor_price: number
           id: string
           is_active: boolean
-          is_demo: boolean | null
-          owner_id: string | null
           package_price: number
           product_name: string
           product_type: string
@@ -612,8 +580,6 @@ export type Database = {
           distributor_price?: number
           id?: string
           is_active?: boolean
-          is_demo?: boolean | null
-          owner_id?: string | null
           package_price?: number
           product_name: string
           product_type: string
@@ -630,8 +596,6 @@ export type Database = {
           distributor_price?: number
           id?: string
           is_active?: boolean
-          is_demo?: boolean | null
-          owner_id?: string | null
           package_price?: number
           product_name?: string
           product_type?: string
@@ -649,9 +613,7 @@ export type Database = {
           created_by: string | null
           id: string
           is_active: boolean
-          is_demo: boolean | null
           name: string
-          owner_id: string | null
           price: number
           sku: string | null
           stock_quantity: number
@@ -664,9 +626,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           is_active?: boolean
-          is_demo?: boolean | null
           name: string
-          owner_id?: string | null
           price: number
           sku?: string | null
           stock_quantity?: number
@@ -679,9 +639,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           is_active?: boolean
-          is_demo?: boolean | null
           name?: string
-          owner_id?: string | null
           price?: number
           sku?: string | null
           stock_quantity?: number
@@ -727,8 +685,6 @@ export type Database = {
           created_by: string | null
           id: string
           is_active: boolean
-          is_demo: boolean | null
-          owner_id: string | null
           quantity: number
           type: string
           updated_at: string
@@ -739,8 +695,6 @@ export type Database = {
           created_by?: string | null
           id?: string
           is_active?: boolean
-          is_demo?: boolean | null
-          owner_id?: string | null
           quantity?: number
           type?: string
           updated_at?: string
@@ -751,8 +705,6 @@ export type Database = {
           created_by?: string | null
           id?: string
           is_active?: boolean
-          is_demo?: boolean | null
-          owner_id?: string | null
           quantity?: number
           type?: string
           updated_at?: string
@@ -765,9 +717,7 @@ export type Database = {
           created_by: string | null
           id: string
           is_active: boolean
-          is_demo: boolean | null
           name: string
-          owner_id: string | null
           phone: string | null
           role: string
           salary: number
@@ -778,9 +728,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           is_active?: boolean
-          is_demo?: boolean | null
           name: string
-          owner_id?: string | null
           phone?: string | null
           role?: string
           salary?: number
@@ -791,9 +739,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           is_active?: boolean
-          is_demo?: boolean | null
           name?: string
-          owner_id?: string | null
           phone?: string | null
           role?: string
           salary?: number
@@ -807,9 +753,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
-          is_demo: boolean | null
           notes: string | null
-          owner_id: string | null
           payment_date: string
           staff_id: string
         }
@@ -818,9 +762,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
-          is_demo?: boolean | null
           notes?: string | null
-          owner_id?: string | null
           payment_date?: string
           staff_id: string
         }
@@ -829,9 +771,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
-          is_demo?: boolean | null
           notes?: string | null
-          owner_id?: string | null
           payment_date?: string
           staff_id?: string
         }
@@ -853,9 +793,7 @@ export type Database = {
           created_by: string | null
           id: string
           is_active: boolean
-          is_demo: boolean | null
           model: string
-          owner_id: string | null
           price: number
           quantity: number
           updated_at: string
@@ -867,9 +805,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           is_active?: boolean
-          is_demo?: boolean | null
           model: string
-          owner_id?: string | null
           price?: number
           quantity?: number
           updated_at?: string
@@ -881,9 +817,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           is_active?: boolean
-          is_demo?: boolean | null
           model?: string
-          owner_id?: string | null
           price?: number
           quantity?: number
           updated_at?: string
@@ -991,8 +925,6 @@ export type Database = {
           created_by: string | null
           description: string | null
           id: string
-          is_demo: boolean | null
-          owner_id: string | null
           vehicle_id: string
         }
         Insert: {
@@ -1003,8 +935,6 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           id?: string
-          is_demo?: boolean | null
-          owner_id?: string | null
           vehicle_id: string
         }
         Update: {
@@ -1015,8 +945,6 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           id?: string
-          is_demo?: boolean | null
-          owner_id?: string | null
           vehicle_id?: string
         }
         Relationships: [
@@ -1035,10 +963,8 @@ export type Database = {
           created_by: string | null
           id: string
           is_active: boolean
-          is_demo: boolean | null
           license_plate: string | null
           name: string
-          owner_id: string | null
           updated_at: string
         }
         Insert: {
@@ -1046,10 +972,8 @@ export type Database = {
           created_by?: string | null
           id?: string
           is_active?: boolean
-          is_demo?: boolean | null
           license_plate?: string | null
           name: string
-          owner_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -1057,10 +981,8 @@ export type Database = {
           created_by?: string | null
           id?: string
           is_active?: boolean
-          is_demo?: boolean | null
           license_plate?: string | null
           name?: string
-          owner_id?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -1070,11 +992,8 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      count_demo_data: { Args: never; Returns: number }
-      delete_demo_data: { Args: never; Returns: undefined }
       generate_order_number: { Args: never; Returns: string }
       generate_transaction_number: { Args: never; Returns: string }
-      get_owner_id: { Args: never; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1083,7 +1002,6 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
-      is_same_team: { Args: { _owner_id: string }; Returns: boolean }
       mark_invite_used: {
         Args: { _code: string; _email: string; _user_id: string }
         Returns: string
@@ -1093,7 +1011,6 @@ export type Database = {
         Args: { _member_id: string; _owner_id: string }
         Returns: boolean
       }
-      seed_demo_data: { Args: { _owner_id: string }; Returns: undefined }
       update_team_member_role: {
         Args: {
           _member_id: string
