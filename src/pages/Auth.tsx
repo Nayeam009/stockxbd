@@ -171,9 +171,17 @@ const Auth = () => {
             role: 'owner'
           });
           
+          // Seed demo data for new owner
+          try {
+            await supabase.rpc('seed_demo_data', { _owner_id: data.user.id });
+          } catch (seedError) {
+            console.error('Failed to seed demo data:', seedError);
+            // Don't block signup if demo data fails
+          }
+          
           toast({ 
             title: "Account Created Successfully!", 
-            description: "Welcome! You're now the owner of your Stock-X shop" 
+            description: "Welcome! Demo data has been added to help you get started." 
           });
         }
         
