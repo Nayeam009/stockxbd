@@ -19,6 +19,8 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { QRCodeSVG } from "qrcode.react";
+import { generateSecureInviteCode } from "@/lib/validationSchemas";
+import { logger } from "@/lib/logger";
 import {
   Dialog,
   DialogContent,
@@ -63,7 +65,7 @@ export const ProfileSharingCard = () => {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('Error fetching team members:', error);
+      logger.error('Error fetching team members', error, { component: 'ProfileSharingCard' });
       return;
     }
 
@@ -102,8 +104,8 @@ export const ProfileSharingCard = () => {
     setLoading(true);
     
     try {
-      // Generate a unique invite code
-      const code = `SX-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+      // Generate a cryptographically secure invite code
+      const code = generateSecureInviteCode();
       
       // Store invite in database
       const { error } = await supabase
@@ -116,7 +118,7 @@ export const ProfileSharingCard = () => {
         });
 
       if (error) {
-        console.error('Error creating invite:', error);
+        logger.error('Error creating invite', error, { component: 'ProfileSharingCard' });
         toast({ 
           title: language === 'bn' ? 'ত্রুটি হয়েছে' : 'Error creating invite',
           variant: 'destructive'
@@ -128,7 +130,7 @@ export const ProfileSharingCard = () => {
       setInviteCode(code);
       setShowQRDialog(true);
     } catch (err) {
-      console.error('Error generating invite:', err);
+      logger.error('Error generating invite', err, { component: 'ProfileSharingCard' });
       toast({ 
         title: language === 'bn' ? 'ত্রুটি হয়েছে' : 'Error creating invite',
         variant: 'destructive'
@@ -153,7 +155,7 @@ export const ProfileSharingCard = () => {
       .eq('id', memberId);
 
     if (error) {
-      console.error('Error removing team member:', error);
+      logger.error('Error removing team member', error, { component: 'ProfileSharingCard' });
       toast({ 
         title: language === 'bn' ? 'ত্রুটি হয়েছে' : 'Error removing member',
         variant: 'destructive'

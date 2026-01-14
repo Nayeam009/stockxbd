@@ -38,6 +38,8 @@ import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
+import { sanitizeString, customerSchema } from "@/lib/validationSchemas";
+import { logger } from "@/lib/logger";
 
 interface Customer {
   id: string;
@@ -251,6 +253,22 @@ export const CustomerManagementModule = () => {
   };
 
   const handleAddCustomer = async () => {
+    // Validate customer input using Zod schema
+    const result = customerSchema.safeParse({
+      name: newCustomer.name,
+      phone: newCustomer.phone || null,
+      address: newCustomer.address || null,
+    });
+    
+    if (!result.success) {
+      toast({ 
+        title: "Invalid input", 
+        description: result.error.errors[0]?.message || "Please check your input",
+        variant: "destructive" 
+      });
+      return;
+    }
+    
     const { data: { user } } = await supabase.auth.getUser();
     
     const totalDue = parseFloat(newCustomer.total_due) || 0;
@@ -259,10 +277,10 @@ export const CustomerManagementModule = () => {
     const { error } = await supabase
       .from('customers')
       .insert({
-        name: newCustomer.name,
+        name: sanitizeString(newCustomer.name),
         email: newCustomer.email || null,
         phone: newCustomer.phone || null,
-        address: newCustomer.address || null,
+        address: newCustomer.address ? sanitizeString(newCustomer.address) : null,
         total_due: totalDue,
         cylinders_due: cylindersDue,
         billing_status: totalDue > 0 || cylindersDue > 0 ? 'pending' : 'clear',
@@ -270,7 +288,8 @@ export const CustomerManagementModule = () => {
       });
 
     if (error) {
-      toast({ title: "Error adding customer", description: error.message, variant: "destructive" });
+      logger.error('Error adding customer', error, { component: 'CustomerManagement' });
+      toast({ title: "Error adding customer", description: "Failed to add customer", variant: "destructive" });
       return;
     }
 
