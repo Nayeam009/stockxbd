@@ -61,7 +61,7 @@ export const ProfileSharingCard = () => {
     if (currentUserId && userRole === 'owner') {
       fetchTeamMembers();
     }
-  }, [currentUserId, userRole]);
+  }, [currentUserId, userRole, fetchTeamMembers]);
 
   const checkUserRole = async () => {
     const { data: { user } } = await supabase.auth.getUser();

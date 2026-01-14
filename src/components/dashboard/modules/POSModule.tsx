@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -233,7 +233,7 @@ export const POSModule = () => {
         setPrice(autoPrice.toString());
       }
     }
-  }, [sellingBrand, weight, cylinderType, saleType, productPrices]);
+  }, [sellingBrand, weight, cylinderType, saleType, productPrices, getLPGPrice]);
 
   // Auto-populate regulator price when selected
   useEffect(() => {
@@ -246,7 +246,7 @@ export const POSModule = () => {
         }
       }
     }
-  }, [selectedRegulator, regulators, productPrices]);
+  }, [selectedRegulator, regulators, productPrices, getRegulatorPrice]);
 
   // Filter brands by mouth size, weight, and search
   const filteredBrands = useMemo(() => {
@@ -307,16 +307,16 @@ export const POSModule = () => {
     return priceEntry?.retail_price || 0;
   };
 
-  const getRegulatorPrice = (brand: string, type: string) => {
+  const getRegulatorPrice = useCallback((brand: string, type: string) => {
     const priceEntry = productPrices.find(
       p => p.product_type === 'regulator' && 
            p.product_name.toLowerCase().includes(brand.toLowerCase()) &&
            p.product_name.toLowerCase().includes(type.toLowerCase())
     );
     return priceEntry?.retail_price || 0;
-  };
+  }, [productPrices]);
 
-  const getLPGPrice = (brandId: string, weight: string, cylinderType: 'refill' | 'package', saleType: 'retail' | 'wholesale') => {
+  const getLPGPrice = useCallback((brandId: string, weight: string, cylinderType: 'refill' | 'package', saleType: 'retail' | 'wholesale') => {
     const brand = lpgBrands.find(b => b.id === brandId);
     if (!brand) return 0;
     
@@ -332,7 +332,7 @@ export const POSModule = () => {
       return priceEntry.package_price || priceEntry.retail_price;
     }
     return saleType === 'wholesale' ? priceEntry.distributor_price : priceEntry.retail_price;
-  };
+  }, [lpgBrands, productPrices]);
 
   // Fetch customer sales history
   const fetchCustomerHistory = async (customerId: string) => {

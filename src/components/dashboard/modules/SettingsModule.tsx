@@ -120,7 +120,7 @@ export const SettingsModule = () => {
     if (savedNotifications) {
       setNotifications(JSON.parse(savedNotifications));
     }
-  }, []);
+  }, [businessName, businessPhone, businessAddress]);
 
   const handleSaveProfile = async () => {
     setSavingProfile(true);

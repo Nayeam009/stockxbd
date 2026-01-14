@@ -82,7 +82,7 @@ const channel = supabase.channel('change-key')
 - **Operations**: Staff, vehicles, daily expenses, cylinder exchanges
 
 **Bangladesh-Specific Details**:
-- Currency symbol: `BANGLADESHI_CURRENCY_SYMBOL` from [lib/bangladeshConstants.ts](src/lib/bangladeshConstants.ts)
+- Currency symbol: `BANGLADESHI_CURRENCY_SYMBOL` from `src/lib/bangladeshConstants.ts`
 - Payment methods: Cash, bKash, Nagad, Rocket, Bank, Credit
 - Product types: Cylinders (12kg refill/package), Stoves, Regulators
 - Multi-language support (Bangla/English) via `LanguageContext`
@@ -105,10 +105,10 @@ npm run lint       # ESLint check (strict rules disabled for unused vars & any)
 6. Register in Dashboard.tsx module list
 
 ### Supabase Integration
-- **Config**: [supabase/config.toml](supabase/config.toml)
-- **Migrations**: Auto-generated in [supabase/migrations/](supabase/migrations/)
-- **Types**: Auto-generated [src/integrations/supabase/types.ts](src/integrations/supabase/types.ts) - **DO NOT EDIT**
-- **Client**: [src/integrations/supabase/client.ts](src/integrations/supabase/client.ts) uses env vars `VITE_SUPABASE_URL` & `VITE_SUPABASE_PUBLISHABLE_KEY`
+- **Config**: `supabase/config.toml`
+- **Migrations**: Auto-generated in `supabase/migrations/`
+- **Types**: Auto-generated `src/integrations/supabase/types.ts` - **DO NOT EDIT**
+- **Client**: `src/integrations/supabase/client.ts` uses env vars `VITE_SUPABASE_URL` & `VITE_SUPABASE_PUBLISHABLE_KEY`
 
 ### Common Tasks
 
@@ -129,7 +129,7 @@ import { toast } from "sonner";
 toast.error("Error message");
 ```
 
-**PDF export**: Use [lib/pdfExport.ts](src/lib/pdfExport.ts) for invoice generation.
+**PDF export**: Use `src/lib/pdfExport.ts` for invoice generation.
 
 **File uploads**: Handled in ProfileModule (avatar to Supabase storage).
 
@@ -147,7 +147,7 @@ toast.error("Error message");
 - **Type matching**: Return types from Supabase must match interface definitions
 
 ## Common Gotchas
-- **Auto-generated types**: Never manually edit [src/integrations/supabase/types.ts](src/integrations/supabase/types.ts)
+- **Auto-generated types**: Never manually edit `src/integrations/supabase/types.ts`
 - **Realtime listeners**: Always cleanup subscriptions in `useEffect` return
 - **Null handling**: Supabase nullable fields may return `null` - use optional chaining
 - **Timestamps**: Stored as ISO strings - use `date-fns` for formatting

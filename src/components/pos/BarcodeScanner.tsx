@@ -173,7 +173,7 @@ export const BarcodeScanner = ({ open, onOpenChange, onProductFound }: BarcodeSc
         clearTimeout(scanTimeoutRef.current);
       }
     };
-  }, [open, scanMode, scanBuffer]);
+  }, [open, scanMode, scanBuffer, handleSearch]);
 
   const handleSearch = useCallback(async (code: string) => {
     if (!code.trim() || code.length < 3) {

@@ -125,7 +125,7 @@ export const CustomerManagementModule = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [selectedCustomer]);
 
   const fetchCustomers = async () => {
     setLoading(true);

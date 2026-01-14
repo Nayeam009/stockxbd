@@ -183,7 +183,7 @@ export const SearchModule = ({ salesData, customers, stockData, drivers, userRol
     }
 
     return results;
-  }, [searchQuery, searchCategory, salesData, customers, stockData, drivers, userRole]);
+  }, [searchQuery, searchCategory, salesData, customers, stockData, drivers, userRole, saveSearch]);
 
   // Generate Daily Sales Report
   const generateDailySalesReport = async () => {

@@ -119,7 +119,7 @@ export const LPGStockModule = ({ size = "22mm" }: LPGStockModuleProps) => {
 
   useEffect(() => {
     fetchBrands();
-  }, [size, selectedWeight]);
+  }, [size, selectedWeight, fetchBrands]);
 
   // Update newBrand weight when selectedWeight changes
   useEffect(() => {

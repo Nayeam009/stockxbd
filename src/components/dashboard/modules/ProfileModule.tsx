@@ -43,7 +43,67 @@ export const ProfileModule = () => {
   });
 
   useEffect(() => {
-    fetchProfile();
+    const initProfile = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        setUserEmail(user.email || "");
+
+        // Fetch user role
+        const { data: roleData } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .single();
+
+        if (roleData) {
+          setUserRole(roleData.role);
+        }
+
+        // Fetch profile
+        const { data: profileData, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('user_id', user.id)
+          .single();
+
+        if (error && error.code !== 'PGRST116') {
+          throw error;
+        }
+
+        if (profileData) {
+          setProfile(profileData);
+          setFormData({
+            full_name: profileData.full_name || "",
+            phone: profileData.phone || "",
+          });
+        } else {
+          // Create profile if doesn't exist
+          const { data: newProfile, error: insertError } = await supabase
+            .from('profiles')
+            .insert({
+              user_id: user.id,
+              full_name: user.email?.split('@')[0] || 'User',
+            })
+            .select()
+            .single();
+
+          if (!insertError && newProfile) {
+            setProfile(newProfile);
+            setFormData({
+              full_name: newProfile.full_name || "",
+              phone: newProfile.phone || "",
+            });
+          }
+        }
+      } catch (error: any) {
+        console.error('Error fetching profile:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    initProfile();
   }, []);
 
   const fetchProfile = async () => {

@@ -31,90 +31,90 @@ const Auth = () => {
 
   // Check system state on mount
   useEffect(() => {
-    checkSystemState();
-  }, [inviteCode]);
-
-  const checkSystemState = async () => {
-    setCheckingSystem(true);
-    
-    try {
-      // Check if user is already logged in
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        // If invite code present, process it for existing user
-        if (inviteCode) {
-          await processInviteForExistingUser(session.user.id, session.user.email || '');
-        } else {
-          navigate('/dashboard');
-          return;
-        }
-      }
-
-      // If invite code is present, validate it
-      if (inviteCode) {
-        const { data: inviteData, error } = await supabase.rpc('validate_invite', { _code: inviteCode });
+    const processInviteForExistingUser = async (userId: string, email: string) => {
+      if (!inviteCode) return;
+      
+      try {
+        const { data, error } = await supabase.rpc('mark_invite_used', {
+          _code: inviteCode,
+          _user_id: userId,
+          _email: email
+        });
         
-        if (error || !inviteData || inviteData.length === 0) {
-          setInviteValid(false);
-          setAuthMode('login');
+        if (error || !data) {
           toast({
-            title: "Invalid Invite",
-            description: "This invite link is invalid or expired",
+            title: "Invite Processing Failed",
+            description: "Could not process the invite. It may be invalid or already used.",
             variant: "destructive"
           });
         } else {
-          setInviteValid(true);
-          setInviteRole(inviteData[0].role);
-          setAuthMode('invite');
+          toast({
+            title: "Welcome to the Team!",
+            description: `You've been added as ${inviteRoleParam || 'team member'}`,
+          });
         }
-      } else {
-        // Check if any owners exist
-        const { data: hasOwners, error } = await supabase.rpc('owners_exist');
-        
-        if (error) {
-          console.error('Error checking owners:', error);
-          setOwnersExist(true); // Assume owners exist if check fails
-        } else {
-          setOwnersExist(hasOwners || false);
-          // If no owners, show signup; otherwise show login
-          setAuthMode(hasOwners ? 'login' : 'signup');
-        }
+        navigate('/dashboard');
+      } catch (err) {
+        console.error('Error processing invite:', err);
+        navigate('/dashboard');
       }
-    } catch (err) {
-      console.error('Error checking system state:', err);
-    }
-    
-    setCheckingSystem(false);
-  };
+    };
 
-  const processInviteForExistingUser = async (userId: string, email: string) => {
-    if (!inviteCode) return;
-    
-    try {
-      const { data, error } = await supabase.rpc('mark_invite_used', {
-        _code: inviteCode,
-        _user_id: userId,
-        _email: email
-      });
+    const checkSystemState = async () => {
+      setCheckingSystem(true);
       
-      if (error || !data) {
-        toast({
-          title: "Invite Processing Failed",
-          description: "Could not process the invite. It may be invalid or already used.",
-          variant: "destructive"
-        });
-      } else {
-        toast({
-          title: "Welcome to the Team!",
-          description: `You've been added as ${inviteRoleParam || 'team member'}`,
-        });
+      try {
+        // Check if user is already logged in
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          // If invite code present, process it for existing user
+          if (inviteCode) {
+            await processInviteForExistingUser(session.user.id, session.user.email || '');
+          } else {
+            navigate('/dashboard');
+            return;
+          }
+        }
+
+        // If invite code is present, validate it
+        if (inviteCode) {
+          const { data: inviteData, error } = await supabase.rpc('validate_invite', { _code: inviteCode });
+          
+          if (error || !inviteData || inviteData.length === 0) {
+            setInviteValid(false);
+            setAuthMode('login');
+            toast({
+              title: "Invalid Invite",
+              description: "This invite link is invalid or expired",
+              variant: "destructive"
+            });
+          } else {
+            setInviteValid(true);
+            setInviteRole(inviteData[0].role);
+            setAuthMode('invite');
+          }
+        } else {
+          // Check if any owners exist
+          const { data: hasOwners, error } = await supabase.rpc('owners_exist');
+          
+          if (error) {
+            console.error('Error checking owners:', error);
+            setOwnersExist(true); // Assume owners exist if check fails
+          } else {
+            setOwnersExist(hasOwners || false);
+            // If no owners, show signup; otherwise show login
+            setAuthMode(hasOwners ? 'login' : 'signup');
+          }
+        }
+      } catch (err) {
+        console.error('Error checking system state:', err);
       }
-      navigate('/dashboard');
-    } catch (err) {
-      console.error('Error processing invite:', err);
-      navigate('/dashboard');
-    }
-  };
+      
+      setCheckingSystem(false);
+    };
+
+    checkSystemState();
+  }, [inviteCode, navigate, inviteRoleParam]);
 
   const handleEmailSignUp = async () => {
     if (!email || !password) {

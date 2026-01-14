@@ -44,7 +44,7 @@ export const InventoryPricingCard = ({
 
   useEffect(() => {
     fetchProducts();
-  }, [productType, brandFilter, sizeFilter]);
+  }, [productType, brandFilter, sizeFilter, fetchProducts]);
 
   const fetchProducts = async () => {
     try {
