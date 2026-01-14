@@ -978,6 +978,20 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      mark_invite_used: {
+        Args: { _code: string; _email: string; _user_id: string }
+        Returns: string
+      }
+      owners_exist: { Args: never; Returns: boolean }
+      validate_invite: {
+        Args: { _code: string }
+        Returns: {
+          created_by: string
+          expires_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+        }[]
+      }
     }
     Enums: {
       app_role: "owner" | "manager" | "driver"

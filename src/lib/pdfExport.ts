@@ -1,5 +1,4 @@
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import { PDFDocument, rgb, StandardFonts, PDFPage, PDFFont } from 'pdf-lib';
 
 interface BusinessInfo {
   name: string;
@@ -51,201 +50,219 @@ const defaultBusiness: BusinessInfo = {
   tagline: 'Your Trusted LPG Partner'
 };
 
+// Colors
+const primaryColor = rgb(16 / 255, 163 / 255, 127 / 255);
+const textColor = rgb(30 / 255, 30 / 255, 30 / 255);
+const mutedColor = rgb(100 / 255, 100 / 255, 100 / 255);
+const headerBgColor = rgb(240 / 255, 240 / 255, 240 / 255);
+const lightBorderColor = rgb(220 / 255, 220 / 255, 220 / 255);
+
+// Helper to draw text
+const drawText = (
+  page: PDFPage, 
+  text: string, 
+  x: number, 
+  y: number, 
+  font: PDFFont, 
+  size: number, 
+  color = textColor
+) => {
+  page.drawText(text, { x, y, size, font, color });
+};
+
+// Helper to truncate text
+const truncateText = (text: string, maxLength: number): string => {
+  return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
+};
+
 // Generate PDF from Invoice Data
 export const generateInvoicePDF = async (
   invoiceData: InvoiceData,
   business: BusinessInfo = defaultBusiness
 ): Promise<void> => {
-  const doc = new jsPDF();
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const margin = 20;
-  let y = 20;
+  const pdfDoc = await PDFDocument.create();
+  const page = pdfDoc.addPage([595, 842]); // A4 size
+  const { width, height } = page.getSize();
+  
+  const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  
+  const margin = 50;
+  let y = height - 50;
 
-  // Colors
-  const primaryColor: [number, number, number] = [16, 163, 127]; // Green
-  const textColor: [number, number, number] = [30, 30, 30];
-  const mutedColor: [number, number, number] = [100, 100, 100];
-
-  // Header with gradient effect
-  doc.setFillColor(...primaryColor);
-  doc.rect(0, 0, pageWidth, 45, 'F');
+  // Header with background
+  page.drawRectangle({
+    x: 0,
+    y: height - 80,
+    width: width,
+    height: 80,
+    color: primaryColor,
+  });
 
   // Business Name
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(24);
-  doc.setFont('helvetica', 'bold');
-  doc.text(business.name, margin, y + 10);
-
-  // Business Details
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'normal');
-  doc.text(business.address, margin, y + 18);
-  doc.text(`Phone: ${business.phone}`, margin, y + 25);
+  drawText(page, business.name, margin, height - 35, fontBold, 22, rgb(1, 1, 1));
+  drawText(page, business.address, margin, height - 52, fontRegular, 10, rgb(1, 1, 1));
+  drawText(page, `Phone: ${business.phone}`, margin, height - 65, fontRegular, 10, rgb(1, 1, 1));
 
   // Invoice Title
-  doc.setFontSize(16);
-  doc.setFont('helvetica', 'bold');
-  doc.text('INVOICE', pageWidth - margin - 35, y + 15);
-  
-  y = 55;
+  drawText(page, 'INVOICE', width - margin - 70, height - 45, fontBold, 16, rgb(1, 1, 1));
+
+  y = height - 110;
 
   // Invoice Details Section
-  doc.setTextColor(...textColor);
-  doc.setFontSize(11);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Invoice Details', margin, y);
-  
-  y += 8;
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-  
+  drawText(page, 'Invoice Details', margin, y, fontBold, 12, textColor);
+  y -= 20;
+
   const customerName = invoiceData.customerName || invoiceData.customer?.name || 'Walk-in Customer';
   const invoiceDate = invoiceData.date instanceof Date 
     ? invoiceData.date.toLocaleDateString('en-BD') 
     : new Date(invoiceData.date).toLocaleDateString('en-BD');
 
-  // Two column layout for details
-  doc.text(`Invoice No: ${invoiceData.invoiceNumber}`, margin, y);
-  doc.text(`Date: ${invoiceDate}`, pageWidth / 2 + 10, y);
+  drawText(page, `Invoice No: ${invoiceData.invoiceNumber}`, margin, y, fontRegular, 10, textColor);
+  drawText(page, `Date: ${invoiceDate}`, width / 2 + 30, y, fontRegular, 10, textColor);
+  y -= 15;
   
-  y += 6;
-  doc.text(`Customer: ${customerName}`, margin, y);
+  drawText(page, `Customer: ${customerName}`, margin, y, fontRegular, 10, textColor);
   if (invoiceData.customer?.phone) {
-    doc.text(`Phone: ${invoiceData.customer.phone}`, pageWidth / 2 + 10, y);
+    drawText(page, `Phone: ${invoiceData.customer.phone}`, width / 2 + 30, y, fontRegular, 10, textColor);
   }
   
   if (invoiceData.customer?.address) {
-    y += 6;
-    doc.text(`Address: ${invoiceData.customer.address}`, margin, y);
+    y -= 15;
+    drawText(page, `Address: ${invoiceData.customer.address}`, margin, y, fontRegular, 10, textColor);
   }
 
-  y += 15;
+  y -= 35;
 
-  // Items Table
+  // Items Table Header
   const tableHeaders = ['#', 'Item Description', 'Qty', 'Unit Price', 'Total'];
-  const colWidths = [15, 80, 20, 35, 35];
-  const tableWidth = colWidths.reduce((a, b) => a + b, 0);
+  const colWidths = [30, 220, 50, 80, 80];
   const tableX = margin;
+  const tableWidth = colWidths.reduce((a, b) => a + b, 0);
 
-  // Table Header
-  doc.setFillColor(240, 240, 240);
-  doc.rect(tableX, y - 5, tableWidth, 10, 'F');
-  
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.setTextColor(...textColor);
-  
-  let xPos = tableX + 2;
+  // Table Header Background
+  page.drawRectangle({
+    x: tableX,
+    y: y - 5,
+    width: tableWidth,
+    height: 20,
+    color: headerBgColor,
+  });
+
+  let xPos = tableX + 5;
   tableHeaders.forEach((header, i) => {
-    doc.text(header, xPos, y);
+    drawText(page, header, xPos, y, fontBold, 9, textColor);
     xPos += colWidths[i];
   });
 
-  y += 8;
+  y -= 25;
 
   // Table Rows
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(...textColor);
-
   invoiceData.items.forEach((item, index) => {
-    if (y > 250) {
-      doc.addPage();
-      y = 20;
-    }
+    if (y < 100) return; // Prevent overflow
 
-    xPos = tableX + 2;
+    xPos = tableX + 5;
     const unitPrice = item.price ?? item.unitPrice ?? 0;
     const itemTotal = item.total || (unitPrice * item.quantity);
     const itemName = item.description ? `${item.name} - ${item.description}` : item.name;
 
-    doc.text(String(index + 1), xPos, y);
+    drawText(page, String(index + 1), xPos, y, fontRegular, 9, textColor);
     xPos += colWidths[0];
     
-    // Truncate long names
-    const truncatedName = itemName.length > 35 ? itemName.substring(0, 35) + '...' : itemName;
-    doc.text(truncatedName, xPos, y);
+    drawText(page, truncateText(itemName, 40), xPos, y, fontRegular, 9, textColor);
     xPos += colWidths[1];
     
-    doc.text(String(item.quantity), xPos, y);
+    drawText(page, String(item.quantity), xPos, y, fontRegular, 9, textColor);
     xPos += colWidths[2];
     
-    doc.text(`৳${unitPrice.toLocaleString()}`, xPos, y);
+    drawText(page, `Tk ${unitPrice.toLocaleString()}`, xPos, y, fontRegular, 9, textColor);
     xPos += colWidths[3];
     
-    doc.text(`৳${itemTotal.toLocaleString()}`, xPos, y);
+    drawText(page, `Tk ${itemTotal.toLocaleString()}`, xPos, y, fontRegular, 9, textColor);
 
-    // Draw bottom border
-    doc.setDrawColor(220, 220, 220);
-    doc.line(tableX, y + 3, tableX + tableWidth, y + 3);
+    // Draw row border
+    page.drawLine({
+      start: { x: tableX, y: y - 8 },
+      end: { x: tableX + tableWidth, y: y - 8 },
+      thickness: 0.5,
+      color: lightBorderColor,
+    });
 
-    y += 8;
+    y -= 18;
   });
 
-  y += 10;
+  y -= 20;
 
-  // Totals Section (Right aligned)
-  const totalsX = pageWidth - margin - 80;
+  // Totals Section
+  const totalsX = width - margin - 150;
   
-  doc.setFont('helvetica', 'normal');
-  doc.text('Subtotal:', totalsX, y);
-  doc.text(`৳${invoiceData.subtotal.toLocaleString()}`, totalsX + 50, y);
+  drawText(page, 'Subtotal:', totalsX, y, fontRegular, 10, textColor);
+  drawText(page, `Tk ${invoiceData.subtotal.toLocaleString()}`, totalsX + 80, y, fontRegular, 10, textColor);
   
   if (invoiceData.discount > 0) {
-    y += 7;
-    doc.setTextColor(16, 163, 127);
-    doc.text('Discount:', totalsX, y);
-    doc.text(`-৳${invoiceData.discount.toLocaleString()}`, totalsX + 50, y);
+    y -= 15;
+    drawText(page, 'Discount:', totalsX, y, fontRegular, 10, primaryColor);
+    drawText(page, `-Tk ${invoiceData.discount.toLocaleString()}`, totalsX + 80, y, fontRegular, 10, primaryColor);
   }
   
-  y += 10;
-  doc.setDrawColor(...primaryColor);
-  doc.setLineWidth(0.5);
-  doc.line(totalsX, y - 3, totalsX + 80, y - 3);
+  y -= 20;
   
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
-  doc.setTextColor(...primaryColor);
-  doc.text('Total:', totalsX, y);
-  doc.text(`৳${invoiceData.total.toLocaleString()}`, totalsX + 50, y);
+  // Total line
+  page.drawLine({
+    start: { x: totalsX, y: y + 12 },
+    end: { x: totalsX + 140, y: y + 12 },
+    thickness: 1,
+    color: primaryColor,
+  });
 
-  // Payment Status
-  y += 15;
-  doc.setFontSize(10);
-  
+  drawText(page, 'Total:', totalsX, y, fontBold, 12, primaryColor);
+  drawText(page, `Tk ${invoiceData.total.toLocaleString()}`, totalsX + 80, y, fontBold, 12, primaryColor);
+
+  // Payment Status Badge
+  y -= 30;
   const isPaid = invoiceData.paymentStatus === 'paid' || invoiceData.paymentStatus === 'completed';
-  const statusColor: [number, number, number] = isPaid ? [16, 163, 127] : [220, 38, 38];
+  const statusColor = isPaid ? primaryColor : rgb(220 / 255, 38 / 255, 38 / 255);
   
-  doc.setFillColor(...statusColor);
-  doc.roundedRect(totalsX, y - 5, 80, 12, 2, 2, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFont('helvetica', 'bold');
-  doc.text(isPaid ? 'PAID' : 'PAYMENT DUE', totalsX + 25, y + 2);
+  page.drawRectangle({
+    x: totalsX,
+    y: y - 5,
+    width: 100,
+    height: 20,
+    color: statusColor,
+  });
+  
+  drawText(page, isPaid ? 'PAID' : 'PAYMENT DUE', totalsX + 20, y, fontBold, 10, rgb(1, 1, 1));
 
   // Notes
   if (invoiceData.notes) {
-    y += 25;
-    doc.setTextColor(...mutedColor);
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.text('Notes:', margin, y);
-    y += 5;
-    doc.text(invoiceData.notes, margin, y);
+    y -= 40;
+    drawText(page, 'Notes:', margin, y, fontRegular, 9, mutedColor);
+    y -= 12;
+    drawText(page, invoiceData.notes, margin, y, fontRegular, 9, mutedColor);
   }
 
   // Footer
-  const footerY = doc.internal.pageSize.getHeight() - 20;
-  doc.setDrawColor(200, 200, 200);
-  doc.line(margin, footerY - 10, pageWidth - margin, footerY - 10);
+  const footerY = 40;
+  page.drawLine({
+    start: { x: margin, y: footerY + 15 },
+    end: { x: width - margin, y: footerY + 15 },
+    thickness: 0.5,
+    color: lightBorderColor,
+  });
   
-  doc.setTextColor(...mutedColor);
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'normal');
-  doc.text('Thank you for your business!', pageWidth / 2, footerY, { align: 'center' });
-  doc.text(`Generated by ${business.name}`, pageWidth / 2, footerY + 5, { align: 'center' });
+  const thankYouText = 'Thank you for your business!';
+  const thankYouWidth = fontRegular.widthOfTextAtSize(thankYouText, 9);
+  drawText(page, thankYouText, (width - thankYouWidth) / 2, footerY, fontRegular, 9, mutedColor);
 
   // Save PDF
-  const fileName = `Invoice_${invoiceData.invoiceNumber}_${new Date().toISOString().split('T')[0]}.pdf`;
-  doc.save(fileName);
+  const pdfBytes = await pdfDoc.save();
+  const blob = new Blob([new Uint8Array(pdfBytes)], { type: 'application/pdf' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `Invoice_${invoiceData.invoiceNumber}_${new Date().toISOString().split('T')[0]}.pdf`;
+  link.click();
+  URL.revokeObjectURL(url);
 };
 
 // Generate PDF from Report Data
@@ -253,199 +270,187 @@ export const generateReportPDF = async (
   reportData: ReportData,
   business: BusinessInfo = defaultBusiness
 ): Promise<void> => {
-  const doc = new jsPDF('landscape');
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = 15;
-  let y = 15;
-
-  // Colors
-  const primaryColor: [number, number, number] = [16, 163, 127];
-  const textColor: [number, number, number] = [30, 30, 30];
-  const mutedColor: [number, number, number] = [100, 100, 100];
+  const pdfDoc = await PDFDocument.create();
+  const page = pdfDoc.addPage([842, 595]); // A4 Landscape
+  const { width, height } = page.getSize();
+  
+  const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  
+  const margin = 40;
+  let y = height - 40;
 
   // Header
-  doc.setFillColor(...primaryColor);
-  doc.rect(0, 0, pageWidth, 35, 'F');
+  page.drawRectangle({
+    x: 0,
+    y: height - 60,
+    width: width,
+    height: 60,
+    color: primaryColor,
+  });
 
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(18);
-  doc.setFont('helvetica', 'bold');
-  doc.text(business.name, margin, y + 8);
+  drawText(page, business.name, margin, height - 30, fontBold, 16, rgb(1, 1, 1));
+  drawText(page, `${business.address} | ${business.phone}`, margin, height - 45, fontRegular, 9, rgb(1, 1, 1));
+  
+  // Report Title (right aligned)
+  const titleWidth = fontBold.widthOfTextAtSize(reportData.title, 12);
+  drawText(page, reportData.title, width - margin - titleWidth, height - 35, fontBold, 12, rgb(1, 1, 1));
 
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'normal');
-  doc.text(business.address + ' | ' + business.phone, margin, y + 16);
+  y = height - 80;
 
-  // Report Title
-  doc.setFontSize(14);
-  doc.setFont('helvetica', 'bold');
-  doc.text(reportData.title, pageWidth - margin, y + 12, { align: 'right' });
-
-  y = 45;
-
-  // Summary Cards (if available)
+  // Summary Cards
   if (reportData.summary && reportData.summary.length > 0) {
-    const cardWidth = (pageWidth - margin * 2 - 10 * (reportData.summary.length - 1)) / reportData.summary.length;
+    const cardWidth = (width - margin * 2 - 15 * (reportData.summary.length - 1)) / reportData.summary.length;
     let cardX = margin;
 
     reportData.summary.forEach((item) => {
-      doc.setFillColor(245, 245, 245);
-      doc.roundedRect(cardX, y, cardWidth, 20, 3, 3, 'F');
+      page.drawRectangle({
+        x: cardX,
+        y: y - 35,
+        width: cardWidth,
+        height: 40,
+        color: headerBgColor,
+      });
       
-      doc.setTextColor(...mutedColor);
-      doc.setFontSize(8);
-      doc.setFont('helvetica', 'normal');
-      doc.text(item.label, cardX + 5, y + 7);
+      drawText(page, item.label, cardX + 10, y - 12, fontRegular, 8, mutedColor);
+      drawText(page, item.value, cardX + 10, y - 28, fontBold, 11, textColor);
       
-      doc.setTextColor(...textColor);
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'bold');
-      doc.text(item.value, cardX + 5, y + 15);
-      
-      cardX += cardWidth + 10;
+      cardX += cardWidth + 15;
     });
 
-    y += 30;
+    y -= 55;
   }
 
   // Table
   const colCount = reportData.headers.length;
-  const colWidth = (pageWidth - margin * 2) / colCount;
+  const colWidth = (width - margin * 2) / colCount;
   const tableX = margin;
 
   // Table Header
-  doc.setFillColor(240, 240, 240);
-  doc.rect(tableX, y, pageWidth - margin * 2, 10, 'F');
+  page.drawRectangle({
+    x: tableX,
+    y: y - 5,
+    width: width - margin * 2,
+    height: 20,
+    color: headerBgColor,
+  });
 
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
-  doc.setTextColor(...textColor);
-
-  let xPos = tableX + 3;
+  let xPos = tableX + 5;
   reportData.headers.forEach((header) => {
-    const truncatedHeader = header.length > 12 ? header.substring(0, 12) + '..' : header;
-    doc.text(truncatedHeader, xPos, y + 6);
+    drawText(page, truncateText(header, 15), xPos, y, fontBold, 8, textColor);
     xPos += colWidth;
   });
 
-  y += 12;
+  y -= 25;
 
   // Table Rows
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
+  const maxRows = Math.min(reportData.rows.length, 20); // Limit rows per page
+  
+  for (let i = 0; i < maxRows; i++) {
+    const row = reportData.rows[i];
+    
+    if (y < 50) break;
 
-  const maxRowsPerPage = Math.floor((pageHeight - y - 30) / 7);
-  let rowCount = 0;
-
-  reportData.rows.forEach((row) => {
-    if (rowCount >= maxRowsPerPage) {
-      doc.addPage();
-      y = 20;
-      rowCount = 0;
-      
-      // Redraw header on new page
-      doc.setFillColor(240, 240, 240);
-      doc.rect(tableX, y, pageWidth - margin * 2, 10, 'F');
-      
-      doc.setFont('helvetica', 'bold');
-      xPos = tableX + 3;
-      reportData.headers.forEach((header) => {
-        const truncatedHeader = header.length > 12 ? header.substring(0, 12) + '..' : header;
-        doc.text(truncatedHeader, xPos, y + 6);
-        xPos += colWidth;
-      });
-      
-      y += 12;
-      doc.setFont('helvetica', 'normal');
-    }
-
-    xPos = tableX + 3;
-    doc.setTextColor(...textColor);
-
+    xPos = tableX + 5;
     row.forEach((cell) => {
       const cellStr = String(cell ?? '');
-      const truncatedCell = cellStr.length > 15 ? cellStr.substring(0, 15) + '..' : cellStr;
-      doc.text(truncatedCell, xPos, y);
+      drawText(page, truncateText(cellStr, 18), xPos, y, fontRegular, 8, textColor);
       xPos += colWidth;
     });
 
     // Row separator
-    doc.setDrawColor(230, 230, 230);
-    doc.line(tableX, y + 2, pageWidth - margin, y + 2);
+    page.drawLine({
+      start: { x: tableX, y: y - 5 },
+      end: { x: width - margin, y: y - 5 },
+      thickness: 0.5,
+      color: lightBorderColor,
+    });
 
-    y += 7;
-    rowCount++;
-  });
+    y -= 15;
+  }
 
   // Footer
-  const footerY = pageHeight - 10;
-  doc.setTextColor(...mutedColor);
-  doc.setFontSize(7);
-  doc.text(
-    `Generated on ${new Date().toLocaleString('en-BD')} | ${business.name}`,
-    pageWidth / 2,
-    footerY,
-    { align: 'center' }
-  );
+  const footerText = `Generated on ${new Date().toLocaleString('en-BD')} | ${business.name}`;
+  const footerWidth = fontRegular.widthOfTextAtSize(footerText, 7);
+  drawText(page, footerText, (width - footerWidth) / 2, 20, fontRegular, 7, mutedColor);
 
   // Save PDF
-  const fileName = `${reportData.title.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
-  doc.save(fileName);
+  const pdfBytes = await pdfDoc.save();
+  const blob = new Blob([new Uint8Array(pdfBytes)], { type: 'application/pdf' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `${reportData.title.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+  link.click();
+  URL.revokeObjectURL(url);
 };
 
-// Export from HTML element (for complex layouts)
+// Export from HTML element using browser print
 export const exportElementToPDF = async (
   element: HTMLElement,
   fileName: string,
   options?: { orientation?: 'portrait' | 'landscape' }
 ): Promise<void> => {
-  const canvas = await html2canvas(element, {
-    scale: 2,
-    useCORS: true,
-    logging: false,
-    backgroundColor: '#ffffff'
-  });
-
-  const imgData = canvas.toDataURL('image/png');
-  const pdf = new jsPDF({
-    orientation: options?.orientation || 'portrait',
-    unit: 'mm',
-    format: 'a4'
-  });
-
-  const pageWidth = pdf.internal.pageSize.getWidth();
-  const pageHeight = pdf.internal.pageSize.getHeight();
-  const imgWidth = pageWidth - 20;
-  const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-  let y = 10;
-  let remainingHeight = imgHeight;
-
-  while (remainingHeight > 0) {
-    if (y > 10) {
-      pdf.addPage();
-      y = 10;
-    }
-
-    const sourceY = (imgHeight - remainingHeight) * (canvas.height / imgHeight);
-    const heightToDraw = Math.min(pageHeight - 20, remainingHeight);
-
-    pdf.addImage(
-      imgData,
-      'PNG',
-      10,
-      y,
-      imgWidth,
-      imgHeight,
-      undefined,
-      'FAST',
-      0
-    );
-
-    remainingHeight -= heightToDraw;
-    y += heightToDraw;
+  // Use browser's print functionality for HTML elements
+  // This provides better styling support than canvas-based approaches
+  const printWindow = window.open('', '_blank');
+  
+  if (!printWindow) {
+    throw new Error('Could not open print window. Please allow popups for this site.');
   }
 
-  pdf.save(`${fileName}.pdf`);
+  // Get computed styles
+  const styles = Array.from(document.styleSheets)
+    .map(styleSheet => {
+      try {
+        return Array.from(styleSheet.cssRules)
+          .map(rule => rule.cssText)
+          .join('\n');
+      } catch (e) {
+        return '';
+      }
+    })
+    .join('\n');
+
+  const orientation = options?.orientation || 'portrait';
+  
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>${fileName}</title>
+        <style>
+          ${styles}
+          @page {
+            size: A4 ${orientation};
+            margin: 1cm;
+          }
+          @media print {
+            body {
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+          }
+          body {
+            margin: 0;
+            padding: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          }
+        </style>
+      </head>
+      <body>
+        ${element.outerHTML}
+      </body>
+    </html>
+  `);
+  
+  printWindow.document.close();
+  
+  // Wait for content to load then print
+  printWindow.onload = () => {
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 250);
+  };
 };
