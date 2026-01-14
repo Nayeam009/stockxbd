@@ -36,7 +36,7 @@ import {
   Loader2,
   Search
 } from "lucide-react";
-import { Order } from "@/hooks/useDashboardData";
+import { Order, Driver } from "@/hooks/useDashboardData";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -45,7 +45,7 @@ import { orderSchema, parsePositiveNumber, parsePositiveInt, sanitizeString } fr
 interface OnlineDeliveryModuleProps {
   orders: Order[];
   setOrders: (orders: Order[]) => void;
-  drivers: any[];
+  drivers: Driver[];
   userRole: string;
 }
 
@@ -241,7 +241,7 @@ export const OnlineDeliveryModule = ({ orders, setOrders, drivers, userRole }: O
 
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
     try {
-      const updateData: any = { status: newStatus };
+      const updateData: Record<string, unknown> = { status: newStatus };
       if (newStatus === 'delivered') {
         updateData.delivery_date = new Date().toISOString();
       }
@@ -255,12 +255,12 @@ export const OnlineDeliveryModule = ({ orders, setOrders, drivers, userRole }: O
 
       setOrders(orders.map(order => 
         order.id === orderId 
-          ? { ...order, status: newStatus as any, deliveryDate: newStatus === 'delivered' ? new Date().toISOString() : order.deliveryDate }
+          ? { ...order, status: newStatus as typeof order.status, deliveryDate: newStatus === 'delivered' ? new Date().toISOString() : order.deliveryDate }
           : order
       ));
 
       toast.success(`Order status updated to ${newStatus}`);
-    } catch (error: any) {
+    } catch (error) {
       toast.error("Failed to update order status");
     }
   };

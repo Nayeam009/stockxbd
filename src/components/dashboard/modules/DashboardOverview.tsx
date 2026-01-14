@@ -18,6 +18,12 @@ import {
 } from "lucide-react";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { Driver } from "@/hooks/useDashboardData";
+
+interface TopProduct {
+  name: string;
+  sales: number;
+}
 
 interface DashboardOverviewProps {
   analytics: {
@@ -28,7 +34,9 @@ interface DashboardOverviewProps {
     totalCustomers: number;
     activeDrivers: number;
   };
-  drivers: any[];
+  drivers: Driver[];
+  topProducts?: TopProduct[];
+  selectedTimeframe?: string;
   userRole: string;
   setActiveModule?: (module: string) => void;
 }
