@@ -275,6 +275,30 @@ export type Database = {
         }
         Relationships: []
       }
+      invite_validation_attempts: {
+        Row: {
+          attempted_at: string | null
+          code_prefix: string | null
+          id: string
+          ip_hash: string
+          user_id: string | null
+        }
+        Insert: {
+          attempted_at?: string | null
+          code_prefix?: string | null
+          id?: string
+          ip_hash: string
+          user_id?: string | null
+        }
+        Update: {
+          attempted_at?: string | null
+          code_prefix?: string | null
+          id?: string
+          ip_hash?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       lpg_brands: {
         Row: {
           color: string
@@ -1004,6 +1028,7 @@ export type Database = {
           role: Database["public"]["Enums"]["app_role"]
         }[]
       }
+      validate_invite_secure: { Args: { _code: string }; Returns: boolean }
     }
     Enums: {
       app_role: "owner" | "manager" | "driver"

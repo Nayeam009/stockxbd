@@ -63,7 +63,20 @@ export const orderSchema = z.object({
 
 // Input sanitization helpers
 export const sanitizeString = (value: string): string => {
-  return value.trim().slice(0, 500);
+  return value
+    .trim()
+    .replace(/[\u0000-\u001F\u007F-\u009F]/g, '') // Remove control characters
+    .replace(/^[=+\-@]/, "'") // Prevent CSV formula injection
+    .slice(0, 500);
+};
+
+/**
+ * Sanitizes string specifically for CSV export to prevent formula injection
+ */
+export const sanitizeForCSV = (value: string): string => {
+  return value
+    .replace(/^[=+\-@]/, "'") // Prevent formula injection
+    .replace(/"/g, '""'); // Escape quotes
 };
 
 export const parsePositiveNumber = (value: string, max: number = 10000000): number => {
@@ -76,4 +89,16 @@ export const parsePositiveInt = (value: string, max: number = 10000): number => 
   const num = parseInt(value, 10);
   if (isNaN(num) || num < 1) return 1;
   return Math.min(num, max);
+};
+
+/**
+ * Generates a cryptographically secure invite code
+ * Uses Web Crypto API for secure random generation
+ */
+export const generateSecureInviteCode = (): string => {
+  const array = new Uint8Array(16); // 128 bits of entropy
+  crypto.getRandomValues(array);
+  return 'INV-' + Array.from(array, byte => 
+    byte.toString(36).padStart(2, '0')
+  ).join('').toUpperCase().substring(0, 20);
 };
