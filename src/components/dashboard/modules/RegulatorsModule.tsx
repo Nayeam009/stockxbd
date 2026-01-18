@@ -16,7 +16,6 @@ import {
 } from "@/components/ui/dialog";
 import { Plus, Minus, Trash2, Search, Wrench, Package, AlertTriangle, Gauge } from "lucide-react";
 import { toast } from "sonner";
-import { InventoryPricingCard } from "./InventoryPricingCard";
 import { syncRegulatorToPricing } from "@/hooks/useInventoryPricingSync";
 import { useLanguage } from "@/contexts/LanguageContext";
 
@@ -465,13 +464,6 @@ export const RegulatorsModule = () => {
           })
         )}
       </div>
-
-      {/* Pricing Card */}
-      <InventoryPricingCard
-        productType="regulator"
-        title="Regulator Pricing"
-        description="Quick access to view and edit regulator prices"
-      />
     </div>
   );
 };
