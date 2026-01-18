@@ -175,28 +175,30 @@ export const VehicleCostModule = () => {
                 Add Vehicle
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-[95vw] sm:max-w-md p-4 sm:p-6">
               <DialogHeader>
-                <DialogTitle>Add New Vehicle</DialogTitle>
+                <DialogTitle className="text-lg">Add New Vehicle</DialogTitle>
               </DialogHeader>
-              <div className="space-y-4 py-4">
+              <div className="space-y-4 py-2">
                 <div className="space-y-2">
-                  <Label>Vehicle Name</Label>
+                  <Label className="text-sm font-medium">Vehicle Name</Label>
                   <Input 
                     value={newVehicle.name}
                     onChange={e => setNewVehicle({...newVehicle, name: e.target.value})}
                     placeholder="e.g., Truck 1"
+                    className="h-11 text-base"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>License Plate (Optional)</Label>
+                  <Label className="text-sm font-medium">License Plate (Optional)</Label>
                   <Input 
                     value={newVehicle.license_plate}
                     onChange={e => setNewVehicle({...newVehicle, license_plate: e.target.value})}
                     placeholder="e.g., DHA-1234"
+                    className="h-11 text-base"
                   />
                 </div>
-                <Button onClick={handleAddVehicle} className="w-full">Add Vehicle</Button>
+                <Button onClick={handleAddVehicle} className="w-full h-11 text-base">Add Vehicle</Button>
               </div>
             </DialogContent>
           </Dialog>
@@ -207,70 +209,74 @@ export const VehicleCostModule = () => {
                 Add Cost
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-[95vw] sm:max-w-md p-4 sm:p-6">
               <DialogHeader>
-                <DialogTitle>Add Vehicle Cost</DialogTitle>
+                <DialogTitle className="text-lg">Add Vehicle Cost</DialogTitle>
               </DialogHeader>
-              <div className="space-y-4 py-4">
+              <div className="space-y-4 py-2">
                 <div className="space-y-2">
-                  <Label>Vehicle</Label>
+                  <Label className="text-sm font-medium">Vehicle</Label>
                   <Select 
                     value={newCost.vehicle_id} 
                     onValueChange={v => setNewCost({...newCost, vehicle_id: v})}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="h-11 text-base">
                       <SelectValue placeholder="Select vehicle" />
                     </SelectTrigger>
                     <SelectContent>
                       {vehicles.map(v => (
-                        <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                        <SelectItem key={v.id} value={v.id} className="py-3">{v.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Cost Type</Label>
+                  <Label className="text-sm font-medium">Cost Type</Label>
                   <Select 
                     value={newCost.cost_type} 
                     onValueChange={v => setNewCost({...newCost, cost_type: v})}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="h-11 text-base">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       {COST_TYPES.map(type => (
-                        <SelectItem key={type} value={type}>{type}</SelectItem>
+                        <SelectItem key={type} value={type} className="py-3">{type}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Description</Label>
+                  <Label className="text-sm font-medium">Description</Label>
                   <Input 
                     value={newCost.description}
                     onChange={e => setNewCost({...newCost, description: e.target.value})}
                     placeholder="e.g., Diesel top-up"
+                    className="h-11 text-base"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Amount (৳)</Label>
+                    <Label className="text-sm font-medium">Amount (৳)</Label>
                     <Input 
                       type="number"
                       value={newCost.amount}
                       onChange={e => setNewCost({...newCost, amount: Number(e.target.value)})}
+                      className="h-11 text-base"
+                      inputMode="numeric"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Date</Label>
+                    <Label className="text-sm font-medium">Date</Label>
                     <Input 
                       type="date"
                       value={newCost.cost_date}
                       onChange={e => setNewCost({...newCost, cost_date: e.target.value})}
+                      className="h-11 text-base"
                     />
                   </div>
                 </div>
-                <Button onClick={handleAddCost} className="w-full">Add Cost</Button>
+                <Button onClick={handleAddCost} className="w-full h-11 text-base">Add Cost</Button>
               </div>
             </DialogContent>
           </Dialog>

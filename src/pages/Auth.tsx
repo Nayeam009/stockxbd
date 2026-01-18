@@ -521,11 +521,11 @@ const Auth = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <form onSubmit={handleSubmit} className="space-y-5">
                   {/* Full Name - Only for Sign Up */}
                   {isSignUpMode && (
                     <div className="space-y-2">
-                      <Label htmlFor="fullName">Full Name (Optional)</Label>
+                      <Label htmlFor="fullName" className="text-sm font-medium">Full Name (Optional)</Label>
                       <Input 
                         id="fullName" 
                         type="text" 
@@ -533,12 +533,13 @@ const Auth = () => {
                         value={fullName}
                         onChange={(e) => setFullName(e.target.value)}
                         disabled={loading}
+                        className="h-12 text-base px-4"
                       />
                     </div>
                   )}
 
                   <div className="space-y-2">
-                    <Label htmlFor="email">Email Address</Label>
+                    <Label htmlFor="email" className="text-sm font-medium">Email Address</Label>
                     <Input 
                       id="email" 
                       type="email" 
@@ -547,11 +548,14 @@ const Auth = () => {
                       onChange={(e) => setEmail(e.target.value)}
                       required
                       disabled={loading}
+                      className="h-12 text-base px-4"
+                      inputMode="email"
+                      autoComplete="email"
                     />
                   </div>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="password">Password</Label>
+                    <Label htmlFor="password" className="text-sm font-medium">Password</Label>
                     <Input 
                       id="password" 
                       type="password" 
@@ -560,13 +564,15 @@ const Auth = () => {
                       onChange={(e) => setPassword(e.target.value)}
                       required
                       disabled={loading}
+                      className="h-12 text-base px-4"
+                      autoComplete={isSignUpMode ? "new-password" : "current-password"}
                     />
                   </div>
 
                   {/* Confirm Password - Only for Sign Up */}
                   {isSignUpMode && (
                     <div className="space-y-2">
-                      <Label htmlFor="confirmPassword">Confirm Password</Label>
+                      <Label htmlFor="confirmPassword" className="text-sm font-medium">Confirm Password</Label>
                       <Input 
                         id="confirmPassword" 
                         type="password" 
@@ -575,6 +581,8 @@ const Auth = () => {
                         onChange={(e) => setConfirmPassword(e.target.value)}
                         required
                         disabled={loading}
+                        className="h-12 text-base px-4"
+                        autoComplete="new-password"
                       />
                     </div>
                   )}
@@ -622,25 +630,25 @@ const Auth = () => {
 
                   <Button 
                     type="submit" 
-                    className="w-full bg-gradient-primary hover:opacity-90 transition-opacity"
+                    className="w-full bg-gradient-primary hover:opacity-90 transition-opacity h-12 text-base font-medium"
                     size="lg"
                     disabled={loading}
                   >
                     {loading ? (
                       <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                         {authMode === 'signin' ? 'Signing In...' : 'Creating Account...'}
                       </>
                     ) : (
                       <>
                         {authMode === 'signin' ? (
                           <>
-                            <LogIn className="mr-2 h-4 w-4" />
+                            <LogIn className="mr-2 h-5 w-5" />
                             Sign In
                           </>
                         ) : (
                           <>
-                            <UserPlus className="mr-2 h-4 w-4" />
+                            <UserPlus className="mr-2 h-5 w-5" />
                             Sign Up
                           </>
                         )}
@@ -662,12 +670,12 @@ const Auth = () => {
                   <Button 
                     type="button"
                     variant="outline"
-                    className="w-full"
+                    className="w-full h-12 text-base font-medium"
                     size="lg"
                     onClick={handleGoogleAuth}
                     disabled={loading}
                   >
-                    <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
+                    <svg className="mr-2 h-5 w-5" viewBox="0 0 24 24">
                       <path
                         d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
                         fill="#4285F4"

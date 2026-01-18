@@ -326,9 +326,9 @@ export const LPGStockModule = ({ size = "22mm" }: LPGStockModuleProps) => {
                 New Brand
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px]">
+            <DialogContent className="max-w-[95vw] sm:max-w-[500px] p-4 sm:p-6">
               <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
+                <DialogTitle className="flex items-center gap-2 text-lg">
                   Add New LPG Brand
                   <Badge variant="outline">{selectedWeight}</Badge>
                 </DialogTitle>
@@ -336,81 +336,89 @@ export const LPGStockModule = ({ size = "22mm" }: LPGStockModuleProps) => {
                   Enter the brand details and initial cylinder counts for {selectedWeight} cylinders.
                 </DialogDescription>
               </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="name" className="text-right">Brand Name</Label>
+              <div className="grid gap-4 py-2">
+                <div className="space-y-2">
+                  <Label htmlFor="name" className="text-sm font-medium">Brand Name</Label>
                   <Input
                     id="name"
                     value={newBrand.name}
                     onChange={(e) => setNewBrand({ ...newBrand, name: e.target.value })}
-                    className="col-span-3"
                     placeholder="e.g., Total Energies"
+                    className="h-11 text-base"
                   />
                 </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="color" className="text-right">Color</Label>
-                  <div className="col-span-3 flex items-center gap-2">
+                <div className="space-y-2">
+                  <Label htmlFor="color" className="text-sm font-medium">Color</Label>
+                  <div className="flex items-center gap-3">
                     <input
                       type="color"
                       id="color"
                       value={newBrand.color}
                       onChange={(e) => setNewBrand({ ...newBrand, color: e.target.value })}
-                      className="w-10 h-10 rounded cursor-pointer"
+                      className="w-12 h-12 rounded cursor-pointer border-0"
                     />
                     <span className="text-sm text-muted-foreground">Brand indicator color</span>
                   </div>
                 </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="package" className="text-right">Package</Label>
-                  <Input
-                    id="package"
-                    type="number"
-                    value={newBrand.package_cylinder}
-                    onChange={(e) => setNewBrand({ ...newBrand, package_cylinder: parseInt(e.target.value) || 0 })}
-                    className="col-span-3"
-                    min={0}
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="package" className="text-sm font-medium">Package</Label>
+                    <Input
+                      id="package"
+                      type="number"
+                      value={newBrand.package_cylinder}
+                      onChange={(e) => setNewBrand({ ...newBrand, package_cylinder: parseInt(e.target.value) || 0 })}
+                      className="h-11 text-base"
+                      min={0}
+                      inputMode="numeric"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="refill" className="text-sm font-medium">Refill</Label>
+                    <Input
+                      id="refill"
+                      type="number"
+                      value={newBrand.refill_cylinder}
+                      onChange={(e) => setNewBrand({ ...newBrand, refill_cylinder: parseInt(e.target.value) || 0 })}
+                      className="h-11 text-base"
+                      min={0}
+                      inputMode="numeric"
+                    />
+                  </div>
                 </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="refill" className="text-right">Refill</Label>
-                  <Input
-                    id="refill"
-                    type="number"
-                    value={newBrand.refill_cylinder}
-                    onChange={(e) => setNewBrand({ ...newBrand, refill_cylinder: parseInt(e.target.value) || 0 })}
-                    className="col-span-3"
-                    min={0}
-                  />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="empty" className="text-right">Empty</Label>
-                  <Input
-                    id="empty"
-                    type="number"
-                    value={newBrand.empty_cylinder}
-                    onChange={(e) => setNewBrand({ ...newBrand, empty_cylinder: parseInt(e.target.value) || 0 })}
-                    className="col-span-3"
-                    min={0}
-                  />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="problem" className="text-right">Problem</Label>
-                  <Input
-                    id="problem"
-                    type="number"
-                    value={newBrand.problem_cylinder}
-                    onChange={(e) => setNewBrand({ ...newBrand, problem_cylinder: parseInt(e.target.value) || 0 })}
-                    className="col-span-3"
-                    min={0}
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="empty" className="text-sm font-medium">Empty</Label>
+                    <Input
+                      id="empty"
+                      type="number"
+                      value={newBrand.empty_cylinder}
+                      onChange={(e) => setNewBrand({ ...newBrand, empty_cylinder: parseInt(e.target.value) || 0 })}
+                      className="h-11 text-base"
+                      min={0}
+                      inputMode="numeric"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="problem" className="text-sm font-medium">Problem</Label>
+                    <Input
+                      id="problem"
+                      type="number"
+                      value={newBrand.problem_cylinder}
+                      onChange={(e) => setNewBrand({ ...newBrand, problem_cylinder: parseInt(e.target.value) || 0 })}
+                      className="h-11 text-base"
+                      min={0}
+                      inputMode="numeric"
+                    />
+                  </div>
                 </div>
               </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+              <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
+                <Button variant="outline" onClick={() => setIsAddDialogOpen(false)} className="h-11 text-base w-full sm:w-auto">
                   Cancel
                 </Button>
-                <Button onClick={handleAddBrand} disabled={isSubmitting}>
-                  {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                <Button onClick={handleAddBrand} disabled={isSubmitting} className="h-11 text-base w-full sm:w-auto">
+                  {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : null}
                   Add Brand
                 </Button>
               </DialogFooter>
@@ -434,7 +442,7 @@ export const LPGStockModule = ({ size = "22mm" }: LPGStockModuleProps) => {
                   variant={selectedWeight === option.value ? "default" : "outline"}
                   size="sm"
                   onClick={() => setSelectedWeight(option.value)}
-                  className={`transition-all duration-200 ${
+                  className={`transition-all duration-200 h-10 px-4 min-w-[60px] ${
                     selectedWeight === option.value 
                       ? "bg-primary text-primary-foreground shadow-md scale-105" 
                       : "hover:bg-primary/10 hover:border-primary/50"
