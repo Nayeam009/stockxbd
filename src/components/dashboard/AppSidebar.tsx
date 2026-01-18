@@ -237,30 +237,27 @@ export const AppSidebar = ({
         </div>
       </SidebarHeader>
 
-      {/* User Profile Card */}
-      <div className={`border-b border-border/40 transition-all duration-300 ease-out overflow-hidden ${isCollapsed ? 'max-h-0 opacity-0 py-0 px-0' : 'max-h-32 opacity-100 px-3 py-3'}`}>
-        
-      </div>
-      
-      {/* Collapsed User Avatar */}
-      <div className={`border-b border-border/40 flex justify-center transition-all duration-300 ease-out overflow-hidden ${isCollapsed ? 'max-h-20 opacity-100 py-2 px-1' : 'max-h-0 opacity-0 py-0'}`}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Avatar className="h-8 w-8 border-2 border-primary/20 shadow-sm cursor-pointer transition-transform duration-200 hover:scale-105">
-              <AvatarImage src="" />
-              <AvatarFallback className="bg-gradient-to-br from-primary to-primary-light text-primary-foreground font-semibold text-xs">
-                {getInitials(userName)}
-              </AvatarFallback>
-            </Avatar>
-          </TooltipTrigger>
-          <TooltipContent side="right">
-            <div>
-              <p className="font-semibold">{userName}</p>
-              <p className="text-xs text-muted-foreground capitalize">{userRole}</p>
-            </div>
-          </TooltipContent>
-        </Tooltip>
-      </div>
+      {/* User Profile - Only show collapsed avatar */}
+      {isCollapsed && (
+        <div className="border-b border-border/40 flex justify-center py-2">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Avatar className="h-8 w-8 border-2 border-primary/20 shadow-sm cursor-pointer transition-transform duration-200 hover:scale-105">
+                <AvatarImage src="" />
+                <AvatarFallback className="bg-gradient-to-br from-primary to-primary-light text-primary-foreground font-semibold text-xs">
+                  {getInitials(userName)}
+                </AvatarFallback>
+              </Avatar>
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              <div>
+                <p className="font-semibold">{userName}</p>
+                <p className="text-xs text-muted-foreground capitalize">{userRole}</p>
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        </div>
+      )}
 
       <SidebarContent className="py-2 overflow-x-hidden transition-all duration-300">
         {renderNavGroup(mainNavItems)}
