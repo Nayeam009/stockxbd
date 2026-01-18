@@ -583,13 +583,13 @@ export const OnlineDeliveryModule = ({ orders, setOrders, drivers, userRole }: O
 
       {/* Add Order Dialog */}
       <Dialog open={showAddForm} onOpenChange={setShowAddForm}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="max-w-[95vw] sm:max-w-[500px] p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Create New Order</DialogTitle>
+            <DialogTitle className="text-lg">Create New Order</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label>Customer</Label>
+              <Label className="text-sm font-medium">Customer</Label>
               <Select 
                 value={newOrder.customerId || "new"} 
                 onValueChange={(v) => {
@@ -606,13 +606,13 @@ export const OnlineDeliveryModule = ({ orders, setOrders, drivers, userRole }: O
                   }
                 }}
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-11 text-base">
                   <SelectValue placeholder="Select customer..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="new">New Customer</SelectItem>
+                  <SelectItem value="new" className="py-3">New Customer</SelectItem>
                   {customers.map(c => (
-                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    <SelectItem key={c.id} value={c.id} className="py-3">{c.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -620,26 +620,28 @@ export const OnlineDeliveryModule = ({ orders, setOrders, drivers, userRole }: O
 
             {(!newOrder.customerId || newOrder.customerId === "new") && (
               <div className="space-y-2">
-                <Label>Customer Name</Label>
+                <Label className="text-sm font-medium">Customer Name</Label>
                 <Input
                   value={newOrder.customerName}
                   onChange={(e) => setNewOrder({ ...newOrder, customerName: e.target.value })}
                   placeholder="Enter customer name"
+                  className="h-11 text-base"
                 />
               </div>
             )}
 
             <div className="space-y-2">
-              <Label>Delivery Address</Label>
+              <Label className="text-sm font-medium">Delivery Address</Label>
               <Input
                 value={newOrder.deliveryAddress}
                 onChange={(e) => setNewOrder({ ...newOrder, deliveryAddress: e.target.value })}
                 placeholder="Enter delivery address"
+                className="h-11 text-base"
               />
             </div>
 
             <div className="space-y-2">
-              <Label>Product</Label>
+              <Label className="text-sm font-medium">Product</Label>
               <Select 
                 value={newOrder.productId || "custom"} 
                 onValueChange={(v) => {
@@ -656,13 +658,13 @@ export const OnlineDeliveryModule = ({ orders, setOrders, drivers, userRole }: O
                   }
                 }}
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-11 text-base">
                   <SelectValue placeholder="Select product..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="custom">Custom Product</SelectItem>
+                  <SelectItem value="custom" className="py-3">Custom Product</SelectItem>
                   {products.map(p => (
-                    <SelectItem key={p.id} value={p.id}>{p.name} - ৳{p.price}</SelectItem>
+                    <SelectItem key={p.id} value={p.id} className="py-3">{p.name} - ৳{p.price}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -671,32 +673,37 @@ export const OnlineDeliveryModule = ({ orders, setOrders, drivers, userRole }: O
             {(!newOrder.productId || newOrder.productId === "custom") && (
               <>
                 <div className="space-y-2">
-                  <Label>Product Name</Label>
+                  <Label className="text-sm font-medium">Product Name</Label>
                   <Input
                     value={newOrder.productName}
                     onChange={(e) => setNewOrder({ ...newOrder, productName: e.target.value })}
                     placeholder="Enter product name"
+                    className="h-11 text-base"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Price (৳)</Label>
+                  <Label className="text-sm font-medium">Price (৳)</Label>
                   <Input
                     type="number"
                     value={newOrder.price}
                     onChange={(e) => setNewOrder({ ...newOrder, price: Number(e.target.value) })}
                     placeholder="Enter price"
+                    className="h-11 text-base"
+                    inputMode="numeric"
                   />
                 </div>
               </>
             )}
 
             <div className="space-y-2">
-              <Label>Quantity</Label>
+              <Label className="text-sm font-medium">Quantity</Label>
               <Input
                 type="number"
                 min="1"
                 value={newOrder.quantity}
                 onChange={(e) => setNewOrder({ ...newOrder, quantity: parseInt(e.target.value) || 1 })}
+                className="h-11 text-base"
+                inputMode="numeric"
               />
             </div>
 
@@ -706,8 +713,8 @@ export const OnlineDeliveryModule = ({ orders, setOrders, drivers, userRole }: O
               </p>
             </div>
 
-            <Button onClick={handleCreateOrder} className="w-full" disabled={loading}>
-              {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            <Button onClick={handleCreateOrder} className="w-full h-11 text-base" disabled={loading}>
+              {loading && <Loader2 className="h-5 w-5 mr-2 animate-spin" />}
               Create Order
             </Button>
           </div>
