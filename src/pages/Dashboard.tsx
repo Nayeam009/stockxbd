@@ -241,7 +241,7 @@ const Dashboard = () => {
 
           {/* Main Content with Swipe Support */}
           <main 
-            className="flex-1 overflow-auto pb-24 md:pb-0"
+            className="flex-1 overflow-auto pb-mobile-nav"
             onTouchStart={isMobile ? onTouchStart : undefined}
             onTouchMove={isMobile ? onTouchMove : undefined}
             onTouchEnd={isMobile ? onTouchEnd : undefined}

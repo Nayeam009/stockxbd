@@ -522,20 +522,86 @@ export const LPGStockModule = ({ size = "22mm" }: LPGStockModuleProps) => {
         </Card>
       </div>
 
-      {/* Stock Table */}
+      {/* Stock - Mobile Cards + Desktop Table */}
       <Card className="border-0 shadow-sm">
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
+        <CardContent className="p-3 sm:p-6">
+          {/* Mobile Cards View */}
+          <div className="sm:hidden space-y-3">
+            {filteredBrands.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No brands found. Add your first LPG brand.
+              </div>
+            ) : (
+              filteredBrands.map((brand, index) => {
+                const status = getStatus(brand);
+                return (
+                  <Card key={brand.id} className="p-3 border border-border/50">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-2 h-6 rounded-full"
+                          style={{ backgroundColor: brand.color }}
+                        />
+                        <span className="font-semibold text-sm">{brand.name}</span>
+                      </div>
+                      <Badge className={`${status.color} hover:opacity-90 text-white border-0 text-[10px]`}>
+                        {status.label}
+                      </Badge>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="flex justify-between p-2 bg-muted/30 rounded-lg">
+                        <span className="text-muted-foreground">Package</span>
+                        <span className="font-semibold" onClick={() => setEditingCell({ id: brand.id, field: 'package_cylinder' })}>
+                          {brand.package_cylinder}
+                        </span>
+                      </div>
+                      <div className="flex justify-between p-2 bg-muted/30 rounded-lg">
+                        <span className="text-muted-foreground">Refill</span>
+                        <span className="font-semibold" onClick={() => setEditingCell({ id: brand.id, field: 'refill_cylinder' })}>
+                          {brand.refill_cylinder}
+                        </span>
+                      </div>
+                      <div className="flex justify-between p-2 bg-muted/30 rounded-lg">
+                        <span className="text-muted-foreground">Empty</span>
+                        <span className="font-semibold" onClick={() => setEditingCell({ id: brand.id, field: 'empty_cylinder' })}>
+                          {brand.empty_cylinder}
+                        </span>
+                      </div>
+                      <div className="flex justify-between p-2 bg-destructive/10 rounded-lg">
+                        <span className="text-muted-foreground">Problem</span>
+                        <span className="font-semibold text-destructive" onClick={() => setEditingCell({ id: brand.id, field: 'problem_cylinder' })}>
+                          {brand.problem_cylinder}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex justify-end mt-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteBrand(brand.id)}
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </Card>
+                );
+              })
+            )}
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="hidden sm:block overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50 hover:bg-muted/50">
                   <TableHead className="w-16 text-muted-foreground">Sl. NO.</TableHead>
                   <TableHead className="text-muted-foreground">Brand</TableHead>
                   <TableHead className="text-muted-foreground">Status</TableHead>
-                  <TableHead className="text-center text-muted-foreground">Package cylinder</TableHead>
-                  <TableHead className="text-center text-muted-foreground">Refill cylinder</TableHead>
-                  <TableHead className="text-center text-muted-foreground">Empty cylinder</TableHead>
-                  <TableHead className="text-center text-muted-foreground">Problem Cylinder</TableHead>
+                  <TableHead className="text-center text-muted-foreground">Package</TableHead>
+                  <TableHead className="text-center text-muted-foreground">Refill</TableHead>
+                  <TableHead className="text-center text-muted-foreground">Empty</TableHead>
+                  <TableHead className="text-center text-muted-foreground">Problem</TableHead>
                   <TableHead className="text-center text-muted-foreground">Actions</TableHead>
                 </TableRow>
               </TableHeader>
