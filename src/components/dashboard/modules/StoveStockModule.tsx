@@ -23,7 +23,6 @@ import {
 import { Plus, Minus, Trash2, Search, ChefHat, Package, TrendingUp, AlertTriangle, Flame } from "lucide-react";
 import { toast } from "sonner";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
-import { InventoryPricingCard } from "./InventoryPricingCard";
 import { syncStoveToPricing } from "@/hooks/useInventoryPricingSync";
 import { useLanguage } from "@/contexts/LanguageContext";
 
@@ -472,13 +471,6 @@ export const StoveStockModule = () => {
           })
         )}
       </div>
-
-      {/* Pricing Card */}
-      <InventoryPricingCard
-        productType="stove"
-        title="Gas Stove Pricing"
-        description="Quick access to view and edit stove prices"
-      />
     </div>
   );
 };
