@@ -56,8 +56,12 @@ export const AppSidebar = ({
   userName,
   analytics 
 }: AppSidebarProps) => {
-  const { open } = useSidebar();
+  const { open, isMobile, setOpenMobile } = useSidebar();
   const { t } = useLanguage();
+
+  // On mobile, the sidebar is a sheet (openMobile) and should always render in "expanded" mode.
+  // On desktop, "open" controls expanded vs icon-collapsed.
+  const sidebarExpanded = isMobile ? true : open;
   
   const mainNavItems = [
     { id: 'overview', titleKey: 'overview', icon: Home, roles: ['owner', 'manager', 'driver'] },
@@ -97,6 +101,7 @@ export const AppSidebar = ({
 
   const handleModuleChange = (moduleId: string) => {
     setActiveModule(moduleId);
+    if (isMobile) setOpenMobile(false);
   };
 
   const getInitials = (name: string) => {
@@ -105,9 +110,9 @@ export const AppSidebar = ({
 
   const getRoleBadgeVariant = (role: string) => {
     switch (role) {
-      case 'owner': return 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30';
-      case 'manager': return 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30';
-      case 'driver': return 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30';
+      case 'owner': return 'bg-primary/15 text-primary border-primary/30';
+      case 'manager': return 'bg-secondary/15 text-secondary border-secondary/30';
+      case 'driver': return 'bg-accent/15 text-accent border-accent/30';
       default: return 'bg-muted text-muted-foreground';
     }
   };
@@ -118,7 +123,7 @@ export const AppSidebar = ({
 
     return (
       <SidebarGroup className="py-1">
-        {label && open && (
+        {label && sidebarExpanded && (
           <SidebarGroupLabel className="text-[10px] uppercase tracking-wider text-muted-foreground/50 font-semibold px-4 py-2 flex items-center gap-2">
             <CircleDot className="h-2 w-2 text-primary/60" />
             {label}
@@ -149,7 +154,7 @@ export const AppSidebar = ({
                     }`}>
                       <Icon className={`h-4 w-4 transition-colors ${isActive ? 'text-primary-foreground' : 'text-muted-foreground group-hover:text-primary'}`} />
                     </div>
-                    {open && (
+                    {sidebarExpanded && (
                       <div className="flex items-center justify-between w-full ml-1">
                         <span className="text-sm font-medium truncate">{displayTitle}</span>
                         <div className="flex items-center gap-1.5">
@@ -165,7 +170,7 @@ export const AppSidebar = ({
                         </div>
                       </div>
                     )}
-                    {!open && item.badge && (
+                    {!sidebarExpanded && item.badge && (
                       <Badge 
                         className="absolute -top-1 -right-1 h-4 min-w-4 p-0 flex items-center justify-center text-[9px] font-bold bg-destructive text-destructive-foreground border-0"
                       >
@@ -194,9 +199,9 @@ export const AppSidebar = ({
             <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary to-primary-light flex items-center justify-center shadow-md overflow-hidden">
               <img src={stockXLogo} alt="Stock-X" className="h-7 w-7 object-contain" />
             </div>
-            <div className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 bg-emerald-500 rounded-full border-2 border-sidebar" />
+            <div className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 bg-success rounded-full border-2 border-sidebar shadow-sm" />
           </div>
-          {open && (
+          {sidebarExpanded && (
             <div className="min-w-0 flex-1">
               <h2 className="text-base font-bold text-foreground tracking-tight">STOCK X</h2>
               <p className="text-[11px] text-muted-foreground font-medium">LPG Management</p>
@@ -206,7 +211,7 @@ export const AppSidebar = ({
       </SidebarHeader>
 
       {/* User Profile Card */}
-      {open && (
+      {sidebarExpanded && (
         <div className="px-3 py-3 border-b border-border/40">
           <div className="flex items-center gap-3 p-2.5 rounded-xl bg-muted/50">
             <Avatar className="h-9 w-9 border-2 border-primary/20 shadow-sm flex-shrink-0">
@@ -225,7 +230,7 @@ export const AppSidebar = ({
         </div>
       )}
 
-      <SidebarContent className="py-3 overflow-x-hidden scrollbar-thin">
+      <SidebarContent className="py-3 overflow-x-hidden safe-area-pb">
         {renderNavGroup(mainNavItems)}
         
         <div className="my-2 mx-4 h-px bg-border/50" />
@@ -248,15 +253,15 @@ export const AppSidebar = ({
       <SidebarFooter className="border-t border-border/40 p-3">
         <Button 
           variant="ghost" 
-          size={open ? "sm" : "icon"}
-          className={`text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors rounded-xl ${open ? 'w-full justify-start h-10 px-3' : 'w-10 h-10 mx-auto'}`}
+          size={sidebarExpanded ? "sm" : "icon"}
+          className={`text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors rounded-xl ${sidebarExpanded ? 'w-full justify-start h-10 px-3' : 'w-10 h-10 mx-auto'}`}
           onClick={async () => {
             await supabase.auth.signOut();
             toast({ title: t("logout") });
           }}
         >
           <LogOut className="h-4 w-4" />
-          {open && <span className="ml-2 text-sm font-medium">{t("logout")}</span>}
+          {sidebarExpanded && <span className="ml-2 text-sm font-medium">{t("logout")}</span>}
         </Button>
       </SidebarFooter>
     </Sidebar>
