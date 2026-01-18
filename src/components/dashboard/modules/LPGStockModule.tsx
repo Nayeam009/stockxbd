@@ -28,7 +28,10 @@ import {
   Package,
   AlertTriangle,
   Loader2,
-  Cylinder
+  Cylinder,
+  Truck,
+  ArrowUpFromLine,
+  ArrowDownToLine
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -44,6 +47,7 @@ interface LPGBrand {
   refill_cylinder: number;
   empty_cylinder: number;
   problem_cylinder: number;
+  in_transit_cylinder: number;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -78,8 +82,19 @@ export const LPGStockModule = ({ size = "22mm" }: LPGStockModuleProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedWeight, setSelectedWeight] = useState("12kg");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isSendToPlantOpen, setIsSendToPlantOpen] = useState(false);
+  const [isReceiveFromPlantOpen, setIsReceiveFromPlantOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingCell, setEditingCell] = useState<{id: string, field: string} | null>(null);
+  
+  // Send to Plant state
+  const [sendToBrand, setSendToBrand] = useState("");
+  const [sendQuantity, setSendQuantity] = useState(0);
+  
+  // Receive from Plant state
+  const [receiveFromBrand, setReceiveFromBrand] = useState("");
+  const [receiveQuantity, setReceiveQuantity] = useState(0);
+  const [receiveType, setReceiveType] = useState<'refill' | 'package'>('refill');
   
   const weightOptions = size === "22mm" ? WEIGHT_OPTIONS_22MM : WEIGHT_OPTIONS_20MM;
 
@@ -130,15 +145,16 @@ export const LPGStockModule = ({ size = "22mm" }: LPGStockModuleProps) => {
     brand.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Calculate totals
+  // Calculate totals including in-transit
   const totals = filteredBrands.reduce(
     (acc, brand) => ({
       package: acc.package + brand.package_cylinder,
       refill: acc.refill + brand.refill_cylinder,
       empty: acc.empty + brand.empty_cylinder,
       problem: acc.problem + brand.problem_cylinder,
+      inTransit: acc.inTransit + (brand.in_transit_cylinder || 0),
     }),
-    { package: 0, refill: 0, empty: 0, problem: 0 }
+    { package: 0, refill: 0, empty: 0, problem: 0, inTransit: 0 }
   );
 
   // Get status based on stock levels
@@ -216,6 +232,79 @@ export const LPGStockModule = ({ size = "22mm" }: LPGStockModuleProps) => {
     } catch (error: any) {
       toast.error("Failed to update");
       console.error(error);
+    }
+  };
+
+  // Send to Plant - Move empties to in-transit
+  const handleSendToPlant = async () => {
+    if (!sendToBrand || sendQuantity <= 0) {
+      toast.error("Select brand and enter quantity");
+      return;
+    }
+
+    const brand = brands.find(b => b.id === sendToBrand);
+    if (!brand || brand.empty_cylinder < sendQuantity) {
+      toast.error("Not enough empty cylinders");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const newEmpty = brand.empty_cylinder - sendQuantity;
+      const newInTransit = (brand.in_transit_cylinder || 0) + sendQuantity;
+
+      await supabase
+        .from("lpg_brands")
+        .update({ empty_cylinder: newEmpty, in_transit_cylinder: newInTransit })
+        .eq("id", sendToBrand);
+
+      toast.success(`${sendQuantity} cylinders sent to plant`);
+      setIsSendToPlantOpen(false);
+      setSendToBrand("");
+      setSendQuantity(0);
+      fetchBrands();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to send");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Receive from Plant - Move in-transit to refill/package
+  const handleReceiveFromPlant = async () => {
+    if (!receiveFromBrand || receiveQuantity <= 0) {
+      toast.error("Select brand and enter quantity");
+      return;
+    }
+
+    const brand = brands.find(b => b.id === receiveFromBrand);
+    if (!brand || (brand.in_transit_cylinder || 0) < receiveQuantity) {
+      toast.error("Quantity exceeds in-transit stock");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const newInTransit = (brand.in_transit_cylinder || 0) - receiveQuantity;
+      const updates: any = { in_transit_cylinder: newInTransit };
+      
+      if (receiveType === 'refill') {
+        updates.refill_cylinder = brand.refill_cylinder + receiveQuantity;
+      } else {
+        updates.package_cylinder = brand.package_cylinder + receiveQuantity;
+      }
+
+      await supabase.from("lpg_brands").update(updates).eq("id", receiveFromBrand);
+
+      toast.success(`${receiveQuantity} cylinders received from plant`);
+      setIsReceiveFromPlantOpen(false);
+      setReceiveFromBrand("");
+      setReceiveQuantity(0);
+      fetchBrands();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to receive");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 

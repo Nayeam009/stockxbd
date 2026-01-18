@@ -227,6 +227,7 @@ export const POSModule = () => {
   const [showInvoiceDialog, setShowInvoiceDialog] = useState(false);
   const [lastTransaction, setLastTransaction] = useState<any>(null);
   const [printType, setPrintType] = useState<'bill' | 'gatepass'>('bill');
+  const [showPrintTypeDialog, setShowPrintTypeDialog] = useState(false);
 
   // Barcode Scanner
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
@@ -813,23 +814,92 @@ export const POSModule = () => {
     return newTotal <= DEFAULT_CREDIT_LIMIT;
   }, [selectedCustomerId, selectedCustomer, total]);
 
-  // Void a recent transaction
+  // Void a recent transaction with full inventory reversal
   const handleVoidTransaction = async () => {
     if (!transactionToVoid) return;
     
     try {
-      // Note: In a real system, you'd reverse inventory changes too
-      // For now, we just mark the transaction status
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({ title: "Please log in", variant: "destructive" });
+        return;
+      }
+
+      // Get transaction items for inventory reversal
+      const { data: txnItems } = await supabase
+        .from('pos_transaction_items')
+        .select('*')
+        .eq('transaction_id', transactionToVoid.id);
+
+      // Mark transaction as voided in database
+      const { error: voidError } = await supabase
+        .from('pos_transactions')
+        .update({
+          is_voided: true,
+          voided_at: new Date().toISOString(),
+          voided_by: user.id,
+          void_reason: 'Voided by user within 5 minutes'
+        })
+        .eq('id', transactionToVoid.id);
+
+      if (voidError) throw voidError;
+
+      // Reverse inventory for each item
+      if (txnItems) {
+        for (const item of txnItems) {
+          const productName = item.product_name.toLowerCase();
+          
+          // Check if it's an LPG item
+          if (productName.includes('refill') || productName.includes('package')) {
+            // Find the brand from the product name
+            const brandMatch = lpgBrands.find(b => productName.includes(b.name.toLowerCase()));
+            if (brandMatch) {
+              if (productName.includes('refill')) {
+                // Reverse: Add back to refill, subtract from empty
+                await supabase
+                  .from('lpg_brands')
+                  .update({ 
+                    refill_cylinder: brandMatch.refill_cylinder + item.quantity,
+                    empty_cylinder: Math.max(0, brandMatch.empty_cylinder - item.quantity)
+                  })
+                  .eq('id', brandMatch.id);
+              } else if (productName.includes('package')) {
+                // Reverse: Add back to package stock
+                await supabase
+                  .from('lpg_brands')
+                  .update({ package_cylinder: brandMatch.package_cylinder + item.quantity })
+                  .eq('id', brandMatch.id);
+              }
+            }
+          }
+        }
+      }
+
+      // Record stock movement for audit
+      await supabase
+        .from('stock_movements')
+        .insert({
+          movement_type: 'void',
+          notes: `Voided transaction: ${transactionToVoid.transactionNumber}`,
+          reference_id: transactionToVoid.id,
+          created_by: user.id
+        });
+
       toast({ 
         title: "Transaction voided", 
-        description: `${transactionToVoid.transactionNumber} has been voided. Inventory will be restored.`
+        description: `${transactionToVoid.transactionNumber} has been voided. Inventory restored.`
       });
       
       setRecentTransactions(prev => prev.filter(t => t.id !== transactionToVoid.id));
       setShowVoidDialog(false);
       setTransactionToVoid(null);
-    } catch (error) {
-      toast({ title: "Error voiding transaction", variant: "destructive" });
+      
+      // Refresh data
+      const { data: brandsRes } = await supabase.from('lpg_brands').select('*').eq('is_active', true);
+      if (brandsRes) setLpgBrands(brandsRes);
+      
+    } catch (error: any) {
+      toast({ title: "Error voiding transaction", description: error.message, variant: "destructive" });
     }
   };
 
@@ -895,7 +965,7 @@ export const POSModule = () => {
         }
       }
 
-      // Create transaction
+      // Create transaction with driver_id
       const { data: transaction, error: txnError } = await supabase
         .from('pos_transactions')
         .insert({
@@ -906,7 +976,8 @@ export const POSModule = () => {
           total: Math.max(0, subtotal - validatedDiscount),
           payment_method: 'cash' as const,
           payment_status: paymentStatus,
-          notes: selectedDriverId ? `Driver: ${drivers.find(d => d.id === selectedDriverId)?.name}` : null,
+          driver_id: selectedDriverId && selectedDriverId !== 'none' ? selectedDriverId : null,
+          notes: selectedDriverId && selectedDriverId !== 'none' ? `Driver: ${drivers.find(d => d.id === selectedDriverId)?.name}` : null,
           created_by: user.id
         })
         .select()
