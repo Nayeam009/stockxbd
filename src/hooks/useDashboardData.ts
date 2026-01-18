@@ -461,8 +461,8 @@ export const useDashboardData = () => {
     : 0;
 
   // Cylinder stock health
-  const totalFullCylinders = cylinderStock.reduce((sum, c) => sum + c.fullCylinders, 0);
-  const totalEmptyCylinders = cylinderStock.reduce((sum, c) => sum + c.emptyCylinders, 0);
+  const totalFullCylinders = cylinderStock.reduce((sum, c) => sum + (c.fullCylinders || 0), 0);
+  const totalEmptyCylinders = cylinderStock.reduce((sum, c) => sum + (c.emptyCylinders || 0), 0);
   const cylinderStockHealth: 'critical' | 'warning' | 'good' = 
     totalEmptyCylinders > totalFullCylinders ? 'critical' :
     totalFullCylinders < 20 ? 'warning' : 'good';
@@ -476,25 +476,25 @@ export const useDashboardData = () => {
   const dispatchedOrders = orders.filter(o => o.status === 'dispatched').length;
 
   const analytics: DashboardAnalytics = {
-    todayRevenue: todayCashRevenue, // Only cash received
-    todayCashRevenue,
-    todayDueRevenue,
-    monthlyRevenue,
-    lastMonthRevenue,
-    monthlyGrowthPercent,
+    todayRevenue: todayCashRevenue || 0, // Only cash received
+    todayCashRevenue: todayCashRevenue || 0,
+    todayDueRevenue: todayDueRevenue || 0,
+    monthlyRevenue: monthlyRevenue || 0,
+    lastMonthRevenue: lastMonthRevenue || 0,
+    monthlyGrowthPercent: isNaN(monthlyGrowthPercent) ? 0 : monthlyGrowthPercent,
     
     lowStockItems: stockData.filter(item => item.currentStock <= item.minStock),
-    totalFullCylinders,
-    totalEmptyCylinders,
+    totalFullCylinders: totalFullCylinders || 0,
+    totalEmptyCylinders: totalEmptyCylinders || 0,
     cylinderStockHealth,
     
     activeOrders: orders.filter(order => ['pending', 'confirmed', 'dispatched'].includes(order.status)).length,
-    pendingOrders,
-    dispatchedOrders,
+    pendingOrders: pendingOrders || 0,
+    dispatchedOrders: dispatchedOrders || 0,
     
-    totalCustomers: customers.length,
-    activeCustomers,
-    lostCustomers,
+    totalCustomers: customers.length || 0,
+    activeCustomers: activeCustomers || 0,
+    lostCustomers: lostCustomers || 0,
     
     activeDrivers: drivers.filter(driver => driver.status === 'active').length,
   };

@@ -1,17 +1,17 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { 
   Users, Banknote, TrendingUp, TrendingDown, Truck, Receipt, Wallet, 
   ClipboardList, ChefHat, Wrench, RefreshCw, Tag, BarChart3, Settings, 
-  Package, AlertTriangle, Cylinder, Eye, EyeOff, Fuel
+  Package, AlertTriangle, Cylinder, Eye, EyeOff, Fuel, MessageSquare
 } from "lucide-react";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Driver, DashboardAnalytics, CylinderStock } from "@/hooks/useDashboardData";
 import { Progress } from "@/components/ui/progress";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface DashboardOverviewProps {
   analytics: DashboardAnalytics;
@@ -36,6 +36,41 @@ export const DashboardOverview = ({
   const isOwnerOrManager = userRole === 'owner' || userRole === 'manager';
   const isOwner = userRole === 'owner';
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'F1') {
+        e.preventDefault();
+        setActiveModule?.('pos');
+      } else if (e.key === 'F2') {
+        e.preventDefault();
+        setActiveModule?.('daily-sales');
+      } else if (e.key === 'F3') {
+        e.preventDefault();
+        setActiveModule?.('lpg-stock');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [setActiveModule]);
+
+  // Safe number formatting
+  const formatNumber = (num: number | undefined | null) => {
+    if (num === undefined || num === null || isNaN(num)) return '0';
+    return num.toLocaleString();
+  };
+
+  const formatCurrency = (num: number | undefined | null) => {
+    return `${BANGLADESHI_CURRENCY_SYMBOL}${formatNumber(num)}`;
+  };
+
+  const safePercentage = (value: number, total: number) => {
+    if (!total || total === 0 || isNaN(total)) return 0;
+    const result = Math.round((value / total) * 100);
+    return isNaN(result) ? 0 : result;
+  };
+
   // KPI Cards - Only show financial data to owner/manager
   const getKpiCards = () => {
     const cards = [];
@@ -45,9 +80,9 @@ export const DashboardOverview = ({
       cards.push({
         id: 'today-revenue',
         title: "Today's Revenue",
-        value: `${BANGLADESHI_CURRENCY_SYMBOL}${analytics.todayRevenue.toLocaleString()}`,
+        value: formatCurrency(analytics.todayRevenue),
         subtitle: showRevenueDetails 
-          ? `Cash: ${BANGLADESHI_CURRENCY_SYMBOL}${analytics.todayCashRevenue.toLocaleString()} | Due: ${BANGLADESHI_CURRENCY_SYMBOL}${analytics.todayDueRevenue.toLocaleString()}`
+          ? `Cash: ${formatCurrency(analytics.todayCashRevenue)} | Due: ${formatCurrency(analytics.todayDueRevenue)}`
           : "Cash received today",
         change: "+12%",
         changeType: "positive" as const,
@@ -60,12 +95,12 @@ export const DashboardOverview = ({
       cards.push({
         id: 'monthly-revenue',
         title: "Monthly Revenue",
-        value: `${BANGLADESHI_CURRENCY_SYMBOL}${analytics.monthlyRevenue.toLocaleString()}`,
+        value: formatCurrency(analytics.monthlyRevenue),
         subtitle: "1st to today",
-        change: `${analytics.monthlyGrowthPercent >= 0 ? '+' : ''}${analytics.monthlyGrowthPercent}%`,
-        changeType: analytics.monthlyGrowthPercent >= 0 ? "positive" as const : "negative" as const,
+        change: `${(analytics.monthlyGrowthPercent || 0) >= 0 ? '+' : ''}${analytics.monthlyGrowthPercent || 0}%`,
+        changeType: (analytics.monthlyGrowthPercent || 0) >= 0 ? "positive" as const : "negative" as const,
         icon: TrendingUp,
-        warning: analytics.monthlyGrowthPercent < 0
+        warning: (analytics.monthlyGrowthPercent || 0) < 0
       });
     }
 
@@ -73,24 +108,27 @@ export const DashboardOverview = ({
     cards.push({
       id: 'active-orders',
       title: "Active Orders",
-      value: analytics.activeOrders.toString(),
-      subtitle: `${analytics.pendingOrders} pending, ${analytics.dispatchedOrders} dispatched`,
-      change: analytics.activeOrders > 0 ? "On the road" : "All clear",
-      changeType: analytics.activeOrders > 0 ? "warning" as const : "positive" as const,
+      value: formatNumber(analytics.activeOrders),
+      subtitle: `${formatNumber(analytics.pendingOrders)} pending, ${formatNumber(analytics.dispatchedOrders)} dispatched`,
+      change: (analytics.activeOrders || 0) > 0 ? "On the road" : "All clear",
+      changeType: (analytics.activeOrders || 0) > 0 ? "warning" as const : "positive" as const,
       icon: ClipboardList,
       clickable: true,
       onClick: () => setActiveModule?.('deliveries')
     });
 
     // Total Customers with active/lost
+    const customerPercentage = safePercentage(analytics.activeCustomers || 0, analytics.totalCustomers || 0);
     cards.push({
       id: 'customers',
       title: "Total Customers",
-      value: analytics.totalCustomers.toString(),
-      subtitle: `${analytics.activeCustomers} active, ${analytics.lostCustomers} inactive`,
-      change: analytics.activeCustomers > 0 ? `${Math.round((analytics.activeCustomers / analytics.totalCustomers) * 100)}% active` : "0% active",
-      changeType: analytics.activeCustomers > analytics.lostCustomers ? "positive" as const : "warning" as const,
-      icon: Users
+      value: formatNumber(analytics.totalCustomers),
+      subtitle: `${formatNumber(analytics.activeCustomers)} active, ${formatNumber(analytics.lostCustomers)} inactive`,
+      change: `${customerPercentage}% active`,
+      changeType: (analytics.activeCustomers || 0) > (analytics.lostCustomers || 0) ? "positive" as const : "warning" as const,
+      icon: Users,
+      clickable: true,
+      onClick: () => setActiveModule?.('customers')
     });
 
     return cards;
@@ -98,13 +136,13 @@ export const DashboardOverview = ({
 
   // Quick Actions - Organized by category
   const salesActions = [
-    { title: "POS (F1)", icon: Receipt, module: "pos", hotkey: "F1" },
-    { title: "Daily Sales", icon: BarChart3, module: "daily-sales" },
+    { title: "POS", icon: Receipt, module: "pos", hotkey: "F1", description: "Point of Sale" },
+    { title: "Daily Sales", icon: BarChart3, module: "daily-sales", hotkey: "F2" },
     { title: "Orders", icon: ClipboardList, module: "orders" },
   ];
 
   const inventoryActions = [
-    { title: "LPG Stock", icon: Package, module: "lpg-stock" },
+    { title: "LPG Stock", icon: Package, module: "lpg-stock", hotkey: "F3" },
     { title: "Gas Stove", icon: ChefHat, module: "stove-stock" },
     { title: "Regulators", icon: Wrench, module: "regulators" },
   ];
@@ -121,7 +159,7 @@ export const DashboardOverview = ({
     { title: "Analytics", icon: BarChart3, module: "analytics" },
     { title: "Customers", icon: Users, module: "customers" },
     { title: "Daily Expenses", icon: Wallet, module: "daily-expenses" },
-    { title: "Community", icon: Users, module: "community" },
+    { title: "Community", icon: MessageSquare, module: "community" },
   ];
 
   const handleQuickAction = (module: string) => {
@@ -131,8 +169,8 @@ export const DashboardOverview = ({
   };
 
   const kpiCards = getKpiCards();
-  const totalCylinders = analytics.totalFullCylinders + analytics.totalEmptyCylinders;
-  const fullPercentage = totalCylinders > 0 ? (analytics.totalFullCylinders / totalCylinders) * 100 : 0;
+  const totalCylinders = (analytics.totalFullCylinders || 0) + (analytics.totalEmptyCylinders || 0);
+  const fullPercentage = totalCylinders > 0 ? ((analytics.totalFullCylinders || 0) / totalCylinders) * 100 : 0;
 
   return (
     <div className="space-y-4 sm:space-y-6 px-1 sm:px-2 md:px-0">
@@ -291,21 +329,21 @@ export const DashboardOverview = ({
       )}
 
       {/* Driver Status - Real-Time Logistics */}
-      {isOwnerOrManager && drivers.length > 0 && (
+      {isOwnerOrManager && (
         <Card className="border border-border/40 shadow-md bg-card overflow-hidden">
           <CardHeader className="p-3 sm:p-4 pb-2 bg-gradient-to-r from-accent/5 to-transparent border-b border-border/40">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-2 sm:gap-3">
-                <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-gradient-to-br from-accent to-accent-light flex items-center justify-center shadow-md">
+                <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-gradient-to-br from-accent to-accent-light flex items-center justify-center shadow-md flex-shrink-0">
                   <Truck className="h-5 w-5 sm:h-6 sm:w-6 text-accent-foreground" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <CardTitle className="text-base sm:text-lg font-bold">Driver Status</CardTitle>
-                  <CardDescription className="text-xs sm:text-sm">Real-time tracking • {drivers.length} drivers</CardDescription>
+                  <CardDescription className="text-xs sm:text-sm">Real-time tracking • {drivers.length} driver{drivers.length !== 1 ? 's' : ''}</CardDescription>
                 </div>
               </div>
               {onRefresh && (
-                <Button variant="ghost" size="icon" onClick={onRefresh}>
+                <Button variant="ghost" size="icon" onClick={onRefresh} className="flex-shrink-0">
                   <RefreshCw className="h-4 w-4" />
                 </Button>
               )}
@@ -313,56 +351,66 @@ export const DashboardOverview = ({
           </CardHeader>
           
           <CardContent className="p-3 sm:p-4">
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs sm:text-sm">
-                <thead>
-                  <tr className="border-b border-border/40">
-                    <th className="text-left py-2 font-semibold text-muted-foreground">Driver</th>
-                    <th className="text-center py-2 font-semibold text-muted-foreground">Status</th>
-                    <th className="text-right py-2 font-semibold text-muted-foreground hidden sm:table-cell">Stock</th>
-                    <th className="text-right py-2 font-semibold text-muted-foreground">Sales</th>
-                    <th className="text-right py-2 font-semibold text-muted-foreground">Trips</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {drivers.map((driver) => (
-                    <tr key={driver.id} className="border-b border-border/20 last:border-0 hover:bg-muted/30 transition-colors">
-                      <td className="py-2.5 sm:py-3">
-                        <div>
-                          <p className="font-semibold truncate max-w-[100px] sm:max-w-none">{driver.name}</p>
-                          <p className="text-[10px] text-muted-foreground hidden sm:block">{driver.phone}</p>
-                        </div>
-                      </td>
-                      <td className="py-2.5 sm:py-3 text-center">
-                        <Badge className={`text-[10px] sm:text-xs ${
-                          driver.status === 'active' ? 'bg-success/15 text-success border-success/30' :
-                          driver.status === 'break' ? 'bg-warning/15 text-warning border-warning/30' :
-                          'bg-muted text-muted-foreground border-border'
-                        }`}>
-                          {driver.status}
-                        </Badge>
-                      </td>
-                      <td className="py-2.5 sm:py-3 text-right hidden sm:table-cell">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className={`font-bold ${driver.stockInHand > 0 ? 'text-warning' : 'text-muted-foreground'}`}>
-                              {driver.stockInHand} cyl
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Cylinders currently with driver</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </td>
-                      <td className="py-2.5 sm:py-3 text-right font-bold">
-                        {BANGLADESHI_CURRENCY_SYMBOL}{driver.todaySales.toLocaleString()}
-                      </td>
-                      <td className="py-2.5 sm:py-3 text-right font-bold">{driver.todayDeliveries}</td>
+            {drivers.length > 0 ? (
+              <div className="overflow-x-auto -mx-3 sm:mx-0">
+                <table className="w-full text-xs sm:text-sm min-w-[400px]">
+                  <thead>
+                    <tr className="border-b border-border/40">
+                      <th className="text-left py-2 px-2 font-semibold text-muted-foreground">Driver</th>
+                      <th className="text-center py-2 px-2 font-semibold text-muted-foreground">Status</th>
+                      <th className="text-right py-2 px-2 font-semibold text-muted-foreground">Stock</th>
+                      <th className="text-right py-2 px-2 font-semibold text-muted-foreground">Sales</th>
+                      <th className="text-right py-2 px-2 font-semibold text-muted-foreground">Trips</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {drivers.map((driver) => (
+                      <tr key={driver.id} className="border-b border-border/20 last:border-0 hover:bg-muted/30 transition-colors">
+                        <td className="py-2.5 sm:py-3 px-2">
+                          <div className="min-w-0">
+                            <p className="font-semibold truncate max-w-[120px]">{driver.name || 'Unknown'}</p>
+                            <p className="text-[10px] text-muted-foreground truncate">{driver.phone || '-'}</p>
+                          </div>
+                        </td>
+                        <td className="py-2.5 sm:py-3 px-2 text-center">
+                          <Badge className={`text-[10px] sm:text-xs ${
+                            driver.status === 'active' ? 'bg-success/15 text-success border-success/30' :
+                            driver.status === 'break' ? 'bg-warning/15 text-warning border-warning/30' :
+                            'bg-muted text-muted-foreground border-border'
+                          }`}>
+                            {driver.status || 'offline'}
+                          </Badge>
+                        </td>
+                        <td className="py-2.5 sm:py-3 px-2 text-right">
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className={`font-bold ${(driver.stockInHand || 0) > 0 ? 'text-warning' : 'text-muted-foreground'}`}>
+                                  {formatNumber(driver.stockInHand)} cyl
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Cylinders currently with driver</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </td>
+                        <td className="py-2.5 sm:py-3 px-2 text-right font-bold">
+                          {formatCurrency(driver.todaySales)}
+                        </td>
+                        <td className="py-2.5 sm:py-3 px-2 text-right font-bold">{formatNumber(driver.todayDeliveries)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-6 text-muted-foreground">
+                <Truck className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                <p className="text-sm">No drivers registered yet</p>
+                <p className="text-xs">Add team members with driver role</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
@@ -381,21 +429,29 @@ export const DashboardOverview = ({
           </div>
         </CardHeader>
         
-        <CardContent className="p-3 sm:p-4 space-y-4">
+        <CardContent className="p-3 sm:p-4 space-y-4 sm:space-y-5">
           {/* Sales Group */}
           <div>
-            <h4 className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">Sales</h4>
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 sm:gap-3">
+            <h4 className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider flex items-center gap-2">
+              <Receipt className="h-3 w-3" />
+              Sales
+            </h4>
+            <div className="grid grid-cols-3 gap-2 sm:gap-3">
               {salesActions.map((action) => {
                 const Icon = action.icon;
                 return (
                   <button 
                     key={action.module}
                     onClick={() => handleQuickAction(action.module)}
-                    className="group flex flex-col items-center justify-center p-3 sm:p-4 rounded-xl border border-border/40 bg-muted/20 hover:bg-primary/10 hover:border-primary/40 hover:shadow-lg transition-all duration-200 min-h-[70px] sm:min-h-[80px]"
+                    className="group relative flex flex-col items-center justify-center p-2.5 sm:p-4 rounded-xl border border-border/40 bg-card hover:bg-primary/10 hover:border-primary/40 hover:shadow-lg transition-all duration-200 min-h-[72px] sm:min-h-[88px] active:scale-95 touch-target"
                   >
-                    <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg bg-gradient-to-br from-muted to-muted/30 group-hover:from-primary/20 group-hover:to-primary/10 flex items-center justify-center mb-1.5 transition-all duration-200 group-hover:scale-110">
-                      <Icon className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+                    {action.hotkey && (
+                      <span className="absolute top-1 right-1 text-[8px] sm:text-[10px] font-mono text-muted-foreground bg-muted/50 px-1 rounded hidden sm:block">
+                        {action.hotkey}
+                      </span>
+                    )}
+                    <div className="h-9 w-9 sm:h-11 sm:w-11 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 group-hover:from-primary group-hover:to-primary-light flex items-center justify-center mb-1.5 transition-all duration-200 group-hover:scale-110 group-hover:shadow-md">
+                      <Icon className="h-4 w-4 sm:h-5 sm:w-5 text-primary group-hover:text-primary-foreground transition-colors" />
                     </div>
                     <span className="text-[10px] sm:text-xs font-medium text-center leading-tight">{action.title}</span>
                   </button>
@@ -406,18 +462,26 @@ export const DashboardOverview = ({
 
           {/* Inventory Group */}
           <div>
-            <h4 className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">Inventory</h4>
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 sm:gap-3">
+            <h4 className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider flex items-center gap-2">
+              <Package className="h-3 w-3" />
+              Inventory
+            </h4>
+            <div className="grid grid-cols-3 gap-2 sm:gap-3">
               {inventoryActions.map((action) => {
                 const Icon = action.icon;
                 return (
                   <button 
                     key={action.module}
                     onClick={() => handleQuickAction(action.module)}
-                    className="group flex flex-col items-center justify-center p-3 sm:p-4 rounded-xl border border-border/40 bg-muted/20 hover:bg-secondary/10 hover:border-secondary/40 hover:shadow-lg transition-all duration-200 min-h-[70px] sm:min-h-[80px]"
+                    className="group relative flex flex-col items-center justify-center p-2.5 sm:p-4 rounded-xl border border-border/40 bg-card hover:bg-secondary/10 hover:border-secondary/40 hover:shadow-lg transition-all duration-200 min-h-[72px] sm:min-h-[88px] active:scale-95 touch-target"
                   >
-                    <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg bg-gradient-to-br from-muted to-muted/30 group-hover:from-secondary/20 group-hover:to-secondary/10 flex items-center justify-center mb-1.5 transition-all duration-200 group-hover:scale-110">
-                      <Icon className="h-4 w-4 sm:h-5 sm:w-5 text-secondary" />
+                    {action.hotkey && (
+                      <span className="absolute top-1 right-1 text-[8px] sm:text-[10px] font-mono text-muted-foreground bg-muted/50 px-1 rounded hidden sm:block">
+                        {action.hotkey}
+                      </span>
+                    )}
+                    <div className="h-9 w-9 sm:h-11 sm:w-11 rounded-xl bg-gradient-to-br from-secondary/10 to-secondary/5 group-hover:from-secondary group-hover:to-secondary-light flex items-center justify-center mb-1.5 transition-all duration-200 group-hover:scale-110 group-hover:shadow-md">
+                      <Icon className="h-4 w-4 sm:h-5 sm:w-5 text-secondary group-hover:text-secondary-foreground transition-colors" />
                     </div>
                     <span className="text-[10px] sm:text-xs font-medium text-center leading-tight">{action.title}</span>
                   </button>
@@ -428,18 +492,21 @@ export const DashboardOverview = ({
 
           {/* Operations Group */}
           <div>
-            <h4 className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">Operations</h4>
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 sm:gap-3">
+            <h4 className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider flex items-center gap-2">
+              <Truck className="h-3 w-3" />
+              Operations
+            </h4>
+            <div className="grid grid-cols-3 gap-2 sm:gap-3">
               {operationActions.map((action) => {
                 const Icon = action.icon;
                 return (
                   <button 
                     key={action.module}
                     onClick={() => handleQuickAction(action.module)}
-                    className="group flex flex-col items-center justify-center p-3 sm:p-4 rounded-xl border border-border/40 bg-muted/20 hover:bg-accent/10 hover:border-accent/40 hover:shadow-lg transition-all duration-200 min-h-[70px] sm:min-h-[80px]"
+                    className="group flex flex-col items-center justify-center p-2.5 sm:p-4 rounded-xl border border-border/40 bg-card hover:bg-accent/10 hover:border-accent/40 hover:shadow-lg transition-all duration-200 min-h-[72px] sm:min-h-[88px] active:scale-95 touch-target"
                   >
-                    <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg bg-gradient-to-br from-muted to-muted/30 group-hover:from-accent/20 group-hover:to-accent/10 flex items-center justify-center mb-1.5 transition-all duration-200 group-hover:scale-110">
-                      <Icon className="h-4 w-4 sm:h-5 sm:w-5 text-accent" />
+                    <div className="h-9 w-9 sm:h-11 sm:w-11 rounded-xl bg-gradient-to-br from-accent/10 to-accent/5 group-hover:from-accent group-hover:to-accent-light flex items-center justify-center mb-1.5 transition-all duration-200 group-hover:scale-110 group-hover:shadow-md">
+                      <Icon className="h-4 w-4 sm:h-5 sm:w-5 text-accent group-hover:text-accent-foreground transition-colors" />
                     </div>
                     <span className="text-[10px] sm:text-xs font-medium text-center leading-tight">{action.title}</span>
                   </button>
@@ -451,7 +518,10 @@ export const DashboardOverview = ({
           {/* Admin Group - Filtered by role */}
           {isOwnerOrManager && (
             <div>
-              <h4 className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">Administration</h4>
+              <h4 className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider flex items-center gap-2">
+                <Settings className="h-3 w-3" />
+                Administration
+              </h4>
               <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-3">
                 {adminActions
                   .filter(action => !action.ownerOnly || isOwner)
@@ -461,14 +531,14 @@ export const DashboardOverview = ({
                       <button 
                         key={action.module}
                         onClick={() => handleQuickAction(action.module)}
-                        className="group flex flex-col items-center justify-center p-3 sm:p-4 rounded-xl border border-border/40 bg-muted/20 hover:bg-warning/10 hover:border-warning/40 hover:shadow-lg transition-all duration-200 min-h-[70px] sm:min-h-[80px]"
+                        className="group relative flex flex-col items-center justify-center p-2.5 sm:p-4 rounded-xl border border-border/40 bg-card hover:bg-warning/10 hover:border-warning/40 hover:shadow-lg transition-all duration-200 min-h-[72px] sm:min-h-[88px] active:scale-95 touch-target"
                       >
-                        <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg bg-gradient-to-br from-muted to-muted/30 group-hover:from-warning/20 group-hover:to-warning/10 flex items-center justify-center mb-1.5 transition-all duration-200 group-hover:scale-110">
-                          <Icon className="h-4 w-4 sm:h-5 sm:w-5 text-warning" />
+                        <div className="h-9 w-9 sm:h-11 sm:w-11 rounded-xl bg-gradient-to-br from-warning/10 to-warning/5 group-hover:from-warning group-hover:to-warning/80 flex items-center justify-center mb-1.5 transition-all duration-200 group-hover:scale-110 group-hover:shadow-md">
+                          <Icon className="h-4 w-4 sm:h-5 sm:w-5 text-warning group-hover:text-warning-foreground transition-colors" />
                         </div>
                         <span className="text-[10px] sm:text-xs font-medium text-center leading-tight">{action.title}</span>
                         {action.ownerOnly && (
-                          <Badge className="text-[8px] mt-1 bg-primary/10 text-primary border-0">Owner</Badge>
+                          <Badge className="text-[7px] sm:text-[8px] mt-0.5 bg-primary/10 text-primary border-0 px-1 py-0">Owner</Badge>
                         )}
                       </button>
                     );
