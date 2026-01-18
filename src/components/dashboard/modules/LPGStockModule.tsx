@@ -32,7 +32,6 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { InventoryPricingCard } from "./InventoryPricingCard";
 import { syncLpgBrandToPricing } from "@/hooks/useInventoryPricingSync";
 
 interface LPGBrand {
@@ -692,14 +691,6 @@ export const LPGStockModule = ({ size = "22mm" }: LPGStockModuleProps) => {
           </div>
         </CardContent>
       </Card>
-
-      {/* Pricing Card */}
-      <InventoryPricingCard
-        productType="lpg"
-        title="LPG Cylinder Pricing"
-        description="Quick access to view and edit cylinder prices"
-        sizeFilter={selectedWeight}
-      />
     </div>
   );
 };
