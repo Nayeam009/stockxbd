@@ -106,6 +106,7 @@ const Dashboard = () => {
   const {
     salesData,
     stockData,
+    cylinderStock,
     drivers,
     customers,
     orders,
@@ -113,6 +114,7 @@ const Dashboard = () => {
     staff,
     analytics,
     loading,
+    refetch,
     setSalesData,
     setStockData,
     setDrivers,
@@ -141,8 +143,10 @@ const Dashboard = () => {
           <DashboardOverview
             analytics={analytics}
             drivers={drivers}
+            cylinderStock={cylinderStock}
             userRole={userRole}
             setActiveModule={setActiveModule}
+            onRefresh={refetch}
           />
         );
       case "pos":
@@ -188,6 +192,7 @@ const Dashboard = () => {
         return <StaffSalaryModule />;
       case "vehicle-cost":
         return <VehicleCostModule />;
+      case "deliveries":
       case "online-delivery":
         return (
           <OnlineDeliveryModule
@@ -212,7 +217,10 @@ const Dashboard = () => {
           <DashboardOverview
             analytics={analytics}
             drivers={drivers}
+            cylinderStock={cylinderStock}
             userRole={userRole}
+            setActiveModule={setActiveModule}
+            onRefresh={refetch}
           />
         );
     }
