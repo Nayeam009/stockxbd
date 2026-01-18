@@ -303,112 +303,114 @@ export const LPGStockModule = ({ size = "22mm" }: LPGStockModuleProps) => {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-4 sm:space-y-6">
+      {/* Header - Mobile optimized */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
         <div>
-          <h2 className="text-2xl sm:text-3xl font-bold text-foreground flex items-center gap-3">
-            <Cylinder className="h-7 w-7 text-primary" />
+          <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground flex items-center gap-2 sm:gap-3">
+            <Cylinder className="h-5 w-5 sm:h-7 sm:w-7 text-primary" />
             LPG Stock ({size})
           </h2>
-          <p className="text-muted-foreground mt-1">Manage your cylinder inventory efficiently</p>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">Manage your cylinder inventory</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={fetchBrands}>
-            <Loader2 className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : 'hidden'}`} />
+          <Button variant="outline" size="sm" onClick={fetchBrands} className="h-8 sm:h-9 text-xs sm:text-sm">
+            <Loader2 className={`h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 ${loading ? 'animate-spin' : 'hidden'}`} />
             Refresh
           </Button>
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
-              <Button size="sm" className="bg-primary hover:bg-primary/90">
-                <Plus className="h-4 w-4 mr-2" />
+              <Button size="sm" className="bg-primary hover:bg-primary/90 h-8 sm:h-9 text-xs sm:text-sm">
+                <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                 New Brand
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px]">
+            <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto mx-4">
               <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
+                <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
                   Add New LPG Brand
-                  <Badge variant="outline">{selectedWeight}</Badge>
+                  <Badge variant="outline" className="text-xs">{selectedWeight}</Badge>
                 </DialogTitle>
-                <DialogDescription>
-                  Enter the brand details and initial cylinder counts for {selectedWeight} cylinders.
+                <DialogDescription className="text-xs sm:text-sm">
+                  Enter the brand details for {selectedWeight} cylinders.
                 </DialogDescription>
               </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="name" className="text-right">Brand Name</Label>
+              <div className="grid gap-3 sm:gap-4 py-3 sm:py-4">
+                <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-2 sm:gap-4">
+                  <Label htmlFor="name" className="sm:text-right text-sm">Brand Name</Label>
                   <Input
                     id="name"
                     value={newBrand.name}
                     onChange={(e) => setNewBrand({ ...newBrand, name: e.target.value })}
-                    className="col-span-3"
+                    className="sm:col-span-3 h-9"
                     placeholder="e.g., Total Energies"
                   />
                 </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="color" className="text-right">Color</Label>
-                  <div className="col-span-3 flex items-center gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-2 sm:gap-4">
+                  <Label htmlFor="color" className="sm:text-right text-sm">Color</Label>
+                  <div className="sm:col-span-3 flex items-center gap-2">
                     <input
                       type="color"
                       id="color"
                       value={newBrand.color}
                       onChange={(e) => setNewBrand({ ...newBrand, color: e.target.value })}
-                      className="w-10 h-10 rounded cursor-pointer"
+                      className="w-8 h-8 sm:w-10 sm:h-10 rounded cursor-pointer"
                     />
-                    <span className="text-sm text-muted-foreground">Brand indicator color</span>
+                    <span className="text-xs sm:text-sm text-muted-foreground">Brand color</span>
                   </div>
                 </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="package" className="text-right">Package</Label>
-                  <Input
-                    id="package"
-                    type="number"
-                    value={newBrand.package_cylinder}
-                    onChange={(e) => setNewBrand({ ...newBrand, package_cylinder: parseInt(e.target.value) || 0 })}
-                    className="col-span-3"
-                    min={0}
-                  />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="refill" className="text-right">Refill</Label>
-                  <Input
-                    id="refill"
-                    type="number"
-                    value={newBrand.refill_cylinder}
-                    onChange={(e) => setNewBrand({ ...newBrand, refill_cylinder: parseInt(e.target.value) || 0 })}
-                    className="col-span-3"
-                    min={0}
-                  />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="empty" className="text-right">Empty</Label>
-                  <Input
-                    id="empty"
-                    type="number"
-                    value={newBrand.empty_cylinder}
-                    onChange={(e) => setNewBrand({ ...newBrand, empty_cylinder: parseInt(e.target.value) || 0 })}
-                    className="col-span-3"
-                    min={0}
-                  />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="problem" className="text-right">Problem</Label>
-                  <Input
-                    id="problem"
-                    type="number"
-                    value={newBrand.problem_cylinder}
-                    onChange={(e) => setNewBrand({ ...newBrand, problem_cylinder: parseInt(e.target.value) || 0 })}
-                    className="col-span-3"
-                    min={0}
-                  />
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="package" className="text-xs sm:text-sm">Package</Label>
+                    <Input
+                      id="package"
+                      type="number"
+                      value={newBrand.package_cylinder}
+                      onChange={(e) => setNewBrand({ ...newBrand, package_cylinder: parseInt(e.target.value) || 0 })}
+                      className="h-9"
+                      min={0}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="refill" className="text-xs sm:text-sm">Refill</Label>
+                    <Input
+                      id="refill"
+                      type="number"
+                      value={newBrand.refill_cylinder}
+                      onChange={(e) => setNewBrand({ ...newBrand, refill_cylinder: parseInt(e.target.value) || 0 })}
+                      className="h-9"
+                      min={0}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="empty" className="text-xs sm:text-sm">Empty</Label>
+                    <Input
+                      id="empty"
+                      type="number"
+                      value={newBrand.empty_cylinder}
+                      onChange={(e) => setNewBrand({ ...newBrand, empty_cylinder: parseInt(e.target.value) || 0 })}
+                      className="h-9"
+                      min={0}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="problem" className="text-xs sm:text-sm">Problem</Label>
+                    <Input
+                      id="problem"
+                      type="number"
+                      value={newBrand.problem_cylinder}
+                      onChange={(e) => setNewBrand({ ...newBrand, problem_cylinder: parseInt(e.target.value) || 0 })}
+                      className="h-9"
+                      min={0}
+                    />
+                  </div>
                 </div>
               </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+              <DialogFooter className="gap-2">
+                <Button variant="outline" onClick={() => setIsAddDialogOpen(false)} className="h-9">
                   Cancel
                 </Button>
-                <Button onClick={handleAddBrand} disabled={isSubmitting}>
+                <Button onClick={handleAddBrand} disabled={isSubmitting} className="h-9">
                   {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                   Add Brand
                 </Button>
@@ -418,28 +420,29 @@ export const LPGStockModule = ({ size = "22mm" }: LPGStockModuleProps) => {
         </div>
       </div>
 
-      {/* Weight Selection Pills */}
+      {/* Weight Selection Pills - Mobile scrollable */}
       <Card className="border-border bg-gradient-to-r from-primary/5 via-card to-accent/5">
-        <CardContent className="p-4">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+        <CardContent className="p-3 sm:p-4">
+          <div className="flex flex-col gap-3">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-muted-foreground">Cylinder Weight:</span>
-              <Badge className="bg-primary/10 text-primary border-primary/20">{size}</Badge>
+              <span className="text-xs sm:text-sm font-medium text-muted-foreground whitespace-nowrap">Weight:</span>
+              <Badge className="bg-primary/10 text-primary border-primary/20 text-xs">{size}</Badge>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex gap-1.5 sm:gap-2 overflow-x-auto pb-1 -mx-1 px-1 no-scrollbar">
               {weightOptions.map((option) => (
                 <Button
                   key={option.value}
                   variant={selectedWeight === option.value ? "default" : "outline"}
                   size="sm"
                   onClick={() => setSelectedWeight(option.value)}
-                  className={`transition-all duration-200 ${
+                  className={`transition-all duration-200 flex-shrink-0 h-8 sm:h-9 px-2.5 sm:px-3 text-xs sm:text-sm ${
                     selectedWeight === option.value 
-                      ? "bg-primary text-primary-foreground shadow-md scale-105" 
+                      ? "bg-primary text-primary-foreground shadow-md" 
                       : "hover:bg-primary/10 hover:border-primary/50"
                   }`}
                 >
-                  {option.label}
+                  <span className="sm:hidden">{option.shortLabel}</span>
+                  <span className="hidden sm:inline">{option.label}</span>
                 </Button>
               ))}
             </div>
@@ -447,44 +450,44 @@ export const LPGStockModule = ({ size = "22mm" }: LPGStockModuleProps) => {
         </CardContent>
       </Card>
 
-      {/* Search */}
-      <div className="relative max-w-md">
+      {/* Search - Mobile optimized */}
+      <div className="relative">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
           placeholder="Search brands..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-9 bg-muted/50"
+          className="pl-9 bg-muted/50 h-10"
         />
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Summary Cards - Mobile 2x2 grid */}
+      <div className="grid grid-cols-2 gap-2 sm:gap-4">
         <Card className="bg-gradient-to-br from-green-500/10 via-card to-card border-green-500/20">
-          <CardContent className="p-4 sm:p-6">
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <p className="text-xs sm:text-sm text-muted-foreground font-medium">Package Cylinders</p>
-                <p className="text-xl sm:text-3xl font-bold text-foreground">{totals.package.toLocaleString()}</p>
-                <p className="text-xs text-muted-foreground">New with cylinder</p>
+          <CardContent className="p-3 sm:p-4 lg:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="space-y-0.5 sm:space-y-1 min-w-0">
+                <p className="text-[10px] sm:text-xs lg:text-sm text-muted-foreground font-medium truncate">Package</p>
+                <p className="text-lg sm:text-xl lg:text-3xl font-bold text-foreground">{totals.package}</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground hidden sm:block">New with cylinder</p>
               </div>
-              <div className="h-12 w-12 rounded-full bg-green-500/20 flex items-center justify-center">
-                <Package className="h-6 w-6 text-green-500" />
+              <div className="h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0">
+                <Package className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 text-green-500" />
               </div>
             </div>
           </CardContent>
         </Card>
         
         <Card className="bg-gradient-to-br from-blue-500/10 via-card to-card border-blue-500/20">
-          <CardContent className="p-4 sm:p-6">
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <p className="text-xs sm:text-sm text-muted-foreground font-medium">Refill Cylinders</p>
-                <p className="text-xl sm:text-3xl font-bold text-foreground">{totals.refill.toLocaleString()}</p>
-                <p className="text-xs text-muted-foreground">Ready for sale</p>
+          <CardContent className="p-3 sm:p-4 lg:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="space-y-0.5 sm:space-y-1 min-w-0">
+                <p className="text-[10px] sm:text-xs lg:text-sm text-muted-foreground font-medium truncate">Refill</p>
+                <p className="text-lg sm:text-xl lg:text-3xl font-bold text-foreground">{totals.refill}</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground hidden sm:block">Ready for sale</p>
               </div>
-              <div className="h-12 w-12 rounded-full bg-blue-500/20 flex items-center justify-center">
-                <Cylinder className="h-6 w-6 text-blue-500" />
+              <div className="h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                <Cylinder className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 text-blue-500" />
               </div>
             </div>
           </CardContent>

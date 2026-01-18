@@ -320,95 +320,95 @@ export const CustomerManagementModule = () => {
   // Main View
   if (viewMode === 'main') {
     return (
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="space-y-4 sm:space-y-6">
+        {/* Header - Mobile optimized */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
           <div>
-            <h2 className="text-2xl sm:text-3xl font-bold text-foreground">Customer Management</h2>
-            <p className="text-muted-foreground">Manage your customer accounts and track dues</p>
+            <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground">Customer Management</h2>
+            <p className="text-xs sm:text-sm text-muted-foreground">Manage accounts and track dues</p>
           </div>
-          <Button onClick={() => setAddCustomerDialogOpen(true)} size="sm" className="bg-primary hover:bg-primary/90">
+          <Button onClick={() => setAddCustomerDialogOpen(true)} size="sm" className="bg-primary hover:bg-primary/90 h-9 w-full sm:w-auto">
             <Plus className="h-4 w-4 mr-2" />
             Add Customer
           </Button>
         </div>
 
-        {/* Summary Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Summary Stats - Mobile 2x2 grid */}
+        <div className="grid grid-cols-2 gap-2 sm:gap-4">
           <Card className="border-border">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
-                  <Users className="h-5 w-5 text-muted-foreground" />
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                  <Users className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
                 </div>
-                <div>
-                  <p className="text-2xl font-bold">{customers.length}</p>
-                  <p className="text-xs text-muted-foreground">Total Customers</p>
+                <div className="min-w-0">
+                  <p className="text-lg sm:text-2xl font-bold">{customers.length}</p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground truncate">Total Customers</p>
                 </div>
               </div>
             </CardContent>
           </Card>
           <Card className="bg-gradient-to-br from-destructive/10 via-card to-card border-destructive/20">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-destructive/20 flex items-center justify-center">
-                  <UserX className="h-5 w-5 text-destructive" />
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg bg-destructive/20 flex items-center justify-center flex-shrink-0">
+                  <UserX className="h-4 w-4 sm:h-5 sm:w-5 text-destructive" />
                 </div>
-                <div>
-                  <p className="text-2xl font-bold">{dueCustomers.length}</p>
-                  <p className="text-xs text-muted-foreground">Due Accounts</p>
+                <div className="min-w-0">
+                  <p className="text-lg sm:text-2xl font-bold">{dueCustomers.length}</p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground truncate">Due Accounts</p>
                 </div>
               </div>
             </CardContent>
           </Card>
           <Card className="border-border">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
-                  <Banknote className="h-5 w-5 text-muted-foreground" />
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                  <Banknote className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
                 </div>
-                <div>
-                  <p className="text-2xl font-bold text-destructive">{BANGLADESHI_CURRENCY_SYMBOL}{totalAmountDue.toLocaleString()}</p>
-                  <p className="text-xs text-muted-foreground">Total Due</p>
+                <div className="min-w-0">
+                  <p className="text-base sm:text-2xl font-bold text-destructive">{BANGLADESHI_CURRENCY_SYMBOL}{totalAmountDue.toLocaleString()}</p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground truncate">Total Due</p>
                 </div>
               </div>
             </CardContent>
           </Card>
           <Card className="bg-gradient-to-br from-green-500/10 via-card to-card border-green-500/20">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-green-500/20 flex items-center justify-center">
-                  <UserCheck className="h-5 w-5 text-green-500" />
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg bg-green-500/20 flex items-center justify-center flex-shrink-0">
+                  <UserCheck className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />
                 </div>
-                <div>
-                  <p className="text-2xl font-bold">{paidCustomers.length}</p>
-                  <p className="text-xs text-muted-foreground">Clear Accounts</p>
+                <div className="min-w-0">
+                  <p className="text-lg sm:text-2xl font-bold">{paidCustomers.length}</p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground truncate">Clear Accounts</p>
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Action Cards */}
-        <div className="grid md:grid-cols-2 gap-6">
+        {/* Action Cards - Stack on mobile */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-6">
           {/* Due Customers Card */}
           <Card className="bg-card border-border hover:border-destructive/50 transition-all duration-300 cursor-pointer group overflow-hidden">
-            <CardContent className="p-6">
-              <div className="flex items-start gap-4 mb-6">
-                <div className="p-3 rounded-xl bg-destructive/20 group-hover:scale-110 transition-transform">
-                  <UserX className="h-8 w-8 text-destructive" />
+            <CardContent className="p-4 sm:p-6">
+              <div className="flex items-start gap-3 sm:gap-4 mb-4 sm:mb-6">
+                <div className="p-2 sm:p-3 rounded-xl bg-destructive/20 group-hover:scale-110 transition-transform flex-shrink-0">
+                  <UserX className="h-5 w-5 sm:h-8 sm:w-8 text-destructive" />
                 </div>
-                <div>
-                  <h3 className="text-xl font-bold text-foreground">Due Customers</h3>
-                  <p className="text-muted-foreground text-sm">View customers with outstanding payments</p>
-                  <p className="text-2xl font-bold text-destructive mt-2">{BANGLADESHI_CURRENCY_SYMBOL}{totalAmountDue.toLocaleString()}</p>
+                <div className="min-w-0">
+                  <h3 className="text-base sm:text-xl font-bold text-foreground">Due Customers</h3>
+                  <p className="text-xs sm:text-sm text-muted-foreground">Outstanding payments</p>
+                  <p className="text-lg sm:text-2xl font-bold text-destructive mt-1 sm:mt-2">{BANGLADESHI_CURRENCY_SYMBOL}{totalAmountDue.toLocaleString()}</p>
                 </div>
               </div>
               <Button 
-                className="w-full bg-destructive hover:bg-destructive/90 text-destructive-foreground group-hover:shadow-lg transition-shadow"
+                className="w-full bg-destructive hover:bg-destructive/90 text-destructive-foreground h-9 sm:h-10 text-sm"
                 onClick={() => setViewMode('due')}
               >
-                Manage Due Customers
+                Manage Due
                 <ArrowRight className="h-4 w-4 ml-2 group-hover:translate-x-1 transition-transform" />
               </Button>
             </CardContent>
@@ -416,23 +416,23 @@ export const CustomerManagementModule = () => {
 
           {/* Paid Customers Card */}
           <Card className="bg-card border-border hover:border-green-500/50 transition-all duration-300 cursor-pointer group overflow-hidden">
-            <CardContent className="p-6">
-              <div className="flex items-start gap-4 mb-6">
-                <div className="p-3 rounded-xl bg-green-500/20 group-hover:scale-110 transition-transform">
-                  <UserCheck className="h-8 w-8 text-green-500" />
+            <CardContent className="p-4 sm:p-6">
+              <div className="flex items-start gap-3 sm:gap-4 mb-4 sm:mb-6">
+                <div className="p-2 sm:p-3 rounded-xl bg-green-500/20 group-hover:scale-110 transition-transform flex-shrink-0">
+                  <UserCheck className="h-5 w-5 sm:h-8 sm:w-8 text-green-500" />
                 </div>
-                <div>
-                  <h3 className="text-xl font-bold text-foreground">Paid Customers</h3>
-                  <p className="text-muted-foreground text-sm">View customers with settled accounts</p>
-                  <p className="text-2xl font-bold text-green-500 mt-2">{paidCustomers.length} customers</p>
+                <div className="min-w-0">
+                  <h3 className="text-base sm:text-xl font-bold text-foreground">Paid Customers</h3>
+                  <p className="text-xs sm:text-sm text-muted-foreground">Settled accounts</p>
+                  <p className="text-lg sm:text-2xl font-bold text-green-500 mt-1 sm:mt-2">{paidCustomers.length} customers</p>
                 </div>
               </div>
               <Button 
                 variant="outline"
-                className="w-full border-green-500/30 hover:bg-green-500/10 group-hover:shadow-lg transition-shadow"
+                className="w-full border-green-500/30 hover:bg-green-500/10 h-9 sm:h-10 text-sm"
                 onClick={() => setViewMode('paid')}
               >
-                View Paid Customers
+                View Paid
                 <ArrowRight className="h-4 w-4 ml-2 group-hover:translate-x-1 transition-transform" />
               </Button>
             </CardContent>
