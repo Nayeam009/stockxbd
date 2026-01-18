@@ -266,15 +266,15 @@ export const OnlineDeliveryModule = ({ orders, setOrders, drivers, userRole }: O
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-3xl font-bold text-primary">Online Delivery Management</h2>
-          <p className="text-muted-foreground">Manage online orders and delivery tracking</p>
+          <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-primary">Online Delivery Management</h2>
+          <p className="text-sm text-muted-foreground">Manage online orders and delivery tracking</p>
         </div>
         {(userRole === 'owner' || userRole === 'manager') && (
-          <Button onClick={() => setShowAddForm(true)} className="bg-primary hover:bg-primary-dark">
+          <Button onClick={() => setShowAddForm(true)} className="bg-primary hover:bg-primary-dark w-full sm:w-auto touch-target">
             <Plus className="h-4 w-4 mr-2" />
             New Order
           </Button>
@@ -282,81 +282,81 @@ export const OnlineDeliveryModule = ({ orders, setOrders, drivers, userRole }: O
       </div>
 
       {/* Analytics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
         <Card className="border-0 shadow-elegant">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-6">
+            <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">
               Total Orders
             </CardTitle>
-            <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+            <ShoppingCart className="h-4 w-4 text-muted-foreground hidden sm:block" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-primary">{analytics.totalOrders}</div>
-            <p className="text-xs text-muted-foreground">{analytics.todayOrders} orders today</p>
+          <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+            <div className="text-xl sm:text-2xl font-bold text-primary">{analytics.totalOrders}</div>
+            <p className="text-[10px] sm:text-xs text-muted-foreground">{analytics.todayOrders} orders today</p>
           </CardContent>
         </Card>
 
         <Card className="border-0 shadow-elegant">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Pending Orders
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-6">
+            <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">
+              Pending
             </CardTitle>
-            <Clock className="h-4 w-4 text-warning" />
+            <Clock className="h-4 w-4 text-warning hidden sm:block" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-warning">{analytics.pendingOrders}</div>
-            <p className="text-xs text-muted-foreground">Awaiting processing</p>
+          <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+            <div className="text-xl sm:text-2xl font-bold text-warning">{analytics.pendingOrders}</div>
+            <p className="text-[10px] sm:text-xs text-muted-foreground">Awaiting processing</p>
           </CardContent>
         </Card>
 
         <Card className="border-0 shadow-elegant">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-6">
+            <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">
               In Transit
             </CardTitle>
-            <Truck className="h-4 w-4 text-secondary" />
+            <Truck className="h-4 w-4 text-secondary hidden sm:block" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-secondary">{analytics.dispatchedOrders}</div>
-            <p className="text-xs text-muted-foreground">Out for delivery</p>
+          <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+            <div className="text-xl sm:text-2xl font-bold text-secondary">{analytics.dispatchedOrders}</div>
+            <p className="text-[10px] sm:text-xs text-muted-foreground">Out for delivery</p>
           </CardContent>
         </Card>
 
         <Card className="border-0 shadow-elegant">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Delivered Today
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-6">
+            <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">
+              Delivered
             </CardTitle>
-            <CheckCircle className="h-4 w-4 text-accent" />
+            <CheckCircle className="h-4 w-4 text-accent hidden sm:block" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-accent">{analytics.deliveredOrders}</div>
-            <p className="text-xs text-muted-foreground">{BANGLADESHI_CURRENCY_SYMBOL}{analytics.todayRevenue.toLocaleString()} revenue</p>
+          <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+            <div className="text-xl sm:text-2xl font-bold text-accent">{analytics.deliveredOrders}</div>
+            <p className="text-[10px] sm:text-xs text-muted-foreground">{BANGLADESHI_CURRENCY_SYMBOL}{analytics.todayRevenue.toLocaleString()}</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Filters */}
       <Card className="border-0 shadow-elegant">
-        <CardHeader>
-          <CardTitle className="text-primary">Order Filters</CardTitle>
+        <CardHeader className="p-3 sm:p-6 pb-2 sm:pb-4">
+          <CardTitle className="text-primary text-base sm:text-lg">Filters</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-4 items-center">
-            <div className="flex items-center space-x-2">
-              <Search className="h-4 w-4 text-muted-foreground" />
+        <CardContent className="p-3 sm:p-6 pt-0">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 sm:items-center">
+            <div className="flex items-center gap-2 flex-1">
+              <Search className="h-4 w-4 text-muted-foreground flex-shrink-0" />
               <Input
                 placeholder="Search orders..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-64"
+                className="flex-1 h-10"
               />
             </div>
 
-            <div className="flex items-center space-x-2">
-              <label className="text-sm font-medium">Status:</label>
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium whitespace-nowrap">Status:</label>
               <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger className="w-40">
+                <SelectTrigger className="w-full sm:w-40 h-10">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -373,14 +373,67 @@ export const OnlineDeliveryModule = ({ orders, setOrders, drivers, userRole }: O
         </CardContent>
       </Card>
 
-      {/* Orders Table */}
+      {/* Orders - Mobile Cards + Desktop Table */}
       <Card className="border-0 shadow-elegant">
-        <CardHeader>
-          <CardTitle className="text-primary">Orders</CardTitle>
-          <CardDescription>Showing {filteredOrders.length} orders</CardDescription>
+        <CardHeader className="p-3 sm:p-6 pb-2 sm:pb-4">
+          <CardTitle className="text-primary text-base sm:text-lg">Orders</CardTitle>
+          <CardDescription className="text-xs sm:text-sm">Showing {filteredOrders.length} orders</CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
+        <CardContent className="p-3 sm:p-6 pt-0">
+          {/* Mobile Cards View */}
+          <div className="sm:hidden space-y-3">
+            {filteredOrders.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No orders found. Create your first order to get started.
+              </div>
+            ) : (
+              filteredOrders.map((order) => (
+                <Card key={order.id} className="p-3 border border-border/50">
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <p className="font-semibold text-sm">{order.orderNumber || order.id.slice(0, 8)}</p>
+                      <p className="text-xs text-muted-foreground">{order.customerName}</p>
+                    </div>
+                    <Badge variant="secondary" className={`${getStatusColor(order.status)} text-[10px]`}>
+                      {order.status.toUpperCase()}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center justify-between text-xs mb-2">
+                    <span className="font-semibold">{BANGLADESHI_CURRENCY_SYMBOL}{(order.totalAmount || 0).toLocaleString()}</span>
+                    <Badge variant="secondary" className={`${getPaymentStatusColor(order.paymentStatus)} text-[10px]`}>
+                      {order.paymentStatus.toUpperCase()}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground mb-2">
+                    <MapPin className="h-3 w-3 flex-shrink-0" />
+                    <span className="truncate">{order.deliveryAddress}</span>
+                  </div>
+                  {(userRole === 'owner' || userRole === 'manager') && (
+                    <div className="flex gap-2 mt-3 pt-3 border-t border-border/50">
+                      {order.status === 'pending' && (
+                        <Button size="sm" variant="outline" onClick={() => updateOrderStatus(order.id, 'confirmed')} className="flex-1 h-8 text-xs">
+                          Confirm
+                        </Button>
+                      )}
+                      {order.status === 'confirmed' && (
+                        <Button size="sm" variant="outline" onClick={() => updateOrderStatus(order.id, 'dispatched')} className="flex-1 h-8 text-xs">
+                          Dispatch
+                        </Button>
+                      )}
+                      {order.status === 'dispatched' && (
+                        <Button size="sm" variant="outline" onClick={() => updateOrderStatus(order.id, 'delivered')} className="flex-1 h-8 text-xs">
+                          Delivered
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </Card>
+              ))
+            )}
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="hidden sm:block">
             <Table>
               <TableHeader>
                 <TableRow>
