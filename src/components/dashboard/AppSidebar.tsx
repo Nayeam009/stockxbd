@@ -216,98 +216,104 @@ export const AppSidebar = ({
   return (
     <Sidebar 
       collapsible="icon" 
-      className="border-r border-border/40 bg-sidebar shadow-lg"
+      className="border-r border-border/40 bg-sidebar shadow-lg transition-all duration-300"
     >
       {/* Header with Logo */}
-      <SidebarHeader className={`border-b border-border/40 ${isCollapsed ? 'p-2' : 'p-3'}`}>
-        <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
+      <SidebarHeader className={`border-b border-border/40 transition-all duration-300 ${isCollapsed ? 'p-2' : 'p-3'}`}>
+        <div className={`flex items-center transition-all duration-300 ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
           <div className="relative shrink-0">
-            <div className={`${isCollapsed ? 'h-8 w-8' : 'h-10 w-10'} rounded-xl bg-gradient-to-br from-primary to-primary-light flex items-center justify-center shadow-md overflow-hidden transition-all duration-200`}>
-              <img src={stockXLogo} alt="Stock-X" className={`${isCollapsed ? 'h-5 w-5' : 'h-7 w-7'} object-contain`} />
+            <div className={`rounded-xl bg-gradient-to-br from-primary to-primary-light flex items-center justify-center shadow-md overflow-hidden transition-all duration-300 ease-out ${isCollapsed ? 'h-8 w-8' : 'h-10 w-10'}`}>
+              <img src={stockXLogo} alt="Stock-X" className={`object-contain transition-all duration-300 ${isCollapsed ? 'h-5 w-5' : 'h-7 w-7'}`} />
             </div>
-            {!isCollapsed && (
-              <div className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 bg-success rounded-full border-2 border-sidebar shadow-sm" />
-            )}
+            <div className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 bg-success rounded-full border-2 border-sidebar shadow-sm transition-all duration-300 ${isCollapsed ? 'opacity-0 scale-0' : 'opacity-100 scale-100'}`} />
           </div>
-          {!isCollapsed && (
-            <div className="min-w-0 flex-1 overflow-hidden">
-              <h2 className="text-base font-bold text-foreground tracking-tight">STOCK X</h2>
-              <p className="text-[11px] text-muted-foreground font-medium">LPG Management</p>
-            </div>
-          )}
+          <div className={`min-w-0 flex-1 transition-all duration-300 ease-out ${isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'}`}>
+            <h2 className="text-base font-bold text-foreground tracking-tight whitespace-nowrap">STOCK X</h2>
+            <p className="text-[11px] text-muted-foreground font-medium whitespace-nowrap">LPG Management</p>
+          </div>
         </div>
       </SidebarHeader>
 
       {/* User Profile Card */}
-      {!isCollapsed && (
-        <div className="px-3 py-3 border-b border-border/40">
-          <div className="flex items-center gap-3 p-2.5 rounded-xl bg-muted/50">
-            <Avatar className="h-9 w-9 border-2 border-primary/20 shadow-sm shrink-0">
+      <div className={`border-b border-border/40 transition-all duration-300 ease-out overflow-hidden ${isCollapsed ? 'max-h-0 opacity-0 py-0 px-0' : 'max-h-32 opacity-100 px-3 py-3'}`}>
+        <div className="flex items-center gap-3 p-2.5 rounded-xl bg-muted/50">
+          <Avatar className="h-9 w-9 border-2 border-primary/20 shadow-sm shrink-0">
+            <AvatarImage src="" />
+            <AvatarFallback className="bg-gradient-to-br from-primary to-primary-light text-primary-foreground font-semibold text-sm">
+              {getInitials(userName)}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0 flex-1 overflow-hidden">
+            <p className="text-sm font-semibold text-foreground truncate">{userName}</p>
+            <Badge className={`mt-0.5 text-[9px] px-2 py-0 h-4 font-medium border capitalize ${getRoleBadgeVariant(userRole)}`}>
+              {userRole}
+            </Badge>
+          </div>
+        </div>
+      </div>
+      
+      {/* Collapsed User Avatar */}
+      <div className={`border-b border-border/40 flex justify-center transition-all duration-300 ease-out overflow-hidden ${isCollapsed ? 'max-h-20 opacity-100 py-2 px-1' : 'max-h-0 opacity-0 py-0'}`}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Avatar className="h-8 w-8 border-2 border-primary/20 shadow-sm cursor-pointer transition-transform duration-200 hover:scale-105">
               <AvatarImage src="" />
-              <AvatarFallback className="bg-gradient-to-br from-primary to-primary-light text-primary-foreground font-semibold text-sm">
+              <AvatarFallback className="bg-gradient-to-br from-primary to-primary-light text-primary-foreground font-semibold text-xs">
                 {getInitials(userName)}
               </AvatarFallback>
             </Avatar>
-            <div className="min-w-0 flex-1 overflow-hidden">
-              <p className="text-sm font-semibold text-foreground truncate">{userName}</p>
-              <Badge className={`mt-0.5 text-[9px] px-2 py-0 h-4 font-medium border capitalize ${getRoleBadgeVariant(userRole)}`}>
-                {userRole}
-              </Badge>
+          </TooltipTrigger>
+          <TooltipContent side="right">
+            <div>
+              <p className="font-semibold">{userName}</p>
+              <p className="text-xs text-muted-foreground capitalize">{userRole}</p>
             </div>
-          </div>
-        </div>
-      )}
-      
-      {/* Collapsed User Avatar */}
-      {isCollapsed && (
-        <div className="py-2 px-1 border-b border-border/40 flex justify-center">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Avatar className="h-8 w-8 border-2 border-primary/20 shadow-sm cursor-pointer">
-                <AvatarImage src="" />
-                <AvatarFallback className="bg-gradient-to-br from-primary to-primary-light text-primary-foreground font-semibold text-xs">
-                  {getInitials(userName)}
-                </AvatarFallback>
-              </Avatar>
-            </TooltipTrigger>
-            <TooltipContent side="right">
-              <div>
-                <p className="font-semibold">{userName}</p>
-                <p className="text-xs text-muted-foreground capitalize">{userRole}</p>
-              </div>
-            </TooltipContent>
-          </Tooltip>
-        </div>
-      )}
+          </TooltipContent>
+        </Tooltip>
+      </div>
 
-      <SidebarContent className="py-2 overflow-x-hidden">
+      <SidebarContent className="py-2 overflow-x-hidden transition-all duration-300">
         {renderNavGroup(mainNavItems)}
         
-        {!isCollapsed && <div className="my-2 mx-4 h-px bg-border/50" />}
+        <div className={`mx-4 h-px bg-border/50 transition-all duration-300 ${isCollapsed ? 'opacity-0 my-0' : 'opacity-100 my-2'}`} />
         {renderNavGroup(salesItems, 'Sales')}
         
-        {!isCollapsed && <div className="my-2 mx-4 h-px bg-border/50" />}
+        <div className={`mx-4 h-px bg-border/50 transition-all duration-300 ${isCollapsed ? 'opacity-0 my-0' : 'opacity-100 my-2'}`} />
         {renderNavGroup(inventoryItems, 'Inventory')}
         
-        {!isCollapsed && <div className="my-2 mx-4 h-px bg-border/50" />}
+        <div className={`mx-4 h-px bg-border/50 transition-all duration-300 ${isCollapsed ? 'opacity-0 my-0' : 'opacity-100 my-2'}`} />
         {renderNavGroup(operationsItems, 'Operations')}
         
-        {!isCollapsed && <div className="my-2 mx-4 h-px bg-border/50" />}
+        <div className={`mx-4 h-px bg-border/50 transition-all duration-300 ${isCollapsed ? 'opacity-0 my-0' : 'opacity-100 my-2'}`} />
         {renderNavGroup(managementItems, 'Manage')}
         
-        {!isCollapsed && <div className="my-2 mx-4 h-px bg-border/50" />}
+        <div className={`mx-4 h-px bg-border/50 transition-all duration-300 ${isCollapsed ? 'opacity-0 my-0' : 'opacity-100 my-2'}`} />
         {renderNavGroup(otherItems)}
       </SidebarContent>
 
       {/* Footer */}
-      <SidebarFooter className={`border-t border-border/40 ${isCollapsed ? 'p-2' : 'p-3'}`}>
-        {isCollapsed ? (
+      <SidebarFooter className={`border-t border-border/40 transition-all duration-300 ${isCollapsed ? 'p-2' : 'p-3'}`}>
+        <div className={`transition-all duration-300 ease-out overflow-hidden ${isCollapsed ? 'max-h-0 opacity-0' : 'max-h-20 opacity-100'}`}>
+          <Button 
+            variant="ghost" 
+            size="sm"
+            className="w-full justify-start h-10 px-3 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all duration-200 rounded-xl"
+            onClick={async () => {
+              await supabase.auth.signOut();
+              toast({ title: t("logout") });
+            }}
+          >
+            <LogOut className="h-4 w-4" />
+            <span className="ml-2 text-sm font-medium">{t("logout")}</span>
+          </Button>
+        </div>
+        <div className={`flex justify-center transition-all duration-300 ease-out overflow-hidden ${isCollapsed ? 'max-h-20 opacity-100' : 'max-h-0 opacity-0'}`}>
           <Tooltip>
             <TooltipTrigger asChild>
               <Button 
                 variant="ghost" 
                 size="icon"
-                className="w-8 h-8 mx-auto text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors rounded-lg"
+                className="w-8 h-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all duration-200 rounded-lg"
                 onClick={async () => {
                   await supabase.auth.signOut();
                   toast({ title: t("logout") });
@@ -318,20 +324,7 @@ export const AppSidebar = ({
             </TooltipTrigger>
             <TooltipContent side="right">{t("logout")}</TooltipContent>
           </Tooltip>
-        ) : (
-          <Button 
-            variant="ghost" 
-            size="sm"
-            className="w-full justify-start h-10 px-3 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors rounded-xl"
-            onClick={async () => {
-              await supabase.auth.signOut();
-              toast({ title: t("logout") });
-            }}
-          >
-            <LogOut className="h-4 w-4" />
-            <span className="ml-2 text-sm font-medium">{t("logout")}</span>
-          </Button>
-        )}
+        </div>
       </SidebarFooter>
     </Sidebar>
   );
