@@ -880,86 +880,112 @@ export const POSModule = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-3xl font-bold text-foreground">{t('pos')}</h2>
-        <p className="text-muted-foreground">Quick sales and billing system with customer integration</p>
+    <div className="space-y-4 sm:space-y-6">
+      {/* Header - Mobile Optimized */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
+        <div>
+          <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground">{t('pos')}</h2>
+          <p className="text-xs sm:text-sm text-muted-foreground">Quick sales and billing system</p>
+        </div>
+        <Button onClick={() => setShowBarcodeScanner(true)} variant="outline" size="sm" className="gap-2 w-full sm:w-auto">
+          <ScanLine className="h-4 w-4" />
+          <span className="sm:inline">Scan Barcode</span>
+        </Button>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-6">
+      {/* Mobile: Stack layout, Desktop: Grid layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
         {/* Left Side - Product Entry */}
-        <div className="lg:col-span-2 space-y-4">
-          {/* Product Search Bar with Barcode Scanner */}
-          <Card className="border-0 shadow-lg">
-            <CardContent className="pt-4">
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search products by name or SKU..."
-                    value={productSearch}
-                    onChange={(e) => setProductSearch(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-                <Button onClick={() => setShowBarcodeScanner(true)} variant="outline" className="gap-2">
-                  <ScanLine className="h-4 w-4" />
-                  Scan
-                </Button>
+        <div className="lg:col-span-2 space-y-3 sm:space-y-4 order-1">
+          {/* Product Search Bar */}
+          <Card className="border-0 shadow-md">
+            <CardContent className="p-3 sm:pt-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search products..."
+                  value={productSearch}
+                  onChange={(e) => setProductSearch(e.target.value)}
+                  className="pl-10 h-10 sm:h-11"
+                />
               </div>
             </CardContent>
           </Card>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-4 bg-muted">
-              <TabsTrigger value="lpg" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                LPG Cylinder
+            {/* Mobile-friendly scrollable tabs */}
+            <TabsList className="grid w-full grid-cols-4 bg-muted h-10 sm:h-11">
+              <TabsTrigger value="lpg" className="text-[10px] sm:text-xs px-1 sm:px-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <span className="hidden sm:inline">LPG</span>
+                <span className="sm:hidden">LPG</span>
               </TabsTrigger>
-              <TabsTrigger value="stove" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                Gas Stove
+              <TabsTrigger value="stove" className="text-[10px] sm:text-xs px-1 sm:px-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <span className="hidden sm:inline">Gas Stove</span>
+                <span className="sm:hidden">Stove</span>
               </TabsTrigger>
-              <TabsTrigger value="regulator" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                Regulator
+              <TabsTrigger value="regulator" className="text-[10px] sm:text-xs px-1 sm:px-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <span className="hidden sm:inline">Regulator</span>
+                <span className="sm:hidden">Reg.</span>
               </TabsTrigger>
-              <TabsTrigger value="custom" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <TabsTrigger value="custom" className="text-[10px] sm:text-xs px-1 sm:px-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 Custom
               </TabsTrigger>
             </TabsList>
 
             {/* LPG Cylinder Tab */}
             <TabsContent value="lpg">
-              <Card className="border-0 shadow-lg">
-                <CardHeader>
-                  <CardTitle className="text-xl">Add LPG Cylinder Sale</CardTitle>
+              <Card className="border-0 shadow-md">
+                <CardHeader className="p-3 sm:p-6 pb-2 sm:pb-4">
+                  <CardTitle className="text-base sm:text-xl">Add LPG Cylinder</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* Cylinder Type & Sale Type */}
-                  <div className="grid md:grid-cols-2 gap-6">
-                    <div className="space-y-3">
-                      <Label className="text-sm font-medium">Cylinder Type</Label>
-                      <RadioGroup value={cylinderType} onValueChange={(v) => setCylinderType(v as "refill" | "package")} className="flex gap-4">
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="refill" id="refill" className="text-primary border-primary" />
-                          <Label htmlFor="refill" className="cursor-pointer">Refill</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="package" id="package" />
-                          <Label htmlFor="package" className="cursor-pointer">Package (New Cylinder)</Label>
-                        </div>
-                      </RadioGroup>
+                <CardContent className="p-3 sm:p-6 pt-0 space-y-4 sm:space-y-6">
+                  {/* Cylinder Type & Sale Type - Mobile optimized with chips */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-xs sm:text-sm font-medium">Cylinder Type</Label>
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={cylinderType === 'refill' ? 'default' : 'outline'}
+                          onClick={() => setCylinderType('refill')}
+                          className="flex-1 h-9 text-xs sm:text-sm"
+                        >
+                          Refill
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={cylinderType === 'package' ? 'default' : 'outline'}
+                          onClick={() => setCylinderType('package')}
+                          className="flex-1 h-9 text-xs sm:text-sm"
+                        >
+                          Package
+                        </Button>
+                      </div>
                     </div>
-                    <div className="space-y-3">
-                      <Label className="text-sm font-medium">Sale Type</Label>
-                      <RadioGroup value={saleType} onValueChange={(v) => setSaleType(v as "retail" | "wholesale")} className="flex gap-4">
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="retail" id="retail" className="text-primary border-primary" />
-                          <Label htmlFor="retail" className="cursor-pointer">Retail</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="wholesale" id="wholesale" />
-                          <Label htmlFor="wholesale" className="cursor-pointer">Wholesale</Label>
-                        </div>
-                      </RadioGroup>
+                    <div className="space-y-2">
+                      <Label className="text-xs sm:text-sm font-medium">Sale Type</Label>
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={saleType === 'retail' ? 'default' : 'outline'}
+                          onClick={() => setSaleType('retail')}
+                          className="flex-1 h-9 text-xs sm:text-sm"
+                        >
+                          Retail
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={saleType === 'wholesale' ? 'default' : 'outline'}
+                          onClick={() => setSaleType('wholesale')}
+                          className="flex-1 h-9 text-xs sm:text-sm"
+                        >
+                          Wholesale
+                        </Button>
+                      </div>
                     </div>
                   </div>
 
@@ -1266,39 +1292,39 @@ export const POSModule = () => {
             </TabsContent>
           </Tabs>
 
-          {/* Sale Items */}
-          <Card className="border-0 shadow-lg">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <ShoppingCart className="h-5 w-5" />
-                Sale Items ({saleItems.length})
+          {/* Sale Items - Mobile optimized cart */}
+          <Card className="border-0 shadow-md">
+            <CardHeader className="p-3 sm:p-6 pb-2 sm:pb-4">
+              <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5" />
+                Cart ({saleItems.length})
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-3 sm:p-6 pt-0">
               {saleItems.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">No items added yet</p>
+                <p className="text-center text-muted-foreground py-6 sm:py-8 text-sm">No items added yet</p>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-2 sm:space-y-3 max-h-[300px] sm:max-h-[400px] overflow-y-auto">
                   {saleItems.map(item => (
-                    <div key={item.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                      <div className="flex-1">
-                        <p className="font-medium">{item.name}</p>
-                        <p className="text-sm text-muted-foreground">{item.details}</p>
+                    <div key={item.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-2 sm:p-3 bg-muted/50 rounded-lg gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm sm:text-base truncate">{item.name}</p>
+                        <p className="text-xs sm:text-sm text-muted-foreground truncate">{item.details}</p>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-2">
-                          <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => updateItemQuantity(item.id, -1)}>
+                      <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3">
+                        <div className="flex items-center gap-1 sm:gap-2">
+                          <Button variant="outline" size="icon" className="h-7 w-7 sm:h-8 sm:w-8" onClick={() => updateItemQuantity(item.id, -1)}>
                             <Minus className="h-3 w-3" />
                           </Button>
-                          <span className="w-8 text-center font-medium">{item.quantity}</span>
-                          <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => updateItemQuantity(item.id, 1)}>
+                          <span className="w-6 sm:w-8 text-center font-medium text-sm">{item.quantity}</span>
+                          <Button variant="outline" size="icon" className="h-7 w-7 sm:h-8 sm:w-8" onClick={() => updateItemQuantity(item.id, 1)}>
                             <Plus className="h-3 w-3" />
                           </Button>
                         </div>
-                        <span className="font-bold w-24 text-right">
+                        <span className="font-bold text-sm sm:text-base min-w-[60px] sm:min-w-[80px] text-right">
                           {BANGLADESHI_CURRENCY_SYMBOL}{item.price * item.quantity}
                         </span>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => removeItem(item.id)}>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive flex-shrink-0" onClick={() => removeItem(item.id)}>
                           <X className="h-4 w-4" />
                         </Button>
                       </div>
@@ -1310,18 +1336,18 @@ export const POSModule = () => {
           </Card>
         </div>
 
-        {/* Right Side - Customer & Summary */}
-        <div className="space-y-4">
+        {/* Right Side - Customer & Summary - Sticky on mobile */}
+        <div className="space-y-3 sm:space-y-4 order-2 lg:sticky lg:top-4">
           {/* Customer Selection */}
-          <Card className="border-0 shadow-lg">
-            <CardHeader>
+          <Card className="border-0 shadow-md">
+            <CardHeader className="p-3 sm:p-6 pb-2 sm:pb-4">
               <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <User className="h-5 w-5" />
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                  <User className="h-4 w-4 sm:h-5 sm:w-5" />
                   Customer
                 </CardTitle>
-                <Button variant="outline" size="sm" onClick={() => setShowAddCustomerDialog(true)}>
-                  <UserPlus className="h-4 w-4 mr-1" />
+                <Button variant="outline" size="sm" onClick={() => setShowAddCustomerDialog(true)} className="h-8 text-xs sm:text-sm">
+                  <UserPlus className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                   New
                 </Button>
               </div>
@@ -1416,93 +1442,96 @@ export const POSModule = () => {
             </CardContent>
           </Card>
 
-          {/* Summary */}
-          <Card className="border-0 shadow-lg">
-            <CardHeader>
-              <CardTitle>Summary</CardTitle>
+          {/* Summary - Mobile optimized */}
+          <Card className="border-0 shadow-md bg-gradient-to-br from-card to-muted/20">
+            <CardHeader className="p-3 sm:p-6 pb-2 sm:pb-4">
+              <CardTitle className="text-base sm:text-lg">Summary</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-3">
-                <div className="flex justify-between text-sm">
+            <CardContent className="p-3 sm:p-6 pt-0 space-y-3 sm:space-y-4">
+              <div className="space-y-2 sm:space-y-3">
+                <div className="flex justify-between text-xs sm:text-sm">
                   <span className="text-muted-foreground">Subtotal</span>
-                  <span className="font-medium">{BANGLADESHI_CURRENCY_SYMBOL}{subtotal.toFixed(2)}</span>
+                  <span className="font-medium">{BANGLADESHI_CURRENCY_SYMBOL}{subtotal.toFixed(0)}</span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <Label className="text-muted-foreground">Discount</Label>
-                  <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground">{BANGLADESHI_CURRENCY_SYMBOL}</span>
+                <div className="flex items-center justify-between gap-2">
+                  <Label className="text-muted-foreground text-xs sm:text-sm">Discount</Label>
+                  <div className="flex items-center gap-1">
+                    <span className="text-muted-foreground text-xs sm:text-sm">{BANGLADESHI_CURRENCY_SYMBOL}</span>
                     <Input
                       type="number"
                       value={discount}
                       onChange={(e) => setDiscount(e.target.value)}
-                      className="w-24 text-right"
+                      className="w-16 sm:w-20 text-right h-8 text-sm"
                       min="0"
                     />
                   </div>
                 </div>
                 {packageCylinderCount > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Cylinders (Package)</span>
+                  <div className="flex justify-between text-xs sm:text-sm">
+                    <span className="text-muted-foreground">Package Cylinders</span>
                     <span className="font-medium text-warning">{packageCylinderCount} pcs</span>
                   </div>
                 )}
-                <div className="border-t pt-3 flex justify-between">
-                  <span className="text-lg font-bold">Total</span>
-                  <span className="text-lg font-bold text-primary">{BANGLADESHI_CURRENCY_SYMBOL}{total.toFixed(2)}</span>
+                <div className="border-t pt-2 sm:pt-3 flex justify-between">
+                  <span className="text-base sm:text-lg font-bold">Total</span>
+                  <span className="text-base sm:text-lg font-bold text-primary">{BANGLADESHI_CURRENCY_SYMBOL}{total.toFixed(0)}</span>
                 </div>
               </div>
 
-              <div className="space-y-3 pt-4">
+              {/* Action Buttons - Mobile optimized */}
+              <div className="space-y-2 sm:space-y-3 pt-2 sm:pt-4">
                 <Button 
                   onClick={() => handleCompleteSale('completed')}
-                  className="w-full bg-primary hover:bg-primary/90"
+                  className="w-full bg-primary hover:bg-primary/90 h-10 sm:h-11 text-sm sm:text-base"
                   disabled={processing || saleItems.length === 0}
                 >
                   {processing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <FileText className="h-4 w-4 mr-2" />}
-                  Complete Sale (Paid)
+                  {processing ? 'Processing...' : 'Complete Sale (Paid)'}
                 </Button>
-                <Button 
-                  onClick={() => handleCompleteSale('pending')}
-                  variant="secondary"
-                  className="w-full bg-warning hover:bg-warning/90 text-warning-foreground"
-                  disabled={processing || saleItems.length === 0}
-                >
-                  <Clock className="h-4 w-4 mr-2" />
-                  Save as Due (Unpaid)
-                </Button>
-                <Button 
-                  variant="outline"
-                  className="w-full"
-                  disabled={saleItems.length === 0}
-                  onClick={() => {
-                    const displayName = selectedCustomer?.name || customerName || "Walk-in Customer";
-                    setLastTransaction({
-                      invoiceNumber: 'PREVIEW',
-                      date: new Date(),
-                      customer: {
-                        name: displayName,
-                        phone: selectedCustomer?.phone || undefined,
-                        address: selectedCustomer?.address || undefined
-                      },
-                      items: saleItems.map(item => ({
-                        name: item.name,
-                        description: item.details,
-                        quantity: item.quantity,
-                        unitPrice: item.price,
-                        total: item.price * item.quantity
-                      })),
-                      subtotal,
-                      discount: discountAmount,
-                      total,
-                      paymentStatus: 'preview',
-                      paymentMethod: 'cash'
-                    });
-                    setShowInvoiceDialog(true);
-                  }}
-                >
-                  <Printer className="h-4 w-4 mr-2" />
-                  Preview Invoice
-                </Button>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button 
+                    onClick={() => handleCompleteSale('pending')}
+                    variant="secondary"
+                    className="bg-warning hover:bg-warning/90 text-warning-foreground h-9 sm:h-10 text-xs sm:text-sm"
+                    disabled={processing || saleItems.length === 0}
+                  >
+                    <Clock className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                    Save as Due
+                  </Button>
+                  <Button 
+                    variant="outline"
+                    className="h-9 sm:h-10 text-xs sm:text-sm"
+                    disabled={saleItems.length === 0}
+                    onClick={() => {
+                      const displayName = selectedCustomer?.name || customerName || "Walk-in Customer";
+                      setLastTransaction({
+                        invoiceNumber: 'PREVIEW',
+                        date: new Date(),
+                        customer: {
+                          name: displayName,
+                          phone: selectedCustomer?.phone || undefined,
+                          address: selectedCustomer?.address || undefined
+                        },
+                        items: saleItems.map(item => ({
+                          name: item.name,
+                          description: item.details,
+                          quantity: item.quantity,
+                          unitPrice: item.price,
+                          total: item.price * item.quantity
+                        })),
+                        subtotal,
+                        discount: discountAmount,
+                        total,
+                        paymentStatus: 'preview',
+                        paymentMethod: 'cash'
+                      });
+                      setShowInvoiceDialog(true);
+                    }}
+                  >
+                    <Printer className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                    Preview
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>

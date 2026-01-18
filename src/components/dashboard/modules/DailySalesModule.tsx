@@ -260,69 +260,68 @@ export const DailySalesModule = ({ salesData: propSalesData, setSalesData }: Dai
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-4 sm:space-y-6">
+      {/* Header - Mobile optimized */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
         <div>
-          <h2 className="text-2xl sm:text-3xl font-bold text-foreground">Daily Sales Management</h2>
-          <p className="text-muted-foreground">Monitor and analyze your day-to-day sales performance</p>
+          <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground">Daily Sales</h2>
+          <p className="text-xs sm:text-sm text-muted-foreground">Monitor your sales performance</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={fetchSalesData}>
-            <RefreshCcw className="h-4 w-4 mr-2" />
+          <Button variant="outline" size="sm" onClick={fetchSalesData} className="h-8 sm:h-9 text-xs sm:text-sm">
+            <RefreshCcw className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
             Refresh
           </Button>
           <Button 
             size="sm" 
-            className="bg-primary hover:bg-primary/90"
+            className="bg-primary hover:bg-primary/90 h-8 sm:h-9 text-xs sm:text-sm"
             onClick={() => {
-              // Navigate to POS module - dispatch custom event
               window.dispatchEvent(new CustomEvent('navigate-module', { detail: 'pos' }));
             }}
           >
-            <Plus className="h-4 w-4 mr-2" />
+            <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
             Add Sale
           </Button>
         </div>
       </div>
 
-      {/* Date Range Tabs */}
-      <div className="flex items-center gap-2 p-1 bg-muted/50 rounded-lg w-fit">
+      {/* Date Range Tabs - Scrollable on mobile */}
+      <div className="flex items-center gap-1 sm:gap-2 p-1 bg-muted/50 rounded-lg w-fit overflow-x-auto">
         {(['today', 'week', 'month'] as const).map((range) => (
           <Button
             key={range}
             variant={dateRange === range ? "default" : "ghost"}
             size="sm"
             onClick={() => setDateRange(range)}
-            className={dateRange === range ? "bg-primary text-primary-foreground" : ""}
+            className={`h-8 px-3 text-xs sm:text-sm whitespace-nowrap ${dateRange === range ? "bg-primary text-primary-foreground" : ""}`}
           >
-            {range === 'today' ? 'Today' : range === 'week' ? 'This Week' : 'This Month'}
+            {range === 'today' ? 'Today' : range === 'week' ? 'Week' : 'Month'}
           </Button>
         ))}
       </div>
 
-      {/* Analytics Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Analytics Cards - Mobile 2x2 grid */}
+      <div className="grid grid-cols-2 gap-2 sm:gap-4">
         <Card className="bg-gradient-to-br from-primary/10 via-card to-card border-primary/20 overflow-hidden">
-          <CardContent className="p-4 sm:p-6">
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <p className="text-xs sm:text-sm text-muted-foreground font-medium">Today's Revenue</p>
-                <p className="text-xl sm:text-3xl font-bold text-foreground">{BANGLADESHI_CURRENCY_SYMBOL}{analytics.todayRevenue.toLocaleString()}</p>
-                <div className="flex items-center gap-1 text-xs">
+          <CardContent className="p-3 sm:p-4 lg:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="space-y-0.5 sm:space-y-1 min-w-0">
+                <p className="text-[10px] sm:text-xs lg:text-sm text-muted-foreground font-medium">Today's Revenue</p>
+                <p className="text-base sm:text-xl lg:text-3xl font-bold text-foreground truncate">{BANGLADESHI_CURRENCY_SYMBOL}{analytics.todayRevenue.toLocaleString()}</p>
+                <div className="flex items-center gap-1 text-[10px] sm:text-xs">
                   {analytics.dailyGrowth >= 0 ? (
-                    <ArrowUpRight className="h-3 w-3 text-green-500" />
+                    <ArrowUpRight className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-green-500" />
                   ) : (
-                    <ArrowDownRight className="h-3 w-3 text-red-500" />
+                    <ArrowDownRight className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-red-500" />
                   )}
                   <span className={analytics.dailyGrowth >= 0 ? "text-green-500" : "text-red-500"}>
                     {Math.abs(analytics.dailyGrowth).toFixed(1)}%
                   </span>
-                  <span className="text-muted-foreground">vs yesterday</span>
+                  <span className="text-muted-foreground hidden sm:inline">vs yesterday</span>
                 </div>
               </div>
-              <div className="h-12 w-12 rounded-full bg-primary/20 flex items-center justify-center">
-                <Banknote className="h-6 w-6 text-primary" />
+              <div className="h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                <Banknote className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 text-primary" />
               </div>
             </div>
           </CardContent>
