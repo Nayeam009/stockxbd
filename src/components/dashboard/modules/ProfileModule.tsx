@@ -351,9 +351,9 @@ export const ProfileModule = () => {
           <CardDescription>{t('edit_profile_desc')}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="full_name" className="flex items-center gap-2 text-sm font-medium">
+              <Label htmlFor="full_name" className="flex items-center gap-2">
                 <User className="h-4 w-4 text-muted-foreground" />
                 {t('full_name')}
               </Label>
@@ -362,12 +362,12 @@ export const ProfileModule = () => {
                 value={formData.full_name}
                 onChange={(e) => setFormData(prev => ({ ...prev, full_name: e.target.value }))}
                 placeholder={t('enter_full_name')}
-                className="bg-muted/50 h-11 text-base"
+                className="bg-muted/50"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="phone" className="flex items-center gap-2 text-sm font-medium">
+              <Label htmlFor="phone" className="flex items-center gap-2">
                 <Phone className="h-4 w-4 text-muted-foreground" />
                 {t('phone_number')}
               </Label>
@@ -376,14 +376,13 @@ export const ProfileModule = () => {
                 value={formData.phone}
                 onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
                 placeholder={t('enter_phone')}
-                className="bg-muted/50 h-11 text-base"
-                inputMode="tel"
+                className="bg-muted/50"
               />
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="email" className="flex items-center gap-2 text-sm font-medium">
+            <Label htmlFor="email" className="flex items-center gap-2">
               <Mail className="h-4 w-4 text-muted-foreground" />
               {t('email')}
             </Label>
@@ -391,7 +390,7 @@ export const ProfileModule = () => {
               id="email"
               value={userEmail}
               disabled
-              className="bg-muted/30 text-muted-foreground h-11 text-base"
+              className="bg-muted/30 text-muted-foreground"
             />
             <p className="text-xs text-muted-foreground">{t('email_readonly')}</p>
           </div>
@@ -399,12 +398,12 @@ export const ProfileModule = () => {
           <Button 
             onClick={handleSaveProfile} 
             disabled={saving}
-            className="w-full sm:w-auto h-11 text-base"
+            className="w-full sm:w-auto"
           >
             {saving ? (
-              <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
             ) : (
-              <Save className="h-5 w-5 mr-2" />
+              <Save className="h-4 w-4 mr-2" />
             )}
             {t('save_changes')}
           </Button>

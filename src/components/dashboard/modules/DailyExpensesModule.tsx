@@ -243,33 +243,32 @@ export const DailyExpensesModule = () => {
                 Add Expense
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-[95vw] sm:max-w-[425px] p-4 sm:p-6">
+            <DialogContent className="sm:max-w-[425px]">
               <DialogHeader>
-                <DialogTitle className="text-lg">Add New Expense</DialogTitle>
+                <DialogTitle>Add New Expense</DialogTitle>
                 <DialogDescription>Record a new business expense</DialogDescription>
               </DialogHeader>
-              <div className="space-y-4 py-2">
+              <div className="space-y-4 py-4">
                 <div className="space-y-2">
-                  <Label htmlFor="date" className="text-sm font-medium">Date</Label>
+                  <Label htmlFor="date">Date</Label>
                   <Input
                     id="date"
                     type="date"
                     value={newExpense.expense_date}
                     onChange={(e) => setNewExpense({ ...newExpense, expense_date: e.target.value })}
-                    className="h-11 text-base"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="category" className="text-sm font-medium">Category</Label>
+                  <Label htmlFor="category">Category</Label>
                   <Select value={newExpense.category} onValueChange={(value) => setNewExpense({ ...newExpense, category: value })}>
-                    <SelectTrigger className="h-11 text-base">
+                    <SelectTrigger>
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
                     <SelectContent>
                       {EXPENSE_CATEGORIES.map((cat) => (
-                        <SelectItem key={cat.value} value={cat.value} className="py-3">
+                        <SelectItem key={cat.value} value={cat.value}>
                           <span className="flex items-center gap-2">
-                            <span className="text-lg">{cat.icon}</span>
+                            <span>{cat.icon}</span>
                             <span>{cat.label}</span>
                           </span>
                         </SelectItem>
@@ -278,31 +277,28 @@ export const DailyExpensesModule = () => {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="description" className="text-sm font-medium">Description</Label>
+                  <Label htmlFor="description">Description</Label>
                   <Input
                     id="description"
                     placeholder="Enter description (optional)"
                     value={newExpense.description}
                     onChange={(e) => setNewExpense({ ...newExpense, description: e.target.value })}
-                    className="h-11 text-base"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="amount" className="text-sm font-medium">Amount ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
+                  <Label htmlFor="amount">Amount ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
                   <Input
                     id="amount"
                     type="number"
                     placeholder="0"
                     value={newExpense.amount}
                     onChange={(e) => setNewExpense({ ...newExpense, amount: e.target.value })}
-                    className="h-11 text-base"
-                    inputMode="numeric"
                   />
                 </div>
               </div>
-              <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
-                <Button variant="outline" onClick={() => setDialogOpen(false)} className="h-11 text-base w-full sm:w-auto">Cancel</Button>
-                <Button onClick={handleAddExpense} className="h-11 text-base w-full sm:w-auto">Add Expense</Button>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
+                <Button onClick={handleAddExpense}>Add Expense</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>

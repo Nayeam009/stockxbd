@@ -239,30 +239,30 @@ export const ExchangeModule = ({ onBack }: ExchangeModuleProps) => {
           <p className="text-sm text-muted-foreground">Select the brands and weights to exchange, specify the quantity, and confirm.</p>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-4 md:gap-6 items-end">
+          <div className="grid md:grid-cols-[1fr_auto_1fr] gap-6 items-end">
             {/* From Section */}
-            <div className="space-y-3">
-              <Label className="text-muted-foreground font-medium text-sm">From (Empty)</Label>
+            <div className="space-y-4">
+              <Label className="text-muted-foreground font-medium">From (Empty)</Label>
               <div className="grid grid-cols-2 gap-3">
                 <Select value={fromBrand} onValueChange={setFromBrand}>
-                  <SelectTrigger className="bg-muted/50 border-border h-11 text-base">
+                  <SelectTrigger className="bg-muted/50 border-border">
                     <SelectValue placeholder="Select brand" />
                   </SelectTrigger>
                   <SelectContent>
                     {brands.map(brand => (
-                      <SelectItem key={brand.id} value={brand.name} className="py-3">
+                      <SelectItem key={brand.id} value={brand.name}>
                         {brand.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
                 <Select value={fromWeight} onValueChange={setFromWeight}>
-                  <SelectTrigger className="bg-muted/50 border-border h-11 text-base">
+                  <SelectTrigger className="bg-muted/50 border-border">
                     <SelectValue placeholder="Weight" />
                   </SelectTrigger>
                   <SelectContent>
                     {ALL_WEIGHTS.map(w => (
-                      <SelectItem key={w} value={w} className="py-3">{w}</SelectItem>
+                      <SelectItem key={w} value={w}>{w}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -270,33 +270,33 @@ export const ExchangeModule = ({ onBack }: ExchangeModuleProps) => {
             </div>
 
             {/* Arrow */}
-            <div className="flex justify-center py-2 md:pb-2">
-              <ArrowRight className="h-8 w-8 text-muted-foreground rotate-90 md:rotate-0" />
+            <div className="flex justify-center pb-2">
+              <ArrowRight className="h-8 w-8 text-muted-foreground" />
             </div>
 
             {/* To Section */}
-            <div className="space-y-3">
-              <Label className="text-muted-foreground font-medium text-sm">To (Empty)</Label>
+            <div className="space-y-4">
+              <Label className="text-muted-foreground font-medium">To (Empty)</Label>
               <div className="grid grid-cols-2 gap-3">
                 <Select value={toBrand} onValueChange={setToBrand}>
-                  <SelectTrigger className="bg-muted/50 border-border h-11 text-base">
+                  <SelectTrigger className="bg-muted/50 border-border">
                     <SelectValue placeholder="Select brand" />
                   </SelectTrigger>
                   <SelectContent>
                     {brands.map(brand => (
-                      <SelectItem key={brand.id} value={brand.name} className="py-3">
+                      <SelectItem key={brand.id} value={brand.name}>
                         {brand.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
                 <Select value={toWeight} onValueChange={setToWeight}>
-                  <SelectTrigger className="bg-muted/50 border-border h-11 text-base">
+                  <SelectTrigger className="bg-muted/50 border-border">
                     <SelectValue placeholder="Weight" />
                   </SelectTrigger>
                   <SelectContent>
                     {ALL_WEIGHTS.map(w => (
-                      <SelectItem key={w} value={w} className="py-3">{w}</SelectItem>
+                      <SelectItem key={w} value={w}>{w}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -306,14 +306,13 @@ export const ExchangeModule = ({ onBack }: ExchangeModuleProps) => {
 
           {/* Amount */}
           <div className="flex flex-col items-center gap-3">
-            <Label className="text-muted-foreground font-medium text-sm">Amount</Label>
+            <Label className="text-muted-foreground font-medium">Amount</Label>
             <Input
               type="number"
               value={quantity}
               onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-              className="w-full max-w-md text-center bg-muted/50 border-border h-12 text-lg font-medium"
+              className="w-full max-w-md text-center bg-muted/50 border-border text-lg font-medium"
               min={1}
-              inputMode="numeric"
             />
           </div>
 
@@ -322,12 +321,12 @@ export const ExchangeModule = ({ onBack }: ExchangeModuleProps) => {
             <Button 
               onClick={handleSubmit} 
               disabled={submitting}
-              className="bg-primary hover:bg-primary/90 px-8 h-12 text-base w-full sm:w-auto"
+              className="bg-primary hover:bg-primary/90 px-8"
             >
               {submitting ? (
-                <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
               ) : (
-                <Plus className="h-5 w-5 mr-2" />
+                <Plus className="h-4 w-4 mr-2" />
               )}
               Confirm Exchange & Post
             </Button>

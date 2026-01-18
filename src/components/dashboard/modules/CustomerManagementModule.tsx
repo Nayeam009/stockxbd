@@ -441,81 +441,77 @@ export const CustomerManagementModule = () => {
 
         {/* Add Customer Dialog */}
         <Dialog open={addCustomerDialogOpen} onOpenChange={setAddCustomerDialogOpen}>
-          <DialogContent className="bg-card border-border max-w-[95vw] sm:max-w-md p-4 sm:p-6">
+          <DialogContent className="bg-card border-border">
             <DialogHeader>
-              <DialogTitle className="text-lg">Add New Customer</DialogTitle>
+              <DialogTitle>Add New Customer</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4 py-2">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground block">Customer Name *</label>
+            <div className="space-y-4 py-4">
+              <div>
+                <label className="text-sm font-medium text-foreground">Customer Name *</label>
                 <Input
                   value={newCustomer.name}
                   onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })}
                   placeholder="Enter customer name"
-                  className="h-11 text-base"
+                  className="mt-1"
                 />
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground block">Email</label>
+              <div>
+                <label className="text-sm font-medium text-foreground">Email</label>
                 <Input
                   type="email"
                   value={newCustomer.email}
                   onChange={(e) => setNewCustomer({ ...newCustomer, email: e.target.value })}
                   placeholder="customer@example.com"
-                  className="h-11 text-base"
-                  inputMode="email"
+                  className="mt-1"
                 />
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground block">Phone</label>
+              <div>
+                <label className="text-sm font-medium text-foreground">Phone</label>
                 <Input
                   value={newCustomer.phone}
                   onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })}
                   placeholder="+880 1XXX-XXXXXX"
-                  className="h-11 text-base"
-                  inputMode="tel"
+                  className="mt-1"
                 />
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground block">Address</label>
+              <div>
+                <label className="text-sm font-medium text-foreground">Address</label>
                 <Input
                   value={newCustomer.address}
                   onChange={(e) => setNewCustomer({ ...newCustomer, address: e.target.value })}
                   placeholder="Enter address"
-                  className="h-11 text-base"
+                  className="mt-1"
                 />
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground block">Initial Due Amount</label>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-foreground">Initial Due Amount</label>
                   <Input
                     type="number"
                     value={newCustomer.total_due}
                     onChange={(e) => setNewCustomer({ ...newCustomer, total_due: e.target.value })}
                     placeholder="0"
-                    className="h-11 text-base"
-                    inputMode="numeric"
+                    className="mt-1"
                   />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground block">Cylinders Due</label>
+                <div>
+                  <label className="text-sm font-medium text-foreground">Cylinders Due</label>
                   <Input
                     type="number"
                     value={newCustomer.cylinders_due}
                     onChange={(e) => setNewCustomer({ ...newCustomer, cylinders_due: e.target.value })}
                     placeholder="0"
-                    className="h-11 text-base"
-                    inputMode="numeric"
+                    className="mt-1"
                   />
                 </div>
               </div>
             </div>
-            <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
-              <Button variant="outline" onClick={() => setAddCustomerDialogOpen(false)} className="h-11 text-base w-full sm:w-auto">Cancel</Button>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setAddCustomerDialogOpen(false)}>Cancel</Button>
               <Button 
                 onClick={handleAddCustomer}
                 disabled={!newCustomer.name.trim()}
-                className="bg-primary hover:bg-primary/90 h-11 text-base w-full sm:w-auto"
+                className="bg-primary hover:bg-primary/90"
               >
                 Add Customer
               </Button>

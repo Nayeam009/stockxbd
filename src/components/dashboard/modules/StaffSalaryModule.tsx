@@ -210,50 +210,44 @@ export const StaffSalaryModule = () => {
               Add New Staff
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-[95vw] sm:max-w-md p-4 sm:p-6">
+          <DialogContent>
             <DialogHeader>
-              <DialogTitle className="text-lg">Add New Staff Member</DialogTitle>
+              <DialogTitle>Add New Staff Member</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4 py-2">
+            <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label className="text-sm font-medium">Name</Label>
+                <Label>Name</Label>
                 <Input 
                   value={newStaff.name}
                   onChange={e => setNewStaff({...newStaff, name: e.target.value})}
                   placeholder="e.g., Md. Razu"
-                  className="h-11 text-base"
                 />
               </div>
               <div className="space-y-2">
-                <Label className="text-sm font-medium">Role</Label>
+                <Label>Role</Label>
                 <Input 
                   value={newStaff.role}
                   onChange={e => setNewStaff({...newStaff, role: e.target.value})}
                   placeholder="e.g., Manager, Driver, Staff"
-                  className="h-11 text-base"
                 />
               </div>
               <div className="space-y-2">
-                <Label className="text-sm font-medium">Monthly Salary (৳)</Label>
+                <Label>Monthly Salary (৳)</Label>
                 <Input 
                   type="number"
                   value={newStaff.salary}
                   onChange={e => setNewStaff({...newStaff, salary: Number(e.target.value)})}
-                  className="h-11 text-base"
-                  inputMode="numeric"
                 />
               </div>
               <div className="space-y-2">
-                <Label className="text-sm font-medium">Phone (Optional)</Label>
+                <Label>Phone (Optional)</Label>
                 <Input 
                   value={newStaff.phone}
                   onChange={e => setNewStaff({...newStaff, phone: e.target.value})}
                   placeholder="e.g., 01XXXXXXXXX"
-                  className="h-11 text-base"
-                  inputMode="tel"
                 />
               </div>
-              <Button onClick={handleAddStaff} className="w-full h-11 text-base">Add Staff</Button>
+              <Button onClick={handleAddStaff} className="w-full">Add Staff</Button>
             </div>
           </DialogContent>
         </Dialog>
@@ -341,11 +335,11 @@ export const StaffSalaryModule = () => {
 
       {/* Pay Dialog */}
       <Dialog open={payDialogOpen} onOpenChange={setPayDialogOpen}>
-        <DialogContent className="max-w-[95vw] sm:max-w-md p-4 sm:p-6">
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle className="text-lg">Pay {selectedStaff?.name}</DialogTitle>
+            <DialogTitle>Pay {selectedStaff?.name}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-2">
+          <div className="space-y-4 py-4">
             <div className="p-4 bg-muted rounded-lg">
               <div className="flex justify-between text-sm">
                 <span>Monthly Salary</span>
@@ -361,25 +355,22 @@ export const StaffSalaryModule = () => {
               </div>
             </div>
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Payment Amount (৳)</Label>
+              <Label>Payment Amount (৳)</Label>
               <Input 
                 type="number"
                 value={payAmount}
                 onChange={e => setPayAmount(Number(e.target.value))}
-                className="h-11 text-base"
-                inputMode="numeric"
               />
             </div>
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Note (Optional)</Label>
+              <Label>Note (Optional)</Label>
               <Input 
                 value={payNote}
                 onChange={e => setPayNote(e.target.value)}
                 placeholder="e.g., Advance payment"
-                className="h-11 text-base"
               />
             </div>
-            <Button onClick={handlePay} className="w-full h-11 text-base">Confirm Payment</Button>
+            <Button onClick={handlePay} className="w-full">Confirm Payment</Button>
           </div>
         </DialogContent>
       </Dialog>
