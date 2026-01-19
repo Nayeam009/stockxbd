@@ -1,14 +1,15 @@
-import { Home, Receipt, Package, BarChart3, Menu, ChevronLeft, ChevronRight } from "lucide-react";
+import { Home, Receipt, Flame, Tag, Menu } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { useState, useCallback, TouchEvent as ReactTouchEvent } from "react";
-import { getNextModule, getModuleNavigationOrder } from "@/hooks/useSwipeNavigation";
+import { useState } from "react";
+
 interface MobileBottomNavProps {
   activeModule: string;
   setActiveModule: (module: string) => void;
   userRole: 'owner' | 'manager' | 'driver';
 }
+
 const navItems = [{
   id: 'overview',
   labelKey: 'overview',
@@ -22,12 +23,12 @@ const navItems = [{
 }, {
   id: 'inventory',
   labelKey: 'inventory',
-  icon: Package,
+  icon: Flame,
   roles: ['owner', 'manager']
 }, {
   id: 'product-pricing',
   labelKey: 'product_pricing',
-  icon: BarChart3,
+  icon: Tag,
   roles: ['owner', 'manager']
 }];
 const moreItems = [{
@@ -39,21 +40,8 @@ const moreItems = [{
   labelKey: 'daily_expenses',
   roles: ['owner', 'manager']
 }, {
-  id: 'lpg-stock-20mm',
-  labelKey: 'lpg_stock',
-  suffix: ' (20mm)',
-  roles: ['owner', 'manager']
-}, {
-  id: 'stove-stock',
-  labelKey: 'stove_stock',
-  roles: ['owner', 'manager']
-}, {
-  id: 'regulators',
-  labelKey: 'regulators',
-  roles: ['owner', 'manager']
-}, {
-  id: 'product-pricing',
-  labelKey: 'product_pricing',
+  id: 'analytics',
+  labelKey: 'analysis',
   roles: ['owner', 'manager']
 }, {
   id: 'orders',
@@ -89,29 +77,16 @@ export const MobileBottomNav = ({
   setActiveModule,
   userRole
 }: MobileBottomNavProps) => {
-  const {
-    t
-  } = useLanguage();
+  const { t } = useLanguage();
   const [sheetOpen, setSheetOpen] = useState(false);
+  
   const filteredNavItems = navItems.filter(item => item.roles.includes(userRole));
   const filteredMoreItems = moreItems.filter(item => item.roles.includes(userRole));
+  
   const handleModuleChange = (moduleId: string) => {
     setActiveModule(moduleId);
     setSheetOpen(false);
   };
-  const handlePrevModule = () => {
-    const nextModule = getNextModule(activeModule, 'right', userRole);
-    setActiveModule(nextModule);
-  };
-  const handleNextModule = () => {
-    const nextModule = getNextModule(activeModule, 'left', userRole);
-    setActiveModule(nextModule);
-  };
-
-  // Get current module position for indicator
-  const modules = getModuleNavigationOrder(userRole);
-  const currentIndex = modules.indexOf(activeModule);
-  const totalModules = modules.length;
   return <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-card/95 backdrop-blur-xl border-t border-border/50 shadow-[0_-4px_20px_rgba(0,0,0,0.1)]" style={{
     paddingBottom: 'env(safe-area-inset-bottom, 0px)'
   }}>
@@ -157,7 +132,7 @@ export const MobileBottomNav = ({
               const isActive = activeModule === item.id;
               return <button key={item.id} onClick={() => handleModuleChange(item.id)} aria-current={isActive ? 'page' : undefined} className={cn("flex flex-col items-center justify-center p-4 rounded-xl transition-all duration-200 border min-h-[72px] touch-target", isActive ? "bg-primary/10 border-primary/30 text-primary" : "bg-muted/30 border-border/30 text-foreground hover:bg-muted/50 active:scale-95")}>
                     <span className={cn("text-xs font-medium text-center line-clamp-2", isActive && "font-semibold")}>
-                      {t(item.labelKey)}{item.suffix || ''}
+                      {t(item.labelKey)}
                     </span>
                   </button>;
             })}
