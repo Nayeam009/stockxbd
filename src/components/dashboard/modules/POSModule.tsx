@@ -163,60 +163,74 @@ const DEFAULT_CREDIT_LIMIT = 10000;
 // ============= STEP COMPONENT =============
 const StepIndicator = ({ 
   currentStep, 
-  onStepClick 
+  onStepClick,
+  hasLPG 
 }: { 
   currentStep: number;
   onStepClick: (step: number) => void;
+  hasLPG: boolean;
 }) => {
   const steps = [
-    { num: 1, label: "Select Products", icon: ShoppingCart },
-    { num: 2, label: "Return Cylinder", icon: ArrowLeftRight },
-    { num: 3, label: "Checkout", icon: CreditCard }
+    { num: 1, label: "Products", mobileLabel: "1", icon: ShoppingCart },
+    { num: 2, label: "Return", mobileLabel: "2", icon: ArrowLeftRight, skip: !hasLPG },
+    { num: 3, label: "Checkout", mobileLabel: "3", icon: CreditCard }
   ];
 
   return (
-    <div className="flex items-center justify-between mb-4 px-2">
-      {steps.map((step, idx) => {
-        const isActive = currentStep === step.num;
-        const isCompleted = currentStep > step.num;
-        const Icon = step.icon;
-        
-        return (
-          <div key={step.num} className="flex items-center flex-1">
-            <button
-              onClick={() => onStepClick(step.num)}
-              className={`flex items-center gap-2 transition-all ${
-                isActive 
-                  ? "text-primary font-semibold" 
-                  : isCompleted 
-                    ? "text-green-600 cursor-pointer" 
-                    : "text-muted-foreground"
-              }`}
-            >
-              <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all ${
-                isActive 
-                  ? "bg-primary text-primary-foreground" 
-                  : isCompleted 
-                    ? "bg-green-600 text-white" 
-                    : "bg-muted text-muted-foreground"
-              }`}>
-                {isCompleted ? (
-                  <Check className="h-4 w-4 sm:h-5 sm:w-5" />
-                ) : (
-                  <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
-                )}
-              </div>
-              <span className="hidden sm:inline text-sm">{step.label}</span>
-            </button>
-            {idx < steps.length - 1 && (
-              <div className={`flex-1 h-0.5 mx-2 transition-colors ${
-                currentStep > step.num ? "bg-green-500" : "bg-muted"
-              }`} />
-            )}
-          </div>
-        );
-      })}
-    </div>
+    <Card className="p-3 sm:p-4 bg-gradient-to-r from-muted/50 to-muted/30">
+      <div className="flex items-center justify-between">
+        {steps.map((step, idx) => {
+          const isActive = currentStep === step.num;
+          const isCompleted = currentStep > step.num;
+          const Icon = step.icon;
+          const isSkipped = step.skip;
+          
+          return (
+            <div key={step.num} className="flex items-center flex-1">
+              <button
+                onClick={() => onStepClick(step.num)}
+                disabled={isSkipped}
+                className={`flex items-center gap-1.5 sm:gap-2 transition-all ${
+                  isSkipped ? "opacity-40 cursor-not-allowed" :
+                  isActive 
+                    ? "text-primary font-semibold" 
+                    : isCompleted 
+                      ? "text-emerald-600 cursor-pointer hover:scale-105" 
+                      : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <div className={`w-9 h-9 sm:w-11 sm:h-11 rounded-full flex items-center justify-center transition-all shadow-sm ${
+                  isSkipped ? "bg-muted/50" :
+                  isActive 
+                    ? "bg-primary text-primary-foreground shadow-md ring-4 ring-primary/20" 
+                    : isCompleted 
+                      ? "bg-emerald-600 text-white shadow-md" 
+                      : "bg-background border-2 border-muted-foreground/30"
+                }`}>
+                  {isCompleted ? (
+                    <CheckCircle2 className="h-5 w-5 sm:h-6 sm:w-6" />
+                  ) : (
+                    <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
+                  )}
+                </div>
+                <div className="hidden sm:block text-left">
+                  <p className="text-xs sm:text-sm font-medium leading-tight">{step.label}</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {step.num === 1 ? "Select items" : step.num === 2 ? "Empty swap" : "Pay now"}
+                  </p>
+                </div>
+                <span className="sm:hidden text-xs font-medium">{step.mobileLabel}</span>
+              </button>
+              {idx < steps.length - 1 && (
+                <div className={`flex-1 h-1 mx-2 sm:mx-3 rounded-full transition-colors ${
+                  currentStep > step.num ? "bg-emerald-500" : "bg-muted"
+                }`} />
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </Card>
   );
 };
 
@@ -249,59 +263,68 @@ const ProductCard = ({
   badge
 }: ProductCardProps) => {
   const getStockStyle = () => {
-    if (stock === 0) return { bg: "bg-red-500/10", text: "text-red-500", label: "Out" };
-    if (stock < 5) return { bg: "bg-amber-500/10", text: "text-amber-600", label: `${stock}` };
-    return { bg: "bg-emerald-500/10", text: "text-emerald-600", label: `${stock}` };
+    if (stock === 0) return { bg: "bg-destructive/10", text: "text-destructive", label: "Out" };
+    if (stock < 5) return { bg: "bg-amber-500/10", text: "text-amber-600", label: `${stock} left` };
+    return { bg: "bg-emerald-500/10", text: "text-emerald-600", label: `${stock} in stock` };
   };
 
   const stockStyle = getStockStyle();
+  const isOutOfStock = stock === 0;
 
   return (
     <Card 
-      className={`cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-[1.02] border-2 ${
+      className={`cursor-pointer transition-all duration-200 hover:shadow-xl hover:-translate-y-1 border-2 overflow-hidden group ${
         isSelected 
-          ? 'border-primary ring-2 ring-primary/20 bg-primary/5' 
-          : 'border-border hover:border-primary/50'
-      } ${isDisabled || stock === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
-      onClick={() => !isDisabled && stock > 0 && onClick()}
+          ? 'border-primary ring-2 ring-primary/30 bg-primary/5' 
+          : isOutOfStock
+            ? 'opacity-50 cursor-not-allowed border-muted'
+            : 'border-transparent hover:border-primary/60 bg-card shadow-sm'
+      }`}
+      onClick={() => !isDisabled && !isOutOfStock && onClick()}
     >
-      <CardContent className="p-3">
-        <div className="flex flex-col items-center text-center space-y-2">
+      <CardContent className="p-0">
+        {/* Colored Header Strip */}
+        <div 
+          className="h-2 w-full"
+          style={{ backgroundColor: color || (type === 'stove' ? '#f97316' : type === 'regulator' ? '#8b5cf6' : '#22c55e') }}
+        />
+        
+        <div className="p-3 flex flex-col items-center text-center space-y-2">
           {/* Icon Container */}
           <div 
-            className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl flex items-center justify-center shadow-sm"
+            className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform"
             style={{ backgroundColor: color || (type === 'stove' ? '#f97316' : type === 'regulator' ? '#8b5cf6' : '#22c55e') }}
           >
             {icon}
           </div>
           
-          {/* Product Name */}
-          <div className="space-y-0.5 min-h-[36px]">
-            <p className="font-semibold text-xs sm:text-sm leading-tight line-clamp-1">{name}</p>
+          {/* Product Info */}
+          <div className="space-y-0.5 min-h-[40px]">
+            <p className="font-bold text-sm leading-tight line-clamp-1">{name}</p>
             {subtitle && (
-              <p className="text-[10px] text-muted-foreground line-clamp-1">{subtitle}</p>
+              <p className="text-[11px] text-muted-foreground line-clamp-1">{subtitle}</p>
             )}
           </div>
           
-          {/* Price */}
-          <div className="text-primary font-bold text-sm sm:text-base">
+          {/* Price Tag */}
+          <div className="bg-primary/10 text-primary font-bold text-base sm:text-lg px-3 py-1 rounded-full">
             {BANGLADESHI_CURRENCY_SYMBOL}{price.toLocaleString()}
           </div>
           
-          {/* Stock & Badge Row */}
-          <div className="flex items-center gap-1.5 flex-wrap justify-center">
-            <Badge 
-              variant="secondary" 
-              className={`text-[9px] sm:text-[10px] px-1.5 py-0.5 ${stockStyle.bg} ${stockStyle.text} border-0`}
-            >
-              {stockStyle.label}
+          {/* Stock Badge */}
+          <Badge 
+            variant="secondary" 
+            className={`text-[10px] px-2 py-0.5 ${stockStyle.bg} ${stockStyle.text} border-0`}
+          >
+            {stockStyle.label}
+          </Badge>
+          
+          {/* Optional Badge */}
+          {badge && (
+            <Badge variant="outline" className="text-[9px] px-1.5 py-0 border-primary/30 text-primary">
+              {badge}
             </Badge>
-            {badge && (
-              <Badge variant="outline" className="text-[9px] px-1.5 py-0">
-                {badge}
-              </Badge>
-            )}
-          </div>
+          )}
         </div>
       </CardContent>
     </Card>
@@ -314,30 +337,45 @@ interface ReturnCylinderCardProps {
   isSelected: boolean;
   onClick: () => void;
   isCustom?: boolean;
+  isNoReturn?: boolean;
 }
 
-const ReturnCylinderCard = ({ brand, isSelected, onClick, isCustom }: ReturnCylinderCardProps) => (
+const ReturnCylinderCard = ({ brand, isSelected, onClick, isCustom, isNoReturn }: ReturnCylinderCardProps) => (
   <Card 
-    className={`cursor-pointer transition-all duration-200 hover:shadow-md border-2 ${
+    className={`cursor-pointer transition-all duration-200 hover:shadow-lg hover:-translate-y-1 border-2 overflow-hidden ${
       isSelected 
-        ? 'border-primary bg-primary/5 ring-2 ring-primary/20' 
-        : 'border-border hover:border-primary/50'
+        ? 'border-primary bg-primary/5 ring-2 ring-primary/30 shadow-lg' 
+        : 'border-transparent hover:border-primary/60 bg-card shadow-sm'
     }`}
     onClick={onClick}
   >
-    <CardContent className="p-2 sm:p-3 flex flex-col items-center gap-1.5">
+    <CardContent className="p-0">
+      {/* Colored top strip */}
       <div 
-        className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center"
-        style={{ backgroundColor: brand.color }}
-      >
-        <Cylinder className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+        className="h-1.5 w-full"
+        style={{ backgroundColor: isNoReturn ? '#6b7280' : brand.color }}
+      />
+      <div className="p-3 flex flex-col items-center gap-2">
+        <div 
+          className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl flex items-center justify-center shadow-md"
+          style={{ backgroundColor: isNoReturn ? '#6b7280' : brand.color }}
+        >
+          {isNoReturn ? (
+            <X className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
+          ) : (
+            <Cylinder className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
+          )}
+        </div>
+        <span className="text-xs sm:text-sm font-semibold text-center leading-tight line-clamp-1">
+          {brand.name}
+        </span>
+        {isCustom && (
+          <Badge variant="secondary" className="text-[9px] px-1.5">Custom</Badge>
+        )}
+        {isSelected && !isNoReturn && (
+          <Badge className="text-[9px] px-1.5 bg-primary">Selected</Badge>
+        )}
       </div>
-      <span className="text-[10px] sm:text-xs font-medium text-center leading-tight line-clamp-1">
-        {brand.name}
-      </span>
-      {isCustom && (
-        <Badge variant="secondary" className="text-[8px] px-1">Custom</Badge>
-      )}
     </CardContent>
   </Card>
 );
@@ -1072,6 +1110,7 @@ export const POSModule = () => {
         {/* Step Indicator */}
         <StepIndicator 
           currentStep={currentStep} 
+          hasLPG={hasLPGInCart}
           onStepClick={(step) => {
             if (step < currentStep || saleItems.length > 0) setCurrentStep(step);
           }} 
@@ -1319,25 +1358,66 @@ export const POSModule = () => {
 
             {/* ===== STEP 2: RETURN CYLINDER ===== */}
             {currentStep === 2 && (
-              <Card>
+              <Card className="border-t-4 border-t-amber-500">
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <ArrowLeftRight className="h-5 w-5 text-primary" />
-                    Step 2: Return Cylinder (Optional)
-                  </CardTitle>
-                  <CardDescription>
-                    Select the empty cylinder brand the customer is returning
-                  </CardDescription>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <ArrowLeftRight className="h-5 w-5 text-amber-600" />
+                        Step 2: Return Cylinder
+                      </CardTitle>
+                      <CardDescription>
+                        Select the empty cylinder brand customer is returning
+                      </CardDescription>
+                    </div>
+                    <Badge variant="outline" className="text-xs">Optional</Badge>
+                  </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {hasLPGInCart ? (
                     <>
-                      <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-3">
+                      {/* Selected Return Summary */}
+                      {selectedReturnBrand && (
+                        <Card className="bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800">
+                          <CardContent className="p-4">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div 
+                                  className="w-12 h-12 rounded-xl flex items-center justify-center shadow-md"
+                                  style={{ backgroundColor: lpgBrands.find(b => b.id === selectedReturnBrand)?.color || '#6b7280' }}
+                                >
+                                  <Cylinder className="h-6 w-6 text-white" />
+                                </div>
+                                <div>
+                                  <p className="font-bold text-emerald-800 dark:text-emerald-200">
+                                    Return: {lpgBrands.find(b => b.id === selectedReturnBrand)?.name || 'Selected'}
+                                  </p>
+                                  <p className="text-sm text-emerald-600 dark:text-emerald-400">
+                                    {isLeakedReturn ? '→ Problem Stock' : '→ Empty Stock'} • {saleItems.find(i => i.type === 'lpg')?.weight || weight}
+                                  </p>
+                                </div>
+                              </div>
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="text-emerald-600"
+                                onClick={() => setSelectedReturnBrand(null)}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
+
+                      {/* Return Cylinder Grid */}
+                      <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
                         {/* No Return Option */}
                         <ReturnCylinderCard
-                          brand={{ name: "No Return", color: "#6b7280" }}
+                          brand={{ name: "Skip", color: "#6b7280" }}
                           isSelected={selectedReturnBrand === null}
                           onClick={() => setSelectedReturnBrand(null)}
+                          isNoReturn
                         />
                         {/* Available Brands */}
                         {allBrandsForReturn.map(brand => (
@@ -1350,68 +1430,95 @@ export const POSModule = () => {
                         ))}
                         {/* Custom Brand Option */}
                         <Card 
-                          className={`cursor-pointer transition-all border-2 border-dashed ${
-                            showCustomBrandInput ? 'border-primary' : 'border-border hover:border-primary/50'
+                          className={`cursor-pointer transition-all duration-200 border-2 border-dashed hover:-translate-y-1 ${
+                            showCustomBrandInput ? 'border-primary bg-primary/5' : 'border-muted-foreground/30 hover:border-primary/60'
                           }`}
                           onClick={() => setShowCustomBrandInput(true)}
                         >
-                          <CardContent className="p-2 sm:p-3 flex flex-col items-center gap-1.5">
-                            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-muted flex items-center justify-center">
-                              <Plus className="h-5 w-5 sm:h-6 sm:w-6 text-muted-foreground" />
+                          <CardContent className="p-0">
+                            <div className="h-1.5 w-full bg-muted" />
+                            <div className="p-3 flex flex-col items-center gap-2">
+                              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-muted flex items-center justify-center">
+                                <Plus className="h-6 w-6 sm:h-7 sm:w-7 text-muted-foreground" />
+                              </div>
+                              <span className="text-xs sm:text-sm font-semibold text-muted-foreground">
+                                Add New
+                              </span>
                             </div>
-                            <span className="text-[10px] sm:text-xs font-medium text-center text-muted-foreground">
-                              Custom
-                            </span>
                           </CardContent>
                         </Card>
                       </div>
 
                       {/* Custom Brand Input */}
                       {showCustomBrandInput && (
-                        <div className="p-4 bg-muted/50 rounded-lg space-y-3">
-                          <Label>Enter Custom Brand Name</Label>
-                          <div className="flex gap-2">
-                            <Input
-                              value={customReturnBrand}
-                              onChange={(e) => setCustomReturnBrand(e.target.value)}
-                              placeholder="e.g., Local Brand XYZ"
-                            />
-                            <Button onClick={handleAddCustomBrand} disabled={!customReturnBrand.trim()}>
-                              Add
-                            </Button>
-                            <Button variant="outline" onClick={() => { setShowCustomBrandInput(false); setCustomReturnBrand(""); }}>
-                              Cancel
-                            </Button>
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            This will create a new entry in inventory with 1 empty cylinder
-                          </p>
-                        </div>
+                        <Card className="border-primary/50 bg-primary/5">
+                          <CardContent className="p-4 space-y-3">
+                            <Label className="font-semibold">Enter Custom Brand Name</Label>
+                            <div className="flex gap-2">
+                              <Input
+                                value={customReturnBrand}
+                                onChange={(e) => setCustomReturnBrand(e.target.value)}
+                                placeholder="e.g., Local Brand XYZ"
+                                className="flex-1"
+                              />
+                              <Button onClick={handleAddCustomBrand} disabled={!customReturnBrand.trim()}>
+                                <Plus className="h-4 w-4 mr-1" />
+                                Add
+                              </Button>
+                              <Button variant="outline" onClick={() => { setShowCustomBrandInput(false); setCustomReturnBrand(""); }}>
+                                Cancel
+                              </Button>
+                            </div>
+                            <p className="text-xs text-muted-foreground flex items-center gap-1">
+                              <Info className="h-3 w-3" />
+                              Creates a new entry in inventory with 1 empty cylinder
+                            </p>
+                          </CardContent>
+                        </Card>
                       )}
 
-                      {/* Leak Check */}
+                      {/* Leak Check Option */}
                       {selectedReturnBrand && (
-                        <div className="flex items-center gap-3 p-3 bg-amber-500/10 rounded-lg">
-                          <Checkbox
-                            id="leakCheck"
-                            checked={isLeakedReturn}
-                            onCheckedChange={(checked) => setIsLeakedReturn(checked as boolean)}
-                          />
-                          <Label htmlFor="leakCheck" className="cursor-pointer flex-1">
-                            <span className="font-medium">Leaked / Problem Cylinder</span>
-                            <p className="text-xs text-muted-foreground">Routes to Problem Stock instead of Empty Stock</p>
-                          </Label>
-                          {isLeakedReturn && (
-                            <Badge variant="destructive">→ Problem Stock</Badge>
-                          )}
-                        </div>
+                        <Card className={`border-2 transition-colors ${isLeakedReturn ? 'border-destructive bg-destructive/5' : 'border-amber-300 bg-amber-50 dark:bg-amber-950/20'}`}>
+                          <CardContent className="p-4">
+                            <div className="flex items-center gap-3">
+                              <Checkbox
+                                id="leakCheck"
+                                checked={isLeakedReturn}
+                                onCheckedChange={(checked) => setIsLeakedReturn(checked as boolean)}
+                                className="h-5 w-5"
+                              />
+                              <Label htmlFor="leakCheck" className="cursor-pointer flex-1">
+                                <div className="flex items-center gap-2">
+                                  <AlertTriangle className={`h-4 w-4 ${isLeakedReturn ? 'text-destructive' : 'text-amber-600'}`} />
+                                  <span className="font-semibold">Leaked / Problem Cylinder</span>
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                  Routes to Problem Stock instead of Empty Stock for claims
+                                </p>
+                              </Label>
+                              {isLeakedReturn && (
+                                <Badge variant="destructive" className="ml-auto">
+                                  Problem Stock
+                                </Badge>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
                       )}
                     </>
                   ) : (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <AlertCircle className="h-12 w-12 mx-auto mb-2 opacity-30" />
-                      <p>No LPG Refill in cart - Skip this step</p>
-                    </div>
+                    <Card className="border-dashed">
+                      <CardContent className="py-12 text-center">
+                        <AlertCircle className="h-16 w-16 mx-auto mb-4 text-muted-foreground/30" />
+                        <p className="text-lg font-medium text-muted-foreground">No LPG Refill in Cart</p>
+                        <p className="text-sm text-muted-foreground mt-1">This step only applies to Refill transactions</p>
+                        <Button className="mt-4" onClick={() => setCurrentStep(3)}>
+                          Skip to Checkout
+                          <ChevronRight className="h-4 w-4 ml-1" />
+                        </Button>
+                      </CardContent>
+                    </Card>
                   )}
                 </CardContent>
               </Card>
@@ -1556,123 +1663,186 @@ export const POSModule = () => {
 
           {/* ===== RIGHT SIDEBAR: CART ===== */}
           <div className="space-y-4">
-            <Card className="sticky top-4">
-              <CardHeader className="pb-3">
+            <Card className="sticky top-4 shadow-lg border-2">
+              <CardHeader className="pb-3 bg-gradient-to-r from-primary/10 to-primary/5">
                 <CardTitle className="flex items-center justify-between">
                   <span className="flex items-center gap-2">
-                    <ShoppingCart className="h-5 w-5" />
-                    Cart
+                    <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
+                      <ShoppingCart className="h-4 w-4 text-primary-foreground" />
+                    </div>
+                    <span>Cart</span>
                   </span>
-                  <Badge variant="secondary">{saleItems.length} items</Badge>
+                  <Badge variant="default" className="text-sm px-3">{saleItems.length}</Badge>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="space-y-3 pt-4">
                 {saleItems.length === 0 ? (
-                  <div className="text-center py-6 text-muted-foreground">
-                    <ShoppingCart className="h-10 w-10 mx-auto mb-2 opacity-30" />
-                    <p className="text-sm">Cart is empty</p>
+                  <div className="text-center py-8 text-muted-foreground">
+                    <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-muted flex items-center justify-center">
+                      <ShoppingCart className="h-8 w-8 opacity-30" />
+                    </div>
+                    <p className="font-medium">Cart is empty</p>
+                    <p className="text-xs mt-1">Select products to add</p>
                   </div>
                 ) : (
-                  <ScrollArea className="h-[300px] pr-2">
+                  <ScrollArea className="h-[280px] pr-2">
                     <div className="space-y-2">
                       {saleItems.map(item => (
-                        <div key={item.id} className="flex items-start justify-between p-2 bg-muted/30 rounded-lg">
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm truncate">{item.name}</p>
-                            <p className="text-xs text-muted-foreground truncate">{item.details}</p>
-                            <p className="text-sm font-bold text-primary">
-                              {BANGLADESHI_CURRENCY_SYMBOL}{(item.price * item.quantity).toLocaleString()}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-1 ml-2">
-                            <Button size="icon" variant="outline" className="h-6 w-6" onClick={() => updateItemQuantity(item.id, -1)}>
-                              <Minus className="h-3 w-3" />
-                            </Button>
-                            <span className="w-6 text-center text-sm font-medium">{item.quantity}</span>
-                            <Button size="icon" variant="outline" className="h-6 w-6" onClick={() => updateItemQuantity(item.id, 1)}>
-                              <Plus className="h-3 w-3" />
-                            </Button>
-                            <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive" onClick={() => removeItem(item.id)}>
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        </div>
+                        <Card key={item.id} className="border shadow-sm">
+                          <CardContent className="p-3">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1 min-w-0">
+                                <p className="font-semibold text-sm leading-tight">{item.name}</p>
+                                <p className="text-[11px] text-muted-foreground mt-0.5">{item.details}</p>
+                                {/* Show return brand if assigned */}
+                                {item.returnBrand && (
+                                  <div className="flex items-center gap-1 mt-1">
+                                    <ArrowLeftRight className="h-3 w-3 text-amber-600" />
+                                    <span className="text-[10px] text-amber-600 font-medium">
+                                      Return: {item.returnBrand} {item.isLeakedReturn && '(Leaked)'}
+                                    </span>
+                                  </div>
+                                )}
+                                <p className="text-base font-bold text-primary mt-1">
+                                  {BANGLADESHI_CURRENCY_SYMBOL}{(item.price * item.quantity).toLocaleString()}
+                                </p>
+                              </div>
+                              <div className="flex flex-col items-end gap-1">
+                                <div className="flex items-center gap-0.5 bg-muted rounded-lg p-0.5">
+                                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => updateItemQuantity(item.id, -1)}>
+                                    <Minus className="h-3 w-3" />
+                                  </Button>
+                                  <span className="w-7 text-center text-sm font-bold">{item.quantity}</span>
+                                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => updateItemQuantity(item.id, 1)}>
+                                    <Plus className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                                <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive hover:bg-destructive/10" onClick={() => removeItem(item.id)}>
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
                       ))}
                     </div>
                   </ScrollArea>
                 )}
 
+                {/* Return Cylinder Summary (visible in Step 2+) */}
+                {selectedReturnBrand && currentStep >= 2 && (
+                  <>
+                    <Separator />
+                    <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
+                      <div className="flex items-center gap-2">
+                        <ArrowLeftRight className="h-4 w-4 text-amber-600" />
+                        <div className="flex-1">
+                          <p className="text-xs font-semibold text-amber-800 dark:text-amber-200">Return Cylinder</p>
+                          <p className="text-sm font-bold text-amber-700 dark:text-amber-300">
+                            {lpgBrands.find(b => b.id === selectedReturnBrand)?.name || 'Custom'}
+                            {isLeakedReturn && <span className="text-destructive ml-1">(Leaked)</span>}
+                          </p>
+                        </div>
+                        <Cylinder className="h-5 w-5 text-amber-600" />
+                      </div>
+                    </div>
+                  </>
+                )}
+
                 <Separator />
 
                 {/* Totals */}
-                <div className="space-y-1">
+                <div className="space-y-2 bg-muted/30 p-3 rounded-lg">
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Subtotal</span>
-                    <span>{BANGLADESHI_CURRENCY_SYMBOL}{subtotal.toLocaleString()}</span>
+                    <span className="font-medium">{BANGLADESHI_CURRENCY_SYMBOL}{subtotal.toLocaleString()}</span>
                   </div>
                   {discountAmount > 0 && (
-                    <div className="flex justify-between text-sm text-green-600">
+                    <div className="flex justify-between text-sm text-emerald-600">
                       <span>Discount</span>
-                      <span>-{BANGLADESHI_CURRENCY_SYMBOL}{discountAmount.toLocaleString()}</span>
+                      <span className="font-medium">-{BANGLADESHI_CURRENCY_SYMBOL}{discountAmount.toLocaleString()}</span>
                     </div>
                   )}
-                  <div className="flex justify-between text-lg font-bold pt-1 border-t">
-                    <span>Total</span>
-                    <span className="text-primary">{BANGLADESHI_CURRENCY_SYMBOL}{total.toLocaleString()}</span>
+                  <Separator />
+                  <div className="flex justify-between items-center">
+                    <span className="font-semibold">Total</span>
+                    <span className="text-2xl font-bold text-primary">{BANGLADESHI_CURRENCY_SYMBOL}{total.toLocaleString()}</span>
                   </div>
                 </div>
 
-                <Separator />
-
                 {/* Action Buttons based on Step */}
-                <div className="space-y-2">
+                <div className="space-y-2 pt-2">
                   {currentStep === 1 && (
                     <Button 
-                      className="w-full" 
+                      className="w-full h-12 text-base font-semibold shadow-lg" 
                       size="lg"
                       disabled={saleItems.length === 0}
                       onClick={() => setCurrentStep(hasLPGInCart ? 2 : 3)}
                     >
-                      Next: {hasLPGInCart ? 'Return Cylinder' : 'Checkout'}
-                      <ChevronRight className="h-4 w-4 ml-2" />
+                      {hasLPGInCart ? 'Select Return Cylinder' : 'Proceed to Checkout'}
+                      <ChevronRight className="h-5 w-5 ml-2" />
                     </Button>
                   )}
                   
                   {currentStep === 2 && (
                     <div className="space-y-2">
-                      <Button className="w-full" onClick={applyReturnBrandToCart}>
-                        Next: Checkout
-                        <ChevronRight className="h-4 w-4 ml-2" />
+                      <Button className="w-full h-12 text-base font-semibold shadow-lg" onClick={applyReturnBrandToCart}>
+                        Proceed to Checkout
+                        <ChevronRight className="h-5 w-5 ml-2" />
                       </Button>
                       <Button variant="outline" className="w-full" onClick={() => setCurrentStep(1)}>
                         <ChevronLeft className="h-4 w-4 mr-2" />
-                        Back
+                        Back to Products
                       </Button>
                     </div>
                   )}
                   
                   {currentStep === 3 && (
-                    <div className="space-y-2">
+                    <div className="space-y-3">
+                      {/* Customer Summary */}
+                      <div className="p-3 bg-muted/30 rounded-lg text-sm">
+                        <div className="flex items-center gap-2 mb-1">
+                          <User className="h-4 w-4 text-muted-foreground" />
+                          <span className="font-semibold">
+                            {selectedCustomer?.name || customerName || 'Walk-in Customer'}
+                          </span>
+                        </div>
+                        {(selectedCustomer?.phone || customerPhone) && (
+                          <p className="text-xs text-muted-foreground ml-6">
+                            {selectedCustomer?.phone || customerPhone}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Complete Sale Button */}
                       <Button 
-                        className="w-full bg-green-600 hover:bg-green-700" 
+                        className="w-full h-14 text-lg font-bold shadow-xl bg-emerald-600 hover:bg-emerald-700" 
                         size="lg"
                         disabled={processing || saleItems.length === 0}
                         onClick={() => handleCompleteSale('completed')}
                       >
-                        {processing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Wallet className="h-4 w-4 mr-2" />}
-                        Complete Sale (Cash)
+                        {processing ? (
+                          <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                        ) : (
+                          <CheckCircle2 className="h-5 w-5 mr-2" />
+                        )}
+                        Complete Sale
                       </Button>
+
+                      {/* Save as Due Button */}
                       {selectedCustomerId !== 'walkin' && (
                         <Button 
                           variant="outline" 
-                          className="w-full border-amber-500 text-amber-600 hover:bg-amber-50"
+                          className="w-full h-11 font-semibold border-2 border-amber-500 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30"
                           disabled={processing}
                           onClick={() => handleCompleteSale('pending')}
                         >
                           <FileText className="h-4 w-4 mr-2" />
-                          Save as Due
+                          Save as Due (Credit)
                         </Button>
                       )}
+
+                      {/* Back Button */}
                       <Button variant="ghost" className="w-full" onClick={() => setCurrentStep(hasLPGInCart ? 2 : 1)}>
                         <ChevronLeft className="h-4 w-4 mr-2" />
                         Back
@@ -1685,30 +1855,33 @@ export const POSModule = () => {
 
             {/* Recent Transactions */}
             {recentTransactions.length > 0 && (
-              <Card className="border-l-4 border-l-amber-500">
+              <Card className="border-l-4 border-l-amber-500 shadow-md">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm flex items-center gap-2">
-                    <History className="h-4 w-4" />
-                    Recent (Void in 5min)
+                    <History className="h-4 w-4 text-amber-600" />
+                    <span>Recent Transactions</span>
+                    <Badge variant="outline" className="ml-auto text-[10px]">Void in 5min</Badge>
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-1">
+                <CardContent className="space-y-2">
                   {recentTransactions.slice(0, 3).map(txn => (
-                    <div key={txn.id} className="flex items-center justify-between text-xs p-2 bg-muted/30 rounded">
-                      <div>
-                        <span className="font-medium">{txn.transactionNumber}</span>
-                        <span className="text-muted-foreground ml-2">৳{txn.total}</span>
-                      </div>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="h-6 text-xs text-amber-600"
-                        onClick={() => { setTransactionToVoid(txn); setShowVoidDialog(true); }}
-                      >
-                        <Undo2 className="h-3 w-3 mr-1" />
-                        Void
-                      </Button>
-                    </div>
+                    <Card key={txn.id} className="border">
+                      <CardContent className="p-2 flex items-center justify-between">
+                        <div>
+                          <p className="font-semibold text-xs">{txn.transactionNumber}</p>
+                          <p className="text-primary font-bold text-sm">৳{txn.total.toLocaleString()}</p>
+                        </div>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="h-8 text-xs border-destructive/50 text-destructive hover:bg-destructive/10"
+                          onClick={() => { setTransactionToVoid(txn); setShowVoidDialog(true); }}
+                        >
+                          <Undo2 className="h-3 w-3 mr-1" />
+                          Void
+                        </Button>
+                      </CardContent>
+                    </Card>
                   ))}
                 </CardContent>
               </Card>
