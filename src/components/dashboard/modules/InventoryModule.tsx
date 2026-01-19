@@ -136,15 +136,21 @@ export const InventoryModule = () => {
   
   const weightOptions = sizeTab === "22mm" ? WEIGHT_OPTIONS_22MM : WEIGHT_OPTIONS_20MM;
 
+  const getOwnerIdForWrite = useCallback(async () => {
+    const { data: ownerId, error } = await supabase.rpc("get_owner_id");
+    if (error) throw error;
+    return ownerId;
+  }, []);
+
   // Update weight when size changes
   useEffect(() => {
     const defaultWeight = sizeTab === "22mm" ? "12kg" : "12kg";
     setSelectedWeight(defaultWeight);
-    setNewLpgBrand(prev => ({ ...prev, size: sizeTab, weight: defaultWeight }));
+    setNewLpgBrand((prev) => ({ ...prev, size: sizeTab, weight: defaultWeight }));
   }, [sizeTab]);
 
   useEffect(() => {
-    setNewLpgBrand(prev => ({ ...prev, weight: selectedWeight }));
+    setNewLpgBrand((prev) => ({ ...prev, weight: selectedWeight }));
   }, [selectedWeight]);
 
   // Fetch all data
@@ -152,16 +158,27 @@ export const InventoryModule = () => {
     setLoading(true);
     try {
       const [lpgRes, stovesRes, regulatorsRes] = await Promise.all([
-        supabase.from("lpg_brands").select("*").eq("is_active", true).eq("size", sizeTab).eq("weight", selectedWeight).order("name"),
+        supabase
+          .from("lpg_brands")
+          .select("*")
+          .eq("is_active", true)
+          .eq("size", sizeTab)
+          .eq("weight", selectedWeight)
+          .order("name"),
         supabase.from("stoves").select("*").eq("is_active", true).order("brand"),
         supabase.from("regulators").select("*").eq("is_active", true).order("brand"),
       ]);
 
-      if (lpgRes.data) setLpgBrands(lpgRes.data);
-      if (stovesRes.data) setStoves(stovesRes.data);
-      if (regulatorsRes.data) setRegulators(regulatorsRes.data);
-    } catch (error) {
-      toast.error("Failed to load inventory data");
+      if (lpgRes.error) throw lpgRes.error;
+      if (stovesRes.error) throw stovesRes.error;
+      if (regulatorsRes.error) throw regulatorsRes.error;
+
+      setLpgBrands(lpgRes.data ?? []);
+      setStoves(stovesRes.data ?? []);
+      setRegulators(regulatorsRes.data ?? []);
+    } catch (error: any) {
+      console.error("Failed to load inventory data:", error);
+      toast.error(error?.message || "Failed to load inventory data");
     } finally {
       setLoading(false);
     }
@@ -231,25 +248,51 @@ export const InventoryModule = () => {
       toast.error("Brand name is required");
       return;
     }
+
     setIsSubmitting(true);
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      const { data: insertedBrand, error } = await supabase.from("lpg_brands").insert({
-        ...newLpgBrand, created_by: userData.user?.id,
-      }).select().single();
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
+      if (!userData.user) throw new Error("You must be logged in");
+
+      const ownerId = (await getOwnerIdForWrite().catch(() => userData.user!.id)) || userData.user.id;
+
+      const { data: insertedBrand, error } = await supabase
+        .from("lpg_brands")
+        .insert({
+          ...newLpgBrand,
+          created_by: userData.user.id,
+          owner_id: ownerId,
+        })
+        .select()
+        .single();
 
       if (error) throw error;
 
       if (insertedBrand) {
-        await syncLpgBrandToPricing(newLpgBrand.name.trim(), insertedBrand.id, newLpgBrand.size, newLpgBrand.weight);
+        await syncLpgBrandToPricing(
+          newLpgBrand.name.trim(),
+          insertedBrand.id,
+          newLpgBrand.size,
+          newLpgBrand.weight
+        );
       }
 
       toast.success("Brand added successfully");
       setIsAddLpgDialogOpen(false);
-      setNewLpgBrand({ name: "", color: "#22c55e", size: sizeTab, weight: selectedWeight, package_cylinder: 0, refill_cylinder: 0, empty_cylinder: 0, problem_cylinder: 0 });
-      fetchData();
+      setNewLpgBrand({
+        name: "",
+        color: "#22c55e",
+        size: sizeTab,
+        weight: selectedWeight,
+        package_cylinder: 0,
+        refill_cylinder: 0,
+        empty_cylinder: 0,
+        problem_cylinder: 0,
+      });
+      await fetchData();
     } catch (error: any) {
-      toast.error(error.message || "Failed to add brand");
+      toast.error(error?.message || "Failed to add brand");
     } finally {
       setIsSubmitting(false);
     }
@@ -260,30 +303,52 @@ export const InventoryModule = () => {
       toast.error("Please enter brand name");
       return;
     }
+
     setIsSubmitting(true);
     try {
-      const { data: userData } = await supabase.auth.getUser();
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
+      if (!userData.user) throw new Error("You must be logged in");
+
+      const ownerId = (await getOwnerIdForWrite().catch(() => userData.user!.id)) || userData.user.id;
       const burnerLabel = newStove.burners === 1 ? "Single Burner" : "Double Burner";
-      
-      const existing = stoves.find(s => s.brand.toLowerCase() === newStove.brand.trim().toLowerCase() && s.burners === newStove.burners);
-      
+
+      const existing = stoves.find(
+        (s) =>
+          s.brand.toLowerCase() === newStove.brand.trim().toLowerCase() &&
+          s.burners === newStove.burners
+      );
+
       if (existing) {
-        await supabase.from("stoves").update({ quantity: existing.quantity + newStove.quantity }).eq("id", existing.id);
+        const { error } = await supabase
+          .from("stoves")
+          .update({ quantity: existing.quantity + newStove.quantity })
+          .eq("id", existing.id);
+        if (error) throw error;
+
         toast.success("Stove quantity updated");
       } else {
-        await supabase.from("stoves").insert({
-          brand: newStove.brand.trim(), model: burnerLabel, burners: newStove.burners,
-          quantity: newStove.quantity, price: 0, warranty_months: newStove.warranty_months, created_by: userData.user?.id,
+        const { error } = await supabase.from("stoves").insert({
+          brand: newStove.brand.trim(),
+          model: burnerLabel,
+          burners: newStove.burners,
+          quantity: newStove.quantity,
+          price: 0,
+          warranty_months: newStove.warranty_months,
+          created_by: userData.user.id,
+          owner_id: ownerId,
         });
+        if (error) throw error;
+
         await syncStoveToPricing(newStove.brand.trim(), burnerLabel);
         toast.success("Stove added successfully");
       }
 
       setNewStove({ brand: "", burners: 1, quantity: 0, warranty_months: 12 });
       setIsAddStoveDialogOpen(false);
-      fetchData();
+      await fetchData();
     } catch (error: any) {
-      toast.error(error.message || "Failed to add stove");
+      toast.error(error?.message || "Failed to add stove");
     } finally {
       setIsSubmitting(false);
     }
@@ -294,28 +359,49 @@ export const InventoryModule = () => {
       toast.error("Please enter brand name");
       return;
     }
+
     setIsSubmitting(true);
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      
-      const existing = regulators.find(r => r.brand.toLowerCase() === newRegulator.brand.trim().toLowerCase() && r.type === newRegulator.type);
-      
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
+      if (!userData.user) throw new Error("You must be logged in");
+
+      const ownerId = (await getOwnerIdForWrite().catch(() => userData.user!.id)) || userData.user.id;
+
+      const existing = regulators.find(
+        (r) =>
+          r.brand.toLowerCase() === newRegulator.brand.trim().toLowerCase() &&
+          r.type === newRegulator.type
+      );
+
       if (existing) {
-        await supabase.from("regulators").update({ quantity: existing.quantity + newRegulator.quantity }).eq("id", existing.id);
+        const { error } = await supabase
+          .from("regulators")
+          .update({ quantity: existing.quantity + newRegulator.quantity })
+          .eq("id", existing.id);
+        if (error) throw error;
+
         toast.success("Regulator quantity updated");
       } else {
-        await supabase.from("regulators").insert({
-          brand: newRegulator.brand.trim(), type: newRegulator.type, quantity: newRegulator.quantity, created_by: userData.user?.id,
+        const { error } = await supabase.from("regulators").insert({
+          brand: newRegulator.brand.trim(),
+          type: newRegulator.type,
+          quantity: newRegulator.quantity,
+          price: 0,
+          created_by: userData.user.id,
+          owner_id: ownerId,
         });
+        if (error) throw error;
+
         await syncRegulatorToPricing(newRegulator.brand.trim(), newRegulator.type);
         toast.success("Regulator added successfully");
       }
 
       setNewRegulator({ brand: "", type: "22mm", quantity: 0 });
       setIsAddRegulatorDialogOpen(false);
-      fetchData();
+      await fetchData();
     } catch (error: any) {
-      toast.error(error.message || "Failed to add regulator");
+      toast.error(error?.message || "Failed to add regulator");
     } finally {
       setIsSubmitting(false);
     }
@@ -324,54 +410,78 @@ export const InventoryModule = () => {
   // Update operations
   const handleUpdateLpg = async (id: string, field: string, value: number) => {
     try {
-      await supabase.from("lpg_brands").update({ [field]: value }).eq("id", id);
-      setLpgBrands(prev => prev.map(b => b.id === id ? { ...b, [field]: value } : b));
+      const { error } = await supabase.from("lpg_brands").update({ [field]: value }).eq("id", id);
+      if (error) throw error;
+
+      setLpgBrands((prev) => prev.map((b) => (b.id === id ? { ...b, [field]: value } : b)));
       setEditingCell(null);
       toast.success("Updated successfully");
-    } catch (error) {
-      toast.error("Failed to update");
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to update");
     }
   };
 
   const handleUpdateStove = async (id: string, value: number) => {
     try {
-      await supabase.from("stoves").update({ quantity: value }).eq("id", id);
-      setStoves(prev => prev.map(s => s.id === id ? { ...s, quantity: value } : s));
+      const { error } = await supabase.from("stoves").update({ quantity: value }).eq("id", id);
+      if (error) throw error;
+
+      setStoves((prev) => prev.map((s) => (s.id === id ? { ...s, quantity: value } : s)));
       setEditingCell(null);
       toast.success("Updated successfully");
-    } catch (error) {
-      toast.error("Failed to update");
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to update");
     }
   };
 
   const handleUpdateRegulator = async (id: string, value: number) => {
     try {
-      await supabase.from("regulators").update({ quantity: value }).eq("id", id);
-      setRegulators(prev => prev.map(r => r.id === id ? { ...r, quantity: value } : r));
+      const { error } = await supabase.from("regulators").update({ quantity: value }).eq("id", id);
+      if (error) throw error;
+
+      setRegulators((prev) => prev.map((r) => (r.id === id ? { ...r, quantity: value } : r)));
       setEditingCell(null);
       toast.success("Updated successfully");
-    } catch (error) {
-      toast.error("Failed to update");
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to update");
     }
   };
 
   // Delete operations
   const handleDeleteLpg = async (id: string) => {
-    await supabase.from("lpg_brands").update({ is_active: false }).eq("id", id);
-    setLpgBrands(prev => prev.filter(b => b.id !== id));
-    toast.success("Brand removed");
+    try {
+      const { error } = await supabase.from("lpg_brands").update({ is_active: false }).eq("id", id);
+      if (error) throw error;
+
+      setLpgBrands((prev) => prev.filter((b) => b.id !== id));
+      toast.success("Brand removed");
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to remove brand");
+    }
   };
 
   const handleDeleteStove = async (id: string) => {
-    await supabase.from("stoves").update({ is_active: false }).eq("id", id);
-    setStoves(prev => prev.filter(s => s.id !== id));
-    toast.success("Stove removed");
+    try {
+      const { error } = await supabase.from("stoves").update({ is_active: false }).eq("id", id);
+      if (error) throw error;
+
+      setStoves((prev) => prev.filter((s) => s.id !== id));
+      toast.success("Stove removed");
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to remove stove");
+    }
   };
 
   const handleDeleteRegulator = async (id: string) => {
-    await supabase.from("regulators").update({ is_active: false }).eq("id", id);
-    setRegulators(prev => prev.filter(r => r.id !== id));
-    toast.success("Regulator removed");
+    try {
+      const { error } = await supabase.from("regulators").update({ is_active: false }).eq("id", id);
+      if (error) throw error;
+
+      setRegulators((prev) => prev.filter((r) => r.id !== id));
+      toast.success("Regulator removed");
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to remove regulator");
+    }
   };
 
   // Send to Plant
@@ -1049,11 +1159,35 @@ export const InventoryModule = () => {
 
           {/* Regulator Filters */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-            <TabsList className="bg-muted/50 p-1">
-              <TabsTrigger value="all" onClick={() => setRegulatorSizeFilter("all")} className={regulatorSizeFilter === "all" ? "bg-primary text-primary-foreground" : ""}>All Sizes</TabsTrigger>
-              <TabsTrigger value="22mm" onClick={() => setRegulatorSizeFilter("22mm")} className={regulatorSizeFilter === "22mm" ? "bg-violet-500 text-white" : ""}>22mm</TabsTrigger>
-              <TabsTrigger value="20mm" onClick={() => setRegulatorSizeFilter("20mm")} className={regulatorSizeFilter === "20mm" ? "bg-cyan-500 text-white" : ""}>20mm</TabsTrigger>
-            </TabsList>
+            <div className="flex w-full sm:w-auto rounded-lg bg-muted/50 p-1">
+              <Button
+                type="button"
+                size="sm"
+                variant={regulatorSizeFilter === "all" ? "default" : "ghost"}
+                className="h-8 flex-1 sm:flex-none"
+                onClick={() => setRegulatorSizeFilter("all")}
+              >
+                All Sizes
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={regulatorSizeFilter === "22mm" ? "default" : "ghost"}
+                className="h-8 flex-1 sm:flex-none"
+                onClick={() => setRegulatorSizeFilter("22mm")}
+              >
+                22mm
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={regulatorSizeFilter === "20mm" ? "default" : "ghost"}
+                className="h-8 flex-1 sm:flex-none"
+                onClick={() => setRegulatorSizeFilter("20mm")}
+              >
+                20mm
+              </Button>
+            </div>
             <div className="flex flex-1 items-center gap-3 w-full sm:w-auto">
               <div className="relative flex-1 sm:max-w-sm">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
