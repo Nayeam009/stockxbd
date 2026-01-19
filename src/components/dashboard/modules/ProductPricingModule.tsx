@@ -781,31 +781,46 @@ export const ProductPricingModule = () => {
 
         {/* LPG Tab Content */}
         <TabsContent value="lpg" className="space-y-4 mt-4">
-          {/* Size Tabs */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <Tabs value={sizeTab} onValueChange={(v) => setSizeTab(v as "22mm" | "20mm")} className="w-full sm:w-auto">
-              <TabsList className="grid w-full grid-cols-2 sm:w-auto sm:inline-grid h-8">
-                <TabsTrigger value="22mm" className="text-xs sm:text-sm h-7">22mm</TabsTrigger>
-                <TabsTrigger value="20mm" className="text-xs sm:text-sm h-7">20mm</TabsTrigger>
-              </TabsList>
-            </Tabs>
-            
-            {/* Weight Selector */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-1">
-              <span className="text-xs text-muted-foreground whitespace-nowrap">Weight:</span>
-              <div className="flex gap-1">
-                {weightOptions.map(option => (
-                  <Button
-                    key={option.value}
-                    variant={selectedWeight === option.value ? "default" : "outline"}
-                    size="sm"
-                    className="h-7 px-2 sm:px-3 text-xs whitespace-nowrap"
-                    onClick={() => setSelectedWeight(option.value)}
-                  >
-                    {option.shortLabel}
-                  </Button>
-                ))}
+          {/* Size Tabs - Matching Inventory Module Style */}
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              {/* Size Toggle Buttons - Matching Inventory */}
+              <div className="flex w-full sm:w-auto rounded-lg bg-muted/50 p-1">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={sizeTab === "22mm" ? "default" : "ghost"}
+                  className="h-8 flex-1 sm:flex-none data-[active=true]:bg-primary data-[active=true]:text-primary-foreground"
+                  data-active={sizeTab === "22mm"}
+                  onClick={() => setSizeTab("22mm")}
+                >
+                  22mm
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={sizeTab === "20mm" ? "default" : "ghost"}
+                  className={`h-8 flex-1 sm:flex-none ${sizeTab === "20mm" ? "bg-cyan-500 text-white hover:bg-cyan-600" : ""}`}
+                  onClick={() => setSizeTab("20mm")}
+                >
+                  20mm
+                </Button>
               </div>
+            </div>
+            
+            {/* Weight Selector - Matching Inventory Style */}
+            <div className="flex flex-wrap gap-2">
+              {weightOptions.map(option => (
+                <Button
+                  key={option.value}
+                  variant={selectedWeight === option.value ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setSelectedWeight(option.value)}
+                  className={`text-xs sm:text-sm ${selectedWeight === option.value ? "bg-primary text-primary-foreground" : ""}`}
+                >
+                  {option.shortLabel} KG
+                </Button>
+              ))}
             </div>
           </div>
 

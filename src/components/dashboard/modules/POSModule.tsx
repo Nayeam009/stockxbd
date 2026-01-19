@@ -1211,91 +1211,150 @@ export const POSModule = () => {
 
   return (
     <TooltipProvider>
-      <div className="space-y-3 sm:space-y-4">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <div>
-            <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground">{t('pos')}</h2>
-            <p className="text-xs sm:text-sm text-muted-foreground">Inventory-Synced Sales System</p>
+      <div className="space-y-4 pb-20 sm:pb-6">
+        {/* Header - Matching Inventory/Pricing Module Style */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-2xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg flex-shrink-0">
+              <ShoppingCart className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground">{t('pos')}</h1>
+              <p className="text-muted-foreground text-xs sm:text-sm">Inventory-Synced Sales System</p>
+            </div>
           </div>
-          <div className="flex gap-2">
-            <Button onClick={() => setShowBarcodeScanner(true)} variant="outline" size="sm" className="gap-2">
-              <ScanLine className="h-4 w-4" />
-              <span className="hidden sm:inline">Scan</span>
-            </Button>
-          </div>
+          <Button onClick={() => setShowBarcodeScanner(true)} variant="outline" size="sm" className="gap-2 w-full sm:w-auto">
+            <ScanLine className="h-4 w-4" />
+            Scan Barcode
+          </Button>
+        </div>
+
+        {/* Stats Cards - Matching Inventory/Pricing Module */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+          <Card className="border-border bg-card hover:shadow-sm transition-shadow">
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="p-1.5 sm:p-2 rounded-lg bg-primary/10">
+                  <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] sm:text-xs text-muted-foreground truncate">Cart Items</p>
+                  <p className="text-lg sm:text-xl font-bold text-foreground">{saleItems.length}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-border bg-card hover:shadow-sm transition-shadow">
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="p-1.5 sm:p-2 rounded-lg bg-green-500/10">
+                  <Package className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] sm:text-xs text-muted-foreground truncate">LPG Brands</p>
+                  <p className="text-lg sm:text-xl font-bold text-foreground">{lpgBrands.length}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-border bg-card hover:shadow-sm transition-shadow">
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="p-1.5 sm:p-2 rounded-lg bg-orange-500/10">
+                  <Fuel className="h-4 w-4 sm:h-5 sm:w-5 text-orange-500" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] sm:text-xs text-muted-foreground truncate">Stoves</p>
+                  <p className="text-lg sm:text-xl font-bold text-foreground">{stoves.length}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-border bg-card hover:shadow-sm transition-shadow">
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="p-1.5 sm:p-2 rounded-lg bg-purple-500/10">
+                  <Truck className="h-4 w-4 sm:h-5 sm:w-5 text-purple-500" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] sm:text-xs text-muted-foreground truncate">Regulators</p>
+                  <p className="text-lg sm:text-xl font-bold text-foreground">{regulators.length}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Main Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* Left Side - Product Entry */}
-          <div className="lg:col-span-2 space-y-3">
+          <div className="lg:col-span-2 space-y-4">
             {/* Product Search */}
-            <Card className="border-0 shadow-sm">
-              <CardContent className="p-2 sm:p-3">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search products..."
-                    value={productSearch}
-                    onChange={(e) => setProductSearch(e.target.value)}
-                    className="pl-10 h-9 sm:h-10"
-                  />
-                </div>
-              </CardContent>
-            </Card>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search products..."
+                value={productSearch}
+                onChange={(e) => setProductSearch(e.target.value)}
+                className="pl-10 h-10 bg-muted/50"
+              />
+            </div>
 
-            {/* Product Tabs */}
+            {/* Product Tabs - Matching Inventory Module Style */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-4 bg-muted h-9 sm:h-10">
-                <TabsTrigger value="lpg" className="text-[10px] sm:text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                  <Fuel className="h-3 w-3 mr-1 hidden sm:inline" />
-                  LPG
+              <TabsList className="bg-muted/50 p-1 w-full grid grid-cols-4">
+                <TabsTrigger value="lpg" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground gap-1 text-xs sm:text-sm">
+                  <Fuel className="h-3 w-3 sm:h-4 sm:w-4" />
+                  <span className="hidden sm:inline">LPG</span>
+                  <span className="sm:hidden">LPG</span>
                 </TabsTrigger>
-                <TabsTrigger value="stove" className="text-[10px] sm:text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                  Stove
+                <TabsTrigger value="stove" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white gap-1 text-xs sm:text-sm">
+                  <span className="hidden sm:inline">Stove</span>
+                  <span className="sm:hidden">Stove</span>
                 </TabsTrigger>
-                <TabsTrigger value="regulator" className="text-[10px] sm:text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                  Reg.
+                <TabsTrigger value="regulator" className="data-[state=active]:bg-violet-500 data-[state=active]:text-white gap-1 text-xs sm:text-sm">
+                  <span className="hidden sm:inline">Reg.</span>
+                  <span className="sm:hidden">Reg.</span>
                 </TabsTrigger>
-                <TabsTrigger value="custom" className="text-[10px] sm:text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                  Custom
+                <TabsTrigger value="custom" className="data-[state=active]:bg-gray-600 data-[state=active]:text-white gap-1 text-xs sm:text-sm">
+                  <span className="hidden sm:inline">Custom</span>
+                  <span className="sm:hidden">Custom</span>
                 </TabsTrigger>
               </TabsList>
 
               {/* LPG Tab - The Brain of the POS */}
               <TabsContent value="lpg">
-                <Card className="border-0 shadow-sm">
-                  <CardHeader className="p-3 pb-2">
+                <Card className="border-border hover:shadow-md transition-shadow">
+                  <CardHeader className="p-3 sm:p-4 pb-2 sm:pb-3">
                     <CardTitle className="text-sm sm:text-base flex items-center gap-2">
-                      <Fuel className="h-4 w-4 text-primary" />
+                      <Fuel className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
                       LPG Cylinder Sale
                     </CardTitle>
-                    <CardDescription className="text-xs">
+                    <p className="text-xs text-muted-foreground">
                       Inventory auto-synced • Cross-brand swap supported
-                    </CardDescription>
+                    </p>
                   </CardHeader>
-                  <CardContent className="p-3 pt-0 space-y-3">
-                    {/* Cylinder Type & Sale Type */}
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="space-y-1.5">
+                  <CardContent className="p-3 sm:p-4 pt-0 space-y-4">
+                    {/* Cylinder Type & Sale Type - Improved Layout */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
                         <Label className="text-xs font-medium">Cylinder Type</Label>
-                        <div className="grid grid-cols-2 gap-1">
+                        <div className="flex rounded-lg bg-muted/50 p-1">
                           <Button
                             type="button"
                             size="sm"
-                            variant={cylinderType === 'refill' ? 'default' : 'outline'}
+                            variant={cylinderType === 'refill' ? 'default' : 'ghost'}
                             onClick={() => setCylinderType('refill')}
-                            className="h-8 text-xs"
+                            className="flex-1 h-8 text-xs"
                           >
                             Refill
                           </Button>
                           <Button
                             type="button"
                             size="sm"
-                            variant={cylinderType === 'package' ? 'default' : 'outline'}
+                            variant={cylinderType === 'package' ? 'default' : 'ghost'}
                             onClick={() => setCylinderType('package')}
-                            className="h-8 text-xs"
+                            className={`flex-1 h-8 text-xs ${cylinderType === 'package' ? 'bg-green-600 hover:bg-green-700' : ''}`}
                           >
                             Package
                           </Button>
@@ -1304,24 +1363,24 @@ export const POSModule = () => {
                           {cylinderType === 'refill' ? 'Customer returns empty' : 'New connection (deposit)'}
                         </p>
                       </div>
-                      <div className="space-y-1.5">
+                      <div className="space-y-2">
                         <Label className="text-xs font-medium">Sale Type</Label>
-                        <div className="grid grid-cols-2 gap-1">
+                        <div className="flex rounded-lg bg-muted/50 p-1">
                           <Button
                             type="button"
                             size="sm"
-                            variant={saleType === 'retail' ? 'default' : 'outline'}
+                            variant={saleType === 'retail' ? 'default' : 'ghost'}
                             onClick={() => setSaleType('retail')}
-                            className="h-8 text-xs"
+                            className="flex-1 h-8 text-xs"
                           >
                             Retail
                           </Button>
                           <Button
                             type="button"
                             size="sm"
-                            variant={saleType === 'wholesale' ? 'secondary' : 'outline'}
+                            variant={saleType === 'wholesale' ? 'secondary' : 'ghost'}
                             onClick={() => setSaleType('wholesale')}
-                            className="h-8 text-xs"
+                            className={`flex-1 h-8 text-xs ${saleType === 'wholesale' ? 'bg-purple-600 hover:bg-purple-700 text-white' : ''}`}
                           >
                             Wholesale
                           </Button>
@@ -1332,48 +1391,65 @@ export const POSModule = () => {
                       </div>
                     </div>
 
-                    {/* Mouth Size & Weight Selection */}
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="space-y-1.5">
-                        <Label className="text-xs font-medium">Mouth Size</Label>
-                        <Select value={mouthSize} onValueChange={(val) => {
-                          setMouthSize(val);
-                          setWeight("");
-                          setSellingBrand("");
-                        }}>
-                          <SelectTrigger className="h-9 text-xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {mouthSizes.map(s => (
-                              <SelectItem key={s} value={s}>{s}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                    {/* Mouth Size Selection - Matching Inventory Module Style */}
+                    <div className="space-y-2">
+                      <Label className="text-xs font-medium">Mouth Size</Label>
+                      <div className="flex rounded-lg bg-muted/50 p-1 w-full sm:w-auto">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={mouthSize === "22mm" ? "default" : "ghost"}
+                          className="flex-1 sm:flex-none h-8"
+                          onClick={() => {
+                            setMouthSize("22mm");
+                            setWeight("");
+                            setSellingBrand("");
+                          }}
+                        >
+                          22mm
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={mouthSize === "20mm" ? "default" : "ghost"}
+                          className={`flex-1 sm:flex-none h-8 ${mouthSize === "20mm" ? "bg-cyan-500 hover:bg-cyan-600 text-white" : ""}`}
+                          onClick={() => {
+                            setMouthSize("20mm");
+                            setWeight("");
+                            setSellingBrand("");
+                          }}
+                        >
+                          20mm
+                        </Button>
                       </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs font-medium">Weight</Label>
-                        <Select value={weight} onValueChange={(val) => {
-                          setWeight(val);
-                          setSellingBrand("");
-                        }}>
-                          <SelectTrigger className="h-9 text-xs">
-                            <SelectValue placeholder="Select" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {(mouthSize === "22mm" ? WEIGHT_OPTIONS_22MM : WEIGHT_OPTIONS_20MM).map(w => (
-                              <SelectItem key={w} value={w}>{w}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                    </div>
+
+                    {/* Weight Selection - Matching Inventory Style */}
+                    <div className="space-y-2">
+                      <Label className="text-xs font-medium">Weight</Label>
+                      <div className="flex flex-wrap gap-2">
+                        {(mouthSize === "22mm" ? WEIGHT_OPTIONS_22MM : WEIGHT_OPTIONS_20MM).map(w => (
+                          <Button
+                            key={w}
+                            variant={weight === w ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => {
+                              setWeight(w);
+                              setSellingBrand("");
+                            }}
+                            className={`text-xs ${weight === w ? "bg-primary text-primary-foreground" : ""}`}
+                          >
+                            {w}
+                          </Button>
+                        ))}
                       </div>
                     </div>
 
                     {/* Selling Brand */}
-                    <div className="space-y-1.5">
+                    <div className="space-y-2">
                       <Label className="text-xs font-medium">Selling Brand</Label>
                       <Select value={sellingBrand} onValueChange={setSellingBrand}>
-                        <SelectTrigger className="h-9 text-xs">
+                        <SelectTrigger className="h-10 text-sm">
                           <SelectValue placeholder="Select brand to sell..." />
                         </SelectTrigger>
                         <SelectContent>
@@ -1382,7 +1458,7 @@ export const POSModule = () => {
                             return (
                               <SelectItem key={brand.id} value={brand.id} disabled={stock === 0}>
                                 <div className="flex items-center gap-2">
-                                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: brand.color }} />
+                                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: brand.color }} />
                                   <span>{brand.name}</span>
                                   <Badge variant={stock > 0 ? "secondary" : "destructive"} className="text-[10px] ml-auto">
                                     {stock === 0 ? 'Out' : stock}
@@ -1490,15 +1566,18 @@ export const POSModule = () => {
 
               {/* Stove Tab */}
               <TabsContent value="stove">
-                <Card className="border-0 shadow-sm">
-                  <CardHeader className="p-3 pb-2">
-                    <CardTitle className="text-sm sm:text-base">Gas Stove</CardTitle>
+                <Card className="border-border hover:shadow-md transition-shadow">
+                  <CardHeader className="p-3 sm:p-4 pb-2 sm:pb-3">
+                    <CardTitle className="text-sm sm:text-base flex items-center gap-2">
+                      <Fuel className="h-4 w-4 sm:h-5 sm:w-5 text-orange-500" />
+                      Gas Stove
+                    </CardTitle>
                   </CardHeader>
-                  <CardContent className="p-3 pt-0 space-y-3">
-                    <div className="space-y-1.5">
+                  <CardContent className="p-3 sm:p-4 pt-0 space-y-4">
+                    <div className="space-y-2">
                       <Label className="text-xs font-medium">Select Stove</Label>
                       <Select value={selectedStove} onValueChange={setSelectedStove}>
-                        <SelectTrigger className="h-9 text-xs">
+                        <SelectTrigger className="h-10 text-sm">
                           <SelectValue placeholder="Select stove..." />
                         </SelectTrigger>
                         <SelectContent>
@@ -1515,19 +1594,19 @@ export const POSModule = () => {
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="space-y-1.5">
+                    <div className="space-y-2">
                       <Label className="text-xs font-medium">Quantity</Label>
                       <Input 
                         type="number" 
                         value={stoveQuantity} 
                         onChange={(e) => setStoveQuantity(e.target.value)}
                         min="1"
-                        className="h-9 text-xs"
+                        className="h-10 text-sm"
                       />
                     </div>
                     <Button 
                       onClick={addStoveToSale} 
-                      className="w-full h-9 text-sm"
+                      className="w-full h-10 text-sm bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
                       disabled={!selectedStove || getStoveStock(selectedStove) === 0}
                     >
                       <Plus className="h-4 w-4 mr-1" />
@@ -1539,15 +1618,18 @@ export const POSModule = () => {
 
               {/* Regulator Tab */}
               <TabsContent value="regulator">
-                <Card className="border-0 shadow-sm">
-                  <CardHeader className="p-3 pb-2">
-                    <CardTitle className="text-sm sm:text-base">Regulator</CardTitle>
+                <Card className="border-border hover:shadow-md transition-shadow">
+                  <CardHeader className="p-3 sm:p-4 pb-2 sm:pb-3">
+                    <CardTitle className="text-sm sm:text-base flex items-center gap-2">
+                      <Truck className="h-4 w-4 sm:h-5 sm:w-5 text-violet-500" />
+                      Regulator
+                    </CardTitle>
                   </CardHeader>
-                  <CardContent className="p-3 pt-0 space-y-3">
-                    <div className="space-y-1.5">
+                  <CardContent className="p-3 sm:p-4 pt-0 space-y-4">
+                    <div className="space-y-2">
                       <Label className="text-xs font-medium">Select Regulator</Label>
                       <Select value={selectedRegulator} onValueChange={setSelectedRegulator}>
-                        <SelectTrigger className="h-9 text-xs">
+                        <SelectTrigger className="h-10 text-sm">
                           <SelectValue placeholder="Select regulator..." />
                         </SelectTrigger>
                         <SelectContent>
@@ -1564,30 +1646,30 @@ export const POSModule = () => {
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="space-y-1.5">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
                         <Label className="text-xs font-medium">Price</Label>
                         <Input 
                           type="number" 
                           value={regulatorPrice} 
                           onChange={(e) => setRegulatorPrice(e.target.value)}
-                          className="h-9 text-xs"
+                          className="h-10 text-sm"
                         />
                       </div>
-                      <div className="space-y-1.5">
+                      <div className="space-y-2">
                         <Label className="text-xs font-medium">Quantity</Label>
                         <Input 
                           type="number" 
                           value={regulatorQuantity} 
                           onChange={(e) => setRegulatorQuantity(e.target.value)}
                           min="1"
-                          className="h-9 text-xs"
+                          className="h-10 text-sm"
                         />
                       </div>
                     </div>
                     <Button 
                       onClick={addRegulatorToSale} 
-                      className="w-full h-9 text-sm"
+                      className="w-full h-10 text-sm bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700"
                       disabled={!selectedRegulator || getRegulatorStock(selectedRegulator) === 0}
                     >
                       <Plus className="h-4 w-4 mr-1" />
@@ -1599,45 +1681,45 @@ export const POSModule = () => {
 
               {/* Custom Tab */}
               <TabsContent value="custom">
-                <Card className="border-0 shadow-sm">
-                  <CardHeader className="p-3 pb-2">
+                <Card className="border-border hover:shadow-md transition-shadow">
+                  <CardHeader className="p-3 sm:p-4 pb-2 sm:pb-3">
                     <CardTitle className="text-sm sm:text-base">Custom Item</CardTitle>
-                    <CardDescription className="text-xs">Service charges, delivery fees, etc.</CardDescription>
+                    <p className="text-xs text-muted-foreground">Service charges, delivery fees, etc.</p>
                   </CardHeader>
-                  <CardContent className="p-3 pt-0 space-y-3">
-                    <div className="space-y-1.5">
+                  <CardContent className="p-3 sm:p-4 pt-0 space-y-4">
+                    <div className="space-y-2">
                       <Label className="text-xs font-medium">Item Name</Label>
                       <Input 
                         value={customProductName} 
                         onChange={(e) => setCustomProductName(e.target.value)}
                         placeholder="e.g., Delivery Fee"
-                        className="h-9 text-xs"
+                        className="h-10 text-sm"
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="space-y-1.5">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
                         <Label className="text-xs font-medium">Price</Label>
                         <Input 
                           type="number" 
                           value={customProductPrice} 
                           onChange={(e) => setCustomProductPrice(e.target.value)}
-                          className="h-9 text-xs"
+                          className="h-10 text-sm"
                         />
                       </div>
-                      <div className="space-y-1.5">
+                      <div className="space-y-2">
                         <Label className="text-xs font-medium">Quantity</Label>
                         <Input 
                           type="number" 
                           value={customProductQuantity} 
                           onChange={(e) => setCustomProductQuantity(e.target.value)}
                           min="1"
-                          className="h-9 text-xs"
+                          className="h-10 text-sm"
                         />
                       </div>
                     </div>
                     <Button 
                       onClick={addCustomProductToSale} 
-                      className="w-full h-9 text-sm"
+                      className="w-full h-10 text-sm"
                       disabled={!customProductName.trim()}
                     >
                       <Plus className="h-4 w-4 mr-1" />
@@ -1648,17 +1730,21 @@ export const POSModule = () => {
               </TabsContent>
             </Tabs>
 
-            {/* Cart */}
-            <Card className="border-0 shadow-sm">
-              <CardHeader className="p-3 pb-2">
+            {/* Cart - Updated Design */}
+            <Card className="border-border hover:shadow-md transition-shadow">
+              <CardHeader className="p-3 sm:p-4 pb-2 sm:pb-3">
                 <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
-                  <ShoppingCart className="h-4 w-4" />
+                  <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
                   Cart ({saleItems.length})
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-3 pt-0">
+              <CardContent className="p-3 sm:p-4 pt-0">
                 {saleItems.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-6 text-xs">No items added</p>
+                  <div className="text-center py-8">
+                    <ShoppingCart className="h-10 w-10 mx-auto text-muted-foreground/30 mb-2" />
+                    <p className="text-muted-foreground text-sm">No items added</p>
+                    <p className="text-xs text-muted-foreground/70 mt-1">Select products to add</p>
+                  </div>
                 ) : (
                   <ScrollArea className="max-h-[200px] sm:max-h-[280px]">
                     <div className="space-y-2">
