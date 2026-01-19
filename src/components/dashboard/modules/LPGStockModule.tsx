@@ -3,14 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -21,6 +14,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   Search,
   Plus,
@@ -31,7 +25,8 @@ import {
   Cylinder,
   Truck,
   ArrowUpFromLine,
-  ArrowDownToLine
+  ArrowDownToLine,
+  RefreshCw
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -53,10 +48,6 @@ interface LPGBrand {
   updated_at: string;
 }
 
-interface LPGStockModuleProps {
-  size?: "22mm" | "20mm";
-}
-
 // Cylinder weight options
 const WEIGHT_OPTIONS_22MM = [
   { value: "5.5kg", label: "5.5 KG", shortLabel: "5.5" },
@@ -76,11 +67,12 @@ const WEIGHT_OPTIONS_20MM = [
   { value: "35kg", label: "35 KG", shortLabel: "35" },
 ];
 
-export const LPGStockModule = ({ size = "22mm" }: LPGStockModuleProps) => {
+export const LPGStockModule = () => {
+  const [sizeTab, setSizeTab] = useState<"22mm" | "20mm">("22mm");
+  const [selectedWeight, setSelectedWeight] = useState("12kg");
   const [brands, setBrands] = useState<LPGBrand[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedWeight, setSelectedWeight] = useState("12kg");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isSendToPlantOpen, setIsSendToPlantOpen] = useState(false);
   const [isReceiveFromPlantOpen, setIsReceiveFromPlantOpen] = useState(false);
@@ -96,18 +88,30 @@ export const LPGStockModule = ({ size = "22mm" }: LPGStockModuleProps) => {
   const [receiveQuantity, setReceiveQuantity] = useState(0);
   const [receiveType, setReceiveType] = useState<'refill' | 'package'>('refill');
   
-  const weightOptions = size === "22mm" ? WEIGHT_OPTIONS_22MM : WEIGHT_OPTIONS_20MM;
+  const weightOptions = sizeTab === "22mm" ? WEIGHT_OPTIONS_22MM : WEIGHT_OPTIONS_20MM;
 
   const [newBrand, setNewBrand] = useState({
     name: "",
     color: "#22c55e",
-    size: size,
+    size: sizeTab,
     weight: selectedWeight,
     package_cylinder: 0,
     refill_cylinder: 0,
     empty_cylinder: 0,
     problem_cylinder: 0,
   });
+
+  // Update weight options when size changes
+  useEffect(() => {
+    const defaultWeight = sizeTab === "22mm" ? "12kg" : "12kg";
+    setSelectedWeight(defaultWeight);
+    setNewBrand(prev => ({ ...prev, size: sizeTab, weight: defaultWeight }));
+  }, [sizeTab]);
+
+  // Update newBrand weight when selectedWeight changes
+  useEffect(() => {
+    setNewBrand(prev => ({ ...prev, weight: selectedWeight }));
+  }, [selectedWeight]);
 
   // Fetch LPG brands filtered by size and weight
   const fetchBrands = useCallback(async () => {
@@ -117,7 +121,7 @@ export const LPGStockModule = ({ size = "22mm" }: LPGStockModuleProps) => {
         .from("lpg_brands")
         .select("*")
         .eq("is_active", true)
-        .eq("size", size)
+        .eq("size", sizeTab)
         .eq("weight", selectedWeight)
         .order("created_at", { ascending: true });
 
@@ -129,16 +133,11 @@ export const LPGStockModule = ({ size = "22mm" }: LPGStockModuleProps) => {
     } finally {
       setLoading(false);
     }
-  }, [size, selectedWeight]);
+  }, [sizeTab, selectedWeight]);
 
   useEffect(() => {
     fetchBrands();
   }, [fetchBrands]);
-
-  // Update newBrand weight when selectedWeight changes
-  useEffect(() => {
-    setNewBrand(prev => ({ ...prev, weight: selectedWeight }));
-  }, [selectedWeight]);
 
   // Filter brands based on search
   const filteredBrands = brands.filter(brand =>
@@ -161,7 +160,7 @@ export const LPGStockModule = ({ size = "22mm" }: LPGStockModuleProps) => {
   const getStatus = (brand: LPGBrand) => {
     const total = brand.package_cylinder + brand.refill_cylinder;
     if (total === 0) return { label: "Out of Stock", variant: "destructive" as const, color: "bg-red-500" };
-    if (total < 30) return { label: "Low Stock", variant: "warning" as const, color: "bg-yellow-500" };
+    if (total < 10) return { label: "Low Stock", variant: "warning" as const, color: "bg-yellow-500" };
     return { label: "In Stock", variant: "success" as const, color: "bg-green-500" };
   };
 
@@ -198,7 +197,7 @@ export const LPGStockModule = ({ size = "22mm" }: LPGStockModuleProps) => {
       setNewBrand({
         name: "",
         color: "#22c55e",
-        size: size,
+        size: sizeTab,
         weight: selectedWeight,
         package_cylinder: 0,
         refill_cylinder: 0,
@@ -229,6 +228,7 @@ export const LPGStockModule = ({ size = "22mm" }: LPGStockModuleProps) => {
         )
       );
       setEditingCell(null);
+      toast.success("Updated successfully");
     } catch (error: any) {
       toast.error("Failed to update");
       console.error(error);
@@ -325,17 +325,21 @@ export const LPGStockModule = ({ size = "22mm" }: LPGStockModuleProps) => {
     }
   };
 
-  // Editable cell component
-  const EditableCell = ({ 
+  // Editable Stock Cell Component
+  const EditableStockCell = ({ 
     value, 
     brandId, 
     field,
-    isProblem = false 
+    icon: Icon,
+    label,
+    bgColor = "bg-muted"
   }: { 
     value: number; 
     brandId: string; 
     field: string;
-    isProblem?: boolean;
+    icon: React.ElementType;
+    label: string;
+    bgColor?: string;
   }) => {
     const [localValue, setLocalValue] = useState(value);
     const isEditing = editingCell?.id === brandId && editingCell?.field === field;
@@ -346,40 +350,136 @@ export const LPGStockModule = ({ size = "22mm" }: LPGStockModuleProps) => {
 
     if (isEditing) {
       return (
-        <Input
-          type="number"
-          value={localValue}
-          onChange={(e) => setLocalValue(parseInt(e.target.value) || 0)}
-          onBlur={() => handleUpdateCylinder(brandId, field, localValue)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              handleUpdateCylinder(brandId, field, localValue);
-            }
-            if (e.key === "Escape") {
-              setEditingCell(null);
-              setLocalValue(value);
-            }
-          }}
-          className="w-20 h-8 text-center bg-background"
-          autoFocus
-          min={0}
-        />
+        <div className="flex flex-col gap-1">
+          <span className="text-[10px] sm:text-xs text-muted-foreground flex items-center gap-1">
+            <Icon className="h-3 w-3" />
+            {label}
+          </span>
+          <Input
+            type="number"
+            value={localValue}
+            onChange={(e) => setLocalValue(parseInt(e.target.value) || 0)}
+            onBlur={() => handleUpdateCylinder(brandId, field, localValue)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                handleUpdateCylinder(brandId, field, localValue);
+              }
+              if (e.key === "Escape") {
+                setEditingCell(null);
+                setLocalValue(value);
+              }
+            }}
+            className="h-8 w-full text-center font-medium"
+            autoFocus
+            min={0}
+          />
+        </div>
       );
     }
 
     return (
-      <div
-        onClick={() => setEditingCell({ id: brandId, field })}
-        className={`
-          px-3 py-2 rounded-md cursor-pointer transition-colors min-w-[60px] text-center font-medium
-          ${isProblem 
-            ? "bg-destructive/20 text-destructive hover:bg-destructive/30" 
-            : "bg-muted hover:bg-muted/80"
-          }
-        `}
-      >
-        {value}
+      <div className="flex flex-col gap-1">
+        <span className="text-[10px] sm:text-xs text-muted-foreground flex items-center gap-1">
+          <Icon className="h-3 w-3" />
+          {label}
+        </span>
+        <div
+          onClick={() => setEditingCell({ id: brandId, field })}
+          className={`
+            px-2 sm:px-3 py-2 rounded-md cursor-pointer transition-all text-center font-medium text-sm sm:text-base
+            ${bgColor} hover:opacity-80
+          `}
+        >
+          {value}
+        </div>
       </div>
+    );
+  };
+
+  // Brand Stock Card Component
+  const BrandStockCard = ({ brand }: { brand: LPGBrand }) => {
+    const status = getStatus(brand);
+
+    return (
+      <Card className="border-border hover:shadow-md transition-shadow">
+        <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-6 pt-3 sm:pt-4">
+          <div className="flex items-center justify-between gap-2">
+            <CardTitle className="flex items-center gap-2 text-sm sm:text-lg">
+              <span 
+                className="h-3 w-3 sm:h-4 sm:w-4 rounded-full flex-shrink-0" 
+                style={{ backgroundColor: brand.color }}
+              />
+              <span className="truncate">{brand.name}</span>
+            </CardTitle>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Badge className={`${status.color} text-white text-[10px] sm:text-xs border-0`}>
+                {status.label}
+              </Badge>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 text-destructive hover:text-destructive"
+                onClick={() => handleDeleteBrand(brand.id)}
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            </div>
+          </div>
+          <Badge variant="outline" className="text-[10px] sm:text-xs w-fit mt-1">
+            {selectedWeight}
+          </Badge>
+        </CardHeader>
+        <CardContent className="space-y-3 px-3 sm:px-6 pb-3 sm:pb-4">
+          {/* Stock Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <EditableStockCell 
+              value={brand.package_cylinder} 
+              brandId={brand.id}
+              field="package_cylinder"
+              icon={Package}
+              label="Package"
+              bgColor="bg-green-100 dark:bg-green-900/30"
+            />
+            <EditableStockCell 
+              value={brand.refill_cylinder} 
+              brandId={brand.id}
+              field="refill_cylinder"
+              icon={Cylinder}
+              label="Refill"
+              bgColor="bg-blue-100 dark:bg-blue-900/30"
+            />
+            <EditableStockCell 
+              value={brand.empty_cylinder} 
+              brandId={brand.id}
+              field="empty_cylinder"
+              icon={Package}
+              label="Empty"
+              bgColor="bg-gray-100 dark:bg-gray-800/50"
+            />
+            <EditableStockCell 
+              value={brand.problem_cylinder} 
+              brandId={brand.id}
+              field="problem_cylinder"
+              icon={AlertTriangle}
+              label="Problem"
+              bgColor="bg-red-100 dark:bg-red-900/30"
+            />
+          </div>
+
+          {/* In-Transit Row (if any) */}
+          {(brand.in_transit_cylinder || 0) > 0 && (
+            <div className="flex items-center justify-between p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded-md">
+              <span className="text-xs sm:text-sm flex items-center gap-2">
+                <Truck className="h-3 w-3 sm:h-4 sm:w-4 text-yellow-600" />
+                In Transit
+              </span>
+              <Badge variant="outline" className="bg-yellow-500/20 text-yellow-700 dark:text-yellow-300">
+                {brand.in_transit_cylinder}
+              </Badge>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     );
   };
 
@@ -393,32 +493,156 @@ export const LPGStockModule = ({ size = "22mm" }: LPGStockModuleProps) => {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      {/* Header - Mobile optimized */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
         <div>
           <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground flex items-center gap-2 sm:gap-3">
             <Cylinder className="h-5 w-5 sm:h-7 sm:w-7 text-primary" />
-            LPG Stock ({size})
+            LPG Cylinder Stock
           </h2>
-          <p className="text-xs sm:text-sm text-muted-foreground mt-1">Manage your cylinder inventory</p>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+            Click on any count to edit. Manage your cylinder inventory.
+          </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={fetchBrands} className="h-8 sm:h-9 text-xs sm:text-sm">
-            <Loader2 className={`h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 ${loading ? 'animate-spin' : 'hidden'}`} />
-            Refresh
-          </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Send to Plant */}
+          <Dialog open={isSendToPlantOpen} onOpenChange={setIsSendToPlantOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm" className="h-8 sm:h-9 text-xs sm:text-sm gap-1">
+                <ArrowUpFromLine className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Send to Plant</span>
+                <span className="sm:hidden">Send</span>
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md mx-4">
+              <DialogHeader>
+                <DialogTitle>Send Cylinders to Plant</DialogTitle>
+                <DialogDescription>
+                  Move empty cylinders to in-transit for refilling.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label>Select Brand</Label>
+                  <Select value={sendToBrand} onValueChange={setSendToBrand}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="Choose brand" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {brands.filter(b => b.empty_cylinder > 0).map(brand => (
+                        <SelectItem key={brand.id} value={brand.id}>
+                          <div className="flex items-center gap-2">
+                            <span className="h-3 w-3 rounded-full" style={{ backgroundColor: brand.color }} />
+                            {brand.name} (Empty: {brand.empty_cylinder})
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Quantity</Label>
+                  <Input
+                    type="number"
+                    value={sendQuantity}
+                    onChange={(e) => setSendQuantity(parseInt(e.target.value) || 0)}
+                    min={1}
+                    className="h-9"
+                  />
+                </div>
+              </div>
+              <DialogFooter className="gap-2">
+                <Button variant="outline" onClick={() => setIsSendToPlantOpen(false)}>Cancel</Button>
+                <Button onClick={handleSendToPlant} disabled={isSubmitting}>
+                  {isSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                  Send
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Receive from Plant */}
+          <Dialog open={isReceiveFromPlantOpen} onOpenChange={setIsReceiveFromPlantOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm" className="h-8 sm:h-9 text-xs sm:text-sm gap-1">
+                <ArrowDownToLine className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Receive</span>
+                <span className="sm:hidden">Rcv</span>
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md mx-4">
+              <DialogHeader>
+                <DialogTitle>Receive from Plant</DialogTitle>
+                <DialogDescription>
+                  Receive cylinders from in-transit to refill or package.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label>Select Brand</Label>
+                  <Select value={receiveFromBrand} onValueChange={setReceiveFromBrand}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="Choose brand" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {brands.filter(b => (b.in_transit_cylinder || 0) > 0).map(brand => (
+                        <SelectItem key={brand.id} value={brand.id}>
+                          <div className="flex items-center gap-2">
+                            <span className="h-3 w-3 rounded-full" style={{ backgroundColor: brand.color }} />
+                            {brand.name} (Transit: {brand.in_transit_cylinder})
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Receive As</Label>
+                  <Select value={receiveType} onValueChange={(v) => setReceiveType(v as 'refill' | 'package')}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="refill">Refill</SelectItem>
+                      <SelectItem value="package">Package (New)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Quantity</Label>
+                  <Input
+                    type="number"
+                    value={receiveQuantity}
+                    onChange={(e) => setReceiveQuantity(parseInt(e.target.value) || 0)}
+                    min={1}
+                    className="h-9"
+                  />
+                </div>
+              </div>
+              <DialogFooter className="gap-2">
+                <Button variant="outline" onClick={() => setIsReceiveFromPlantOpen(false)}>Cancel</Button>
+                <Button onClick={handleReceiveFromPlant} disabled={isSubmitting}>
+                  {isSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                  Receive
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Add Brand */}
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
-              <Button size="sm" className="bg-primary hover:bg-primary/90 h-8 sm:h-9 text-xs sm:text-sm">
-                <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                New Brand
+              <Button size="sm" className="bg-primary hover:bg-primary/90 h-8 sm:h-9 text-xs sm:text-sm gap-1">
+                <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">New Brand</span>
+                <span className="sm:hidden">Add</span>
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto mx-4">
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
                   Add New LPG Brand
-                  <Badge variant="outline" className="text-xs">{selectedWeight}</Badge>
+                  <Badge variant="outline" className="text-xs">{sizeTab} - {selectedWeight}</Badge>
                 </DialogTitle>
                 <DialogDescription className="text-xs sm:text-sm">
                   Enter the brand details for {selectedWeight} cylinders.
@@ -506,283 +730,166 @@ export const LPGStockModule = ({ size = "22mm" }: LPGStockModuleProps) => {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+
+          <Button variant="ghost" size="icon" onClick={fetchBrands} className="h-8 w-8 sm:h-9 sm:w-9">
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          </Button>
         </div>
       </div>
 
-      {/* Weight Selection Pills - Mobile scrollable */}
-      <Card className="border-border bg-gradient-to-r from-primary/5 via-card to-accent/5">
-        <CardContent className="p-3 sm:p-4">
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center gap-2">
-              <span className="text-xs sm:text-sm font-medium text-muted-foreground whitespace-nowrap">Weight:</span>
-              <Badge className="bg-primary/10 text-primary border-primary/20 text-xs">{size}</Badge>
-            </div>
-            <div className="flex gap-1.5 sm:gap-2 overflow-x-auto pb-1 -mx-1 px-1 no-scrollbar">
-              {weightOptions.map((option) => (
+      {/* Size Tabs (22mm / 20mm) */}
+      <Tabs value={sizeTab} onValueChange={(v) => setSizeTab(v as "22mm" | "20mm")} className="w-full">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <TabsList className="grid w-full grid-cols-2 sm:w-auto sm:inline-grid h-9">
+            <TabsTrigger value="22mm" className="text-xs sm:text-sm h-8 px-4 sm:px-6">22mm</TabsTrigger>
+            <TabsTrigger value="20mm" className="text-xs sm:text-sm h-8 px-4 sm:px-6">20mm</TabsTrigger>
+          </TabsList>
+          
+          {/* Weight Selector */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+            <span className="text-xs text-muted-foreground whitespace-nowrap">Weight:</span>
+            <div className="flex gap-1">
+              {weightOptions.map(option => (
                 <Button
                   key={option.value}
                   variant={selectedWeight === option.value ? "default" : "outline"}
                   size="sm"
-                  onClick={() => setSelectedWeight(option.value)}
-                  className={`transition-all duration-200 flex-shrink-0 h-8 sm:h-9 px-2.5 sm:px-3 text-xs sm:text-sm ${
+                  className={`h-7 px-2 sm:px-3 text-xs whitespace-nowrap transition-all ${
                     selectedWeight === option.value 
-                      ? "bg-primary text-primary-foreground shadow-md" 
-                      : "hover:bg-primary/10 hover:border-primary/50"
+                      ? "bg-primary text-primary-foreground" 
+                      : "hover:bg-primary/10"
                   }`}
+                  onClick={() => setSelectedWeight(option.value)}
                 >
-                  <span className="sm:hidden">{option.shortLabel}</span>
-                  <span className="hidden sm:inline">{option.label}</span>
+                  {option.shortLabel}
                 </Button>
               ))}
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
 
-      {/* Search - Mobile optimized */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search brands..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-9 bg-muted/50 h-10"
-        />
-      </div>
-
-      {/* Summary Cards - Mobile 2x2 grid */}
-      <div className="grid grid-cols-2 gap-2 sm:gap-4">
-        <Card className="bg-gradient-to-br from-green-500/10 via-card to-card border-green-500/20">
-          <CardContent className="p-3 sm:p-4 lg:p-6">
-            <div className="flex items-center justify-between gap-2">
-              <div className="space-y-0.5 sm:space-y-1 min-w-0">
-                <p className="text-[10px] sm:text-xs lg:text-sm text-muted-foreground font-medium truncate">Package</p>
-                <p className="text-lg sm:text-xl lg:text-3xl font-bold text-foreground">{totals.package}</p>
-                <p className="text-[10px] sm:text-xs text-muted-foreground hidden sm:block">New with cylinder</p>
-              </div>
-              <div className="h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0">
-                <Package className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 text-green-500" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="bg-gradient-to-br from-blue-500/10 via-card to-card border-blue-500/20">
-          <CardContent className="p-3 sm:p-4 lg:p-6">
-            <div className="flex items-center justify-between gap-2">
-              <div className="space-y-0.5 sm:space-y-1 min-w-0">
-                <p className="text-[10px] sm:text-xs lg:text-sm text-muted-foreground font-medium truncate">Refill</p>
-                <p className="text-lg sm:text-xl lg:text-3xl font-bold text-foreground">{totals.refill}</p>
-                <p className="text-[10px] sm:text-xs text-muted-foreground hidden sm:block">Ready for sale</p>
-              </div>
-              <div className="h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0">
-                <Cylinder className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 text-blue-500" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="border-border">
-          <CardContent className="p-4 sm:p-6">
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <p className="text-xs sm:text-sm text-muted-foreground font-medium">Empty Cylinders</p>
-                <p className="text-xl sm:text-3xl font-bold text-foreground">{totals.empty.toLocaleString()}</p>
-                <p className="text-xs text-muted-foreground">Need refilling</p>
-              </div>
-              <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
-                <Package className="h-6 w-6 text-muted-foreground" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="bg-gradient-to-br from-destructive/10 via-card to-card border-destructive/20">
-          <CardContent className="p-4 sm:p-6">
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <p className="text-xs sm:text-sm text-muted-foreground font-medium">Problem Cylinders</p>
-                <p className="text-xl sm:text-3xl font-bold text-destructive">{totals.problem.toLocaleString()}</p>
-                <p className="text-xs text-muted-foreground">Need attention</p>
-              </div>
-              <div className="h-12 w-12 rounded-full bg-destructive/20 flex items-center justify-center">
-                <AlertTriangle className="h-6 w-6 text-destructive" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Stock - Mobile Cards + Desktop Table */}
-      <Card className="border-0 shadow-sm">
-        <CardContent className="p-3 sm:p-6">
-          {/* Mobile Cards View */}
-          <div className="sm:hidden space-y-3">
-            {filteredBrands.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No brands found. Add your first LPG brand.
-              </div>
-            ) : (
-              filteredBrands.map((brand, index) => {
-                const status = getStatus(brand);
-                return (
-                  <Card key={brand.id} className="p-3 border border-border/50">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="w-2 h-6 rounded-full"
-                          style={{ backgroundColor: brand.color }}
-                        />
-                        <span className="font-semibold text-sm">{brand.name}</span>
-                      </div>
-                      <Badge className={`${status.color} hover:opacity-90 text-white border-0 text-[10px]`}>
-                        {status.label}
-                      </Badge>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div className="flex justify-between p-2 bg-muted/30 rounded-lg">
-                        <span className="text-muted-foreground">Package</span>
-                        <span className="font-semibold" onClick={() => setEditingCell({ id: brand.id, field: 'package_cylinder' })}>
-                          {brand.package_cylinder}
-                        </span>
-                      </div>
-                      <div className="flex justify-between p-2 bg-muted/30 rounded-lg">
-                        <span className="text-muted-foreground">Refill</span>
-                        <span className="font-semibold" onClick={() => setEditingCell({ id: brand.id, field: 'refill_cylinder' })}>
-                          {brand.refill_cylinder}
-                        </span>
-                      </div>
-                      <div className="flex justify-between p-2 bg-muted/30 rounded-lg">
-                        <span className="text-muted-foreground">Empty</span>
-                        <span className="font-semibold" onClick={() => setEditingCell({ id: brand.id, field: 'empty_cylinder' })}>
-                          {brand.empty_cylinder}
-                        </span>
-                      </div>
-                      <div className="flex justify-between p-2 bg-destructive/10 rounded-lg">
-                        <span className="text-muted-foreground">Problem</span>
-                        <span className="font-semibold text-destructive" onClick={() => setEditingCell({ id: brand.id, field: 'problem_cylinder' })}>
-                          {brand.problem_cylinder}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex justify-end mt-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteBrand(brand.id)}
-                        className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </Card>
-                );
-              })
-            )}
-          </div>
-
-          {/* Desktop Table View */}
-          <div className="hidden sm:block overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/50 hover:bg-muted/50">
-                  <TableHead className="w-16 text-muted-foreground">Sl. NO.</TableHead>
-                  <TableHead className="text-muted-foreground">Brand</TableHead>
-                  <TableHead className="text-muted-foreground">Status</TableHead>
-                  <TableHead className="text-center text-muted-foreground">Package</TableHead>
-                  <TableHead className="text-center text-muted-foreground">Refill</TableHead>
-                  <TableHead className="text-center text-muted-foreground">Empty</TableHead>
-                  <TableHead className="text-center text-muted-foreground">Problem</TableHead>
-                  <TableHead className="text-center text-muted-foreground">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredBrands.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                      No brands found. Add your first LPG brand.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredBrands.map((brand, index) => {
-                    const status = getStatus(brand);
-                    return (
-                      <TableRow key={brand.id} className="border-b border-border/50">
-                        <TableCell className="font-medium text-muted-foreground">
-                          {String(index + 1).padStart(2, "0")}.
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <div
-                              className="w-3 h-8 rounded-full"
-                              style={{ backgroundColor: brand.color }}
-                            />
-                            <span className="font-medium text-foreground">{brand.name}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge 
-                            className={`${status.color} hover:opacity-90 text-white border-0`}
-                          >
-                            {status.label}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <div className="flex justify-center">
-                            <EditableCell
-                              value={brand.package_cylinder}
-                              brandId={brand.id}
-                              field="package_cylinder"
-                            />
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <div className="flex justify-center">
-                            <EditableCell
-                              value={brand.refill_cylinder}
-                              brandId={brand.id}
-                              field="refill_cylinder"
-                            />
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <div className="flex justify-center">
-                            <EditableCell
-                              value={brand.empty_cylinder}
-                              brandId={brand.id}
-                              field="empty_cylinder"
-                            />
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <div className="flex justify-center">
-                            <EditableCell
-                              value={brand.problem_cylinder}
-                              brandId={brand.id}
-                              field="problem_cylinder"
-                              isProblem
-                            />
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDeleteBrand(brand.id)}
-                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+        {/* Content for both tabs is the same (brands are filtered by state) */}
+        <TabsContent value="22mm" className="space-y-4 mt-4">
+          <StockContent />
+        </TabsContent>
+        <TabsContent value="20mm" className="space-y-4 mt-4">
+          <StockContent />
+        </TabsContent>
+      </Tabs>
     </div>
   );
+
+  // Stock Content Component (reused for both tabs)
+  function StockContent() {
+    return (
+      <>
+        {/* Search */}
+        <div className="relative w-full sm:w-80">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input 
+            placeholder="Search brands..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="pl-10 h-9 bg-muted/50"
+          />
+        </div>
+
+        {/* Summary Cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
+          <Card className="bg-gradient-to-br from-green-500/10 via-card to-card border-green-500/20">
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center justify-between gap-2">
+                <div className="space-y-0.5 min-w-0">
+                  <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">Package</p>
+                  <p className="text-lg sm:text-2xl font-bold text-foreground">{totals.package}</p>
+                </div>
+                <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0">
+                  <Package className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="bg-gradient-to-br from-blue-500/10 via-card to-card border-blue-500/20">
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center justify-between gap-2">
+                <div className="space-y-0.5 min-w-0">
+                  <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">Refill</p>
+                  <p className="text-lg sm:text-2xl font-bold text-foreground">{totals.refill}</p>
+                </div>
+                <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                  <Cylinder className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="border-border">
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center justify-between gap-2">
+                <div className="space-y-0.5 min-w-0">
+                  <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">Empty</p>
+                  <p className="text-lg sm:text-2xl font-bold text-foreground">{totals.empty}</p>
+                </div>
+                <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                  <Package className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="bg-gradient-to-br from-destructive/10 via-card to-card border-destructive/20">
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center justify-between gap-2">
+                <div className="space-y-0.5 min-w-0">
+                  <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">Problem</p>
+                  <p className="text-lg sm:text-2xl font-bold text-destructive">{totals.problem}</p>
+                </div>
+                <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-destructive/20 flex items-center justify-center flex-shrink-0">
+                  <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 text-destructive" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* In Transit Alert */}
+        {totals.inTransit > 0 && (
+          <Card className="bg-yellow-500/10 border-yellow-500/30">
+            <CardContent className="p-3 sm:p-4 flex items-center gap-3">
+              <Truck className="h-5 w-5 text-yellow-600" />
+              <div>
+                <p className="text-sm font-medium">Cylinders In Transit</p>
+                <p className="text-xs text-muted-foreground">{totals.inTransit} cylinders are being transported</p>
+              </div>
+              <Badge variant="outline" className="ml-auto bg-yellow-500/20 text-yellow-700 dark:text-yellow-300">
+                {totals.inTransit}
+              </Badge>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Brand Cards Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
+          {filteredBrands.map(brand => (
+            <BrandStockCard key={brand.id} brand={brand} />
+          ))}
+        </div>
+
+        {filteredBrands.length === 0 && (
+          <Card className="border-dashed">
+            <CardContent className="flex flex-col items-center justify-center py-8 sm:py-12 text-center">
+              <Cylinder className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground/50 mb-3" />
+              <p className="text-sm sm:text-base text-muted-foreground">
+                No brands found for {sizeTab} - {selectedWeight}
+              </p>
+              <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+                Click "New Brand" to add your first LPG brand.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+      </>
+    );
+  }
 };
