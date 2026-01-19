@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { NotificationCenter } from "@/components/notifications/NotificationCenter";
+import { UniversalNotificationCenter } from "@/components/notifications/UniversalNotificationCenter";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Search, Settings, Command } from "lucide-react";
@@ -102,7 +102,7 @@ export const DashboardHeader = ({
           </Button>
 
           {/* Notifications */}
-          <NotificationCenter />
+          <UniversalNotificationCenter userRole={userRole} />
 
           {/* Settings - Hidden on mobile */}
           <Button 
