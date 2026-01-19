@@ -513,188 +513,253 @@ export const ProductPricingModule = () => {
     );
   }
 
+  // Stats for overview
+  const lpgProductsCount = products.filter(p => p.product_type === "lpg").length;
+  const stoveProductsCount = products.filter(p => p.product_type === "stove").length;
+  const regulatorProductsCount = products.filter(p => p.product_type === "regulator").length;
+  const totalProductsCount = products.length;
+
   return (
-    <div className="space-y-4 sm:space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
-        <div>
-          <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground flex items-center gap-2 sm:gap-3">
-            <DollarSign className="h-5 w-5 sm:h-7 sm:w-7 text-primary" />
-            Product Pricing
-          </h2>
-          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-            Click on any price to edit. Changes are saved with the button.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8 sm:h-9 text-xs sm:text-sm gap-1">
-                <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
-                <span className="hidden sm:inline">Add Product</span>
-                <span className="sm:hidden">Add</span>
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto mx-4">
-              <DialogHeader>
-                <DialogTitle className="text-base sm:text-lg">Add New Product</DialogTitle>
-                <DialogDescription className="text-xs sm:text-sm">
-                  Add pricing for a new product.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-3 sm:space-y-4 py-3 sm:py-4">
-                <div className="space-y-2">
-                  <Label className="text-sm">Product Type</Label>
-                  <Select 
-                    value={newProduct.product_type} 
-                    onValueChange={v => setNewProduct({...newProduct, product_type: v})}
-                  >
-                    <SelectTrigger className="h-9">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="lpg">LPG Cylinder</SelectItem>
-                      <SelectItem value="stove">Gas Stove</SelectItem>
-                      <SelectItem value="regulator">Regulator</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                {newProduct.product_type === "lpg" && (
+    <div className="space-y-4 sm:space-y-6 pb-20 sm:pb-6">
+      {/* Header - Matching Inventory Module */}
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+          <div>
+            <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground flex items-center gap-2 sm:gap-3">
+              <DollarSign className="h-5 w-5 sm:h-7 sm:w-7 text-primary" />
+              Product Pricing
+            </h2>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+              Click on any price to edit. Changes are saved with the button.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 sm:h-9 text-xs sm:text-sm gap-1">
+                  <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
+                  <span className="hidden sm:inline">Add Product</span>
+                  <span className="sm:hidden">Add</span>
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto mx-4">
+                <DialogHeader>
+                  <DialogTitle className="text-base sm:text-lg">Add New Product</DialogTitle>
+                  <DialogDescription className="text-xs sm:text-sm">
+                    Add pricing for a new product.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-3 sm:space-y-4 py-3 sm:py-4">
                   <div className="space-y-2">
-                    <Label className="text-sm">Brand</Label>
+                    <Label className="text-sm">Product Type</Label>
                     <Select 
-                      value={newProduct.brand_id} 
-                      onValueChange={v => setNewProduct({...newProduct, brand_id: v})}
-                    >
-                      <SelectTrigger className="h-9">
-                        <SelectValue placeholder="Select brand" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {lpgBrands.map(brand => (
-                          <SelectItem key={brand.id} value={brand.id}>
-                            <div className="flex items-center gap-2">
-                              <span 
-                                className="h-3 w-3 rounded-full" 
-                                style={{ backgroundColor: brand.color }}
-                              />
-                              {brand.name} ({brand.weight})
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-                <div className="space-y-2">
-                  <Label className="text-sm">Product Name</Label>
-                  <Input 
-                    value={newProduct.product_name}
-                    onChange={e => setNewProduct({...newProduct, product_name: e.target.value})}
-                    placeholder="e.g., Bashundhara LP Gas 12kg Refill"
-                    className="h-9"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label className="text-sm">Size</Label>
-                    <Input 
-                      value={newProduct.size || ""}
-                      onChange={e => setNewProduct({...newProduct, size: e.target.value})}
-                      placeholder="12kg"
-                      className="h-9"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-sm">Variant</Label>
-                    <Select 
-                      value={newProduct.variant || "Refill"} 
-                      onValueChange={v => setNewProduct({...newProduct, variant: v})}
+                      value={newProduct.product_type} 
+                      onValueChange={v => setNewProduct({...newProduct, product_type: v})}
                     >
                       <SelectTrigger className="h-9">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Refill">Refill</SelectItem>
-                        <SelectItem value="Package">Package</SelectItem>
+                        <SelectItem value="lpg">LPG Cylinder</SelectItem>
+                        <SelectItem value="stove">Gas Stove</SelectItem>
+                        <SelectItem value="regulator">Regulator</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
+                  {newProduct.product_type === "lpg" && (
+                    <div className="space-y-2">
+                      <Label className="text-sm">Brand</Label>
+                      <Select 
+                        value={newProduct.brand_id} 
+                        onValueChange={v => setNewProduct({...newProduct, brand_id: v})}
+                      >
+                        <SelectTrigger className="h-9">
+                          <SelectValue placeholder="Select brand" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {lpgBrands.map(brand => (
+                            <SelectItem key={brand.id} value={brand.id}>
+                              <div className="flex items-center gap-2">
+                                <span 
+                                  className="h-3 w-3 rounded-full" 
+                                  style={{ backgroundColor: brand.color }}
+                                />
+                                {brand.name} ({brand.weight})
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    <Label className="text-sm">Product Name</Label>
+                    <Input 
+                      value={newProduct.product_name}
+                      onChange={e => setNewProduct({...newProduct, product_name: e.target.value})}
+                      placeholder="e.g., Bashundhara LP Gas 12kg Refill"
+                      className="h-9"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label className="text-sm">Size</Label>
+                      <Input 
+                        value={newProduct.size || ""}
+                        onChange={e => setNewProduct({...newProduct, size: e.target.value})}
+                        placeholder="12kg"
+                        className="h-9"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm">Variant</Label>
+                      <Select 
+                        value={newProduct.variant || "Refill"} 
+                        onValueChange={v => setNewProduct({...newProduct, variant: v})}
+                      >
+                        <SelectTrigger className="h-9">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Refill">Refill</SelectItem>
+                          <SelectItem value="Package">Package</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label className="text-sm">Company Price</Label>
+                      <Input 
+                        type="number"
+                        value={newProduct.company_price}
+                        onChange={e => setNewProduct({...newProduct, company_price: Number(e.target.value)})}
+                        className="h-9"
+                        min={0}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm">Distributor Price</Label>
+                      <Input 
+                        type="number"
+                        value={newProduct.distributor_price}
+                        onChange={e => setNewProduct({...newProduct, distributor_price: Number(e.target.value)})}
+                        className="h-9"
+                        min={0}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm">Retail Price</Label>
+                      <Input 
+                        type="number"
+                        value={newProduct.retail_price}
+                        onChange={e => setNewProduct({...newProduct, retail_price: Number(e.target.value)})}
+                        className="h-9"
+                        min={0}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm">Package Price</Label>
+                      <Input 
+                        type="number"
+                        value={newProduct.package_price}
+                        onChange={e => setNewProduct({...newProduct, package_price: Number(e.target.value)})}
+                        className="h-9"
+                        min={0}
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label className="text-sm">Company Price</Label>
-                    <Input 
-                      type="number"
-                      value={newProduct.company_price}
-                      onChange={e => setNewProduct({...newProduct, company_price: Number(e.target.value)})}
-                      className="h-9"
-                      min={0}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-sm">Distributor Price</Label>
-                    <Input 
-                      type="number"
-                      value={newProduct.distributor_price}
-                      onChange={e => setNewProduct({...newProduct, distributor_price: Number(e.target.value)})}
-                      className="h-9"
-                      min={0}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-sm">Retail Price</Label>
-                    <Input 
-                      type="number"
-                      value={newProduct.retail_price}
-                      onChange={e => setNewProduct({...newProduct, retail_price: Number(e.target.value)})}
-                      className="h-9"
-                      min={0}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-sm">Package Price</Label>
-                    <Input 
-                      type="number"
-                      value={newProduct.package_price}
-                      onChange={e => setNewProduct({...newProduct, package_price: Number(e.target.value)})}
-                      className="h-9"
-                      min={0}
-                    />
-                  </div>
+                <DialogFooter className="gap-2">
+                  <Button variant="outline" onClick={() => setDialogOpen(false)} className="h-9">
+                    Cancel
+                  </Button>
+                  <Button onClick={handleAddProduct} className="h-9">
+                    Add Product
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+            <Button 
+              onClick={saveChanges} 
+              disabled={!hasChanges || isSaving}
+              size="sm"
+              className="h-8 sm:h-9 text-xs sm:text-sm gap-1 bg-primary hover:bg-primary/90"
+            >
+              {isSaving ? (
+                <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
+              ) : (
+                <Save className="h-3 w-3 sm:h-4 sm:w-4" />
+              )}
+              <span className="hidden sm:inline">Save Changes</span>
+              <span className="sm:hidden">Save</span>
+              {hasChanges && (
+                <Badge variant="secondary" className="ml-1 text-[10px] sm:text-xs h-4 sm:h-5 px-1">
+                  {Object.keys(editedPrices).length}
+                </Badge>
+              )}
+            </Button>
+          </div>
+        </div>
+
+        {/* Stats Cards - Matching Inventory Module */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+          <Card className="border-border bg-card hover:shadow-sm transition-shadow">
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="p-1.5 sm:p-2 rounded-lg bg-primary/10">
+                  <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] sm:text-xs text-muted-foreground truncate">Total Products</p>
+                  <p className="text-lg sm:text-xl font-bold text-foreground">{totalProductsCount}</p>
                 </div>
               </div>
-              <DialogFooter className="gap-2">
-                <Button variant="outline" onClick={() => setDialogOpen(false)} className="h-9">
-                  Cancel
-                </Button>
-                <Button onClick={handleAddProduct} className="h-9">
-                  Add Product
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-          <Button 
-            onClick={saveChanges} 
-            disabled={!hasChanges || isSaving}
-            size="sm"
-            className="h-8 sm:h-9 text-xs sm:text-sm gap-1 bg-primary hover:bg-primary/90"
-          >
-            {isSaving ? (
-              <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
-            ) : (
-              <Save className="h-3 w-3 sm:h-4 sm:w-4" />
-            )}
-            <span className="hidden sm:inline">Save</span>
-            {hasChanges && (
-              <Badge variant="secondary" className="ml-1 text-[10px] sm:text-xs h-4 sm:h-5 px-1">
-                {Object.keys(editedPrices).length}
-              </Badge>
-            )}
-          </Button>
+            </CardContent>
+          </Card>
+          <Card className="border-border bg-card hover:shadow-sm transition-shadow">
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="p-1.5 sm:p-2 rounded-lg bg-blue-500/10">
+                  <Package className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] sm:text-xs text-muted-foreground truncate">LPG Prices</p>
+                  <p className="text-lg sm:text-xl font-bold text-foreground">{lpgProductsCount}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-border bg-card hover:shadow-sm transition-shadow">
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="p-1.5 sm:p-2 rounded-lg bg-orange-500/10">
+                  <ChefHat className="h-4 w-4 sm:h-5 sm:w-5 text-orange-500" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] sm:text-xs text-muted-foreground truncate">Stove Prices</p>
+                  <p className="text-lg sm:text-xl font-bold text-foreground">{stoveProductsCount}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-border bg-card hover:shadow-sm transition-shadow">
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="p-1.5 sm:p-2 rounded-lg bg-purple-500/10">
+                  <Wrench className="h-4 w-4 sm:h-5 sm:w-5 text-purple-500" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] sm:text-xs text-muted-foreground truncate">Regulator Prices</p>
+                  <p className="text-lg sm:text-xl font-bold text-foreground">{regulatorProductsCount}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
 
-      {/* Product Type Tabs */}
+      {/* Product Type Tabs - Matching Inventory Module */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-3 h-9 sm:h-10">
           <TabsTrigger value="lpg" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2">
