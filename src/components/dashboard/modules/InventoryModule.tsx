@@ -814,24 +814,23 @@ export const InventoryModule = () => {
             </Button>
           </div>
 
-          {/* Price display if available */}
+          {/* Price badge if available - matching stove design */}
           {regulator.price && regulator.price > 0 && (
-            <div className="flex items-center justify-between p-2 bg-muted/50 rounded-md">
-              <span className="text-xs text-muted-foreground">Price</span>
-              <span className="text-sm font-medium">৳{regulator.price.toLocaleString()}</span>
-            </div>
+            <Badge variant="outline" className="text-xs bg-green-500/10 text-green-600 border-green-500/30">
+              ৳{regulator.price.toLocaleString()}
+            </Badge>
           )}
 
-          {/* Delete button */}
-          <div className="flex justify-end pt-1">
+          {/* Delete button - matching stove design with full-width row */}
+          <div className="flex items-center gap-2 pt-1">
+            <div className="flex-1" /> {/* Spacer to push delete button right */}
             <Button 
               variant="ghost" 
-              size="sm" 
-              className="h-8 text-xs text-destructive hover:text-destructive hover:bg-destructive/10" 
+              size="icon"
+              className="h-9 w-9 text-destructive hover:text-destructive hover:bg-destructive/10" 
               onClick={() => handleDeleteRegulator(regulator.id)}
             >
-              <Trash2 className="h-3 w-3 mr-1" />
-              Remove
+              <Trash2 className="h-4 w-4" />
             </Button>
           </div>
         </CardContent>
