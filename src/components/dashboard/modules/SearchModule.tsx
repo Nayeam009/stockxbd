@@ -144,7 +144,6 @@ export const SearchModule = ({ salesData, customers, stockData, drivers, userRol
 
   // Navigation items based on role
   const navigationItems: NavigationItem[] = useMemo((): NavigationItem[] => [
-    // Main Pages
     { id: 'overview', title: 'Dashboard Overview', description: 'Main dashboard with KPIs and quick actions', icon: Home, category: 'page' as const, roles: ['owner', 'manager', 'driver'], keywords: ['home', 'dashboard', 'overview', 'main', 'kpi', 'summary'] },
     { id: 'pos', title: 'Point of Sale (POS)', description: 'Create new sales transactions', icon: Receipt, category: 'page' as const, roles: ['owner', 'manager', 'driver'], keywords: ['pos', 'sale', 'sell', 'transaction', 'billing', 'invoice', 'cash'] },
     { id: 'daily-sales', title: 'Daily Sales', description: 'View and manage daily sales records', icon: BarChart3, category: 'page' as const, roles: ['owner', 'manager'], keywords: ['sales', 'daily', 'revenue', 'transactions', 'records'] },
@@ -180,7 +179,11 @@ export const SearchModule = ({ salesData, customers, stockData, drivers, userRol
   useEffect(() => {
     const saved = localStorage.getItem("recentSearches");
     if (saved) {
-      setRecentSearches(JSON.parse(saved));
+      try {
+        setRecentSearches(JSON.parse(saved));
+      } catch (e) {
+        console.error("Error loading recent searches:", e);
+      }
     }
   }, []);
 
@@ -199,21 +202,66 @@ export const SearchModule = ({ salesData, customers, stockData, drivers, userRol
   // Save search to history
   const saveSearch = useCallback((query: string) => {
     if (!query.trim()) return;
-    const updated = [query, ...recentSearches.filter(s => s !== query)].slice(0, 10);
-    setRecentSearches(updated);
-    localStorage.setItem("recentSearches", JSON.stringify(updated));
-  }, [recentSearches]);
+    setRecentSearches(prev => {
+      const updated = [query, ...prev.filter(s => s !== query)].slice(0, 10);
+      localStorage.setItem("recentSearches", JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
 
   // Navigate to module
   const navigateToModule = useCallback((moduleId: string) => {
+    console.log("Navigating to module:", moduleId);
     const event = new CustomEvent('navigate-module', { detail: { moduleId } });
     window.dispatchEvent(event);
     setCommandOpen(false);
     setSearchQuery("");
+    toast.success(`Navigating to ${moduleId.replace(/-/g, ' ')}`);
+  }, []);
+
+  // Generate report handler
+  const generateReport = useCallback(async (type: string) => {
+    setIsGeneratingReport(true);
+    setCommandOpen(false);
+    try {
+      let report: ReportData;
+      
+      switch (type) {
+        case 'daily-sales':
+          report = await generateDailySalesReport();
+          break;
+        case 'stock-status':
+          report = await generateStockReport();
+          break;
+        case 'customer-analysis':
+          report = await generateCustomerReport();
+          break;
+        case 'financial-summary':
+          report = await generateFinancialReport();
+          break;
+        case 'monthly-report':
+          report = await generateMonthlyReport();
+          break;
+        default:
+          throw new Error('Unknown report type');
+      }
+
+      setCurrentReport(report);
+      setReportDialogOpen(true);
+      toast.success('Report generated successfully');
+    } catch (error) {
+      console.error('Report generation error:', error);
+      toast.error('Failed to generate report');
+    } finally {
+      setIsGeneratingReport(false);
+    }
   }, []);
 
   // Handle action execution
   const handleAction = useCallback((actionId: string) => {
+    console.log("Handling action:", actionId);
+    setCommandOpen(false);
+    
     switch (actionId) {
       case 'action-new-sale':
         navigateToModule('pos');
@@ -254,16 +302,12 @@ export const SearchModule = ({ salesData, customers, stockData, drivers, userRol
         generateReport('monthly-report');
         break;
       default:
-        if (actionId.startsWith('action-') || actionId.startsWith('report-')) {
-          toast.info('Action triggered: ' + actionId);
-        } else {
-          navigateToModule(actionId);
-        }
+        // Navigate to the page
+        navigateToModule(actionId);
     }
-    setCommandOpen(false);
-  }, [navigateToModule]);
+  }, [navigateToModule, generateReport]);
 
-  // Combined search results
+  // Combined search results for main search
   const searchResults = useMemo((): SearchResult[] => {
     if (!searchQuery.trim()) return [];
 
@@ -345,7 +389,7 @@ export const SearchModule = ({ salesData, customers, stockData, drivers, userRol
             title: item.name,
             subtitle: `${item.currentStock} units @ ${BANGLADESHI_CURRENCY_SYMBOL}${item.price}`,
             meta: item.type,
-            icon: item.type === 'cylinder' ? Flame : item.type === 'stove' ? ChefHat : Wrench,
+            icon: item.type === 'cylinder' ? Flame : ChefHat,
             action: () => navigateToModule('lpg-stock'),
             data: item
           });
@@ -427,7 +471,7 @@ export const SearchModule = ({ salesData, customers, stockData, drivers, userRol
   }, [searchQuery, searchCategory, salesData, customers, stockData, drivers, staffData, vehicleData, userRole, navigationItems, handleAction, navigateToModule, saveSearch]);
 
   // Generate Daily Sales Report
-  const generateDailySalesReport = async () => {
+  const generateDailySalesReport = async (): Promise<ReportData> => {
     const today = format(new Date(), 'yyyy-MM-dd');
     
     const { data: transactions, error } = await supabase
@@ -466,7 +510,7 @@ export const SearchModule = ({ salesData, customers, stockData, drivers, userRol
   };
 
   // Generate Stock Status Report
-  const generateStockReport = async () => {
+  const generateStockReport = async (): Promise<ReportData> => {
     const [lpgResult, stoveResult, regulatorResult] = await Promise.all([
       supabase.from("lpg_brands").select("*").eq("is_active", true),
       supabase.from("stoves").select("*").eq("is_active", true),
@@ -507,15 +551,15 @@ export const SearchModule = ({ salesData, customers, stockData, drivers, userRol
   };
 
   // Generate Customer Analysis Report
-  const generateCustomerReport = async () => {
-    const { data: customers, error } = await supabase
+  const generateCustomerReport = async (): Promise<ReportData> => {
+    const { data: customersData, error } = await supabase
       .from("customers")
       .select("*")
       .order("total_due", { ascending: false });
 
     if (error) throw error;
 
-    const rows = customers?.map((c, i) => [
+    const rows = customersData?.map((c, i) => [
       i + 1,
       c.name,
       c.phone || '-',
@@ -526,15 +570,15 @@ export const SearchModule = ({ salesData, customers, stockData, drivers, userRol
       c.last_order_date ? format(new Date(c.last_order_date), 'dd MMM yyyy') : '-'
     ]) || [];
 
-    const totalDue = customers?.reduce((sum, c) => sum + Number(c.total_due || 0), 0) || 0;
-    const cylindersDue = customers?.reduce((sum, c) => sum + (c.cylinders_due || 0), 0) || 0;
+    const totalDue = customersData?.reduce((sum, c) => sum + Number(c.total_due || 0), 0) || 0;
+    const cylindersDue = customersData?.reduce((sum, c) => sum + (c.cylinders_due || 0), 0) || 0;
 
     return {
       title: `Customer Analysis Report - ${format(new Date(), 'dd MMM yyyy')}`,
       headers: ['#', 'Name', 'Phone', 'Address', 'Cylinders Due', 'Amount Due', 'Status', 'Last Order'],
       rows,
       summary: [
-        { label: 'Total Customers', value: String(customers?.length || 0) },
+        { label: 'Total Customers', value: String(customersData?.length || 0) },
         { label: 'Total Amount Due', value: `${BANGLADESHI_CURRENCY_SYMBOL}${totalDue.toLocaleString()}` },
         { label: 'Total Cylinders Due', value: String(cylindersDue) },
       ]
@@ -542,7 +586,7 @@ export const SearchModule = ({ salesData, customers, stockData, drivers, userRol
   };
 
   // Generate Financial Summary Report
-  const generateFinancialReport = async () => {
+  const generateFinancialReport = async (): Promise<ReportData> => {
     const startDate = format(startOfMonth(new Date()), 'yyyy-MM-dd');
     const endDate = format(endOfMonth(new Date()), 'yyyy-MM-dd');
 
@@ -581,7 +625,7 @@ export const SearchModule = ({ salesData, customers, stockData, drivers, userRol
   };
 
   // Generate Monthly Report
-  const generateMonthlyReport = async () => {
+  const generateMonthlyReport = async (): Promise<ReportData> => {
     const startDate = format(startOfMonth(new Date()), 'yyyy-MM-dd');
     const endDate = format(endOfMonth(new Date()), 'yyyy-MM-dd');
 
@@ -619,44 +663,6 @@ export const SearchModule = ({ salesData, customers, stockData, drivers, userRol
         { label: 'Avg Daily Revenue', value: `${BANGLADESHI_CURRENCY_SYMBOL}${Math.round(avgDaily).toLocaleString()}` },
       ]
     };
-  };
-
-  // Generate report handler
-  const generateReport = async (type: string) => {
-    setIsGeneratingReport(true);
-    setCommandOpen(false);
-    try {
-      let report: ReportData;
-      
-      switch (type) {
-        case 'daily-sales':
-          report = await generateDailySalesReport();
-          break;
-        case 'stock-status':
-          report = await generateStockReport();
-          break;
-        case 'customer-analysis':
-          report = await generateCustomerReport();
-          break;
-        case 'financial-summary':
-          report = await generateFinancialReport();
-          break;
-        case 'monthly-report':
-          report = await generateMonthlyReport();
-          break;
-        default:
-          throw new Error('Unknown report type');
-      }
-
-      setCurrentReport(report);
-      setReportDialogOpen(true);
-      toast.success('Report generated successfully');
-    } catch (error) {
-      console.error('Report generation error:', error);
-      toast.error('Failed to generate report');
-    } finally {
-      setIsGeneratingReport(false);
-    }
   };
 
   // Export to CSV
@@ -698,7 +704,7 @@ export const SearchModule = ({ salesData, customers, stockData, drivers, userRol
   }, [navigationItems]);
 
   return (
-    <div className="space-y-4 md:space-y-6">
+    <div className="space-y-4 md:space-y-6 p-2 md:p-0">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
@@ -708,7 +714,7 @@ export const SearchModule = ({ salesData, customers, stockData, drivers, userRol
         <Button 
           variant="outline" 
           onClick={() => setCommandOpen(true)}
-          className="w-full sm:w-auto gap-2 h-10 md:h-9"
+          className="w-full sm:w-auto gap-2 h-11 md:h-9"
         >
           <CommandIcon className="h-4 w-4" />
           <span className="flex-1 text-left sm:flex-none">Quick Search</span>
@@ -722,11 +728,11 @@ export const SearchModule = ({ salesData, customers, stockData, drivers, userRol
 
       {/* Command Palette Dialog */}
       <Dialog open={commandOpen} onOpenChange={setCommandOpen}>
-        <DialogContent className="p-0 gap-0 max-w-2xl overflow-hidden">
-          <Command className="rounded-lg border-0">
+        <DialogContent className="p-0 gap-0 max-w-[95vw] md:max-w-2xl overflow-hidden">
+          <Command className="rounded-lg border-0" shouldFilter={true}>
             <CommandInput 
               placeholder="Search pages, actions, customers, sales, stock..." 
-              className="h-12 md:h-14 text-base"
+              className="h-12 md:h-14 text-base border-0"
             />
             <CommandList className="max-h-[60vh] md:max-h-[400px]">
               <CommandEmpty>
@@ -739,18 +745,19 @@ export const SearchModule = ({ salesData, customers, stockData, drivers, userRol
               
               {/* Pages */}
               <CommandGroup heading="Pages">
-                {categoryGroups.pages.slice(0, 8).map(item => (
+                {categoryGroups.pages.map(item => (
                   <CommandItem 
-                    key={item.id} 
+                    key={item.id}
+                    value={`${item.title} ${item.description} ${item.keywords.join(' ')}`}
                     onSelect={() => handleAction(item.id)}
                     className="py-3 px-3 cursor-pointer"
                   >
-                    <item.icon className="mr-3 h-5 w-5 text-muted-foreground" />
+                    <item.icon className="mr-3 h-5 w-5 text-muted-foreground shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-sm truncate">{item.title}</p>
                       <p className="text-xs text-muted-foreground truncate">{item.description}</p>
                     </div>
-                    <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0 ml-2" />
                   </CommandItem>
                 ))}
               </CommandGroup>
@@ -761,7 +768,8 @@ export const SearchModule = ({ salesData, customers, stockData, drivers, userRol
               <CommandGroup heading="Quick Actions">
                 {categoryGroups.actions.map(item => (
                   <CommandItem 
-                    key={item.id} 
+                    key={item.id}
+                    value={`${item.title} ${item.description} ${item.keywords.join(' ')}`}
                     onSelect={() => handleAction(item.id)}
                     className="py-3 px-3 cursor-pointer"
                   >
@@ -772,7 +780,7 @@ export const SearchModule = ({ salesData, customers, stockData, drivers, userRol
                       <p className="font-medium text-sm truncate">{item.title}</p>
                       <p className="text-xs text-muted-foreground truncate">{item.description}</p>
                     </div>
-                    <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/20 shrink-0">
+                    <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/20 shrink-0 ml-2 text-[10px]">
                       Action
                     </Badge>
                   </CommandItem>
@@ -785,7 +793,8 @@ export const SearchModule = ({ salesData, customers, stockData, drivers, userRol
               <CommandGroup heading="Generate Reports">
                 {categoryGroups.reports.map(item => (
                   <CommandItem 
-                    key={item.id} 
+                    key={item.id}
+                    value={`${item.title} ${item.description} ${item.keywords.join(' ')}`}
                     onSelect={() => handleAction(item.id)}
                     className="py-3 px-3 cursor-pointer"
                   >
@@ -796,7 +805,7 @@ export const SearchModule = ({ salesData, customers, stockData, drivers, userRol
                       <p className="font-medium text-sm truncate">{item.title}</p>
                       <p className="text-xs text-muted-foreground truncate">{item.description}</p>
                     </div>
-                    <Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-blue-500/20 shrink-0">
+                    <Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-blue-500/20 shrink-0 ml-2 text-[10px]">
                       Report
                     </Badge>
                   </CommandItem>
@@ -804,26 +813,28 @@ export const SearchModule = ({ salesData, customers, stockData, drivers, userRol
               </CommandGroup>
             </CommandList>
             
-            {/* Keyboard hints */}
-            <div className="hidden md:flex items-center justify-between border-t px-4 py-2 bg-muted/30">
-              <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1">
-                  <Keyboard className="h-3 w-3" /> Navigate
-                </span>
-                <span className="flex items-center gap-1">
-                  <kbd className="px-1.5 py-0.5 rounded bg-muted">↵</kbd> Select
-                </span>
-                <span className="flex items-center gap-1">
-                  <kbd className="px-1.5 py-0.5 rounded bg-muted">Esc</kbd> Close
-                </span>
+            {/* Keyboard hints - desktop only */}
+            {!isMobile && (
+              <div className="flex items-center justify-between border-t px-4 py-2 bg-muted/30">
+                <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1">
+                    <Keyboard className="h-3 w-3" /> Navigate
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <kbd className="px-1.5 py-0.5 rounded bg-muted text-[10px]">↵</kbd> Select
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <kbd className="px-1.5 py-0.5 rounded bg-muted text-[10px]">Esc</kbd> Close
+                  </span>
+                </div>
               </div>
-            </div>
+            )}
           </Command>
         </DialogContent>
       </Dialog>
 
       {/* Main Search Interface */}
-      <Card className="border-0 shadow-sm">
+      <Card className="border shadow-sm">
         <CardHeader className="pb-3 md:pb-4">
           <CardTitle className="text-base md:text-lg flex items-center gap-2">
             <Search className="h-4 w-4 md:h-5 md:w-5 text-primary" />
@@ -862,7 +873,7 @@ export const SearchModule = ({ salesData, customers, stockData, drivers, userRol
               <div className="flex items-center gap-2">
                 <label className="text-xs md:text-sm font-medium text-muted-foreground whitespace-nowrap">Category:</label>
                 <Select value={searchCategory} onValueChange={setSearchCategory}>
-                  <SelectTrigger className="flex-1 sm:w-36 h-10 md:h-9 bg-background text-sm">
+                  <SelectTrigger className="flex-1 sm:w-40 h-10 md:h-9 bg-background text-sm">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -910,7 +921,7 @@ export const SearchModule = ({ salesData, customers, stockData, drivers, userRol
 
       {/* Search Results */}
       {searchQuery && (
-        <Card className="border-0 shadow-sm">
+        <Card className="border shadow-sm">
           <CardHeader className="pb-3 md:pb-4">
             <CardTitle className="text-base md:text-lg">Search Results</CardTitle>
             <CardDescription className="text-xs md:text-sm">
@@ -955,7 +966,7 @@ export const SearchModule = ({ salesData, customers, stockData, drivers, userRol
       )}
 
       {/* Quick Reports */}
-      <Card className="border-0 shadow-sm">
+      <Card className="border shadow-sm">
         <CardHeader className="pb-3 md:pb-4">
           <CardTitle className="text-base md:text-lg flex items-center gap-2">
             <FileSpreadsheet className="h-4 w-4 md:h-5 md:w-5 text-primary" />
@@ -1036,7 +1047,7 @@ export const SearchModule = ({ salesData, customers, stockData, drivers, userRol
 
       {/* Recent Searches */}
       {recentSearches.length > 0 && !searchQuery && (
-        <Card className="border-0 shadow-sm">
+        <Card className="border shadow-sm">
           <CardHeader className="pb-3 md:pb-4">
             <CardTitle className="text-base md:text-lg flex items-center gap-2">
               <Clock className="h-4 w-4 md:h-5 md:w-5 text-muted-foreground" />
@@ -1051,7 +1062,7 @@ export const SearchModule = ({ salesData, customers, stockData, drivers, userRol
                   key={index}
                   variant="outline"
                   size="sm"
-                  className="hover:bg-primary/10 h-8 md:h-7 text-xs md:text-sm"
+                  className="hover:bg-primary/10 h-9 md:h-8 text-xs md:text-sm"
                   onClick={() => setSearchQuery(query)}
                 >
                   <Search className="h-3 w-3 mr-1.5 text-muted-foreground" />
@@ -1064,7 +1075,7 @@ export const SearchModule = ({ salesData, customers, stockData, drivers, userRol
       )}
 
       {/* Quick Navigation Cards */}
-      <Card className="border-0 shadow-sm">
+      <Card className="border shadow-sm">
         <CardHeader className="pb-3 md:pb-4">
           <CardTitle className="text-base md:text-lg flex items-center gap-2">
             <ArrowRight className="h-4 w-4 md:h-5 md:w-5 text-primary" />
@@ -1078,7 +1089,7 @@ export const SearchModule = ({ salesData, customers, stockData, drivers, userRol
               <Button
                 key={item.id}
                 variant="ghost"
-                className="h-auto py-3 md:py-4 flex-col gap-1 md:gap-2 justify-start hover:bg-muted/80"
+                className="h-auto py-3 md:py-4 flex-col gap-1 md:gap-2 justify-start hover:bg-muted/80 border border-transparent hover:border-border"
                 onClick={() => navigateToModule(item.id)}
               >
                 <item.icon className="h-5 w-5 md:h-6 md:w-6 text-primary" />
