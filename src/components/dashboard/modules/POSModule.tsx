@@ -1801,7 +1801,6 @@ export const POSModule = () => {
             open={showInvoiceDialog}
             onOpenChange={setShowInvoiceDialog}
             invoiceData={lastTransaction}
-            printType={printType}
           />
         )}
 
