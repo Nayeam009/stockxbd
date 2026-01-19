@@ -212,7 +212,8 @@ export const SearchModule = ({ salesData, customers, stockData, drivers, userRol
   // Navigate to module
   const navigateToModule = useCallback((moduleId: string) => {
     console.log("Navigating to module:", moduleId);
-    const event = new CustomEvent('navigate-module', { detail: { moduleId } });
+    // Dashboard expects just the moduleId string as detail
+    const event = new CustomEvent('navigate-module', { detail: moduleId });
     window.dispatchEvent(event);
     setCommandOpen(false);
     setSearchQuery("");

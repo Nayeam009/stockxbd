@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, TouchEvent } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/dashboard/AppSidebar";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
+import { GlobalCommandPalette } from "@/components/dashboard/GlobalCommandPalette";
 import { DashboardOverview } from "@/components/dashboard/modules/DashboardOverview";
 import { DailySalesModule } from "@/components/dashboard/modules/DailySalesModule";
 import { DailyExpensesModule } from "@/components/dashboard/modules/DailyExpensesModule";
@@ -266,6 +267,12 @@ const Dashboard = () => {
             userRole={userRole}
           />
         </div>
+        
+        {/* Global Command Palette */}
+        <GlobalCommandPalette 
+          userRole={userRole}
+          setActiveModule={setActiveModule}
+        />
       </div>
     </SidebarProvider>
   );
