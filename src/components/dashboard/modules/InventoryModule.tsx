@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { InventoryStatCard } from "@/components/inventory/InventoryStatCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -1141,52 +1142,52 @@ export const InventoryModule = () => {
 
         {/* Stoves Tab Content */}
         <TabsContent value="stoves" className="space-y-4 mt-4">
-          {/* Stove Summary Cards */}
+          {/* Stove Summary Cards (tap to filter) */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <Card className="bg-gradient-to-br from-orange-500/10 to-orange-500/5 border-orange-500/20">
-              <CardContent className="p-3">
-                <div className="flex items-center gap-2">
-                  <Package className="h-4 w-4 text-orange-500" />
-                  <div>
-                    <p className="text-lg sm:text-2xl font-bold">{stoveTotals.total}</p>
-                    <p className="text-[10px] sm:text-xs text-muted-foreground">Total Units</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="bg-gradient-to-br from-amber-500/10 to-amber-500/5 border-amber-500/20">
-              <CardContent className="p-3">
-                <div className="flex items-center gap-2">
-                  <Flame className="h-4 w-4 text-amber-500" />
-                  <div>
-                    <p className="text-lg sm:text-2xl font-bold">{stoveTotals.singleBurner}</p>
-                    <p className="text-[10px] sm:text-xs text-muted-foreground">Single Burner</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="bg-gradient-to-br from-purple-500/10 to-purple-500/5 border-purple-500/20">
-              <CardContent className="p-3">
-                <div className="flex items-center gap-2">
-                  <Flame className="h-4 w-4 text-purple-500" />
-                  <div>
-                    <p className="text-lg sm:text-2xl font-bold">{stoveTotals.doubleBurner}</p>
-                    <p className="text-[10px] sm:text-xs text-muted-foreground">Double Burner</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="bg-gradient-to-br from-destructive/10 to-destructive/5 border-destructive/20">
-              <CardContent className="p-3">
-                <div className="flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 text-destructive" />
-                  <div>
-                    <p className="text-lg sm:text-2xl font-bold">{stoveTotals.damaged}</p>
-                    <p className="text-[10px] sm:text-xs text-muted-foreground">Damaged</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <InventoryStatCard
+              icon={Package}
+              label="Total Units"
+              value={stoveTotals.total}
+              active={filterBurner === "all" && !showDamagedOnly}
+              onClick={() => {
+                setFilterBurner("all");
+                setShowDamagedOnly(false);
+              }}
+            />
+            <InventoryStatCard
+              icon={Flame}
+              label="Single Burner"
+              value={stoveTotals.singleBurner}
+              active={filterBurner === "1" && !showDamagedOnly}
+              onClick={() => {
+                const isActive = filterBurner === "1" && !showDamagedOnly;
+                setFilterBurner(isActive ? "all" : "1");
+                setShowDamagedOnly(false);
+              }}
+            />
+            <InventoryStatCard
+              icon={Flame}
+              label="Double Burner"
+              value={stoveTotals.doubleBurner}
+              active={filterBurner === "2" && !showDamagedOnly}
+              onClick={() => {
+                const isActive = filterBurner === "2" && !showDamagedOnly;
+                setFilterBurner(isActive ? "all" : "2");
+                setShowDamagedOnly(false);
+              }}
+            />
+            <InventoryStatCard
+              icon={AlertTriangle}
+              label="Damaged"
+              value={stoveTotals.damaged}
+              tone="danger"
+              active={showDamagedOnly}
+              onClick={() => {
+                const next = !showDamagedOnly;
+                setShowDamagedOnly(next);
+                if (next) setFilterBurner("all");
+              }}
+            />
           </div>
 
           {/* Stove Filters */}
@@ -1273,41 +1274,34 @@ export const InventoryModule = () => {
 
         {/* Regulators Tab Content */}
         <TabsContent value="regulators" className="space-y-4 mt-4">
-          {/* Regulator Summary Cards */}
-          <div className="grid grid-cols-3 gap-3">
-            <Card className="bg-gradient-to-br from-violet-500/10 to-violet-500/5 border-violet-500/20">
-              <CardContent className="p-3">
-                <div className="flex items-center gap-2">
-                  <Package className="h-4 w-4 text-violet-500" />
-                  <div>
-                    <p className="text-lg sm:text-2xl font-bold">{regulatorTotals.total}</p>
-                    <p className="text-[10px] sm:text-xs text-muted-foreground">Total Units</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="bg-gradient-to-br from-violet-500/10 to-violet-500/5 border-violet-500/20">
-              <CardContent className="p-3">
-                <div className="flex items-center gap-2">
-                  <Gauge className="h-4 w-4 text-violet-500" />
-                  <div>
-                    <p className="text-lg sm:text-2xl font-bold">{regulatorTotals.size22mm}</p>
-                    <p className="text-[10px] sm:text-xs text-muted-foreground">22mm Size</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="bg-gradient-to-br from-cyan-500/10 to-cyan-500/5 border-cyan-500/20">
-              <CardContent className="p-3">
-                <div className="flex items-center gap-2">
-                  <Gauge className="h-4 w-4 text-cyan-500" />
-                  <div>
-                    <p className="text-lg sm:text-2xl font-bold">{regulatorTotals.size20mm}</p>
-                    <p className="text-[10px] sm:text-xs text-muted-foreground">20mm Size</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+          {/* Regulator Summary Cards (tap to filter) */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <InventoryStatCard
+              icon={Package}
+              label="Total Units"
+              value={regulatorTotals.total}
+              active={regulatorSizeFilter === "all"}
+              className="col-span-2 sm:col-span-1"
+              onClick={() => setRegulatorSizeFilter("all")}
+            />
+            <InventoryStatCard
+              icon={Gauge}
+              label="22mm Size"
+              value={regulatorTotals.size22mm}
+              active={regulatorSizeFilter === "22mm"}
+              onClick={() =>
+                setRegulatorSizeFilter((prev) => (prev === "22mm" ? "all" : "22mm"))
+              }
+            />
+            <InventoryStatCard
+              icon={Gauge}
+              label="20mm Size"
+              value={regulatorTotals.size20mm}
+              active={regulatorSizeFilter === "20mm"}
+              onClick={() =>
+                setRegulatorSizeFilter((prev) => (prev === "20mm" ? "all" : "20mm"))
+              }
+            />
           </div>
 
           {/* Regulator Filters */}
