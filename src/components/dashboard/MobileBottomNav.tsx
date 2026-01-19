@@ -20,13 +20,13 @@ const navItems = [{
   icon: Receipt,
   roles: ['owner', 'manager', 'driver']
 }, {
-  id: 'lpg-stock',
-  labelKey: 'lpg_stock',
+  id: 'inventory',
+  labelKey: 'inventory',
   icon: Package,
   roles: ['owner', 'manager']
 }, {
-  id: 'analytics',
-  labelKey: 'analysis',
+  id: 'product-pricing',
+  labelKey: 'product_pricing',
   icon: BarChart3,
   roles: ['owner', 'manager']
 }];
