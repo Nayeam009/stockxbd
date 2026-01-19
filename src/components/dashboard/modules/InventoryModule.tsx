@@ -17,6 +17,7 @@ import { Switch } from "@/components/ui/switch";
 import { 
   Search,
   Plus,
+  Minus,
   Trash2,
   Package,
   AlertTriangle,
@@ -29,7 +30,8 @@ import {
   ChefHat,
   Wrench,
   Flame,
-  Gauge
+  Gauge,
+  Edit
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -630,40 +632,129 @@ export const InventoryModule = () => {
     );
   };
 
-  // Stove Card
+  // Stove Card with full features
   const StoveCard = ({ stove }: { stove: Stove }) => {
     const status = getStockStatus(stove.quantity);
+    
+    const handleQuickAdjust = async (delta: number) => {
+      const newValue = Math.max(0, stove.quantity + delta);
+      await handleUpdateStove(stove.id, newValue);
+    };
+
+    const handleMarkDamaged = async () => {
+      try {
+        const { error } = await supabase.from("stoves").update({ is_damaged: !stove.is_damaged }).eq("id", stove.id);
+        if (error) throw error;
+        setStoves(prev => prev.map(s => s.id === stove.id ? { ...s, is_damaged: !s.is_damaged } : s));
+        toast.success(stove.is_damaged ? "Marked as functional" : "Marked as damaged");
+      } catch (error: any) {
+        toast.error(error?.message || "Failed to update");
+      }
+    };
+
     return (
-      <Card className="border-border hover:shadow-md transition-shadow">
+      <Card className={`border-border hover:shadow-md transition-shadow ${stove.is_damaged ? 'border-destructive/50 bg-destructive/5' : ''}`}>
         <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-6 pt-3 sm:pt-4">
           <div className="flex items-center justify-between gap-2">
             <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
-              <ChefHat className="h-4 w-4 text-orange-500" />
+              <ChefHat className={`h-4 w-4 ${stove.is_damaged ? 'text-destructive' : 'text-orange-500'}`} />
               <span className="truncate">{stove.brand}</span>
             </CardTitle>
-            <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
               <Badge className={`${status.bgClass} text-[10px] sm:text-xs border-0`}>{status.label}</Badge>
-              <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={() => handleDeleteStove(stove.id)}>
-                <Trash2 className="h-3 w-3" />
-              </Button>
             </div>
           </div>
           <div className="flex flex-wrap gap-1 mt-1">
-            <Badge variant="outline" className="text-[10px] sm:text-xs">{stove.burners === 1 ? "Single Burner" : "Double Burner"}</Badge>
+            <Badge variant="outline" className="text-[10px] sm:text-xs">
+              <Flame className="h-3 w-3 mr-1" />
+              {stove.burners === 1 ? "Single" : "Double"} Burner
+            </Badge>
+            <Badge variant="outline" className="text-[10px] sm:text-xs">{stove.model}</Badge>
             {stove.is_damaged && <Badge variant="destructive" className="text-[10px] sm:text-xs">Damaged</Badge>}
+            {stove.warranty_months && stove.warranty_months > 0 && (
+              <Badge variant="outline" className="text-[10px] sm:text-xs bg-green-500/10 text-green-600 border-green-500/30">
+                {stove.warranty_months}mo Warranty
+              </Badge>
+            )}
           </div>
         </CardHeader>
-        <CardContent className="px-3 sm:px-6 pb-3 sm:pb-4">
-          <EditableStockCell value={stove.quantity} itemId={stove.id} field="quantity" icon={Package} label="Quantity" bgColor="bg-orange-100 dark:bg-orange-900/30" type="stove" onUpdate={(id, _, val) => handleUpdateStove(id, val)} />
+        <CardContent className="px-3 sm:px-6 pb-3 sm:pb-4 space-y-3">
+          {/* Quantity with quick adjust buttons */}
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              size="icon" 
+              className="h-8 w-8 shrink-0"
+              onClick={() => handleQuickAdjust(-1)}
+              disabled={stove.quantity <= 0}
+            >
+              <Minus className="h-4 w-4" />
+            </Button>
+            <div className="flex-1">
+              <EditableStockCell 
+                value={stove.quantity} 
+                itemId={stove.id} 
+                field="quantity" 
+                icon={Package} 
+                label="Stock" 
+                bgColor="bg-orange-100 dark:bg-orange-900/30" 
+                type="stove" 
+                onUpdate={(id, _, val) => handleUpdateStove(id, val)} 
+              />
+            </div>
+            <Button 
+              variant="outline" 
+              size="icon" 
+              className="h-8 w-8 shrink-0"
+              onClick={() => handleQuickAdjust(1)}
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
+
+          {/* Price display if available */}
+          {stove.price > 0 && (
+            <div className="flex items-center justify-between p-2 bg-muted/50 rounded-md">
+              <span className="text-xs text-muted-foreground">Price</span>
+              <span className="text-sm font-medium">৳{stove.price.toLocaleString()}</span>
+            </div>
+          )}
+
+          {/* Action buttons */}
+          <div className="flex gap-2 pt-1">
+            <Button 
+              variant={stove.is_damaged ? "default" : "outline"} 
+              size="sm" 
+              className={`flex-1 text-xs h-8 ${stove.is_damaged ? 'bg-green-600 hover:bg-green-700' : ''}`}
+              onClick={handleMarkDamaged}
+            >
+              <AlertTriangle className="h-3 w-3 mr-1" />
+              {stove.is_damaged ? "Mark OK" : "Mark Damaged"}
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10" 
+              onClick={() => handleDeleteStove(stove.id)}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
         </CardContent>
       </Card>
     );
   };
 
-  // Regulator Card
+  // Regulator Card with full features
   const RegulatorCard = ({ regulator }: { regulator: Regulator }) => {
     const status = getStockStatus(regulator.quantity);
     const isSize22 = regulator.type === "22mm";
+    
+    const handleQuickAdjust = async (delta: number) => {
+      const newValue = Math.max(0, regulator.quantity + delta);
+      await handleUpdateRegulator(regulator.id, newValue);
+    };
+
     return (
       <Card className="border-border hover:shadow-md transition-shadow">
         <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-6 pt-3 sm:pt-4">
@@ -672,19 +763,87 @@ export const InventoryModule = () => {
               <Gauge className={`h-4 w-4 ${isSize22 ? "text-violet-500" : "text-cyan-500"}`} />
               <span className="truncate">{regulator.brand}</span>
             </CardTitle>
-            <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
               <Badge className={`${status.bgClass} text-[10px] sm:text-xs border-0`}>{status.label}</Badge>
-              <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={() => handleDeleteRegulator(regulator.id)}>
-                <Trash2 className="h-3 w-3" />
-              </Button>
             </div>
           </div>
-          <Badge variant="outline" className={`mt-1 text-[10px] sm:text-xs ${isSize22 ? "bg-violet-500/10 text-violet-600 border-violet-500/30" : "bg-cyan-500/10 text-cyan-600 border-cyan-500/30"}`}>
-            {regulator.type}
-          </Badge>
+          <div className="flex flex-wrap gap-1 mt-1">
+            <Badge variant="outline" className={`text-[10px] sm:text-xs ${isSize22 ? "bg-violet-500/10 text-violet-600 border-violet-500/30" : "bg-cyan-500/10 text-cyan-600 border-cyan-500/30"}`}>
+              <Wrench className="h-3 w-3 mr-1" />
+              {regulator.type}
+            </Badge>
+            {isSize22 ? (
+              <Badge variant="outline" className="text-[10px] sm:text-xs bg-blue-500/10 text-blue-600 border-blue-500/30">
+                Omera/Bashundhara
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="text-[10px] sm:text-xs bg-amber-500/10 text-amber-600 border-amber-500/30">
+                TotalGaz/Petromax
+              </Badge>
+            )}
+          </div>
         </CardHeader>
-        <CardContent className="px-3 sm:px-6 pb-3 sm:pb-4">
-          <EditableStockCell value={regulator.quantity} itemId={regulator.id} field="quantity" icon={Package} label="Quantity" bgColor={isSize22 ? "bg-violet-100 dark:bg-violet-900/30" : "bg-cyan-100 dark:bg-cyan-900/30"} type="regulator" onUpdate={(id, _, val) => handleUpdateRegulator(id, val)} />
+        <CardContent className="px-3 sm:px-6 pb-3 sm:pb-4 space-y-3">
+          {/* Quantity with quick adjust buttons */}
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              size="icon" 
+              className="h-8 w-8 shrink-0"
+              onClick={() => handleQuickAdjust(-1)}
+              disabled={regulator.quantity <= 0}
+            >
+              <Minus className="h-4 w-4" />
+            </Button>
+            <div className="flex-1">
+              <EditableStockCell 
+                value={regulator.quantity} 
+                itemId={regulator.id} 
+                field="quantity" 
+                icon={Package} 
+                label="Stock" 
+                bgColor={isSize22 ? "bg-violet-100 dark:bg-violet-900/30" : "bg-cyan-100 dark:bg-cyan-900/30"} 
+                type="regulator" 
+                onUpdate={(id, _, val) => handleUpdateRegulator(id, val)} 
+              />
+            </div>
+            <Button 
+              variant="outline" 
+              size="icon" 
+              className="h-8 w-8 shrink-0"
+              onClick={() => handleQuickAdjust(1)}
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
+
+          {/* Price display if available */}
+          {regulator.price && regulator.price > 0 && (
+            <div className="flex items-center justify-between p-2 bg-muted/50 rounded-md">
+              <span className="text-xs text-muted-foreground">Price</span>
+              <span className="text-sm font-medium">৳{regulator.price.toLocaleString()}</span>
+            </div>
+          )}
+
+          {/* Compatibility info */}
+          <div className="p-2 bg-muted/30 rounded-md">
+            <p className="text-[10px] sm:text-xs text-muted-foreground">
+              💡 Compatible with {isSize22 ? "22mm valve cylinders (Omera, Bashundhara, Jamuna)" : "20mm valve cylinders (TotalGaz, Petromax)"}
+            </p>
+          </div>
+
+          {/* Delete button */}
+          <div className="flex justify-end pt-1">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-8 text-xs text-destructive hover:text-destructive hover:bg-destructive/10" 
+              onClick={() => handleDeleteRegulator(regulator.id)}
+            >
+              <Trash2 className="h-3 w-3 mr-1" />
+              Remove
+            </Button>
+          </div>
         </CardContent>
       </Card>
     );
