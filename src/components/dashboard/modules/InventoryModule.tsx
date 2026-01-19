@@ -38,6 +38,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { syncLpgBrandToPricing, syncStoveToPricing, syncRegulatorToPricing } from "@/hooks/useInventoryPricingSync";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
+import { BrandSelect } from "@/components/shared/BrandSelect";
+import { getLpgBrandColor, type LpgBrandInfo } from "@/lib/brandConstants";
 
 // Interfaces
 interface LPGBrand {
@@ -990,12 +992,28 @@ export const InventoryModule = () => {
                     <div className="space-y-4 py-4">
                       <div className="space-y-2">
                         <Label>Brand Name *</Label>
-                        <Input placeholder="e.g., Bashundhara, Omera" value={newLpgBrand.name} onChange={(e) => setNewLpgBrand({ ...newLpgBrand, name: e.target.value })} />
+                        <BrandSelect
+                          type="lpg"
+                          value={newLpgBrand.name}
+                          onChange={(value, brandInfo) => {
+                            const lpgInfo = brandInfo as LpgBrandInfo | undefined;
+                            setNewLpgBrand({
+                              ...newLpgBrand,
+                              name: value,
+                              color: lpgInfo?.color || getLpgBrandColor(value),
+                            });
+                          }}
+                          filterByMouthSize={sizeTab}
+                          placeholder="Select or type brand name..."
+                        />
                       </div>
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <Label>Color</Label>
-                          <Input type="color" value={newLpgBrand.color} onChange={(e) => setNewLpgBrand({ ...newLpgBrand, color: e.target.value })} className="h-10" />
+                          <div className="flex gap-2">
+                            <Input type="color" value={newLpgBrand.color} onChange={(e) => setNewLpgBrand({ ...newLpgBrand, color: e.target.value })} className="h-10 flex-1" />
+                            <div className="h-10 w-10 rounded-lg border" style={{ backgroundColor: newLpgBrand.color }} />
+                          </div>
                         </div>
                         <div className="space-y-2">
                           <Label>Weight</Label>
@@ -1218,7 +1236,12 @@ export const InventoryModule = () => {
                   <div className="space-y-4 py-4">
                     <div className="space-y-2">
                       <Label>Brand Name *</Label>
-                      <Input placeholder="e.g., Walton, RFL" value={newStove.brand} onChange={(e) => setNewStove({ ...newStove, brand: e.target.value })} />
+                      <BrandSelect
+                        type="stove"
+                        value={newStove.brand}
+                        onChange={(value) => setNewStove({ ...newStove, brand: value })}
+                        placeholder="Select or type brand name..."
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label>Burner Type *</Label>
@@ -1349,7 +1372,12 @@ export const InventoryModule = () => {
                   <div className="space-y-4 py-4">
                     <div className="space-y-2">
                       <Label>Brand Name *</Label>
-                      <Input placeholder="e.g., Sena, Pamir, Bono" value={newRegulator.brand} onChange={(e) => setNewRegulator({ ...newRegulator, brand: e.target.value })} />
+                      <BrandSelect
+                        type="regulator"
+                        value={newRegulator.brand}
+                        onChange={(value) => setNewRegulator({ ...newRegulator, brand: value })}
+                        placeholder="Select or type brand name..."
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label>Size *</Label>
