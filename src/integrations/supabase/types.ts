@@ -748,6 +748,7 @@ export type Database = {
           created_by: string | null
           id: string
           is_active: boolean
+          is_defective: boolean | null
           is_demo: boolean | null
           owner_id: string | null
           price: number | null
@@ -761,6 +762,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           is_active?: boolean
+          is_defective?: boolean | null
           is_demo?: boolean | null
           owner_id?: string | null
           price?: number | null
@@ -774,6 +776,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           is_active?: boolean
+          is_defective?: boolean | null
           is_demo?: boolean | null
           owner_id?: string | null
           price?: number | null
