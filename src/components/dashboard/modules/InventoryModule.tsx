@@ -71,6 +71,7 @@ interface Regulator {
   type: string;
   quantity: number;
   price: number | null;
+  is_defective: boolean | null;
 }
 
 // Weight options
@@ -744,7 +745,7 @@ export const InventoryModule = () => {
     );
   };
 
-  // Regulator Card with full features
+  // Regulator Card with full features - matching StoveCard design
   const RegulatorCard = ({ regulator }: { regulator: Regulator }) => {
     const status = getStockStatus(regulator.quantity);
     const isSize22 = regulator.type === "22mm";
@@ -754,12 +755,23 @@ export const InventoryModule = () => {
       await handleUpdateRegulator(regulator.id, newValue);
     };
 
+    const handleMarkDefective = async () => {
+      try {
+        const { error } = await supabase.from("regulators").update({ is_defective: !regulator.is_defective }).eq("id", regulator.id);
+        if (error) throw error;
+        setRegulators(prev => prev.map(r => r.id === regulator.id ? { ...r, is_defective: !r.is_defective } : r));
+        toast.success(regulator.is_defective ? "Marked as functional" : "Marked as defective");
+      } catch (error: any) {
+        toast.error(error?.message || "Failed to update");
+      }
+    };
+
     return (
-      <Card className="border-border hover:shadow-md transition-shadow">
+      <Card className={`border-border hover:shadow-md transition-shadow ${regulator.is_defective ? 'border-destructive/50 bg-destructive/5' : ''}`}>
         <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-6 pt-3 sm:pt-4">
           <div className="flex items-center justify-between gap-2">
             <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
-              <Gauge className={`h-4 w-4 ${isSize22 ? "text-violet-500" : "text-cyan-500"}`} />
+              <Gauge className={`h-4 w-4 ${regulator.is_defective ? 'text-destructive' : isSize22 ? "text-violet-500" : "text-cyan-500"}`} />
               <span className="truncate">{regulator.brand}</span>
             </CardTitle>
             <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
@@ -780,6 +792,7 @@ export const InventoryModule = () => {
                 TotalGaz/Petromax
               </Badge>
             )}
+            {regulator.is_defective && <Badge variant="destructive" className="text-[10px] sm:text-xs">Defective</Badge>}
           </div>
         </CardHeader>
         <CardContent className="px-3 sm:px-6 pb-3 sm:pb-4 space-y-3">
@@ -814,20 +827,29 @@ export const InventoryModule = () => {
             </Button>
           </div>
 
-          {/* Price badge if available - matching stove design */}
+          {/* Price display if available - matching stove design */}
           {regulator.price && regulator.price > 0 && (
-            <Badge variant="outline" className="text-xs bg-green-500/10 text-green-600 border-green-500/30">
-              ৳{regulator.price.toLocaleString()}
-            </Badge>
+            <div className="flex items-center justify-between p-2 bg-muted/50 rounded-md">
+              <span className="text-xs text-muted-foreground">Price</span>
+              <span className="text-sm font-medium">৳{regulator.price.toLocaleString()}</span>
+            </div>
           )}
 
-          {/* Delete button - matching stove design with full-width row */}
-          <div className="flex items-center gap-2 pt-1">
-            <div className="flex-1" /> {/* Spacer to push delete button right */}
+          {/* Action buttons - matching stove design */}
+          <div className="flex gap-2 pt-1">
+            <Button 
+              variant={regulator.is_defective ? "default" : "outline"} 
+              size="sm" 
+              className={`flex-1 text-xs h-8 ${regulator.is_defective ? 'bg-green-600 hover:bg-green-700' : ''}`}
+              onClick={handleMarkDefective}
+            >
+              <AlertTriangle className="h-3 w-3 mr-1" />
+              {regulator.is_defective ? "Mark OK" : "Mark Defective"}
+            </Button>
             <Button 
               variant="ghost" 
-              size="icon"
-              className="h-9 w-9 text-destructive hover:text-destructive hover:bg-destructive/10" 
+              size="icon" 
+              className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10" 
               onClick={() => handleDeleteRegulator(regulator.id)}
             >
               <Trash2 className="h-4 w-4" />
