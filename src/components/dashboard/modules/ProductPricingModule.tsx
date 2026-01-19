@@ -400,7 +400,7 @@ export const ProductPricingModule = () => {
                   <Trash2 className="h-3 w-3" />
                 </Button>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 <EditablePriceCell 
                   product={packageProduct} 
                   field="company_price" 
@@ -421,6 +421,13 @@ export const ProductPricingModule = () => {
                   icon={Store}
                   label="Retail"
                   bgColor="bg-green-100 dark:bg-green-900/30"
+                />
+                <EditablePriceCell 
+                  product={packageProduct} 
+                  field="package_price" 
+                  icon={Package}
+                  label="Package"
+                  bgColor="bg-blue-100 dark:bg-blue-900/30"
                 />
               </div>
             </div>
