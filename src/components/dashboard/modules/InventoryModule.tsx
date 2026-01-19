@@ -675,8 +675,8 @@ export const InventoryModule = () => {
               {stove.burners === 1 ? "Single" : "Double"} Burner
             </Badge>
             {stove.model && (
-              <Badge variant="secondary" className="text-[10px] sm:text-xs">
-                {stove.model}
+              <Badge variant="secondary" className="text-[10px] sm:text-xs bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30">
+                Model: {stove.model}
               </Badge>
             )}
             {stove.is_damaged && <Badge variant="destructive" className="text-[10px] sm:text-xs">Damaged</Badge>}
