@@ -1078,15 +1078,9 @@ export const InventoryModule = () => {
                         ))}
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>Quantity</Label>
-                        <Input type="number" min={0} value={newStove.quantity} onChange={(e) => setNewStove({ ...newStove, quantity: parseInt(e.target.value) || 0 })} />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Warranty (months)</Label>
-                        <Input type="number" min={0} value={newStove.warranty_months} onChange={(e) => setNewStove({ ...newStove, warranty_months: parseInt(e.target.value) || 0 })} />
-                      </div>
+                    <div className="space-y-2">
+                      <Label>Quantity</Label>
+                      <Input type="number" min={0} value={newStove.quantity} onChange={(e) => setNewStove({ ...newStove, quantity: parseInt(e.target.value) || 0 })} />
                     </div>
                     <p className="text-xs text-muted-foreground bg-muted/50 p-3 rounded-lg">
                       💡 Prices are set in the Product Pricing module
