@@ -1257,23 +1257,45 @@ export const POSModule = () => {
                       className="pl-10 h-10 bg-background"
                     />
                   </div>
-                  <div className="flex items-center gap-2 bg-muted rounded-lg p-1">
-                    <Button
-                      size="sm"
-                      variant={saleType === 'retail' ? 'default' : 'ghost'}
-                      onClick={() => setSaleType('retail')}
-                      className="h-8 text-xs"
-                    >
-                      Retail
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant={saleType === 'wholesale' ? 'default' : 'ghost'}
-                      onClick={() => setSaleType('wholesale')}
-                      className={`h-8 text-xs ${saleType === 'wholesale' ? 'bg-purple-600 hover:bg-purple-700 text-white' : ''}`}
-                    >
-                      Wholesale
-                    </Button>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {/* Refill/Package Toggle */}
+                    <div className="flex items-center bg-muted rounded-lg p-1">
+                      <Button
+                        size="sm"
+                        variant={cylinderType === 'refill' ? 'default' : 'ghost'}
+                        onClick={() => setCylinderType('refill')}
+                        className="h-8 text-xs"
+                      >
+                        Refill
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={cylinderType === 'package' ? 'default' : 'ghost'}
+                        onClick={() => setCylinderType('package')}
+                        className={`h-8 text-xs ${cylinderType === 'package' ? 'bg-green-600 hover:bg-green-700 text-white' : ''}`}
+                      >
+                        Package
+                      </Button>
+                    </div>
+                    {/* Retail/Wholesale Toggle */}
+                    <div className="flex items-center bg-muted rounded-lg p-1">
+                      <Button
+                        size="sm"
+                        variant={saleType === 'retail' ? 'default' : 'ghost'}
+                        onClick={() => setSaleType('retail')}
+                        className="h-8 text-xs"
+                      >
+                        Retail
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={saleType === 'wholesale' ? 'default' : 'ghost'}
+                        onClick={() => setSaleType('wholesale')}
+                        className={`h-8 text-xs ${saleType === 'wholesale' ? 'bg-purple-600 hover:bg-purple-700 text-white' : ''}`}
+                      >
+                        Wholesale
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </CardContent>
