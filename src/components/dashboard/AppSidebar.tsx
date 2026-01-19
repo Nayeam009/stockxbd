@@ -64,28 +64,11 @@ export const AppSidebar = ({
     roles: ['owner', 'manager']
   }];
   const inventoryItems = [{
-    id: 'lpg-stock',
-    titleKey: 'lpg_stock',
-    titleSuffix: ' (22mm)',
+    id: 'inventory',
+    titleKey: 'inventory',
     icon: Flame,
     roles: ['owner', 'manager'],
     badge: analytics.lowStockItems.length > 0 ? analytics.lowStockItems.length : null
-  }, {
-    id: 'lpg-stock-20mm',
-    titleKey: 'lpg_stock',
-    titleSuffix: ' (20mm)',
-    icon: Flame,
-    roles: ['owner', 'manager']
-  }, {
-    id: 'stove-stock',
-    titleKey: 'stove_stock',
-    icon: ChefHat,
-    roles: ['owner', 'manager']
-  }, {
-    id: 'regulators',
-    titleKey: 'regulators',
-    icon: Wrench,
-    roles: ['owner', 'manager']
   }, {
     id: 'product-pricing',
     titleKey: 'product_pricing',
