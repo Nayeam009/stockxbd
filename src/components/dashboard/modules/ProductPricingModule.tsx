@@ -24,6 +24,8 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { BrandSelect } from "@/components/shared/BrandSelect";
+import { getLpgBrandNames, getStoveBrandNames, getRegulatorBrandNames } from "@/lib/brandConstants";
 
 interface ProductPrice {
   id: string;
@@ -594,12 +596,32 @@ export const ProductPricingModule = () => {
                   )}
                   <div className="space-y-2">
                     <Label className="text-sm">Product Name</Label>
-                    <Input 
-                      value={newProduct.product_name}
-                      onChange={e => setNewProduct({...newProduct, product_name: e.target.value})}
-                      placeholder="e.g., Bashundhara LP Gas 12kg Refill"
-                      className="h-9"
-                    />
+                    {newProduct.product_type === "stove" ? (
+                      <div className="space-y-2">
+                        <BrandSelect
+                          type="stove"
+                          value={newProduct.product_name}
+                          onChange={(value) => setNewProduct({...newProduct, product_name: value})}
+                          placeholder="Select or type stove brand..."
+                        />
+                      </div>
+                    ) : newProduct.product_type === "regulator" ? (
+                      <div className="space-y-2">
+                        <BrandSelect
+                          type="regulator"
+                          value={newProduct.product_name}
+                          onChange={(value) => setNewProduct({...newProduct, product_name: value})}
+                          placeholder="Select or type regulator brand..."
+                        />
+                      </div>
+                    ) : (
+                      <Input 
+                        value={newProduct.product_name}
+                        onChange={e => setNewProduct({...newProduct, product_name: e.target.value})}
+                        placeholder="e.g., Bashundhara LP Gas 12kg Refill"
+                        className="h-9"
+                      />
+                    )}
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">

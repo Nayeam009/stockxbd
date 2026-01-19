@@ -40,6 +40,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
+import { getBrandMouthSizeMap, getDefaultMouthSize } from "@/lib/brandConstants";
 import { supabase } from "@/integrations/supabase/client";
 import { parsePositiveNumber, parsePositiveInt, sanitizeString, customerSchema } from "@/lib/validationSchemas";
 import { InvoiceDialog } from "@/components/invoice/InvoiceDialog";
@@ -144,14 +145,8 @@ const WEIGHT_OPTIONS_22MM = ["5.5kg", "12kg", "12.5kg", "25kg", "35kg", "45kg"];
 const WEIGHT_OPTIONS_20MM = ["5kg", "10kg", "12kg", "15kg", "21kg", "35kg"];
 const mouthSizes = ["22mm", "20mm"];
 
-// Brand mouth size mapping (common defaults)
-const BRAND_MOUTH_SIZE_MAP: Record<string, string> = {
-  'bashundhara': '22mm',
-  'omera': '22mm',
-  'beximco': '22mm',
-  'total': '20mm',
-  'laugfs': '20mm'
-};
+// Brand mouth size mapping (generated from brand constants)
+const BRAND_MOUTH_SIZE_MAP = getBrandMouthSizeMap();
 
 // Credit limit for customers (configurable)
 const DEFAULT_CREDIT_LIMIT = 10000;
