@@ -7,9 +7,7 @@ import { DashboardOverview } from "@/components/dashboard/modules/DashboardOverv
 import { DailySalesModule } from "@/components/dashboard/modules/DailySalesModule";
 import { DailyExpensesModule } from "@/components/dashboard/modules/DailyExpensesModule";
 import { AnalysisModule } from "@/components/dashboard/modules/AnalysisModule";
-import { LPGStockModule } from "@/components/dashboard/modules/LPGStockModule";
-import { RegulatorsModule } from "@/components/dashboard/modules/RegulatorsModule";
-import { StoveStockModule } from "@/components/dashboard/modules/StoveStockModule";
+import { InventoryModule } from "@/components/dashboard/modules/InventoryModule";
 import { OnlineDeliveryModule } from "@/components/dashboard/modules/OnlineDeliveryModule";
 import { SearchModule } from "@/components/dashboard/modules/SearchModule";
 import { POSModule } from "@/components/dashboard/modules/POSModule";
@@ -163,8 +161,8 @@ const Dashboard = () => {
             userRole={userRole}
           />
         );
-      case "regulators":
-        return <RegulatorsModule />;
+      case "inventory":
+        return <InventoryModule />;
       case "exchange":
         return <ExchangeModule />;
       case "profile":
@@ -179,11 +177,6 @@ const Dashboard = () => {
         return <AnalysisModule />;
       case "daily-sales":
         return <DailySalesModule />;
-      case "lpg-stock":
-      case "lpg-stock-20mm":
-        return <LPGStockModule />;
-      case "stove-stock":
-        return <StoveStockModule />;
       case "driver-sales":
         return <DailySalesModule />;
       case "community":
