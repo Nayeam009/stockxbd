@@ -1386,9 +1386,9 @@ export const POSModule = () => {
                       </div>
                     </div>
 
-                    {/* Mouth Size Selection - Matching Inventory Module Style */}
+                    {/* Valve Size Selection - Matching Inventory Module Style */}
                     <div className="space-y-2">
-                      <Label className="text-xs font-medium">Mouth Size</Label>
+                      <Label className="text-xs font-medium">Valve Size</Label>
                       <div className="flex rounded-lg bg-muted/50 p-1 w-full sm:w-auto">
                         <Button
                           type="button"
@@ -1467,7 +1467,7 @@ export const POSModule = () => {
                       {showMouthSizeWarning && (
                         <div className="flex items-center gap-1 text-xs text-warning">
                           <AlertTriangle className="h-3 w-3" />
-                          Mouth size mismatch likely
+                          Valve size mismatch likely
                         </div>
                       )}
                     </div>
