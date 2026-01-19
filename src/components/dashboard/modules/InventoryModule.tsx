@@ -712,13 +712,6 @@ export const InventoryModule = () => {
             </Button>
           </div>
 
-          {/* Price display if available */}
-          {stove.price > 0 && (
-            <div className="flex items-center justify-between p-2 bg-muted/50 rounded-md">
-              <span className="text-xs text-muted-foreground">Price</span>
-              <span className="text-sm font-medium">৳{stove.price.toLocaleString()}</span>
-            </div>
-          )}
 
           {/* Action buttons */}
           <div className="flex gap-2 pt-1">
@@ -827,13 +820,6 @@ export const InventoryModule = () => {
             </Button>
           </div>
 
-          {/* Price display if available - matching stove design */}
-          {regulator.price && regulator.price > 0 && (
-            <div className="flex items-center justify-between p-2 bg-muted/50 rounded-md">
-              <span className="text-xs text-muted-foreground">Price</span>
-              <span className="text-sm font-medium">৳{regulator.price.toLocaleString()}</span>
-            </div>
-          )}
 
           {/* Action buttons - matching stove design */}
           <div className="flex gap-2 pt-1">
