@@ -28,7 +28,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 const Dashboard = () => {
   const [activeModule, setActiveModule] = useState("overview");
   const [searchQuery, setSearchQuery] = useState("");
-  const [userRole, setUserRole] = useState<'owner' | 'manager' | 'driver'>('driver');
+  const [userRole, setUserRole] = useState<'owner' | 'manager' | 'driver'>('owner');
   const [userName, setUserName] = useState("");
   const [authLoading, setAuthLoading] = useState(true);
   const isMobile = useIsMobile();
