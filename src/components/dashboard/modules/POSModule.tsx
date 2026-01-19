@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
+import { Switch } from "@/components/ui/switch";
 import { 
   Plus, 
   Minus, 
@@ -32,7 +33,11 @@ import {
   Undo2,
   FileCheck,
   Fuel,
-  Info
+  Info,
+  ChefHat,
+  Gauge,
+  ArrowLeftRight,
+  Cylinder
 } from "lucide-react";
 import { BarcodeScanner } from "@/components/pos/BarcodeScanner";
 import { generateInvoicePDF } from "@/lib/pdfExport";
@@ -153,16 +158,16 @@ const DEFAULT_CREDIT_LIMIT = 10000;
 
 export const POSModule = () => {
   const { t } = useLanguage();
-  const [activeTab, setActiveTab] = useState("lpg");
+  const [activeTab, setActiveTab] = useState("all");
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   
-  // LPG form state
+  // LPG form state - defaults set to refill, retail, 22mm
   const [cylinderType, setCylinderType] = useState<"refill" | "package">("refill");
   const [saleType, setSaleType] = useState<"retail" | "wholesale">("retail");
   const [sellingBrand, setSellingBrand] = useState("");
   const [returnBrand, setReturnBrand] = useState("");
-  const [weight, setWeight] = useState("");
+  const [weight, setWeight] = useState("12kg");
   const [mouthSize, setMouthSize] = useState("22mm");
   const [price, setPrice] = useState("0");
   const [quantity, setQuantity] = useState("1");
@@ -194,10 +199,14 @@ export const POSModule = () => {
   // Cart & Customer
   const [saleItems, setSaleItems] = useState<SaleItem[]>([]);
   const [customerName, setCustomerName] = useState("");
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>("walkin");
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [discount, setDiscount] = useState("0");
   const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null);
+  
+  // Configuration Panel state
+  const [showConfigPanel, setShowConfigPanel] = useState(false);
+  const [exchangeEmpty, setExchangeEmpty] = useState(true);
   
   // Recent Transactions for void/undo
   const [recentTransactions, setRecentTransactions] = useState<RecentTransaction[]>([]);
@@ -230,92 +239,135 @@ export const POSModule = () => {
   // Mouth size mismatch warning
   const [showMouthSizeWarning, setShowMouthSizeWarning] = useState(false);
 
-  // Fetch data
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
+  // Fetch data with real-time subscriptions
+  const fetchData = useCallback(async () => {
+    const [brandsRes, stovesRes, regulatorsRes, customersRes, pricesRes, driversRes] = await Promise.all([
+      supabase.from('lpg_brands').select('*').eq('is_active', true),
+      supabase.from('stoves').select('*').eq('is_active', true),
+      supabase.from('regulators').select('*').eq('is_active', true),
+      supabase.from('customers').select('*').order('name'),
+      supabase.from('product_prices').select('*').eq('is_active', true),
+      supabase.from('user_roles').select('user_id').eq('role', 'driver')
+    ]);
+
+    if (brandsRes.data) setLpgBrands(brandsRes.data);
+    if (stovesRes.data) setStoves(stovesRes.data);
+    if (regulatorsRes.data) setRegulators(regulatorsRes.data);
+    if (customersRes.data) setCustomers(customersRes.data);
+    if (pricesRes.data) setProductPrices(pricesRes.data);
+    
+    // Fetch driver profiles
+    if (driversRes.data && driversRes.data.length > 0) {
+      const driverIds = driversRes.data.map(d => d.user_id);
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('user_id, full_name, phone')
+        .in('user_id', driverIds);
       
-      const [brandsRes, stovesRes, regulatorsRes, customersRes, pricesRes, driversRes] = await Promise.all([
-        supabase.from('lpg_brands').select('*').eq('is_active', true),
-        supabase.from('stoves').select('*').eq('is_active', true),
-        supabase.from('regulators').select('*').eq('is_active', true),
-        supabase.from('customers').select('*').order('name'),
-        supabase.from('product_prices').select('*').eq('is_active', true),
-        supabase.from('user_roles').select('user_id').eq('role', 'driver')
-      ]);
-
-      if (brandsRes.data) setLpgBrands(brandsRes.data);
-      if (stovesRes.data) setStoves(stovesRes.data);
-      if (regulatorsRes.data) setRegulators(regulatorsRes.data);
-      if (customersRes.data) setCustomers(customersRes.data);
-      if (pricesRes.data) setProductPrices(pricesRes.data);
-      
-      // Fetch driver profiles
-      if (driversRes.data && driversRes.data.length > 0) {
-        const driverIds = driversRes.data.map(d => d.user_id);
-        const { data: profiles } = await supabase
-          .from('profiles')
-          .select('user_id, full_name, phone')
-          .in('user_id', driverIds);
-        
-        if (profiles) {
-          const formattedDrivers: Driver[] = profiles.map(p => ({
-            id: p.user_id,
-            name: p.full_name || 'Driver',
-            phone: p.phone || '',
-            status: 'active' as const
-          }));
-          setDrivers(formattedDrivers);
-        }
-      }
-
-      // Fetch recent transactions (last 5 minutes)
-      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-      const { data: recentTxns } = await supabase
-        .from('pos_transactions')
-        .select(`
-          id,
-          transaction_number,
-          total,
-          payment_status,
-          created_at,
-          customer_id,
-          pos_transaction_items (product_name, quantity)
-        `)
-        .gte('created_at', fiveMinutesAgo)
-        .order('created_at', { ascending: false })
-        .limit(5);
-
-      if (recentTxns) {
-        const txns: RecentTransaction[] = recentTxns.map(t => ({
-          id: t.id,
-          transactionNumber: t.transaction_number,
-          customerName: 'Customer', // We'll populate this from customer lookup if needed
-          total: Number(t.total),
-          status: t.payment_status,
-          createdAt: new Date(t.created_at),
-          items: t.pos_transaction_items?.map((i: any) => ({ name: i.product_name, quantity: i.quantity })) || []
+      if (profiles) {
+        const formattedDrivers: Driver[] = profiles.map(p => ({
+          id: p.user_id,
+          name: p.full_name || 'Driver',
+          phone: p.phone || '',
+          status: 'active' as const
         }));
-        setRecentTransactions(txns);
+        setDrivers(formattedDrivers);
       }
-      
+    }
+
+    // Fetch recent transactions (last 5 minutes)
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const { data: recentTxns } = await supabase
+      .from('pos_transactions')
+      .select(`
+        id,
+        transaction_number,
+        total,
+        payment_status,
+        created_at,
+        customer_id,
+        pos_transaction_items (product_name, quantity)
+      `)
+      .gte('created_at', fiveMinutesAgo)
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    if (recentTxns) {
+      const txns: RecentTransaction[] = recentTxns.map(t => ({
+        id: t.id,
+        transactionNumber: t.transaction_number,
+        customerName: 'Customer',
+        total: Number(t.total),
+        status: t.payment_status,
+        createdAt: new Date(t.created_at),
+        items: t.pos_transaction_items?.map((i: any) => ({ name: i.product_name, quantity: i.quantity })) || []
+      }));
+      setRecentTransactions(txns);
+    }
+  }, []);
+
+  useEffect(() => {
+    const initData = async () => {
+      setLoading(true);
+      await fetchData();
       setLoading(false);
     };
+    initData();
 
-    fetchData();
+    // Real-time subscriptions for inventory changes - NO DELAY
+    const lpgChannel = supabase
+      .channel('pos-lpg-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'lpg_brands' }, () => {
+        supabase.from('lpg_brands').select('*').eq('is_active', true).then(({ data }) => {
+          if (data) setLpgBrands(data);
+        });
+      })
+      .subscribe();
 
-    // Real-time subscription for customers
-    const channel = supabase
-      .channel('pos-customers')
+    const stoveChannel = supabase
+      .channel('pos-stoves-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'stoves' }, () => {
+        supabase.from('stoves').select('*').eq('is_active', true).then(({ data }) => {
+          if (data) setStoves(data);
+        });
+      })
+      .subscribe();
+
+    const regulatorChannel = supabase
+      .channel('pos-regulators-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'regulators' }, () => {
+        supabase.from('regulators').select('*').eq('is_active', true).then(({ data }) => {
+          if (data) setRegulators(data);
+        });
+      })
+      .subscribe();
+
+    const customerChannel = supabase
+      .channel('pos-customers-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'customers' }, () => {
-        fetchData();
+        supabase.from('customers').select('*').order('name').then(({ data }) => {
+          if (data) setCustomers(data);
+        });
+      })
+      .subscribe();
+
+    const priceChannel = supabase
+      .channel('pos-prices-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'product_prices' }, () => {
+        supabase.from('product_prices').select('*').eq('is_active', true).then(({ data }) => {
+          if (data) setProductPrices(data);
+        });
       })
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(lpgChannel);
+      supabase.removeChannel(stoveChannel);
+      supabase.removeChannel(regulatorChannel);
+      supabase.removeChannel(customerChannel);
+      supabase.removeChannel(priceChannel);
     };
-  }, []);
+  }, [fetchData]);
 
   // Get price functions
   const getRegulatorPrice = useCallback((brand: string, type: string) => {
@@ -323,6 +375,15 @@ export const POSModule = () => {
       p => p.product_type === 'regulator' && 
            p.product_name.toLowerCase().includes(brand.toLowerCase()) &&
            p.product_name.toLowerCase().includes(type.toLowerCase())
+    );
+    return priceEntry?.retail_price || 0;
+  }, [productPrices]);
+
+  const getStovePrice = useCallback((brand: string, model: string) => {
+    const priceEntry = productPrices.find(
+      p => p.product_type === 'stove' && 
+           p.product_name.toLowerCase().includes(brand.toLowerCase()) &&
+           p.product_name.toLowerCase().includes(model.toLowerCase())
     );
     return priceEntry?.retail_price || 0;
   }, [productPrices]);
@@ -372,24 +433,11 @@ export const POSModule = () => {
     }
   }, [sellingBrand, mouthSize, lpgBrands]);
 
-  // Auto-populate regulator price when selected
-  useEffect(() => {
-    if (selectedRegulator && productPrices.length > 0) {
-      const regulator = regulators.find(r => r.id === selectedRegulator);
-      if (regulator) {
-        const autoPrice = getRegulatorPrice(regulator.brand, regulator.type);
-        if (autoPrice > 0) {
-          setRegulatorPrice(autoPrice.toString());
-        }
-      }
-    }
-  }, [selectedRegulator, regulators, productPrices, getRegulatorPrice]);
-
   // Filter brands by mouth size, weight, and search
   const filteredBrands = useMemo(() => {
     return lpgBrands.filter(b => {
       const matchesSize = b.size === mouthSize;
-      const matchesWeight = !weight || b.weight === weight;
+      const matchesWeight = b.weight === weight;
       const matchesSearch = productSearch === "" || 
         b.name.toLowerCase().includes(productSearch.toLowerCase());
       return matchesSize && matchesWeight && matchesSearch;
@@ -531,7 +579,7 @@ export const POSModule = () => {
   // Add LPG to sale with refill/package logic validation
   const addLPGToSale = (forcePackage: boolean = false) => {
     if (!sellingBrand || !weight) {
-      toast({ title: "Please fill all required fields", variant: "destructive" });
+      toast({ title: "Please select a brand first", variant: "destructive" });
       return;
     }
 
@@ -562,7 +610,7 @@ export const POSModule = () => {
     }
 
     // CRITICAL LOGIC: Refill requires return brand unless customer pays deposit
-    if (cylinderType === 'refill' && (!returnBrand || returnBrand === "none") && !forcePackage) {
+    if (cylinderType === 'refill' && exchangeEmpty && (!returnBrand || returnBrand === "none") && !forcePackage) {
       // Show deposit prompt
       setPendingLpgItem({
         brand,
@@ -600,17 +648,17 @@ export const POSModule = () => {
 
     setSaleItems([...saleItems, newItem]);
     resetLPGForm();
-    toast({ title: "Added to sale" });
+    toast({ title: "Added to cart" });
   };
 
   const resetLPGForm = () => {
     setSellingBrand("");
     setReturnBrand("");
-    setWeight("");
     setPrice("0");
     setQuantity("1");
     setIsLeakedReturn(false);
     setShowMouthSizeWarning(false);
+    setShowConfigPanel(false);
   };
 
   // Handle deposit prompt response
@@ -635,87 +683,89 @@ export const POSModule = () => {
       setSaleItems([...saleItems, newItem]);
       resetLPGForm();
       toast({ 
-        title: "Added to sale", 
+        title: "Added to cart", 
         description: "Customer owes cylinder return",
       });
     }
     setPendingLpgItem(null);
   };
 
-  const addStoveToSale = () => {
-    const validatedQuantity = parsePositiveInt(stoveQuantity, 10000);
-    
-    if (!selectedStove) {
-      toast({ title: "Please select a stove", variant: "destructive" });
-      return;
-    }
+  // Quick add LPG from card
+  const handleQuickAddLPG = (brand: LPGBrand) => {
+    setSellingBrand(brand.id);
+    const autoPrice = getLPGPrice(brand.id, weight, cylinderType, saleType);
+    setPrice(autoPrice.toString());
+    setShowConfigPanel(true);
+  };
 
-    const stove = stoves.find(s => s.id === selectedStove);
-    if (!stove) return;
-
-    // BLOCK if stock = 0
+  // Add stove to sale
+  const addStoveToSale = (stove: Stove) => {
     if (stove.quantity === 0) {
       toast({ title: "Out of Stock", variant: "destructive" });
       return;
     }
-    if (validatedQuantity > stove.quantity) {
-      toast({ title: `Only ${stove.quantity} in stock`, variant: "destructive" });
-      return;
+
+    const stovePrice = getStovePrice(stove.brand, stove.model) || stove.price;
+
+    const existingItem = saleItems.find(item => item.stoveId === stove.id);
+    if (existingItem) {
+      if (existingItem.quantity >= stove.quantity) {
+        toast({ title: `Only ${stove.quantity} in stock`, variant: "destructive" });
+        return;
+      }
+      setSaleItems(saleItems.map(item => 
+        item.stoveId === stove.id 
+          ? { ...item, quantity: item.quantity + 1 }
+          : item
+      ));
+    } else {
+      const newItem: SaleItem = {
+        id: `stove-${Date.now()}`,
+        type: 'stove',
+        name: `${stove.brand} ${stove.model}`,
+        details: `${stove.burners} Burner`,
+        price: stovePrice,
+        quantity: 1,
+        stoveId: stove.id
+      };
+      setSaleItems([...saleItems, newItem]);
     }
-
-    const newItem: SaleItem = {
-      id: `stove-${Date.now()}`,
-      type: 'stove',
-      name: `${stove.brand} ${stove.model}`,
-      details: `${stove.burners} Burner`,
-      price: stove.price,
-      quantity: validatedQuantity,
-      stoveId: stove.id
-    };
-
-    setSaleItems([...saleItems, newItem]);
-    setSelectedStove("");
-    setStoveQuantity("1");
-    toast({ title: "Added to sale" });
+    toast({ title: "Added to cart" });
   };
 
-  const addRegulatorToSale = () => {
-    const validatedQuantity = parsePositiveInt(regulatorQuantity, 10000);
-    const validatedPrice = parsePositiveNumber(regulatorPrice, 10000000);
-    
-    if (!selectedRegulator) {
-      toast({ title: "Please select a regulator", variant: "destructive" });
-      return;
-    }
-
-    const regulator = regulators.find(r => r.id === selectedRegulator);
-    if (!regulator) return;
-
-    // BLOCK if stock = 0
+  // Add regulator to sale
+  const addRegulatorToSale = (regulator: Regulator) => {
     if (regulator.quantity === 0) {
       toast({ title: "Out of Stock", variant: "destructive" });
       return;
     }
-    if (validatedQuantity > regulator.quantity) {
-      toast({ title: `Only ${regulator.quantity} in stock`, variant: "destructive" });
-      return;
+
+    const regPrice = getRegulatorPrice(regulator.brand, regulator.type) || regulator.price || 0;
+
+    const existingItem = saleItems.find(item => item.regulatorId === regulator.id);
+    if (existingItem) {
+      if (existingItem.quantity >= regulator.quantity) {
+        toast({ title: `Only ${regulator.quantity} in stock`, variant: "destructive" });
+        return;
+      }
+      setSaleItems(saleItems.map(item => 
+        item.regulatorId === regulator.id 
+          ? { ...item, quantity: item.quantity + 1 }
+          : item
+      ));
+    } else {
+      const newItem: SaleItem = {
+        id: `reg-${Date.now()}`,
+        type: 'regulator',
+        name: regulator.brand,
+        details: regulator.type,
+        price: regPrice,
+        quantity: 1,
+        regulatorId: regulator.id
+      };
+      setSaleItems([...saleItems, newItem]);
     }
-
-    const newItem: SaleItem = {
-      id: `reg-${Date.now()}`,
-      type: 'regulator',
-      name: regulator.brand,
-      details: regulator.type,
-      price: validatedPrice,
-      quantity: validatedQuantity,
-      regulatorId: regulator.id
-    };
-
-    setSaleItems([...saleItems, newItem]);
-    setSelectedRegulator("");
-    setRegulatorQuantity("1");
-    setRegulatorPrice("0");
-    toast({ title: "Added to sale" });
+    toast({ title: "Added to cart" });
   };
 
   const addCustomProductToSale = () => {
@@ -751,17 +801,14 @@ export const POSModule = () => {
   // Handle barcode scanner product found
   const handleBarcodeProductFound = (product: any) => {
     if (product.type === 'lpg') {
-      setActiveTab('lpg');
-      setSellingBrand(product.id);
-      toast({ title: "LPG product selected", description: `${product.name} - Select weight and quantity` });
+      const brand = lpgBrands.find(b => b.id === product.id);
+      if (brand) handleQuickAddLPG(brand);
     } else if (product.type === 'stove') {
-      setActiveTab('stove');
-      setSelectedStove(product.id);
-      toast({ title: "Stove selected", description: product.name });
+      const stove = stoves.find(s => s.id === product.id);
+      if (stove) addStoveToSale(stove);
     } else if (product.type === 'regulator') {
-      setActiveTab('regulator');
-      setSelectedRegulator(product.id);
-      toast({ title: "Regulator selected", description: product.name });
+      const regulator = regulators.find(r => r.id === product.id);
+      if (regulator) addRegulatorToSale(regulator);
     }
     setShowBarcodeScanner(false);
   };
@@ -889,10 +936,6 @@ export const POSModule = () => {
       setShowVoidDialog(false);
       setTransactionToVoid(null);
       
-      // Refresh data
-      const { data: brandsRes } = await supabase.from('lpg_brands').select('*').eq('is_active', true);
-      if (brandsRes) setLpgBrands(brandsRes);
-      
     } catch (error: any) {
       toast({ title: "Error voiding transaction", description: error.message, variant: "destructive" });
     }
@@ -900,7 +943,7 @@ export const POSModule = () => {
 
   const handleCompleteSale = async (paymentStatus: 'completed' | 'pending') => {
     if (saleItems.length === 0) {
-      toast({ title: "No items in sale", variant: "destructive" });
+      toast({ title: "No items in cart", variant: "destructive" });
       return;
     }
 
@@ -1015,139 +1058,106 @@ export const POSModule = () => {
         if (!brand) continue;
 
         if (item.cylinderType === 'refill') {
-          // Refill sale: Full Stock -1
-          const newRefillCount = Math.max(0, brand.refill_cylinder - item.quantity);
-          await supabase
-            .from('lpg_brands')
-            .update({ refill_cylinder: newRefillCount })
-            .eq('id', item.brandId);
+          // Refill: Full Stock -1, Empty Stock +1 (or Problem Stock if leaked)
+          const newRefill = Math.max(0, brand.refill_cylinder - item.quantity);
           
-          setLpgBrands(prev => prev.map(b => 
-            b.id === item.brandId ? { ...b, refill_cylinder: newRefillCount } : b
-          ));
-
-          // If return brand specified, add to appropriate stock
           if (item.returnBrandId) {
+            // Customer returned an empty - add to appropriate stock
             const returnBrand = lpgBrands.find(b => b.id === item.returnBrandId);
             if (returnBrand) {
               if (item.isLeakedReturn) {
-                // Leaked cylinder goes to problem_cylinder
-                const newProblemCount = returnBrand.problem_cylinder + item.quantity;
+                // Goes to problem stock
                 await supabase
                   .from('lpg_brands')
-                  .update({ problem_cylinder: newProblemCount })
-                  .eq('id', item.returnBrandId);
-                
-                setLpgBrands(prev => prev.map(b => 
-                  b.id === item.returnBrandId ? { ...b, problem_cylinder: newProblemCount } : b
-                ));
+                  .update({ problem_cylinder: returnBrand.problem_cylinder + item.quantity })
+                  .eq('id', returnBrand.id);
               } else {
-                // Normal return goes to empty_cylinder
-                const newEmptyCount = returnBrand.empty_cylinder + item.quantity;
+                // Goes to empty stock
                 await supabase
                   .from('lpg_brands')
-                  .update({ empty_cylinder: newEmptyCount })
-                  .eq('id', item.returnBrandId);
-                
-                setLpgBrands(prev => prev.map(b => 
-                  b.id === item.returnBrandId ? { ...b, empty_cylinder: newEmptyCount } : b
-                ));
+                  .update({ empty_cylinder: returnBrand.empty_cylinder + item.quantity })
+                  .eq('id', returnBrand.id);
               }
             }
           }
-        } else if (item.cylinderType === 'package') {
-          // Package sale: Full Stock -1 (No Empty comes back)
-          const newPackageCount = Math.max(0, brand.package_cylinder - item.quantity);
+          
           await supabase
             .from('lpg_brands')
-            .update({ package_cylinder: newPackageCount })
-            .eq('id', item.brandId);
-          
-          setLpgBrands(prev => prev.map(b => 
-            b.id === item.brandId ? { ...b, package_cylinder: newPackageCount } : b
-          ));
+            .update({ refill_cylinder: newRefill })
+            .eq('id', brand.id);
+            
+        } else {
+          // Package: Just deduct from package stock
+          const newPackage = Math.max(0, brand.package_cylinder - item.quantity);
+          await supabase
+            .from('lpg_brands')
+            .update({ package_cylinder: newPackage })
+            .eq('id', brand.id);
         }
       }
 
       // Update Stove Stock
       for (const item of saleItems.filter(i => i.type === 'stove' && i.stoveId)) {
         const stove = stoves.find(s => s.id === item.stoveId);
-        if (!stove) continue;
-
-        const newQuantity = Math.max(0, stove.quantity - item.quantity);
-        await supabase
-          .from('stoves')
-          .update({ quantity: newQuantity })
-          .eq('id', item.stoveId);
-        
-        setStoves(prev => prev.map(s => 
-          s.id === item.stoveId ? { ...s, quantity: newQuantity } : s
-        ));
+        if (stove) {
+          const newQty = Math.max(0, stove.quantity - item.quantity);
+          await supabase
+            .from('stoves')
+            .update({ quantity: newQty })
+            .eq('id', stove.id);
+        }
       }
 
       // Update Regulator Stock
       for (const item of saleItems.filter(i => i.type === 'regulator' && i.regulatorId)) {
         const regulator = regulators.find(r => r.id === item.regulatorId);
-        if (!regulator) continue;
-
-        const newQuantity = Math.max(0, regulator.quantity - item.quantity);
-        await supabase
-          .from('regulators')
-          .update({ quantity: newQuantity })
-          .eq('id', item.regulatorId);
-        
-        setRegulators(prev => prev.map(r => 
-          r.id === item.regulatorId ? { ...r, quantity: newQuantity } : r
-        ));
+        if (regulator) {
+          const newQty = Math.max(0, regulator.quantity - item.quantity);
+          await supabase
+            .from('regulators')
+            .update({ quantity: newQty })
+            .eq('id', regulator.id);
+        }
       }
 
-      // Update customer dues if sale is marked as pending (due)
-      if (customerId && paymentStatus === 'pending') {
-        const currentCustomer = customers.find(c => c.id === customerId);
-        if (currentCustomer) {
-          const newTotalDue = (currentCustomer.total_due || 0) + total;
-          // Track cylinder due for package or no-return refill sales
-          const cylindersDue = saleItems
-            .filter(item => item.type === 'lpg' && (!item.returnBrandId || item.cylinderType === 'package'))
-            .reduce((sum, item) => sum + item.quantity, 0);
-          const newCylindersDue = (currentCustomer.cylinders_due || 0) + cylindersDue;
-
+      // Update customer dues if pending
+      if (paymentStatus === 'pending' && customerId) {
+        const customer = customers.find(c => c.id === customerId);
+        if (customer) {
+          const newDue = (customer.total_due || 0) + total;
+          const newCylindersDue = (customer.cylinders_due || 0) + packageCylinderCount;
           await supabase
             .from('customers')
-            .update({
-              total_due: newTotalDue,
+            .update({ 
+              total_due: newDue,
               cylinders_due: newCylindersDue,
-              billing_status: 'pending',
               last_order_date: new Date().toISOString()
             })
             .eq('id', customerId);
-
-          setCustomers(customers.map(c => 
-            c.id === customerId 
-              ? { ...c, total_due: newTotalDue, cylinders_due: newCylindersDue, billing_status: 'pending' }
-              : c
-          ));
         }
-      } else if (customerId) {
-        await supabase
-          .from('customers')
-          .update({ last_order_date: new Date().toISOString() })
-          .eq('id', customerId);
       }
 
+      // Stock movement record
+      await supabase
+        .from('stock_movements')
+        .insert({
+          movement_type: 'sale',
+          notes: `POS Sale: ${transactionNumber}`,
+          reference_id: transaction?.id,
+          created_by: user.id
+        });
+
       // Prepare invoice data
-      const displayName = selectedCustomer?.name || sanitizedCustomerName || "Walk-in Customer";
-      const driverName = selectedDriverId ? drivers.find(d => d.id === selectedDriverId)?.name : undefined;
-      
-      setLastTransaction({
+      const displayName = selectedCustomer?.name || customerName || "Walk-in Customer";
+      const invoiceData = {
         invoiceNumber: transactionNumber,
         date: new Date(),
-        customer: {
+        customer: { 
           name: displayName,
-          phone: selectedCustomer?.phone || undefined,
-          address: selectedCustomer?.address || undefined
+          phone: selectedCustomer?.phone,
+          address: selectedCustomer?.address
         },
-        driver: driverName,
+        driver: selectedDriverId ? drivers.find(d => d.id === selectedDriverId)?.name : undefined,
         items: saleItems.map(item => ({
           name: item.name,
           description: item.details,
@@ -1158,41 +1168,39 @@ export const POSModule = () => {
         subtotal,
         discount: validatedDiscount,
         total: Math.max(0, subtotal - validatedDiscount),
-        paymentStatus: paymentStatus === 'completed' ? 'paid' : 'due',
+        paymentStatus,
         paymentMethod: 'cash'
-      });
+      };
 
-      // Add to recent transactions
-      setRecentTransactions(prev => [{
-        id: transaction?.id || '',
-        transactionNumber,
-        customerName: displayName,
-        total: Math.max(0, subtotal - validatedDiscount),
-        status: paymentStatus,
-        createdAt: new Date(),
-        items: saleItems.map(item => ({ name: item.name, quantity: item.quantity }))
-      }, ...prev].slice(0, 5));
+      setLastTransaction(invoiceData);
+      setShowPrintTypeDialog(true);
 
-      setShowInvoiceDialog(true);
-      
-      // Clear form
+      // Reset form
       setSaleItems([]);
-      setCustomerName("");
-      setSelectedCustomerId(null);
-      setSelectedCustomer(null);
       setDiscount("0");
+      setSelectedCustomerId("walkin");
+      setSelectedCustomer(null);
+      setCustomerName("");
       setSelectedDriverId(null);
-
+      
       toast({ 
         title: paymentStatus === 'completed' ? "Sale completed!" : "Saved as due",
-        description: `Invoice: ${transactionNumber}`
+        description: `Transaction: ${transactionNumber}`
       });
 
     } catch (error: any) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      console.error('Sale error:', error);
+      toast({ title: "Error processing sale", description: error.message, variant: "destructive" });
     } finally {
       setProcessing(false);
     }
+  };
+
+  // Get stock status styling
+  const getStockStatusStyle = (stock: number) => {
+    if (stock === 0) return { bg: "bg-red-500/10", text: "text-red-500", label: "Out" };
+    if (stock < 5) return { bg: "bg-amber-500/10", text: "text-amber-600", label: `${stock}` };
+    return { bg: "bg-emerald-500/10", text: "text-emerald-600", label: `${stock}` };
   };
 
   if (loading) {
@@ -1206,575 +1214,523 @@ export const POSModule = () => {
 
   return (
     <TooltipProvider>
-      <div className="space-y-4 pb-20 sm:pb-6">
-        {/* Header - Matching Inventory/Pricing Module Style */}
+      <div className="space-y-3 sm:space-y-4 pb-20 sm:pb-6">
+        {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-2xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg flex-shrink-0">
               <ShoppingCart className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
             </div>
             <div>
-              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground">{t('pos')}</h1>
-              <p className="text-muted-foreground text-xs sm:text-sm">Inventory-Synced Sales System</p>
+              <h1 className="text-xl sm:text-2xl font-bold text-foreground">{t('pos')}</h1>
+              <p className="text-muted-foreground text-xs sm:text-sm">Real-Time Inventory Sync</p>
             </div>
           </div>
-          <Button onClick={() => setShowBarcodeScanner(true)} variant="outline" size="sm" className="gap-2 w-full sm:w-auto">
-            <ScanLine className="h-4 w-4" />
-            Scan Barcode
-          </Button>
-        </div>
-
-        {/* Stats Cards - Matching Inventory/Pricing Module */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-          <Card className="border-border bg-card hover:shadow-sm transition-shadow">
-            <CardContent className="p-3 sm:p-4">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="p-1.5 sm:p-2 rounded-lg bg-primary/10">
-                  <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[10px] sm:text-xs text-muted-foreground truncate">Cart Items</p>
-                  <p className="text-lg sm:text-xl font-bold text-foreground">{saleItems.length}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="border-border bg-card hover:shadow-sm transition-shadow">
-            <CardContent className="p-3 sm:p-4">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="p-1.5 sm:p-2 rounded-lg bg-green-500/10">
-                  <Package className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[10px] sm:text-xs text-muted-foreground truncate">LPG Brands</p>
-                  <p className="text-lg sm:text-xl font-bold text-foreground">{lpgBrands.length}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="border-border bg-card hover:shadow-sm transition-shadow">
-            <CardContent className="p-3 sm:p-4">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="p-1.5 sm:p-2 rounded-lg bg-orange-500/10">
-                  <Fuel className="h-4 w-4 sm:h-5 sm:w-5 text-orange-500" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[10px] sm:text-xs text-muted-foreground truncate">Stoves</p>
-                  <p className="text-lg sm:text-xl font-bold text-foreground">{stoves.length}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="border-border bg-card hover:shadow-sm transition-shadow">
-            <CardContent className="p-3 sm:p-4">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="p-1.5 sm:p-2 rounded-lg bg-purple-500/10">
-                  <Truck className="h-4 w-4 sm:h-5 sm:w-5 text-purple-500" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[10px] sm:text-xs text-muted-foreground truncate">Regulators</p>
-                  <p className="text-lg sm:text-xl font-bold text-foreground">{regulators.length}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-1.5">
+              <span className="text-xs text-muted-foreground">Mode:</span>
+              <Badge variant={saleType === 'retail' ? 'default' : 'secondary'} className="text-xs cursor-pointer" onClick={() => setSaleType(saleType === 'retail' ? 'wholesale' : 'retail')}>
+                {saleType === 'retail' ? 'Retail' : 'Wholesale'}
+              </Badge>
+            </div>
+            <Button onClick={() => setShowBarcodeScanner(true)} variant="outline" size="sm" className="gap-2">
+              <ScanLine className="h-4 w-4" />
+              <span className="hidden sm:inline">Scan</span>
+            </Button>
+          </div>
         </div>
 
         {/* Main Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {/* Left Side - Product Entry */}
-          <div className="lg:col-span-2 space-y-4">
-            {/* Product Search */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search products..."
-                value={productSearch}
-                onChange={(e) => setProductSearch(e.target.value)}
-                className="pl-10 h-10 bg-muted/50"
-              />
-            </div>
-
-            {/* Product Tabs - Matching Inventory Module Style */}
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="bg-muted/50 p-1 w-full grid grid-cols-4">
-                <TabsTrigger value="lpg" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground gap-1 text-xs sm:text-sm">
-                  <Fuel className="h-3 w-3 sm:h-4 sm:w-4" />
-                  <span className="hidden sm:inline">LPG</span>
-                  <span className="sm:hidden">LPG</span>
-                </TabsTrigger>
-                <TabsTrigger value="stove" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white gap-1 text-xs sm:text-sm">
-                  <span className="hidden sm:inline">Stove</span>
-                  <span className="sm:hidden">Stove</span>
-                </TabsTrigger>
-                <TabsTrigger value="regulator" className="data-[state=active]:bg-violet-500 data-[state=active]:text-white gap-1 text-xs sm:text-sm">
-                  <span className="hidden sm:inline">Reg.</span>
-                  <span className="sm:hidden">Reg.</span>
-                </TabsTrigger>
-                <TabsTrigger value="custom" className="data-[state=active]:bg-gray-600 data-[state=active]:text-white gap-1 text-xs sm:text-sm">
-                  <span className="hidden sm:inline">Custom</span>
-                  <span className="sm:hidden">Custom</span>
-                </TabsTrigger>
-              </TabsList>
-
-              {/* LPG Tab - The Brain of the POS */}
-              <TabsContent value="lpg">
-                <Card className="border-border hover:shadow-md transition-shadow">
-                  <CardHeader className="p-3 sm:p-4 pb-2 sm:pb-3">
-                    <CardTitle className="text-sm sm:text-base flex items-center gap-2">
-                      <Fuel className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
-                      LPG Cylinder Sale
-                    </CardTitle>
-                    <p className="text-xs text-muted-foreground">
-                      Inventory auto-synced • Cross-brand swap supported
-                    </p>
-                  </CardHeader>
-                  <CardContent className="p-3 sm:p-4 pt-0 space-y-4">
-                    {/* Cylinder Type & Sale Type - Improved Layout */}
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-2">
-                        <Label className="text-xs font-medium">Cylinder Type</Label>
-                        <div className="flex rounded-lg bg-muted/50 p-1">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant={cylinderType === 'refill' ? 'default' : 'ghost'}
-                            onClick={() => setCylinderType('refill')}
-                            className="flex-1 h-8 text-xs"
-                          >
-                            Refill
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant={cylinderType === 'package' ? 'default' : 'ghost'}
-                            onClick={() => setCylinderType('package')}
-                            className={`flex-1 h-8 text-xs ${cylinderType === 'package' ? 'bg-green-600 hover:bg-green-700' : ''}`}
-                          >
-                            Package
-                          </Button>
-                        </div>
-                        <p className="text-[10px] text-muted-foreground">
-                          {cylinderType === 'refill' ? 'Customer returns empty' : 'New connection (deposit)'}
-                        </p>
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-xs font-medium">Sale Type</Label>
-                        <div className="flex rounded-lg bg-muted/50 p-1">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant={saleType === 'retail' ? 'default' : 'ghost'}
-                            onClick={() => setSaleType('retail')}
-                            className="flex-1 h-8 text-xs"
-                          >
-                            Retail
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant={saleType === 'wholesale' ? 'secondary' : 'ghost'}
-                            onClick={() => setSaleType('wholesale')}
-                            className={`flex-1 h-8 text-xs ${saleType === 'wholesale' ? 'bg-purple-600 hover:bg-purple-700 text-white' : ''}`}
-                          >
-                            Wholesale
-                          </Button>
-                        </div>
-                        <p className="text-[10px] text-muted-foreground">
-                          {saleType === 'wholesale' ? 'Bulk buyer price' : 'Standard price'}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Valve Size Selection - Matching Inventory Module Style */}
-                    <div className="space-y-2">
-                      <Label className="text-xs font-medium">Valve Size</Label>
-                      <div className="flex rounded-lg bg-muted/50 p-1 w-full sm:w-auto">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant={mouthSize === "22mm" ? "default" : "ghost"}
-                          className="flex-1 sm:flex-none h-8"
-                          onClick={() => {
-                            setMouthSize("22mm");
-                            setWeight("");
-                            setSellingBrand("");
-                          }}
-                        >
-                          22mm
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant={mouthSize === "20mm" ? "default" : "ghost"}
-                          className={`flex-1 sm:flex-none h-8 ${mouthSize === "20mm" ? "bg-cyan-500 hover:bg-cyan-600 text-white" : ""}`}
-                          onClick={() => {
-                            setMouthSize("20mm");
-                            setWeight("");
-                            setSellingBrand("");
-                          }}
-                        >
-                          20mm
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* Weight Selection - Matching Inventory Style */}
-                    <div className="space-y-2">
-                      <Label className="text-xs font-medium">Weight</Label>
-                      <div className="flex flex-wrap gap-2">
-                        {(mouthSize === "22mm" ? WEIGHT_OPTIONS_22MM : WEIGHT_OPTIONS_20MM).map(w => (
-                          <Button
-                            key={w}
-                            variant={weight === w ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => {
-                              setWeight(w);
-                              setSellingBrand("");
-                            }}
-                            className={`text-xs ${weight === w ? "bg-primary text-primary-foreground" : ""}`}
-                          >
-                            {w}
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Selling Brand */}
-                    <div className="space-y-2">
-                      <Label className="text-xs font-medium">Selling Brand</Label>
-                      <Select value={sellingBrand} onValueChange={setSellingBrand}>
-                        <SelectTrigger className="h-10 text-sm">
-                          <SelectValue placeholder="Select brand to sell..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {filteredBrands.map(brand => {
-                            const stock = cylinderType === 'refill' ? brand.refill_cylinder : brand.package_cylinder;
-                            return (
-                              <SelectItem key={brand.id} value={brand.id} disabled={stock === 0}>
-                                <div className="flex items-center gap-2">
-                                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: brand.color }} />
-                                  <span>{brand.name}</span>
-                                  <Badge variant={stock > 0 ? "secondary" : "destructive"} className="text-[10px] ml-auto">
-                                    {stock === 0 ? 'Out' : stock}
-                                  </Badge>
-                                </div>
-                              </SelectItem>
-                            );
-                          })}
-                        </SelectContent>
-                      </Select>
-                      {showMouthSizeWarning && (
-                        <div className="flex items-center gap-1 text-xs text-warning">
-                          <AlertTriangle className="h-3 w-3" />
-                          Valve size mismatch likely
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Return Brand - Allow cross-swap */}
-                    {cylinderType === 'refill' && (
-                      <div className="space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <Label className="text-xs font-medium">Return Brand (from customer)</Label>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Info className="h-3 w-3 text-muted-foreground cursor-help" />
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-[200px]">
-                              <p className="text-xs">Can be different from selling brand (cross-swap)</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </div>
-                        <Select value={returnBrand} onValueChange={setReturnBrand}>
-                          <SelectTrigger className="h-9 text-xs">
-                            <SelectValue placeholder="Customer returns..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">No Return</SelectItem>
-                            {allBrandsForReturn.map(brand => (
-                              <SelectItem key={brand.id} value={brand.id}>
-                                <div className="flex items-center gap-2">
-                                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: brand.color }} />
-                                  <span>{brand.name} ({brand.weight})</span>
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        
-                        {/* Leak Check */}
-                        {returnBrand && returnBrand !== "none" && (
-                          <div className="flex items-center gap-2 mt-2 p-2 bg-muted/50 rounded-md">
-                            <Checkbox
-                              id="leakCheck"
-                              checked={isLeakedReturn}
-                              onCheckedChange={(checked) => setIsLeakedReturn(checked as boolean)}
-                            />
-                            <label htmlFor="leakCheck" className="text-xs cursor-pointer">
-                              Leaked/Problem Cylinder
-                            </label>
-                            {isLeakedReturn && (
-                              <Badge variant="destructive" className="text-[10px] ml-auto">
-                                → Problem Stock
-                              </Badge>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Price & Quantity */}
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="space-y-1.5">
-                        <Label className="text-xs font-medium">Price ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
-                        <Input 
-                          type="number" 
-                          value={price} 
-                          onChange={(e) => setPrice(e.target.value)}
-                          className="h-9 text-xs"
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs font-medium">Quantity</Label>
-                        <Input 
-                          type="number" 
-                          value={quantity} 
-                          onChange={(e) => setQuantity(e.target.value)}
-                          min="1"
-                          className="h-9 text-xs"
-                        />
-                      </div>
-                    </div>
-
-                    <Button 
-                      onClick={() => addLPGToSale(false)} 
-                      className="w-full h-9 text-sm"
-                      disabled={!sellingBrand || !weight || getLPGStock(sellingBrand, cylinderType) === 0}
-                    >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Add to Cart
-                    </Button>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              {/* Stove Tab */}
-              <TabsContent value="stove">
-                <Card className="border-border hover:shadow-md transition-shadow">
-                  <CardHeader className="p-3 sm:p-4 pb-2 sm:pb-3">
-                    <CardTitle className="text-sm sm:text-base flex items-center gap-2">
-                      <Fuel className="h-4 w-4 sm:h-5 sm:w-5 text-orange-500" />
-                      Gas Stove
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-3 sm:p-4 pt-0 space-y-4">
-                    <div className="space-y-2">
-                      <Label className="text-xs font-medium">Select Stove</Label>
-                      <Select value={selectedStove} onValueChange={setSelectedStove}>
-                        <SelectTrigger className="h-10 text-sm">
-                          <SelectValue placeholder="Select stove..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {filteredStoves.map(stove => (
-                            <SelectItem key={stove.id} value={stove.id} disabled={stove.quantity === 0}>
-                              <div className="flex items-center justify-between w-full gap-2">
-                                <span>{stove.brand} {stove.model} ({stove.burners}B)</span>
-                                <Badge variant={stove.quantity > 0 ? "secondary" : "destructive"} className="text-[10px]">
-                                  {stove.quantity === 0 ? 'Out' : `${stove.quantity}`}
-                                </Badge>
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-xs font-medium">Quantity</Label>
-                      <Input 
-                        type="number" 
-                        value={stoveQuantity} 
-                        onChange={(e) => setStoveQuantity(e.target.value)}
-                        min="1"
-                        className="h-10 text-sm"
-                      />
-                    </div>
-                    <Button 
-                      onClick={addStoveToSale} 
-                      className="w-full h-10 text-sm bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
-                      disabled={!selectedStove || getStoveStock(selectedStove) === 0}
-                    >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Add to Cart
-                    </Button>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              {/* Regulator Tab */}
-              <TabsContent value="regulator">
-                <Card className="border-border hover:shadow-md transition-shadow">
-                  <CardHeader className="p-3 sm:p-4 pb-2 sm:pb-3">
-                    <CardTitle className="text-sm sm:text-base flex items-center gap-2">
-                      <Truck className="h-4 w-4 sm:h-5 sm:w-5 text-violet-500" />
-                      Regulator
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-3 sm:p-4 pt-0 space-y-4">
-                    <div className="space-y-2">
-                      <Label className="text-xs font-medium">Select Regulator</Label>
-                      <Select value={selectedRegulator} onValueChange={setSelectedRegulator}>
-                        <SelectTrigger className="h-10 text-sm">
-                          <SelectValue placeholder="Select regulator..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {filteredRegulators.map(reg => (
-                            <SelectItem key={reg.id} value={reg.id} disabled={reg.quantity === 0}>
-                              <div className="flex items-center justify-between w-full gap-2">
-                                <span>{reg.brand} ({reg.type})</span>
-                                <Badge variant={reg.quantity > 0 ? "secondary" : "destructive"} className="text-[10px]">
-                                  {reg.quantity === 0 ? 'Out' : `${reg.quantity}`}
-                                </Badge>
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-2">
-                        <Label className="text-xs font-medium">Price</Label>
-                        <Input 
-                          type="number" 
-                          value={regulatorPrice} 
-                          onChange={(e) => setRegulatorPrice(e.target.value)}
-                          className="h-10 text-sm"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-xs font-medium">Quantity</Label>
-                        <Input 
-                          type="number" 
-                          value={regulatorQuantity} 
-                          onChange={(e) => setRegulatorQuantity(e.target.value)}
-                          min="1"
-                          className="h-10 text-sm"
-                        />
-                      </div>
-                    </div>
-                    <Button 
-                      onClick={addRegulatorToSale} 
-                      className="w-full h-10 text-sm bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700"
-                      disabled={!selectedRegulator || getRegulatorStock(selectedRegulator) === 0}
-                    >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Add to Cart
-                    </Button>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              {/* Custom Tab */}
-              <TabsContent value="custom">
-                <Card className="border-border hover:shadow-md transition-shadow">
-                  <CardHeader className="p-3 sm:p-4 pb-2 sm:pb-3">
-                    <CardTitle className="text-sm sm:text-base">Custom Item</CardTitle>
-                    <p className="text-xs text-muted-foreground">Service charges, delivery fees, etc.</p>
-                  </CardHeader>
-                  <CardContent className="p-3 sm:p-4 pt-0 space-y-4">
-                    <div className="space-y-2">
-                      <Label className="text-xs font-medium">Item Name</Label>
-                      <Input 
-                        value={customProductName} 
-                        onChange={(e) => setCustomProductName(e.target.value)}
-                        placeholder="e.g., Delivery Fee"
-                        className="h-10 text-sm"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-2">
-                        <Label className="text-xs font-medium">Price</Label>
-                        <Input 
-                          type="number" 
-                          value={customProductPrice} 
-                          onChange={(e) => setCustomProductPrice(e.target.value)}
-                          className="h-10 text-sm"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-xs font-medium">Quantity</Label>
-                        <Input 
-                          type="number" 
-                          value={customProductQuantity} 
-                          onChange={(e) => setCustomProductQuantity(e.target.value)}
-                          min="1"
-                          className="h-10 text-sm"
-                        />
-                      </div>
-                    </div>
-                    <Button 
-                      onClick={addCustomProductToSale} 
-                      className="w-full h-10 text-sm"
-                      disabled={!customProductName.trim()}
-                    >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Add to Cart
-                    </Button>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
-
-            {/* Cart - Updated Design */}
-            <Card className="border-border hover:shadow-md transition-shadow">
-              <CardHeader className="p-3 sm:p-4 pb-2 sm:pb-3">
-                <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
-                  <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
-                  Cart ({saleItems.length})
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-3 sm:p-4 pt-0">
-                {saleItems.length === 0 ? (
-                  <div className="text-center py-8">
-                    <ShoppingCart className="h-10 w-10 mx-auto text-muted-foreground/30 mb-2" />
-                    <p className="text-muted-foreground text-sm">No items added</p>
-                    <p className="text-xs text-muted-foreground/70 mt-1">Select products to add</p>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
+          {/* Left Side - Product Selection */}
+          <div className="lg:col-span-2 space-y-3">
+            {/* Search & Quick Filters */}
+            <Card className="border-border">
+              <CardContent className="p-3">
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Scan QR / Type Product Name..."
+                      value={productSearch}
+                      onChange={(e) => setProductSearch(e.target.value)}
+                      className="pl-10 h-10 bg-background"
+                    />
                   </div>
-                ) : (
-                  <ScrollArea className="max-h-[200px] sm:max-h-[280px]">
-                    <div className="space-y-2">
-                      {saleItems.map(item => (
-                        <div key={item.id} className="flex items-center justify-between p-2 bg-muted/50 rounded-md gap-2">
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-xs truncate">{item.name}</p>
-                            <p className="text-[10px] text-muted-foreground truncate">{item.details}</p>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => updateItemQuantity(item.id, -1)}>
-                              <Minus className="h-3 w-3" />
-                            </Button>
-                            <span className="w-5 text-center text-xs">{item.quantity}</span>
-                            <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => updateItemQuantity(item.id, 1)}>
-                              <Plus className="h-3 w-3" />
-                            </Button>
-                          </div>
-                          <span className="font-bold text-xs min-w-[50px] text-right">
-                            {BANGLADESHI_CURRENCY_SYMBOL}{item.price * item.quantity}
-                          </span>
-                          <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => removeItem(item.id)}>
-                            <X className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  </ScrollArea>
-                )}
+                  <div className="flex items-center gap-2 bg-muted rounded-lg p-1">
+                    <Button
+                      size="sm"
+                      variant={saleType === 'retail' ? 'default' : 'ghost'}
+                      onClick={() => setSaleType('retail')}
+                      className="h-8 text-xs"
+                    >
+                      Retail
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={saleType === 'wholesale' ? 'default' : 'ghost'}
+                      onClick={() => setSaleType('wholesale')}
+                      className={`h-8 text-xs ${saleType === 'wholesale' ? 'bg-purple-600 hover:bg-purple-700 text-white' : ''}`}
+                    >
+                      Wholesale
+                    </Button>
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
+            {/* Product Tabs */}
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="bg-muted/50 p-1 w-full grid grid-cols-4 h-auto">
+                <TabsTrigger value="all" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground gap-1 text-xs sm:text-sm py-2">
+                  All
+                </TabsTrigger>
+                <TabsTrigger value="lpg" className="data-[state=active]:bg-green-600 data-[state=active]:text-white gap-1 text-xs sm:text-sm py-2">
+                  <Fuel className="h-3 w-3 sm:h-4 sm:w-4" />
+                  LPG
+                </TabsTrigger>
+                <TabsTrigger value="stove" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white gap-1 text-xs sm:text-sm py-2">
+                  <ChefHat className="h-3 w-3 sm:h-4 sm:w-4" />
+                  Stove
+                </TabsTrigger>
+                <TabsTrigger value="regulator" className="data-[state=active]:bg-violet-500 data-[state=active]:text-white gap-1 text-xs sm:text-sm py-2">
+                  <Gauge className="h-3 w-3 sm:h-4 sm:w-4" />
+                  Reg.
+                </TabsTrigger>
+              </TabsList>
+
+              {/* LPG Products */}
+              <TabsContent value="lpg" className="mt-3 space-y-3">
+                {/* LPG Controls */}
+                <div className="flex flex-wrap gap-2 items-center">
+                  {/* Valve Size */}
+                  <div className="flex bg-muted rounded-lg p-1">
+                    <Button
+                      size="sm"
+                      variant={mouthSize === "22mm" ? "default" : "ghost"}
+                      className="h-7 text-xs px-3"
+                      onClick={() => { setMouthSize("22mm"); setWeight("12kg"); }}
+                    >
+                      22mm
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={mouthSize === "20mm" ? "default" : "ghost"}
+                      className={`h-7 text-xs px-3 ${mouthSize === "20mm" ? "bg-cyan-500 text-white" : ""}`}
+                      onClick={() => { setMouthSize("20mm"); setWeight("12kg"); }}
+                    >
+                      20mm
+                    </Button>
+                  </div>
+                  {/* Weight */}
+                  <div className="flex flex-wrap gap-1">
+                    {(mouthSize === "22mm" ? WEIGHT_OPTIONS_22MM : WEIGHT_OPTIONS_20MM).map(w => (
+                      <Button
+                        key={w}
+                        variant={weight === w ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setWeight(w)}
+                        className={`h-7 text-xs px-2 ${weight === w ? "" : "bg-muted/50"}`}
+                      >
+                        {w}
+                      </Button>
+                    ))}
+                  </div>
+                  {/* Cylinder Type */}
+                  <div className="flex bg-muted rounded-lg p-1 ml-auto">
+                    <Button
+                      size="sm"
+                      variant={cylinderType === "refill" ? "default" : "ghost"}
+                      className="h-7 text-xs px-3"
+                      onClick={() => setCylinderType("refill")}
+                    >
+                      Refill
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={cylinderType === "package" ? "default" : "ghost"}
+                      className={`h-7 text-xs px-3 ${cylinderType === "package" ? "bg-green-600 text-white" : ""}`}
+                      onClick={() => setCylinderType("package")}
+                    >
+                      Package
+                    </Button>
+                  </div>
+                </div>
+
+                {/* LPG Product Cards */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
+                  {filteredBrands.map(brand => {
+                    const stock = cylinderType === 'refill' ? brand.refill_cylinder : brand.package_cylinder;
+                    const stockStyle = getStockStatusStyle(stock);
+                    const brandPrice = getLPGPrice(brand.id, weight, cylinderType, saleType);
+                    
+                    return (
+                      <Card 
+                        key={brand.id}
+                        className={`cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02] border-2 ${
+                          sellingBrand === brand.id ? 'border-primary ring-2 ring-primary/20' : 'border-border'
+                        } ${stock === 0 ? 'opacity-50' : ''}`}
+                        onClick={() => stock > 0 && handleQuickAddLPG(brand)}
+                      >
+                        <CardContent className="p-3">
+                          <div className="flex flex-col items-center text-center space-y-2">
+                            {/* Brand Color Icon */}
+                            <div 
+                              className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl flex items-center justify-center shadow-sm"
+                              style={{ backgroundColor: brand.color }}
+                            >
+                              <Cylinder className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
+                            </div>
+                            
+                            {/* Brand Name */}
+                            <div className="space-y-0.5 min-h-[36px]">
+                              <p className="font-semibold text-xs sm:text-sm leading-tight line-clamp-2">{brand.name}</p>
+                              <p className="text-[10px] text-muted-foreground">{weight}</p>
+                            </div>
+                            
+                            {/* Price */}
+                            <div className="text-primary font-bold text-sm sm:text-base">
+                              {BANGLADESHI_CURRENCY_SYMBOL}{brandPrice.toLocaleString()}
+                            </div>
+                            
+                            {/* Stock Badge */}
+                            <Badge 
+                              variant="secondary" 
+                              className={`text-[10px] ${stockStyle.bg} ${stockStyle.text} border-0`}
+                            >
+                              Stock: {stockStyle.label}
+                            </Badge>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+
+                {filteredBrands.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Package className="h-12 w-12 mx-auto mb-2 opacity-30" />
+                    <p>No LPG brands found for {weight} ({mouthSize})</p>
+                  </div>
+                )}
+              </TabsContent>
+
+              {/* Stove Products */}
+              <TabsContent value="stove" className="mt-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
+                  {filteredStoves.map(stove => {
+                    const stockStyle = getStockStatusStyle(stove.quantity);
+                    const stovePrice = getStovePrice(stove.brand, stove.model) || stove.price;
+                    
+                    return (
+                      <Card 
+                        key={stove.id}
+                        className={`cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02] border-2 border-border ${stove.quantity === 0 ? 'opacity-50' : ''}`}
+                        onClick={() => addStoveToSale(stove)}
+                      >
+                        <CardContent className="p-3">
+                          <div className="flex flex-col items-center text-center space-y-2">
+                            {/* Stove Icon */}
+                            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-orange-500/20 flex items-center justify-center">
+                              <ChefHat className="h-6 w-6 sm:h-7 sm:w-7 text-orange-600" />
+                            </div>
+                            
+                            {/* Brand & Model */}
+                            <div className="space-y-0.5 min-h-[36px]">
+                              <p className="font-semibold text-xs sm:text-sm leading-tight">{stove.brand}</p>
+                              <p className="text-[10px] text-muted-foreground">{stove.model}</p>
+                            </div>
+                            
+                            {/* Burner Badge */}
+                            <Badge variant="outline" className="text-[10px]">
+                              {stove.burners} Burner
+                            </Badge>
+                            
+                            {/* Price */}
+                            <div className="text-primary font-bold text-sm sm:text-base">
+                              {BANGLADESHI_CURRENCY_SYMBOL}{stovePrice.toLocaleString()}
+                            </div>
+                            
+                            {/* Stock Badge */}
+                            <Badge 
+                              variant="secondary" 
+                              className={`text-[10px] ${stockStyle.bg} ${stockStyle.text} border-0`}
+                            >
+                              Stock: {stockStyle.label}
+                            </Badge>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+
+                {filteredStoves.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <ChefHat className="h-12 w-12 mx-auto mb-2 opacity-30" />
+                    <p>No stoves found</p>
+                  </div>
+                )}
+              </TabsContent>
+
+              {/* Regulator Products */}
+              <TabsContent value="regulator" className="mt-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
+                  {filteredRegulators.map(regulator => {
+                    const stockStyle = getStockStatusStyle(regulator.quantity);
+                    const regPrice = getRegulatorPrice(regulator.brand, regulator.type) || regulator.price || 0;
+                    
+                    return (
+                      <Card 
+                        key={regulator.id}
+                        className={`cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02] border-2 border-border ${regulator.quantity === 0 ? 'opacity-50' : ''}`}
+                        onClick={() => addRegulatorToSale(regulator)}
+                      >
+                        <CardContent className="p-3">
+                          <div className="flex flex-col items-center text-center space-y-2">
+                            {/* Regulator Icon */}
+                            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-violet-500/20 flex items-center justify-center">
+                              <Gauge className="h-6 w-6 sm:h-7 sm:w-7 text-violet-600" />
+                            </div>
+                            
+                            {/* Brand */}
+                            <div className="space-y-0.5 min-h-[36px]">
+                              <p className="font-semibold text-xs sm:text-sm leading-tight">{regulator.brand}</p>
+                              <p className="text-[10px] text-muted-foreground">Regulator</p>
+                            </div>
+                            
+                            {/* Size Badge */}
+                            <Badge variant="outline" className="text-[10px]">
+                              {regulator.type}
+                            </Badge>
+                            
+                            {/* Price */}
+                            <div className="text-primary font-bold text-sm sm:text-base">
+                              {BANGLADESHI_CURRENCY_SYMBOL}{regPrice.toLocaleString()}
+                            </div>
+                            
+                            {/* Stock Badge */}
+                            <Badge 
+                              variant="secondary" 
+                              className={`text-[10px] ${stockStyle.bg} ${stockStyle.text} border-0`}
+                            >
+                              Stock: {stockStyle.label}
+                            </Badge>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+
+                {filteredRegulators.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Gauge className="h-12 w-12 mx-auto mb-2 opacity-30" />
+                    <p>No regulators found</p>
+                  </div>
+                )}
+              </TabsContent>
+
+              {/* All Products Tab */}
+              <TabsContent value="all" className="mt-3 space-y-4">
+                {/* LPG Quick Filters for All tab */}
+                <div className="flex flex-wrap gap-2 items-center">
+                  <div className="flex bg-muted rounded-lg p-1">
+                    <Button size="sm" variant={mouthSize === "22mm" ? "default" : "ghost"} className="h-7 text-xs px-3" onClick={() => { setMouthSize("22mm"); setWeight("12kg"); }}>22mm</Button>
+                    <Button size="sm" variant={mouthSize === "20mm" ? "default" : "ghost"} className={`h-7 text-xs px-3 ${mouthSize === "20mm" ? "bg-cyan-500 text-white" : ""}`} onClick={() => { setMouthSize("20mm"); setWeight("12kg"); }}>20mm</Button>
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {(mouthSize === "22mm" ? WEIGHT_OPTIONS_22MM : WEIGHT_OPTIONS_20MM).slice(0, 3).map(w => (
+                      <Button key={w} variant={weight === w ? "default" : "outline"} size="sm" onClick={() => setWeight(w)} className={`h-7 text-xs px-2`}>{w}</Button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Combined Products Grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-3">
+                  {/* LPG Brands */}
+                  {filteredBrands.slice(0, 4).map(brand => {
+                    const stock = cylinderType === 'refill' ? brand.refill_cylinder : brand.package_cylinder;
+                    const stockStyle = getStockStatusStyle(stock);
+                    const brandPrice = getLPGPrice(brand.id, weight, cylinderType, saleType);
+                    
+                    return (
+                      <Card 
+                        key={brand.id}
+                        className={`cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02] border-2 ${sellingBrand === brand.id ? 'border-primary' : 'border-border'} ${stock === 0 ? 'opacity-50' : ''}`}
+                        onClick={() => stock > 0 && handleQuickAddLPG(brand)}
+                      >
+                        <CardContent className="p-2 sm:p-3">
+                          <div className="flex flex-col items-center text-center space-y-1.5">
+                            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: brand.color }}>
+                              <Cylinder className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+                            </div>
+                            <p className="font-semibold text-[10px] sm:text-xs leading-tight line-clamp-1">{brand.name}</p>
+                            <div className="text-primary font-bold text-xs sm:text-sm">{BANGLADESHI_CURRENCY_SYMBOL}{brandPrice.toLocaleString()}</div>
+                            <Badge variant="secondary" className={`text-[9px] ${stockStyle.bg} ${stockStyle.text} border-0`}>
+                              Stock: {stockStyle.label}
+                            </Badge>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+
+                  {/* Stoves */}
+                  {filteredStoves.slice(0, 2).map(stove => {
+                    const stockStyle = getStockStatusStyle(stove.quantity);
+                    const stovePrice = getStovePrice(stove.brand, stove.model) || stove.price;
+                    
+                    return (
+                      <Card key={stove.id} className={`cursor-pointer transition-all hover:shadow-lg border-2 border-border ${stove.quantity === 0 ? 'opacity-50' : ''}`} onClick={() => addStoveToSale(stove)}>
+                        <CardContent className="p-2 sm:p-3">
+                          <div className="flex flex-col items-center text-center space-y-1.5">
+                            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-orange-500/20 flex items-center justify-center">
+                              <ChefHat className="h-5 w-5 sm:h-6 sm:w-6 text-orange-600" />
+                            </div>
+                            <p className="font-semibold text-[10px] sm:text-xs leading-tight line-clamp-1">{stove.brand}</p>
+                            <div className="text-primary font-bold text-xs sm:text-sm">{BANGLADESHI_CURRENCY_SYMBOL}{stovePrice.toLocaleString()}</div>
+                            <Badge variant="secondary" className={`text-[9px] ${stockStyle.bg} ${stockStyle.text} border-0`}>Stock: {stockStyle.label}</Badge>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+
+                  {/* Regulators */}
+                  {filteredRegulators.slice(0, 2).map(regulator => {
+                    const stockStyle = getStockStatusStyle(regulator.quantity);
+                    const regPrice = getRegulatorPrice(regulator.brand, regulator.type) || regulator.price || 0;
+                    
+                    return (
+                      <Card key={regulator.id} className={`cursor-pointer transition-all hover:shadow-lg border-2 border-border ${regulator.quantity === 0 ? 'opacity-50' : ''}`} onClick={() => addRegulatorToSale(regulator)}>
+                        <CardContent className="p-2 sm:p-3">
+                          <div className="flex flex-col items-center text-center space-y-1.5">
+                            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-violet-500/20 flex items-center justify-center">
+                              <Gauge className="h-5 w-5 sm:h-6 sm:w-6 text-violet-600" />
+                            </div>
+                            <p className="font-semibold text-[10px] sm:text-xs leading-tight line-clamp-1">{regulator.brand}</p>
+                            <div className="text-primary font-bold text-xs sm:text-sm">{BANGLADESHI_CURRENCY_SYMBOL}{regPrice.toLocaleString()}</div>
+                            <Badge variant="secondary" className={`text-[9px] ${stockStyle.bg} ${stockStyle.text} border-0`}>Stock: {stockStyle.label}</Badge>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </TabsContent>
+            </Tabs>
+
+            {/* Configuration Panel - Shows when LPG brand is selected */}
+            {showConfigPanel && sellingBrand && (
+              <Card className="border-2 border-primary/30 bg-primary/5">
+                <CardHeader className="p-3 pb-2">
+                  <CardTitle className="text-sm flex items-center justify-between">
+                    <span className="flex items-center gap-2">
+                      <ArrowLeftRight className="h-4 w-4" />
+                      Configuration Panel
+                    </span>
+                    <span className="text-xs font-normal text-muted-foreground">
+                      Selected: {lpgBrands.find(b => b.id === sellingBrand)?.name}
+                    </span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-3 pt-0 space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* Weight */}
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Weight</Label>
+                      <Select value={weight} onValueChange={setWeight}>
+                        <SelectTrigger className="h-9 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(mouthSize === "22mm" ? WEIGHT_OPTIONS_22MM : WEIGHT_OPTIONS_20MM).map(w => (
+                            <SelectItem key={w} value={w}>{w}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {/* Valve */}
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Valve Size</Label>
+                      <Select value={mouthSize} onValueChange={(v) => { setMouthSize(v); setWeight(v === "22mm" ? "12kg" : "12kg"); }}>
+                        <SelectTrigger className="h-9 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="22mm">22mm</SelectItem>
+                          <SelectItem value="20mm">20mm</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {/* Exchange Empty Toggle */}
+                  <div className="flex items-center justify-between p-2 bg-muted/50 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <Label className="text-xs cursor-pointer">Exchange Empty?</Label>
+                      <Badge variant={exchangeEmpty ? "default" : "secondary"} className="text-[10px]">
+                        {exchangeEmpty ? "YES" : "NO"}
+                      </Badge>
+                    </div>
+                    <Switch checked={exchangeEmpty} onCheckedChange={setExchangeEmpty} />
+                  </div>
+
+                  {/* Return Brand Selection - Only if Exchange Empty is YES */}
+                  {exchangeEmpty && cylinderType === 'refill' && (
+                    <div className="space-y-2">
+                      <Label className="text-xs">Return Cylinder Brand (from customer)</Label>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {allBrandsForReturn.slice(0, 6).map(brand => (
+                          <Card 
+                            key={brand.id}
+                            className={`cursor-pointer transition-all hover:shadow border ${returnBrand === brand.id ? 'border-primary bg-primary/5' : 'border-border'}`}
+                            onClick={() => setReturnBrand(brand.id)}
+                          >
+                            <CardContent className="p-2 flex items-center gap-2">
+                              <div className="w-6 h-6 rounded flex items-center justify-center" style={{ backgroundColor: brand.color }}>
+                                <Cylinder className="h-3 w-3 text-white" />
+                              </div>
+                              <span className="text-[10px] font-medium truncate">{brand.name}</span>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                      
+                      {/* Leak Check */}
+                      {returnBrand && (
+                        <div className="flex items-center gap-2 p-2 bg-amber-500/10 rounded-md">
+                          <Checkbox
+                            id="leakCheck"
+                            checked={isLeakedReturn}
+                            onCheckedChange={(checked) => setIsLeakedReturn(checked as boolean)}
+                          />
+                          <label htmlFor="leakCheck" className="text-xs cursor-pointer">
+                            Leaked/Problem Cylinder
+                          </label>
+                          {isLeakedReturn && (
+                            <Badge variant="destructive" className="text-[10px] ml-auto">
+                              → Problem Stock
+                            </Badge>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Add to Cart Button */}
+                  <Button onClick={() => addLPGToSale()} className="w-full h-10" disabled={!sellingBrand}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    ADD TO CART
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Recent Transactions - Quick Void */}
             {recentTransactions.length > 0 && (
-              <Card className="border-0 shadow-sm border-l-4 border-l-warning">
+              <Card className="border-l-4 border-l-warning">
                 <CardHeader className="p-3 pb-2">
                   <CardTitle className="flex items-center gap-2 text-sm">
                     <History className="h-4 w-4" />
@@ -1809,67 +1765,27 @@ export const POSModule = () => {
             )}
           </div>
 
-          {/* Right Side - Customer & Summary */}
+          {/* Right Side - Billing Panel */}
           <div className="space-y-3 lg:sticky lg:top-4">
-            {/* Driver Assignment */}
-            {drivers.length > 0 && (
-              <Card className="border-0 shadow-sm border-l-4 border-l-accent">
-                <CardHeader className="p-3 pb-2">
-                  <CardTitle className="flex items-center gap-2 text-sm">
-                    <Truck className="h-4 w-4" />
-                    Assign Driver
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-3 pt-0">
-                  <Select value={selectedDriverId || ""} onValueChange={setSelectedDriverId}>
-                    <SelectTrigger className="h-9 text-xs">
-                      <SelectValue placeholder="Select driver for delivery..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Shop Sale (No Driver)</SelectItem>
-                      {drivers.map(driver => (
-                        <SelectItem key={driver.id} value={driver.id}>
-                          <div className="flex items-center gap-2">
-                            <div className={`w-2 h-2 rounded-full ${driver.status === 'active' ? 'bg-success' : 'bg-muted'}`} />
-                            {driver.name}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Customer Selection */}
-            <Card className="border-0 shadow-sm">
+            {/* Billing Header */}
+            <Card>
               <CardHeader className="p-3 pb-2">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2 text-sm">
-                    <User className="h-4 w-4" />
-                    Customer
-                  </CardTitle>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 text-xs"
-                    onClick={() => setShowAddCustomerDialog(true)}
-                  >
-                    <UserPlus className="h-3 w-3 mr-1" />
-                    New
-                  </Button>
-                </div>
+                <CardTitle className="text-base">Billing</CardTitle>
               </CardHeader>
-              <CardContent className="p-3 pt-0 space-y-2">
+              <CardContent className="p-3 pt-0 space-y-3">
+                {/* Customer Selection */}
                 <Select value={selectedCustomerId || ""} onValueChange={handleCustomerSelect}>
-                  <SelectTrigger className="h-9 text-xs">
-                    <SelectValue placeholder="Select customer..." />
+                  <SelectTrigger className="h-10">
+                    <div className="flex items-center gap-2">
+                      <User className="h-4 w-4 text-muted-foreground" />
+                      <SelectValue placeholder="Select customer..." />
+                    </div>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="walkin">
                       <div className="flex items-center gap-2">
                         <User className="h-3 w-3" />
-                        Walk-in Customer
+                        Walk-in (Cash)
                       </div>
                     </SelectItem>
                     {customers.map(customer => (
@@ -1887,160 +1803,176 @@ export const POSModule = () => {
                   </SelectContent>
                 </Select>
 
+                {/* Customer Info */}
                 {selectedCustomer && (
-                  <div className="p-2 bg-muted/50 rounded-md space-y-1.5">
+                  <div className="p-2 bg-muted/50 rounded-md space-y-1 text-xs">
                     <div className="flex items-center justify-between">
-                      <span className="font-medium text-xs">{selectedCustomer.name}</span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-5 text-[10px]"
-                        onClick={() => {
-                          fetchCustomerHistory(selectedCustomer.id);
-                          setShowCustomerHistoryDialog(true);
-                        }}
-                      >
+                      <span className="font-medium">{selectedCustomer.name}</span>
+                      <Button variant="ghost" size="sm" className="h-5 text-[10px]" onClick={() => { fetchCustomerHistory(selectedCustomer.id); setShowCustomerHistoryDialog(true); }}>
                         <History className="h-3 w-3 mr-1" />
                         History
                       </Button>
                     </div>
                     {selectedCustomer.phone && (
-                      <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                      <div className="flex items-center gap-1 text-muted-foreground">
                         <Phone className="h-2.5 w-2.5" />
                         {selectedCustomer.phone}
                       </div>
                     )}
-                    <div className="flex gap-3 pt-1 text-[10px]">
-                      <div>
-                        <span className="text-muted-foreground">Due:</span>
-                        <span className={`ml-1 font-medium ${(selectedCustomer.total_due || 0) > 0 ? 'text-destructive' : 'text-success'}`}>
-                          {BANGLADESHI_CURRENCY_SYMBOL}{selectedCustomer.total_due || 0}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Cylinders:</span>
-                        <span className={`ml-1 font-medium ${(selectedCustomer.cylinders_due || 0) > 0 ? 'text-warning' : 'text-success'}`}>
-                          {selectedCustomer.cylinders_due || 0}
-                        </span>
-                      </div>
+                    <div className="flex gap-3 pt-1">
+                      <span className="text-muted-foreground">Due: <span className={`font-medium ${(selectedCustomer.total_due || 0) > 0 ? 'text-destructive' : 'text-success'}`}>{BANGLADESHI_CURRENCY_SYMBOL}{selectedCustomer.total_due || 0}</span></span>
                     </div>
-                  </div>
-                )}
-
-                {selectedCustomerId === "walkin" && (
-                  <div className="flex items-center gap-1 p-2 bg-warning/10 rounded text-[10px] text-warning">
-                    <AlertCircle className="h-3 w-3" />
-                    Walk-in: Cash only, no credit
                   </div>
                 )}
               </CardContent>
             </Card>
 
-            {/* Summary */}
-            <Card className="border-0 shadow-sm bg-gradient-to-br from-card to-muted/30">
+            {/* Cart Summary */}
+            <Card>
               <CardHeader className="p-3 pb-2">
-                <CardTitle className="text-sm">Summary</CardTitle>
+                <CardTitle className="text-sm">Cart Summary</CardTitle>
               </CardHeader>
-              <CardContent className="p-3 pt-0 space-y-3">
+              <CardContent className="p-3 pt-0">
+                {saleItems.length === 0 ? (
+                  <div className="text-center py-6">
+                    <ShoppingCart className="h-10 w-10 mx-auto text-muted-foreground/30 mb-2" />
+                    <p className="text-muted-foreground text-sm">Cart is empty</p>
+                  </div>
+                ) : (
+                  <ScrollArea className="max-h-[200px]">
+                    <div className="space-y-2">
+                      {saleItems.map((item, index) => (
+                        <div key={item.id} className="flex items-start justify-between gap-2 p-2 bg-muted/30 rounded-md">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start gap-1">
+                              <span className="text-xs text-muted-foreground">{index + 1}.</span>
+                              <div>
+                                <p className="font-medium text-xs line-clamp-1">{item.name}</p>
+                                <p className="text-[10px] text-muted-foreground">{item.details}</p>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1">
+                              <Button variant="outline" size="icon" className="h-5 w-5" onClick={() => updateItemQuantity(item.id, -1)}>
+                                <Minus className="h-2.5 w-2.5" />
+                              </Button>
+                              <span className="w-4 text-center text-xs">{item.quantity}</span>
+                              <Button variant="outline" size="icon" className="h-5 w-5" onClick={() => updateItemQuantity(item.id, 1)}>
+                                <Plus className="h-2.5 w-2.5" />
+                              </Button>
+                            </div>
+                            <span className="font-semibold text-xs min-w-[45px] text-right">
+                              -{BANGLADESHI_CURRENCY_SYMBOL}{(item.price * item.quantity).toLocaleString()}
+                            </span>
+                            <Button variant="ghost" size="icon" className="h-5 w-5 text-destructive" onClick={() => removeItem(item.id)}>
+                              <X className="h-2.5 w-2.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Totals & Actions */}
+            <Card className="bg-gradient-to-br from-card to-muted/30">
+              <CardContent className="p-3 space-y-3">
                 <div className="space-y-2">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-muted-foreground">Subtotal</span>
-                    <span className="font-medium">{BANGLADESHI_CURRENCY_SYMBOL}{subtotal.toFixed(0)}</span>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Subtotal:</span>
+                    <span className="font-medium">{BANGLADESHI_CURRENCY_SYMBOL}{subtotal.toLocaleString()}</span>
                   </div>
                   <div className="flex items-center justify-between gap-2">
-                    <Label className="text-muted-foreground text-xs">Discount</Label>
+                    <span className="text-muted-foreground text-sm">Discount:</span>
                     <div className="flex items-center gap-1">
-                      <span className="text-muted-foreground text-xs">{BANGLADESHI_CURRENCY_SYMBOL}</span>
+                      <span className="text-muted-foreground text-sm">{BANGLADESHI_CURRENCY_SYMBOL}</span>
                       <Input
                         type="number"
                         value={discount}
                         onChange={(e) => setDiscount(e.target.value)}
-                        className="w-16 text-right h-7 text-xs"
+                        className="w-20 text-right h-8 text-sm"
                         min="0"
                       />
                     </div>
                   </div>
-                  {packageCylinderCount > 0 && (
-                    <div className="flex justify-between text-xs">
-                      <span className="text-muted-foreground">New Cylinders</span>
-                      <span className="font-medium text-warning">{packageCylinderCount} pcs</span>
-                    </div>
-                  )}
-                  <div className="border-t pt-2 flex justify-between">
-                    <span className="text-sm font-bold">Total</span>
-                    <span className="text-sm font-bold text-primary">{BANGLADESHI_CURRENCY_SYMBOL}{total.toFixed(0)}</span>
+                  <div className="border-t pt-2 flex justify-between items-center">
+                    <span className="text-base font-bold">GRAND TOTAL:</span>
+                    <span className="text-lg font-bold text-primary">{BANGLADESHI_CURRENCY_SYMBOL}{total.toLocaleString()}</span>
                   </div>
                 </div>
 
-                {/* Credit Limit Warning */}
-                {selectedCustomer && !canSaveAsDue && (
-                  <div className="flex items-center gap-1 p-2 bg-destructive/10 rounded text-[10px] text-destructive">
-                    <AlertTriangle className="h-3 w-3" />
-                    Credit limit ({BANGLADESHI_CURRENCY_SYMBOL}{DEFAULT_CREDIT_LIMIT}) exceeded
-                  </div>
-                )}
+                {/* Payment Mode */}
+                <div className="flex items-center justify-between p-2 bg-muted/50 rounded-lg">
+                  <span className="text-sm">Payment Mode</span>
+                  <Badge variant="default" className="bg-green-600">CASH</Badge>
+                </div>
 
-                {/* Action Buttons */}
-                <div className="space-y-2 pt-2">
+                {/* Action Button */}
+                <Button 
+                  onClick={() => handleCompleteSale('completed')}
+                  className="w-full h-12 text-base font-bold bg-primary hover:bg-primary/90"
+                  disabled={processing || saleItems.length === 0}
+                >
+                  {processing ? (
+                    <>
+                      <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <Printer className="h-5 w-5 mr-2" />
+                      CONFIRM SALE (PRINT)
+                    </>
+                  )}
+                </Button>
+
+                {/* Secondary Actions */}
+                {selectedCustomerId !== "walkin" && canSaveAsDue && (
                   <Button 
-                    onClick={() => handleCompleteSale('completed')}
-                    className="w-full h-9 text-sm"
+                    onClick={() => handleCompleteSale('pending')}
+                    variant="outline"
+                    className="w-full h-9 text-sm border-warning text-warning hover:bg-warning/10"
                     disabled={processing || saleItems.length === 0}
                   >
-                    {processing ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <FileCheck className="h-4 w-4 mr-1" />}
-                    {processing ? 'Processing...' : 'Complete Sale (Paid)'}
+                    <Clock className="h-4 w-4 mr-2" />
+                    Save as Due
                   </Button>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button 
-                          onClick={() => handleCompleteSale('pending')}
-                          variant="secondary"
-                          className="bg-warning hover:bg-warning/90 text-warning-foreground h-8 text-xs"
-                          disabled={processing || saleItems.length === 0 || selectedCustomerId === "walkin" || !canSaveAsDue}
-                        >
-                          <Clock className="h-3 w-3 mr-1" />
-                          Due
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p className="text-xs">Requires registered customer</p>
-                      </TooltipContent>
-                    </Tooltip>
-                    <Button 
-                      variant="outline"
-                      className="h-8 text-xs"
-                      disabled={saleItems.length === 0}
-                      onClick={() => {
-                        const displayName = selectedCustomer?.name || customerName || "Walk-in Customer";
-                        setLastTransaction({
-                          invoiceNumber: 'PREVIEW',
-                          date: new Date(),
-                          customer: { name: displayName },
-                          driver: selectedDriverId ? drivers.find(d => d.id === selectedDriverId)?.name : undefined,
-                          items: saleItems.map(item => ({
-                            name: item.name,
-                            description: item.details,
-                            quantity: item.quantity,
-                            unitPrice: item.price,
-                            total: item.price * item.quantity
-                          })),
-                          subtotal,
-                          discount: discountAmount,
-                          total,
-                          paymentStatus: 'preview',
-                          paymentMethod: 'cash'
-                        });
-                        setShowInvoiceDialog(true);
-                      }}
-                    >
-                      <Printer className="h-3 w-3 mr-1" />
-                      Preview
-                    </Button>
-                  </div>
-                </div>
+                )}
               </CardContent>
             </Card>
+
+            {/* Driver Assignment */}
+            {drivers.length > 0 && (
+              <Card>
+                <CardHeader className="p-3 pb-2">
+                  <CardTitle className="flex items-center gap-2 text-sm">
+                    <Truck className="h-4 w-4" />
+                    Assign Driver
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-3 pt-0">
+                  <Select value={selectedDriverId || ""} onValueChange={setSelectedDriverId}>
+                    <SelectTrigger className="h-9 text-xs">
+                      <SelectValue placeholder="Select driver for delivery..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Shop Sale (No Driver)</SelectItem>
+                      {drivers.map(driver => (
+                        <SelectItem key={driver.id} value={driver.id}>
+                          <div className="flex items-center gap-2">
+                            <div className={`w-2 h-2 rounded-full ${driver.status === 'active' ? 'bg-green-500' : 'bg-muted'}`} />
+                            {driver.name}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
 
@@ -2057,38 +1989,42 @@ export const POSModule = () => {
                 Customer is not returning an empty cylinder. How should we proceed?
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-3 py-4">
+            <div className="space-y-3">
               <Button 
                 onClick={() => handleDepositPromptResponse(true)} 
-                className="w-full"
-                variant="default"
+                className="w-full bg-green-600 hover:bg-green-700"
               >
+                <Package className="h-4 w-4 mr-2" />
                 Charge Deposit (Package Price)
               </Button>
               <Button 
                 onClick={() => handleDepositPromptResponse(false)} 
-                className="w-full"
                 variant="outline"
+                className="w-full"
               >
-                Promise Later (Track as Due Cylinder)
+                <Clock className="h-4 w-4 mr-2" />
+                Promise Later (Track Cylinder)
               </Button>
             </div>
           </DialogContent>
         </Dialog>
 
-        {/* Void Transaction Dialog */}
+        {/* Void Confirmation Dialog */}
         <Dialog open={showVoidDialog} onOpenChange={setShowVoidDialog}>
           <DialogContent className="max-w-sm">
             <DialogHeader>
-              <DialogTitle className="text-destructive">Void Transaction?</DialogTitle>
+              <DialogTitle className="flex items-center gap-2 text-warning">
+                <Undo2 className="h-5 w-5" />
+                Void Transaction?
+              </DialogTitle>
               <DialogDescription>
                 This will reverse the transaction and restore inventory.
               </DialogDescription>
             </DialogHeader>
             {transactionToVoid && (
-              <div className="p-3 bg-muted rounded-md text-sm">
-                <p><strong>{transactionToVoid.transactionNumber}</strong></p>
-                <p className="text-muted-foreground">{BANGLADESHI_CURRENCY_SYMBOL}{transactionToVoid.total}</p>
+              <div className="p-3 bg-muted rounded-lg text-sm">
+                <p><strong>Transaction:</strong> {transactionToVoid.transactionNumber}</p>
+                <p><strong>Total:</strong> {BANGLADESHI_CURRENCY_SYMBOL}{transactionToVoid.total}</p>
               </div>
             )}
             <DialogFooter className="gap-2">
@@ -2104,17 +2040,16 @@ export const POSModule = () => {
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <UserPlus className="h-5 w-5" />
-                Add Customer
+                Add New Customer
               </DialogTitle>
             </DialogHeader>
-            <div className="space-y-3 py-2">
+            <div className="space-y-3">
               <div className="space-y-1.5">
                 <Label className="text-xs">Name *</Label>
                 <Input
                   value={newCustomer.name}
                   onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })}
                   placeholder="Customer name"
-                  className="h-9"
                 />
               </div>
               <div className="space-y-1.5">
@@ -2122,8 +2057,7 @@ export const POSModule = () => {
                 <Input
                   value={newCustomer.phone}
                   onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })}
-                  placeholder="+880 1XXX-XXXXXX"
-                  className="h-9"
+                  placeholder="Phone number"
                 />
               </div>
               <div className="space-y-1.5">
@@ -2132,13 +2066,12 @@ export const POSModule = () => {
                   value={newCustomer.address}
                   onChange={(e) => setNewCustomer({ ...newCustomer, address: e.target.value })}
                   placeholder="Address"
-                  className="h-9"
                 />
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" size="sm" onClick={() => setShowAddCustomerDialog(false)}>Cancel</Button>
-              <Button size="sm" onClick={handleAddCustomer} disabled={!newCustomer.name.trim()}>Add</Button>
+              <Button variant="outline" onClick={() => setShowAddCustomerDialog(false)}>Cancel</Button>
+              <Button onClick={handleAddCustomer}>Add Customer</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -2149,24 +2082,24 @@ export const POSModule = () => {
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <History className="h-5 w-5" />
-                {selectedCustomer?.name}'s History
+                Purchase History
               </DialogTitle>
             </DialogHeader>
             <ScrollArea className="max-h-[300px]">
               {customerHistory.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8 text-sm">No history</p>
+                <p className="text-center text-muted-foreground py-4">No purchase history</p>
               ) : (
                 <div className="space-y-2">
-                  {customerHistory.map(record => (
-                    <div key={record.id} className="p-3 bg-muted/50 rounded-md">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs text-muted-foreground">{record.date}</span>
-                        <Badge variant={record.status === 'completed' ? 'default' : 'destructive'} className="text-[10px]">
-                          {record.status === 'completed' ? 'Paid' : 'Due'}
+                  {customerHistory.map(h => (
+                    <div key={h.id} className="p-2 bg-muted/50 rounded-md text-xs">
+                      <div className="flex justify-between">
+                        <span>{h.date}</span>
+                        <Badge variant={h.status === 'completed' ? 'default' : 'secondary'} className="text-[10px]">
+                          {h.status}
                         </Badge>
                       </div>
-                      <p className="text-xs truncate">{record.items}</p>
-                      <p className="font-medium text-sm mt-1">{BANGLADESHI_CURRENCY_SYMBOL}{record.total}</p>
+                      <p className="text-muted-foreground mt-1">{h.items}</p>
+                      <p className="font-medium mt-1">{BANGLADESHI_CURRENCY_SYMBOL}{h.total}</p>
                     </div>
                   ))}
                 </div>
@@ -2175,15 +2108,53 @@ export const POSModule = () => {
           </DialogContent>
         </Dialog>
 
+        {/* Print Type Dialog */}
+        <Dialog open={showPrintTypeDialog} onOpenChange={setShowPrintTypeDialog}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Printer className="h-5 w-5" />
+                Print Receipt
+              </DialogTitle>
+            </DialogHeader>
+            <div className="grid grid-cols-2 gap-3">
+              <Button
+                variant="outline"
+                className="h-20 flex-col gap-2"
+                onClick={() => {
+                  setPrintType('bill');
+                  setShowPrintTypeDialog(false);
+                  setShowInvoiceDialog(true);
+                }}
+              >
+                <FileText className="h-6 w-6" />
+                <span className="text-xs">Customer Bill</span>
+              </Button>
+              <Button
+                variant="outline"
+                className="h-20 flex-col gap-2"
+                onClick={() => {
+                  setPrintType('gatepass');
+                  setShowPrintTypeDialog(false);
+                  setShowInvoiceDialog(true);
+                }}
+              >
+                <Truck className="h-6 w-6" />
+                <span className="text-xs">Gate Pass</span>
+              </Button>
+            </div>
+            <Button variant="ghost" className="w-full" onClick={() => setShowPrintTypeDialog(false)}>
+              Skip Printing
+            </Button>
+          </DialogContent>
+        </Dialog>
+
         {/* Invoice Dialog */}
-        {lastTransaction && (
-          <InvoiceDialog
-            open={showInvoiceDialog}
-            onOpenChange={setShowInvoiceDialog}
-            invoiceData={lastTransaction}
-            onExportPDF={handleExportPDF}
-          />
-        )}
+        <InvoiceDialog
+          open={showInvoiceDialog}
+          onOpenChange={setShowInvoiceDialog}
+          invoiceData={lastTransaction}
+        />
 
         {/* Barcode Scanner */}
         <BarcodeScanner
