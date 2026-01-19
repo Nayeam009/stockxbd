@@ -358,7 +358,7 @@ export const ProductPricingModule = () => {
                   <Trash2 className="h-3 w-3" />
                 </Button>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 <EditablePriceCell 
                   product={refillProduct} 
                   field="company_price" 
@@ -379,13 +379,6 @@ export const ProductPricingModule = () => {
                   icon={Store}
                   label="Retail"
                   bgColor="bg-green-100 dark:bg-green-900/30"
-                />
-                <EditablePriceCell 
-                  product={refillProduct} 
-                  field="package_price" 
-                  icon={Package}
-                  label="Package"
-                  bgColor="bg-blue-100 dark:bg-blue-900/30"
                 />
               </div>
             </div>
@@ -407,7 +400,7 @@ export const ProductPricingModule = () => {
                   <Trash2 className="h-3 w-3" />
                 </Button>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 <EditablePriceCell 
                   product={packageProduct} 
                   field="company_price" 
@@ -428,13 +421,6 @@ export const ProductPricingModule = () => {
                   icon={Store}
                   label="Retail"
                   bgColor="bg-green-100 dark:bg-green-900/30"
-                />
-                <EditablePriceCell 
-                  product={packageProduct} 
-                  field="package_price" 
-                  icon={Package}
-                  label="Package"
-                  bgColor="bg-blue-100 dark:bg-blue-900/30"
                 />
               </div>
             </div>
@@ -556,9 +542,9 @@ export const ProductPricingModule = () => {
                     <Label className="text-sm">Product Type</Label>
                     <Select 
                       value={newProduct.product_type} 
-                      onValueChange={v => setNewProduct({...newProduct, product_type: v})}
+                      onValueChange={v => setNewProduct({...newProduct, product_type: v, product_name: ""})}
                     >
-                      <SelectTrigger className="h-9">
+                      <SelectTrigger className="h-10">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -568,14 +554,23 @@ export const ProductPricingModule = () => {
                       </SelectContent>
                     </Select>
                   </div>
+                  
+                  {/* LPG Brand Selection */}
                   {newProduct.product_type === "lpg" && (
                     <div className="space-y-2">
                       <Label className="text-sm">Brand</Label>
                       <Select 
                         value={newProduct.brand_id} 
-                        onValueChange={v => setNewProduct({...newProduct, brand_id: v})}
+                        onValueChange={v => {
+                          const brand = lpgBrands.find(b => b.id === v);
+                          setNewProduct({
+                            ...newProduct, 
+                            brand_id: v,
+                            product_name: brand ? `${brand.name} LP Gas ${brand.weight || '12kg'}` : ""
+                          });
+                        }}
                       >
-                        <SelectTrigger className="h-9">
+                        <SelectTrigger className="h-10">
                           <SelectValue placeholder="Select brand" />
                         </SelectTrigger>
                         <SelectContent>
@@ -583,7 +578,7 @@ export const ProductPricingModule = () => {
                             <SelectItem key={brand.id} value={brand.id}>
                               <div className="flex items-center gap-2">
                                 <span 
-                                  className="h-3 w-3 rounded-full" 
+                                  className="h-3 w-3 rounded-full flex-shrink-0" 
                                   style={{ backgroundColor: brand.color }}
                                 />
                                 {brand.name} ({brand.weight})
@@ -594,99 +589,113 @@ export const ProductPricingModule = () => {
                       </Select>
                     </div>
                   )}
-                  <div className="space-y-2">
-                    <Label className="text-sm">Product Name</Label>
-                    {newProduct.product_type === "stove" ? (
-                      <div className="space-y-2">
-                        <BrandSelect
-                          type="stove"
-                          value={newProduct.product_name}
-                          onChange={(value) => setNewProduct({...newProduct, product_name: value})}
-                          placeholder="Select or type stove brand..."
-                        />
-                      </div>
-                    ) : newProduct.product_type === "regulator" ? (
-                      <div className="space-y-2">
-                        <BrandSelect
-                          type="regulator"
-                          value={newProduct.product_name}
-                          onChange={(value) => setNewProduct({...newProduct, product_name: value})}
-                          placeholder="Select or type regulator brand..."
-                        />
-                      </div>
-                    ) : (
-                      <Input 
+                  
+                  {/* Stove Brand Selection */}
+                  {newProduct.product_type === "stove" && (
+                    <div className="space-y-2">
+                      <Label className="text-sm">Brand</Label>
+                      <BrandSelect
+                        type="stove"
                         value={newProduct.product_name}
-                        onChange={e => setNewProduct({...newProduct, product_name: e.target.value})}
-                        placeholder="e.g., Bashundhara LP Gas 12kg Refill"
-                        className="h-9"
-                      />
-                    )}
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-2">
-                      <Label className="text-sm">Size</Label>
-                      <Input 
-                        value={newProduct.size || ""}
-                        onChange={e => setNewProduct({...newProduct, size: e.target.value})}
-                        placeholder="12kg"
-                        className="h-9"
+                        onChange={(value) => setNewProduct({...newProduct, product_name: value})}
+                        placeholder="Select or type stove brand..."
                       />
                     </div>
+                  )}
+                  
+                  {/* Regulator Brand Selection */}
+                  {newProduct.product_type === "regulator" && (
                     <div className="space-y-2">
-                      <Label className="text-sm">Variant</Label>
-                      <Select 
-                        value={newProduct.variant || "Refill"} 
-                        onValueChange={v => setNewProduct({...newProduct, variant: v})}
-                      >
-                        <SelectTrigger className="h-9">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Refill">Refill</SelectItem>
-                          <SelectItem value="Package">Package</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <Label className="text-sm">Brand</Label>
+                      <BrandSelect
+                        type="regulator"
+                        value={newProduct.product_name}
+                        onChange={(value) => setNewProduct({...newProduct, product_name: value})}
+                        placeholder="Select or type regulator brand..."
+                      />
                     </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  )}
+                  
+                  {newProduct.product_type === "lpg" && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label className="text-sm">Size</Label>
+                        <Input 
+                          value={newProduct.size || ""}
+                          onChange={e => setNewProduct({...newProduct, size: e.target.value})}
+                          placeholder="12kg"
+                          className="h-10"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-sm">Variant</Label>
+                        <Select 
+                          value={newProduct.variant || "Refill"} 
+                          onValueChange={v => setNewProduct({...newProduct, variant: v})}
+                        >
+                          <SelectTrigger className="h-10">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Refill">Refill</SelectItem>
+                            <SelectItem value="Package">Package</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {(newProduct.product_type === "stove" || newProduct.product_type === "regulator") && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label className="text-sm">Size/Type</Label>
+                        <Input 
+                          value={newProduct.size || ""}
+                          onChange={e => setNewProduct({...newProduct, size: e.target.value})}
+                          placeholder={newProduct.product_type === "stove" ? "Single/Double" : "22mm/20mm"}
+                          className="h-10"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-sm">Model/Variant</Label>
+                        <Input 
+                          value={newProduct.variant || ""}
+                          onChange={e => setNewProduct({...newProduct, variant: e.target.value})}
+                          placeholder="e.g., GS-102"
+                          className="h-10"
+                        />
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="grid grid-cols-3 gap-3">
                     <div className="space-y-2">
-                      <Label className="text-sm">Company Price</Label>
+                      <Label className="text-sm">Company</Label>
                       <Input 
                         type="number"
                         value={newProduct.company_price}
                         onChange={e => setNewProduct({...newProduct, company_price: Number(e.target.value)})}
-                        className="h-9"
+                        className="h-10"
                         min={0}
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-sm">Distributor Price</Label>
+                      <Label className="text-sm">Distributor</Label>
                       <Input 
                         type="number"
                         value={newProduct.distributor_price}
                         onChange={e => setNewProduct({...newProduct, distributor_price: Number(e.target.value)})}
-                        className="h-9"
+                        className="h-10"
                         min={0}
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-sm">Retail Price</Label>
+                      <Label className="text-sm">Retail</Label>
                       <Input 
                         type="number"
                         value={newProduct.retail_price}
                         onChange={e => setNewProduct({...newProduct, retail_price: Number(e.target.value)})}
-                        className="h-9"
-                        min={0}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-sm">Package Price</Label>
-                      <Input 
-                        type="number"
-                        value={newProduct.package_price}
-                        onChange={e => setNewProduct({...newProduct, package_price: Number(e.target.value)})}
-                        className="h-9"
+                        className="h-10"
                         min={0}
                       />
                     </div>

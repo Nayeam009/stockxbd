@@ -135,7 +135,7 @@ export const InventoryModule = () => {
     name: "", color: "#22c55e", size: "22mm", weight: "12kg",
     package_cylinder: 0, refill_cylinder: 0, empty_cylinder: 0, problem_cylinder: 0,
   });
-  const [newStove, setNewStove] = useState({ brand: "", burners: 1, quantity: 0, warranty_months: 12 });
+  const [newStove, setNewStove] = useState({ brand: "", model: "", burners: 1, quantity: 0 });
   const [newRegulator, setNewRegulator] = useState({ brand: "", type: "22mm", quantity: 0 });
   
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -325,6 +325,8 @@ export const InventoryModule = () => {
           s.burners === newStove.burners
       );
 
+      const modelName = newStove.model.trim() || burnerLabel;
+      
       if (existing) {
         const { error } = await supabase
           .from("stoves")
@@ -336,21 +338,20 @@ export const InventoryModule = () => {
       } else {
         const { error } = await supabase.from("stoves").insert({
           brand: newStove.brand.trim(),
-          model: burnerLabel,
+          model: modelName,
           burners: newStove.burners,
           quantity: newStove.quantity,
           price: 0,
-          warranty_months: newStove.warranty_months,
           created_by: userData.user.id,
           owner_id: ownerId,
         });
         if (error) throw error;
 
-        await syncStoveToPricing(newStove.brand.trim(), burnerLabel);
+        await syncStoveToPricing(newStove.brand.trim(), modelName);
         toast.success("Stove added successfully");
       }
 
-      setNewStove({ brand: "", burners: 1, quantity: 0, warranty_months: 12 });
+      setNewStove({ brand: "", model: "", burners: 1, quantity: 0 });
       setIsAddStoveDialogOpen(false);
       await fetchData();
     } catch (error: any) {
@@ -673,13 +674,12 @@ export const InventoryModule = () => {
               <Flame className="h-3 w-3 mr-1" />
               {stove.burners === 1 ? "Single" : "Double"} Burner
             </Badge>
-            <Badge variant="outline" className="text-[10px] sm:text-xs">{stove.model}</Badge>
-            {stove.is_damaged && <Badge variant="destructive" className="text-[10px] sm:text-xs">Damaged</Badge>}
-            {stove.warranty_months && stove.warranty_months > 0 && (
-              <Badge variant="outline" className="text-[10px] sm:text-xs bg-green-500/10 text-green-600 border-green-500/30">
-                {stove.warranty_months}mo Warranty
+            {stove.model && (
+              <Badge variant="secondary" className="text-[10px] sm:text-xs">
+                {stove.model}
               </Badge>
             )}
+            {stove.is_damaged && <Badge variant="destructive" className="text-[10px] sm:text-xs">Damaged</Badge>}
           </div>
         </CardHeader>
         <CardContent className="px-3 sm:px-6 pb-3 sm:pb-4 space-y-3">
@@ -1043,10 +1043,7 @@ export const InventoryModule = () => {
                           <Input type="number" min={0} value={newLpgBrand.problem_cylinder} onChange={(e) => setNewLpgBrand({ ...newLpgBrand, problem_cylinder: parseInt(e.target.value) || 0 })} />
                         </div>
                       </div>
-                      <p className="text-xs text-muted-foreground bg-muted/50 p-3 rounded-lg">
-                        💡 Prices are set in the Product Pricing module and will be auto-synced
-                      </p>
-                      <Button onClick={handleAddLpgBrand} className="w-full" disabled={isSubmitting}>
+                      <Button onClick={handleAddLpgBrand} className="w-full h-11" disabled={isSubmitting}>
                         {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Add Brand"}
                       </Button>
                     </div>
@@ -1244,6 +1241,15 @@ export const InventoryModule = () => {
                       />
                     </div>
                     <div className="space-y-2">
+                      <Label>Model Number</Label>
+                      <Input 
+                        value={newStove.model} 
+                        onChange={(e) => setNewStove({ ...newStove, model: e.target.value })}
+                        placeholder="e.g., GS-102, WGS-LX3, etc."
+                        className="h-10"
+                      />
+                    </div>
+                    <div className="space-y-2">
                       <Label>Burner Type *</Label>
                       <div className="grid grid-cols-2 gap-3">
                         {[1, 2].map((burner) => (
@@ -1259,12 +1265,9 @@ export const InventoryModule = () => {
                     </div>
                     <div className="space-y-2">
                       <Label>Quantity</Label>
-                      <Input type="number" min={0} value={newStove.quantity} onChange={(e) => setNewStove({ ...newStove, quantity: parseInt(e.target.value) || 0 })} />
+                      <Input type="number" min={0} value={newStove.quantity} onChange={(e) => setNewStove({ ...newStove, quantity: parseInt(e.target.value) || 0 })} className="h-10" />
                     </div>
-                    <p className="text-xs text-muted-foreground bg-muted/50 p-3 rounded-lg">
-                      💡 Prices are set in the Product Pricing module
-                    </p>
-                    <Button onClick={handleAddStove} className="w-full bg-gradient-to-r from-orange-500 to-red-500" disabled={isSubmitting}>
+                    <Button onClick={handleAddStove} className="w-full h-11 bg-gradient-to-r from-orange-500 to-red-500" disabled={isSubmitting}>
                       {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Add Stove"}
                     </Button>
                   </div>
