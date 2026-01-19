@@ -680,33 +680,31 @@ export const InventoryModule = () => {
           </div>
         </CardHeader>
         <CardContent className="px-3 sm:px-6 pb-3 sm:pb-4 space-y-3">
-          {/* Quantity with quick adjust buttons */}
+          {/* Stock Label */}
+          <div className="text-[10px] sm:text-xs text-muted-foreground flex items-center gap-1">
+            <Package className="h-3 w-3" />Stock
+          </div>
+          {/* Quantity with quick adjust buttons - aligned */}
           <div className="flex items-center gap-2">
             <Button 
               variant="outline" 
               size="icon" 
-              className="h-8 w-8 shrink-0"
+              className="h-10 w-10 shrink-0"
               onClick={() => handleQuickAdjust(-1)}
               disabled={stove.quantity <= 0}
             >
               <Minus className="h-4 w-4" />
             </Button>
-            <div className="flex-1">
-              <EditableStockCell 
-                value={stove.quantity} 
-                itemId={stove.id} 
-                field="quantity" 
-                icon={Package} 
-                label="Stock" 
-                bgColor="bg-orange-100 dark:bg-orange-900/30" 
-                type="stove" 
-                onUpdate={(id, _, val) => handleUpdateStove(id, val)} 
-              />
+            <div
+              onClick={() => setEditingCell({ id: stove.id, field: "quantity", type: "stove" })}
+              className="flex-1 px-4 py-2 rounded-md cursor-pointer transition-all text-center font-bold text-lg bg-orange-100 dark:bg-orange-900/30 hover:opacity-80"
+            >
+              {stove.quantity}
             </div>
             <Button 
               variant="outline" 
               size="icon" 
-              className="h-8 w-8 shrink-0"
+              className="h-10 w-10 shrink-0"
               onClick={() => handleQuickAdjust(1)}
             >
               <Plus className="h-4 w-4" />
@@ -785,33 +783,31 @@ export const InventoryModule = () => {
           </div>
         </CardHeader>
         <CardContent className="px-3 sm:px-6 pb-3 sm:pb-4 space-y-3">
-          {/* Quantity with quick adjust buttons */}
+          {/* Stock Label */}
+          <div className="text-[10px] sm:text-xs text-muted-foreground flex items-center gap-1">
+            <Package className="h-3 w-3" />Stock
+          </div>
+          {/* Quantity with quick adjust buttons - aligned */}
           <div className="flex items-center gap-2">
             <Button 
               variant="outline" 
               size="icon" 
-              className="h-8 w-8 shrink-0"
+              className="h-10 w-10 shrink-0"
               onClick={() => handleQuickAdjust(-1)}
               disabled={regulator.quantity <= 0}
             >
               <Minus className="h-4 w-4" />
             </Button>
-            <div className="flex-1">
-              <EditableStockCell 
-                value={regulator.quantity} 
-                itemId={regulator.id} 
-                field="quantity" 
-                icon={Package} 
-                label="Stock" 
-                bgColor={isSize22 ? "bg-violet-100 dark:bg-violet-900/30" : "bg-cyan-100 dark:bg-cyan-900/30"} 
-                type="regulator" 
-                onUpdate={(id, _, val) => handleUpdateRegulator(id, val)} 
-              />
+            <div
+              onClick={() => setEditingCell({ id: regulator.id, field: "quantity", type: "regulator" })}
+              className={`flex-1 px-4 py-2 rounded-md cursor-pointer transition-all text-center font-bold text-lg hover:opacity-80 ${isSize22 ? "bg-violet-100 dark:bg-violet-900/30" : "bg-cyan-100 dark:bg-cyan-900/30"}`}
+            >
+              {regulator.quantity}
             </div>
             <Button 
               variant="outline" 
               size="icon" 
-              className="h-8 w-8 shrink-0"
+              className="h-10 w-10 shrink-0"
               onClick={() => handleQuickAdjust(1)}
             >
               <Plus className="h-4 w-4" />
@@ -825,13 +821,6 @@ export const InventoryModule = () => {
               <span className="text-sm font-medium">৳{regulator.price.toLocaleString()}</span>
             </div>
           )}
-
-          {/* Compatibility info */}
-          <div className="p-2 bg-muted/30 rounded-md">
-            <p className="text-[10px] sm:text-xs text-muted-foreground">
-              💡 Compatible with {isSize22 ? "22mm valve cylinders (Omera, Bashundhara, Jamuna)" : "20mm valve cylinders (TotalGaz, Petromax)"}
-            </p>
-          </div>
 
           {/* Delete button */}
           <div className="flex justify-end pt-1">
