@@ -180,9 +180,8 @@ const Dashboard = () => {
       case "daily-sales":
         return <DailySalesModule />;
       case "lpg-stock":
-        return <LPGStockModule size="22mm" />;
       case "lpg-stock-20mm":
-        return <LPGStockModule size="20mm" />;
+        return <LPGStockModule />;
       case "stove-stock":
         return <StoveStockModule />;
       case "driver-sales":
