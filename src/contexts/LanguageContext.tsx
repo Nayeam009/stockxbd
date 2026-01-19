@@ -142,7 +142,7 @@ export const translations: Translations = {
   "sale_type": { en: "Sale Type", bn: "বিক্রয় প্রকার" },
   "retail": { en: "Retail", bn: "খুচরা" },
   "wholesale": { en: "Wholesale", bn: "পাইকারি" },
-  "mouth_size": { en: "Mouth Size", bn: "মুখের আকার" },
+  "valve_size": { en: "Valve Size", bn: "ভালভ সাইজ" },
   "selling_brand": { en: "Selling Brand", bn: "বিক্রয় ব্র্যান্ড" },
   "return_brand": { en: "Return Brand", bn: "ফেরত ব্র্যান্ড" },
   "weight": { en: "Weight", bn: "ওজন" },
