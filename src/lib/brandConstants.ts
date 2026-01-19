@@ -26,11 +26,21 @@ export const LPG_BRANDS: LpgBrandInfo[] = [
   { name: "Runner", mouthSize: "22mm", color: "#d946ef" },
   { name: "Meghna", mouthSize: "22mm", color: "#a855f7" },
   { name: "Unitex", mouthSize: "22mm", color: "#facc15" },
+  { name: "Sena", mouthSize: "22mm", color: "#64748b" },
+  { name: "City", mouthSize: "22mm", color: "#78716c" },
+  { name: "RP", mouthSize: "22mm", color: "#0284c7" },
+  { name: "Golden", mouthSize: "22mm", color: "#ca8a04" },
+  { name: "Padma", mouthSize: "22mm", color: "#16a34a" },
+  { name: "Confidence", mouthSize: "22mm", color: "#9333ea" },
+  { name: "Unique", mouthSize: "22mm", color: "#ea580c" },
+  { name: "S Alam", mouthSize: "22mm", color: "#0d9488" },
   // 20mm Brands
   { name: "Totalgaz", mouthSize: "20mm", color: "#0891b2" },
   { name: "Laugfs", mouthSize: "20mm", color: "#7c3aed" },
   { name: "Petromax", mouthSize: "20mm", color: "#dc2626" },
   { name: "K-Gas", mouthSize: "20mm", color: "#059669" },
+  { name: "Lufs", mouthSize: "20mm", color: "#f59e0b" },
+  { name: "Shell", mouthSize: "20mm", color: "#facc15" },
 ];
 
 // ============= GAS STOVE BRANDS =============
@@ -50,6 +60,10 @@ export const STOVE_BRANDS: StoveBrandInfo[] = [
   { name: "Singer", country: "BD", countryName: "Bangladesh" },
   { name: "Minister", country: "BD", countryName: "Bangladesh" },
   { name: "Jamuna", country: "BD", countryName: "Bangladesh" },
+  { name: "Navana", country: "BD", countryName: "Bangladesh" },
+  { name: "Kiam", country: "BD", countryName: "Bangladesh" },
+  { name: "Rangs", country: "BD", countryName: "Bangladesh" },
+  { name: "Electra", country: "BD", countryName: "Bangladesh" },
   // International
   { name: "Rinnai", country: "JP", countryName: "Japan" },
   { name: "Midea", country: "CN", countryName: "China" },
@@ -61,6 +75,9 @@ export const STOVE_BRANDS: StoveBrandInfo[] = [
   { name: "Konka", country: "CN", countryName: "China" },
   { name: "LG", country: "KR", countryName: "South Korea" },
   { name: "Panasonic", country: "JP", countryName: "Japan" },
+  { name: "Paloma", country: "JP", countryName: "Japan" },
+  { name: "Prestige", country: "IN", countryName: "India" },
+  { name: "Pigeon", country: "IN", countryName: "India" },
 ];
 
 // ============= REGULATOR BRANDS =============
