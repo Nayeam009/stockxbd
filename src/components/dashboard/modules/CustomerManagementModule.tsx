@@ -323,92 +323,131 @@ export const CustomerManagementModule = () => {
   // Main View
   if (viewMode === 'main') {
     return (
-      <div className="space-y-4 sm:space-y-6">
-        {/* Header - Mobile optimized */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
-          <div>
-            <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground">Customer Management</h2>
-            <p className="text-xs sm:text-sm text-muted-foreground">Manage accounts and track dues</p>
+      <div className="space-y-4 sm:space-y-6 pb-4">
+        {/* Premium Header */}
+        <div className="relative">
+          <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-accent/5 rounded-xl -z-10" />
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-0">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg">
+                <Users className="h-5 w-5 sm:h-6 sm:w-6 text-primary-foreground" />
+              </div>
+              <div>
+                <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground tracking-tight">
+                  Customer Management
+                </h2>
+                <p className="text-xs sm:text-sm text-muted-foreground">
+                  Manage accounts • Track dues • Collect payments
+                </p>
+              </div>
+            </div>
+            <Button 
+              onClick={() => setAddCustomerDialogOpen(true)} 
+              size="sm" 
+              className="h-11 w-full sm:w-auto bg-primary hover:bg-primary/90 shadow-lg touch-manipulation"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Customer
+            </Button>
           </div>
-          <Button onClick={() => setAddCustomerDialogOpen(true)} size="sm" className="bg-primary hover:bg-primary/90 h-9 w-full sm:w-auto">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Customer
-          </Button>
         </div>
 
-        {/* Summary Stats - Mobile 2x2 grid */}
+        {/* Premium Summary Stats - 2x2 Grid */}
         <div className="grid grid-cols-2 gap-2 sm:gap-4">
-          <Card className="border-border">
-            <CardContent className="p-3 sm:p-4">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
-                  <Users className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
+          {/* Total Customers */}
+          <Card className="relative overflow-hidden border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+            <div className="absolute inset-0 bg-gradient-to-br from-muted/50 via-muted/30 to-transparent" />
+            <CardContent className="relative p-3 sm:p-5">
+              <div className="flex items-center gap-3">
+                <div className="h-9 w-9 sm:h-11 sm:w-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                  <Users className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-lg sm:text-2xl font-bold">{customers.length}</p>
-                  <p className="text-[10px] sm:text-xs text-muted-foreground truncate">Total Customers</p>
+                  <p className="text-xl sm:text-3xl font-bold text-foreground tabular-nums">{customers.length}</p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground font-medium uppercase tracking-wider">Customers</p>
                 </div>
               </div>
             </CardContent>
           </Card>
-          <Card className="bg-gradient-to-br from-destructive/10 via-card to-card border-destructive/20">
-            <CardContent className="p-3 sm:p-4">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg bg-destructive/20 flex items-center justify-center flex-shrink-0">
-                  <UserX className="h-4 w-4 sm:h-5 sm:w-5 text-destructive" />
+
+          {/* Due Accounts */}
+          <Card className="relative overflow-hidden border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+            <div className="absolute inset-0 bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-transparent" />
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-rose-500 to-rose-400" />
+            <CardContent className="relative p-3 sm:p-5">
+              <div className="flex items-center gap-3">
+                <div className="h-9 w-9 sm:h-11 sm:w-11 rounded-xl bg-rose-500/20 flex items-center justify-center shrink-0">
+                  <UserX className="h-4 w-4 sm:h-5 sm:w-5 text-rose-600 dark:text-rose-400" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-lg sm:text-2xl font-bold">{dueCustomers.length}</p>
-                  <p className="text-[10px] sm:text-xs text-muted-foreground truncate">Due Accounts</p>
+                  <p className="text-xl sm:text-3xl font-bold text-rose-600 dark:text-rose-400 tabular-nums">{dueCustomers.length}</p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground font-medium uppercase tracking-wider">Due</p>
                 </div>
               </div>
             </CardContent>
           </Card>
-          <Card className="border-border">
-            <CardContent className="p-3 sm:p-4">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
-                  <Banknote className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
+
+          {/* Total Due Amount */}
+          <Card className="relative overflow-hidden border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+            <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent" />
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 to-amber-400" />
+            <CardContent className="relative p-3 sm:p-5">
+              <div className="flex items-center gap-3">
+                <div className="h-9 w-9 sm:h-11 sm:w-11 rounded-xl bg-amber-500/20 flex items-center justify-center shrink-0">
+                  <Banknote className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600 dark:text-amber-400" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-base sm:text-2xl font-bold text-destructive">{BANGLADESHI_CURRENCY_SYMBOL}{totalAmountDue.toLocaleString()}</p>
-                  <p className="text-[10px] sm:text-xs text-muted-foreground truncate">Total Due</p>
+                  <p className="text-lg sm:text-2xl font-bold text-amber-600 dark:text-amber-400 tabular-nums truncate">
+                    {BANGLADESHI_CURRENCY_SYMBOL}{totalAmountDue.toLocaleString()}
+                  </p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground font-medium uppercase tracking-wider">Total Due</p>
                 </div>
               </div>
             </CardContent>
           </Card>
-          <Card className="bg-gradient-to-br from-green-500/10 via-card to-card border-green-500/20">
-            <CardContent className="p-3 sm:p-4">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg bg-green-500/20 flex items-center justify-center flex-shrink-0">
-                  <UserCheck className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />
+
+          {/* Paid/Clear Accounts */}
+          <Card className="relative overflow-hidden border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-transparent" />
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-emerald-400" />
+            <CardContent className="relative p-3 sm:p-5">
+              <div className="flex items-center gap-3">
+                <div className="h-9 w-9 sm:h-11 sm:w-11 rounded-xl bg-emerald-500/20 flex items-center justify-center shrink-0">
+                  <UserCheck className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 dark:text-emerald-400" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-lg sm:text-2xl font-bold">{paidCustomers.length}</p>
-                  <p className="text-[10px] sm:text-xs text-muted-foreground truncate">Clear Accounts</p>
+                  <p className="text-xl sm:text-3xl font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{paidCustomers.length}</p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground font-medium uppercase tracking-wider">Clear</p>
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Action Cards - Stack on mobile */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-6">
+        {/* Premium Action Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-5">
           {/* Due Customers Card */}
-          <Card className="bg-card border-border hover:border-destructive/50 transition-all duration-300 cursor-pointer group overflow-hidden">
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex items-start gap-3 sm:gap-4 mb-4 sm:mb-6">
-                <div className="p-2 sm:p-3 rounded-xl bg-destructive/20 group-hover:scale-110 transition-transform flex-shrink-0">
-                  <UserX className="h-5 w-5 sm:h-8 sm:w-8 text-destructive" />
+          <Card className="relative overflow-hidden border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer group">
+            <div className="absolute inset-0 bg-gradient-to-br from-rose-500/5 via-card to-card group-hover:from-rose-500/10 transition-colors" />
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-rose-500 to-rose-400" />
+            <CardContent className="relative p-4 sm:p-6">
+              <div className="flex items-start gap-4 mb-5">
+                <div className="p-3 rounded-xl bg-rose-500/20 group-hover:scale-110 transition-transform shrink-0">
+                  <UserX className="h-6 w-6 sm:h-8 sm:w-8 text-rose-500" />
                 </div>
-                <div className="min-w-0">
-                  <h3 className="text-base sm:text-xl font-bold text-foreground">Due Customers</h3>
-                  <p className="text-xs sm:text-sm text-muted-foreground">Outstanding payments</p>
-                  <p className="text-lg sm:text-2xl font-bold text-destructive mt-1 sm:mt-2">{BANGLADESHI_CURRENCY_SYMBOL}{totalAmountDue.toLocaleString()}</p>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-lg sm:text-xl font-bold text-foreground">Due Customers</h3>
+                  <p className="text-xs sm:text-sm text-muted-foreground">Outstanding payments to collect</p>
+                  <div className="flex items-baseline gap-2 mt-2">
+                    <p className="text-2xl sm:text-3xl font-bold text-rose-600 dark:text-rose-400 tabular-nums">
+                      {BANGLADESHI_CURRENCY_SYMBOL}{totalAmountDue.toLocaleString()}
+                    </p>
+                    <p className="text-xs text-muted-foreground">from {dueCustomers.length} customers</p>
+                  </div>
                 </div>
               </div>
               <Button 
-                className="w-full bg-destructive hover:bg-destructive/90 text-destructive-foreground h-9 sm:h-10 text-sm"
+                className="w-full bg-rose-500 hover:bg-rose-600 text-white h-11 text-sm font-medium shadow-lg touch-manipulation"
                 onClick={() => setViewMode('due')}
               >
                 Manage Due
@@ -418,21 +457,28 @@ export const CustomerManagementModule = () => {
           </Card>
 
           {/* Paid Customers Card */}
-          <Card className="bg-card border-border hover:border-green-500/50 transition-all duration-300 cursor-pointer group overflow-hidden">
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex items-start gap-3 sm:gap-4 mb-4 sm:mb-6">
-                <div className="p-2 sm:p-3 rounded-xl bg-green-500/20 group-hover:scale-110 transition-transform flex-shrink-0">
-                  <UserCheck className="h-5 w-5 sm:h-8 sm:w-8 text-green-500" />
+          <Card className="relative overflow-hidden border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer group">
+            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 via-card to-card group-hover:from-emerald-500/10 transition-colors" />
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-emerald-400" />
+            <CardContent className="relative p-4 sm:p-6">
+              <div className="flex items-start gap-4 mb-5">
+                <div className="p-3 rounded-xl bg-emerald-500/20 group-hover:scale-110 transition-transform shrink-0">
+                  <UserCheck className="h-6 w-6 sm:h-8 sm:w-8 text-emerald-500" />
                 </div>
-                <div className="min-w-0">
-                  <h3 className="text-base sm:text-xl font-bold text-foreground">Paid Customers</h3>
-                  <p className="text-xs sm:text-sm text-muted-foreground">Settled accounts</p>
-                  <p className="text-lg sm:text-2xl font-bold text-green-500 mt-1 sm:mt-2">{paidCustomers.length} customers</p>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-lg sm:text-xl font-bold text-foreground">Paid Customers</h3>
+                  <p className="text-xs sm:text-sm text-muted-foreground">Accounts with no outstanding dues</p>
+                  <div className="flex items-baseline gap-2 mt-2">
+                    <p className="text-2xl sm:text-3xl font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                      {paidCustomers.length}
+                    </p>
+                    <p className="text-xs text-muted-foreground">customers all clear</p>
+                  </div>
                 </div>
               </div>
               <Button 
                 variant="outline"
-                className="w-full border-green-500/30 hover:bg-green-500/10 h-9 sm:h-10 text-sm"
+                className="w-full border-emerald-500/30 hover:bg-emerald-500/10 hover:border-emerald-500/50 h-11 text-sm font-medium touch-manipulation"
                 onClick={() => setViewMode('paid')}
               >
                 View Paid

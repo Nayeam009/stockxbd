@@ -792,93 +792,127 @@ export const AnalysisSearchReportModule = ({ salesData, customers, stockData, dr
 
   // Render Analysis View
   const renderAnalysisView = () => (
-    <div className="space-y-4">
-      {/* Time Range Selector */}
-      <div className="flex items-center justify-center gap-1 p-1 bg-muted/50 rounded-lg w-full sm:w-auto mx-auto">
-        {(['daily', 'weekly', 'monthly', 'yearly'] as TimeRange[]).map((range) => (
-          <Button
-            key={range}
-            variant={timeRange === range ? "default" : "ghost"}
-            size="sm"
-            onClick={() => setTimeRange(range)}
-            className={`h-9 px-3 sm:px-4 text-xs sm:text-sm capitalize flex-1 sm:flex-none ${timeRange === range ? "bg-primary text-primary-foreground shadow-md" : ""}`}
-          >
-            {range}
-          </Button>
-        ))}
+    <div className="space-y-4 sm:space-y-5">
+      {/* Time Range Selector - Premium Pills */}
+      <div className="flex items-center justify-center">
+        <div className="inline-flex items-center gap-1 p-1.5 bg-muted/60 rounded-xl border border-border/50">
+          {(['daily', 'weekly', 'monthly', 'yearly'] as TimeRange[]).map((range) => (
+            <Button
+              key={range}
+              variant="ghost"
+              size="sm"
+              onClick={() => setTimeRange(range)}
+              className={`h-10 px-4 sm:px-6 text-xs sm:text-sm capitalize rounded-lg transition-all duration-200 touch-manipulation ${
+                timeRange === range 
+                  ? "bg-primary text-primary-foreground shadow-md hover:bg-primary/90" 
+                  : "hover:bg-background/80"
+              }`}
+            >
+              {range}
+            </Button>
+          ))}
+        </div>
       </div>
 
-      {/* Main KPIs */}
+      {/* Premium KPIs - Matching Business Diary Style */}
       <div className="grid grid-cols-3 gap-2 sm:gap-4">
-        {/* Income */}
-        <Card className="bg-gradient-to-br from-green-500/10 via-card to-card border-green-500/20">
-          <CardContent className="p-3 sm:p-4">
-            <div className="space-y-1">
+        {/* Income Card */}
+        <Card className="relative overflow-hidden border-0 shadow-lg group hover:shadow-xl transition-all duration-300">
+          <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-transparent" />
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-emerald-400" />
+          <CardContent className="relative p-3 sm:p-5">
+            <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">Income</p>
-                <ArrowUpRight className="h-3 w-3 sm:h-4 sm:w-4 text-green-500" />
+                <div className="flex items-center gap-1.5">
+                  <div className="h-6 w-6 sm:h-7 sm:w-7 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+                    <ArrowUpRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  <p className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wider">Income</p>
+                </div>
               </div>
-              <p className="text-sm sm:text-xl font-bold text-green-600 dark:text-green-400">
+              <p className="text-lg sm:text-2xl lg:text-3xl font-bold text-emerald-600 dark:text-emerald-400 truncate tabular-nums">
                 {BANGLADESHI_CURRENCY_SYMBOL}{currentData.income.toLocaleString()}
               </p>
               {timeRange === 'monthly' && (
-                <div className="flex items-center gap-1 text-[10px]">
+                <div className="flex items-center gap-1.5 text-[10px] sm:text-xs">
                   {analytics.incomeGrowth >= 0 ? (
-                    <TrendingUp className="h-2.5 w-2.5 text-green-500" />
+                    <Badge className="h-5 bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-0 text-[10px]">
+                      <TrendingUp className="h-2.5 w-2.5 mr-1" />
+                      +{Math.abs(analytics.incomeGrowth).toFixed(1)}%
+                    </Badge>
                   ) : (
-                    <TrendingDown className="h-2.5 w-2.5 text-red-500" />
+                    <Badge className="h-5 bg-rose-500/20 text-rose-700 dark:text-rose-300 border-0 text-[10px]">
+                      <TrendingDown className="h-2.5 w-2.5 mr-1" />
+                      {Math.abs(analytics.incomeGrowth).toFixed(1)}%
+                    </Badge>
                   )}
-                  <span className={analytics.incomeGrowth >= 0 ? "text-green-500" : "text-red-500"}>
-                    {Math.abs(analytics.incomeGrowth).toFixed(1)}%
-                  </span>
                 </div>
               )}
             </div>
           </CardContent>
         </Card>
 
-        {/* Expenses */}
-        <Card className="bg-gradient-to-br from-red-500/10 via-card to-card border-red-500/20">
-          <CardContent className="p-3 sm:p-4">
-            <div className="space-y-1">
+        {/* Expenses Card */}
+        <Card className="relative overflow-hidden border-0 shadow-lg group hover:shadow-xl transition-all duration-300">
+          <div className="absolute inset-0 bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-transparent" />
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-rose-500 to-rose-400" />
+          <CardContent className="relative p-3 sm:p-5">
+            <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">Expenses</p>
-                <ArrowDownRight className="h-3 w-3 sm:h-4 sm:w-4 text-red-500" />
+                <div className="flex items-center gap-1.5">
+                  <div className="h-6 w-6 sm:h-7 sm:w-7 rounded-lg bg-rose-500/20 flex items-center justify-center">
+                    <ArrowDownRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-rose-600 dark:text-rose-400" />
+                  </div>
+                  <p className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wider">Expenses</p>
+                </div>
               </div>
-              <p className="text-sm sm:text-xl font-bold text-red-600 dark:text-red-400">
+              <p className="text-lg sm:text-2xl lg:text-3xl font-bold text-rose-600 dark:text-rose-400 truncate tabular-nums">
                 {BANGLADESHI_CURRENCY_SYMBOL}{currentData.expenses.toLocaleString()}
               </p>
               {timeRange === 'monthly' && (
-                <div className="flex items-center gap-1 text-[10px]">
+                <div className="flex items-center gap-1.5 text-[10px] sm:text-xs">
                   {analytics.expenseGrowth <= 0 ? (
-                    <TrendingDown className="h-2.5 w-2.5 text-green-500" />
+                    <Badge className="h-5 bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-0 text-[10px]">
+                      <TrendingDown className="h-2.5 w-2.5 mr-1" />
+                      {Math.abs(analytics.expenseGrowth).toFixed(1)}%
+                    </Badge>
                   ) : (
-                    <TrendingUp className="h-2.5 w-2.5 text-red-500" />
+                    <Badge className="h-5 bg-rose-500/20 text-rose-700 dark:text-rose-300 border-0 text-[10px]">
+                      <TrendingUp className="h-2.5 w-2.5 mr-1" />
+                      +{Math.abs(analytics.expenseGrowth).toFixed(1)}%
+                    </Badge>
                   )}
-                  <span className={analytics.expenseGrowth <= 0 ? "text-green-500" : "text-red-500"}>
-                    {Math.abs(analytics.expenseGrowth).toFixed(1)}%
-                  </span>
                 </div>
               )}
             </div>
           </CardContent>
         </Card>
 
-        {/* Profit */}
-        <Card className={`bg-gradient-to-br ${currentData.profit >= 0 ? 'from-primary/10' : 'from-destructive/10'} via-card to-card`}>
-          <CardContent className="p-3 sm:p-4">
-            <div className="space-y-1">
+        {/* Profit/Loss Card */}
+        <Card className="relative overflow-hidden border-0 shadow-lg group hover:shadow-xl transition-all duration-300">
+          <div className={`absolute inset-0 bg-gradient-to-br ${currentData.profit >= 0 ? 'from-primary/10 via-primary/5' : 'from-destructive/10 via-destructive/5'} to-transparent`} />
+          <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${currentData.profit >= 0 ? 'from-primary to-primary/80' : 'from-destructive to-destructive/80'}`} />
+          <CardContent className="relative p-3 sm:p-5">
+            <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">
-                  {currentData.profit >= 0 ? 'Profit' : 'Loss'}
-                </p>
-                <DollarSign className={`h-3 w-3 sm:h-4 sm:w-4 ${profitMarginColor}`} />
+                <div className="flex items-center gap-1.5">
+                  <div className={`h-6 w-6 sm:h-7 sm:w-7 rounded-lg ${currentData.profit >= 0 ? 'bg-primary/20' : 'bg-destructive/20'} flex items-center justify-center`}>
+                    {currentData.profit >= 0 ? (
+                      <TrendingUp className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary" />
+                    ) : (
+                      <TrendingDown className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-destructive" />
+                    )}
+                  </div>
+                  <p className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    {currentData.profit >= 0 ? 'Profit' : 'Loss'}
+                  </p>
+                </div>
               </div>
-              <p className={`text-sm sm:text-xl font-bold ${profitMarginColor}`}>
-                {currentData.profit >= 0 ? '+' : ''}{BANGLADESHI_CURRENCY_SYMBOL}{currentData.profit.toLocaleString()}
+              <p className={`text-lg sm:text-2xl lg:text-3xl font-bold truncate tabular-nums ${currentData.profit >= 0 ? 'text-primary' : 'text-destructive'}`}>
+                {currentData.profit >= 0 ? '+' : ''}{BANGLADESHI_CURRENCY_SYMBOL}{Math.abs(currentData.profit).toLocaleString()}
               </p>
               {timeRange === 'monthly' && (
-                <p className="text-[10px] text-muted-foreground">
+                <p className="text-[10px] sm:text-xs text-muted-foreground">
                   {analytics.profitMargin.toFixed(1)}% margin
                 </p>
               )}
@@ -1308,52 +1342,63 @@ export const AnalysisSearchReportModule = ({ salesData, customers, stockData, dr
   );
 
   return (
-    <div className="space-y-4 md:space-y-6 p-1 md:p-0">
-      {/* Header with Toggle */}
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <div>
-            <h2 className="text-xl md:text-2xl font-bold text-foreground">Analysis & Search Report</h2>
-            <p className="text-muted-foreground text-xs md:text-sm">Business analytics, search & report generation</p>
-          </div>
-        </div>
-
-        {/* View Mode Toggle - Similar to Business Diary */}
-        <Card className="p-2">
-          <div className="flex items-center gap-4">
-            <div className="flex-1 flex items-center justify-center">
-              <div className="inline-flex items-center gap-3 bg-muted/50 rounded-lg p-1">
-                <Button
-                  variant={viewMode === 'analysis' ? 'default' : 'ghost'}
-                  size="sm"
-                  className={`h-10 px-4 sm:px-6 gap-2 ${viewMode === 'analysis' ? 'bg-primary text-primary-foreground shadow-md' : ''}`}
-                  onClick={() => setViewMode('analysis')}
-                >
-                  <BarChart3 className="h-4 w-4" />
-                  <span className="hidden sm:inline">Analysis</span>
-                  <span className="sm:hidden">Analysis</span>
-                </Button>
-                <div className="hidden sm:flex items-center gap-2 px-2">
-                  <Switch
-                    id="view-mode"
-                    checked={viewMode === 'search'}
-                    onCheckedChange={(checked) => setViewMode(checked ? 'search' : 'analysis')}
-                  />
-                </div>
-                <Button
-                  variant={viewMode === 'search' ? 'default' : 'ghost'}
-                  size="sm"
-                  className={`h-10 px-4 sm:px-6 gap-2 ${viewMode === 'search' ? 'bg-primary text-primary-foreground shadow-md' : ''}`}
-                  onClick={() => setViewMode('search')}
-                >
-                  <Search className="h-4 w-4" />
-                  <span className="hidden sm:inline">Search & Reports</span>
-                  <span className="sm:hidden">Search</span>
-                </Button>
+    <div className="space-y-4 sm:space-y-6 pb-4">
+      {/* Premium Header */}
+      <div className="relative">
+        <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-accent/5 rounded-xl -z-10" />
+        <div className="flex flex-col gap-4 p-4 sm:p-0">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg">
+                <BarChart3 className="h-5 w-5 sm:h-6 sm:w-6 text-primary-foreground" />
+              </div>
+              <div>
+                <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground tracking-tight">
+                  Analysis & Reports
+                </h2>
+                <p className="text-xs sm:text-sm text-muted-foreground">
+                  Business analytics • Search • Report generation
+                </p>
               </div>
             </div>
           </div>
-        </Card>
+
+          {/* Premium View Mode Toggle */}
+          <div className="bg-muted/50 p-1.5 rounded-xl border border-border/50">
+            <div className="grid grid-cols-2 gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                className={`h-12 rounded-lg transition-all duration-200 touch-manipulation ${
+                  viewMode === 'analysis' 
+                    ? 'bg-primary text-primary-foreground shadow-lg hover:bg-primary/90' 
+                    : 'hover:bg-background/80'
+                }`}
+                onClick={() => setViewMode('analysis')}
+              >
+                <div className="flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4" />
+                  <span className="font-medium">Analysis</span>
+                </div>
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className={`h-12 rounded-lg transition-all duration-200 touch-manipulation ${
+                  viewMode === 'search' 
+                    ? 'bg-accent text-accent-foreground shadow-lg hover:bg-accent/90' 
+                    : 'hover:bg-background/80'
+                }`}
+                onClick={() => setViewMode('search')}
+              >
+                <div className="flex items-center gap-2">
+                  <Search className="h-4 w-4" />
+                  <span className="font-medium">Search & Reports</span>
+                </div>
+              </Button>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Content based on view mode */}
