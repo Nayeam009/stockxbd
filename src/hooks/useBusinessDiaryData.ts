@@ -1,0 +1,553 @@
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { format, startOfMonth, endOfMonth, subMonths, subDays, startOfWeek, endOfWeek, startOfYear, endOfYear } from "date-fns";
+
+export interface SaleEntry {
+  id: string;
+  type: 'pos' | 'payment';
+  date: string;
+  timestamp: string;
+  staffName: string;
+  staffId: string | null;
+  productName: string;
+  productDetails: string;
+  quantity: number;
+  unitPrice: number;
+  totalAmount: number;
+  paymentMethod: string;
+  paymentStatus: 'paid' | 'due' | 'partial';
+  customerName: string;
+  customerId: string | null;
+  transactionType: 'retail' | 'wholesale';
+  transactionNumber: string;
+  source: string;
+  sourceId: string;
+}
+
+export interface ExpenseEntry {
+  id: string;
+  type: 'pob' | 'salary' | 'vehicle' | 'manual';
+  date: string;
+  timestamp: string;
+  staffName: string;
+  staffId: string | null;
+  category: string;
+  categoryIcon: string;
+  categoryColor: string;
+  description: string;
+  amount: number;
+  source: string;
+  sourceId: string;
+  supplierName?: string;
+  vehicleName?: string;
+  staffPayeeName?: string;
+}
+
+interface UseBusinessDiaryDataReturn {
+  sales: SaleEntry[];
+  expenses: ExpenseEntry[];
+  loading: boolean;
+  refetch: () => Promise<void>;
+  analytics: {
+    todayIncome: number;
+    todayExpenses: number;
+    todayProfit: number;
+    weeklyIncome: number;
+    weeklyExpenses: number;
+    weeklyProfit: number;
+    monthlyIncome: number;
+    monthlyExpenses: number;
+    monthlyProfit: number;
+    yearlyIncome: number;
+    yearlyExpenses: number;
+    yearlyProfit: number;
+    incomeGrowth: number;
+    expenseGrowth: number;
+    profitMargin: number;
+    topProducts: { name: string; amount: number; count: number }[];
+    topExpenseCategories: { name: string; amount: number; icon: string; color: string }[];
+    paymentBreakdown: { method: string; amount: number }[];
+  };
+}
+
+const EXPENSE_CATEGORY_MAP: Record<string, { icon: string; color: string }> = {
+  'LPG Purchase': { icon: '🛢️', color: '#3b82f6' },
+  'Gas Stove Purchase': { icon: '🔥', color: '#f97316' },
+  'Regulator Purchase': { icon: '⚙️', color: '#8b5cf6' },
+  'Transport': { icon: '🚛', color: '#8b5cf6' },
+  'Staff': { icon: '👥', color: '#22c55e' },
+  'Staff Salary': { icon: '👥', color: '#22c55e' },
+  'Staff Advance': { icon: '💵', color: '#10b981' },
+  'Staff Bonus': { icon: '🎁', color: '#6366f1' },
+  'Utilities': { icon: '💡', color: '#eab308' },
+  'Maintenance': { icon: '🔧', color: '#f97316' },
+  'Rent': { icon: '🏠', color: '#ec4899' },
+  'Marketing': { icon: '📢', color: '#06b6d4' },
+  'Vehicle': { icon: '🚗', color: '#10b981' },
+  'Vehicle Fuel': { icon: '⛽', color: '#f59e0b' },
+  'Vehicle Maintenance': { icon: '🔧', color: '#ef4444' },
+  'Loading': { icon: '👷', color: '#a855f7' },
+  'Entertainment': { icon: '☕', color: '#f472b6' },
+  'Bank': { icon: '🏦', color: '#0ea5e9' },
+  'Other': { icon: '📦', color: '#6b7280' }
+};
+
+const getCategoryInfo = (category: string) => {
+  return EXPENSE_CATEGORY_MAP[category] || EXPENSE_CATEGORY_MAP['Other'];
+};
+
+export const useBusinessDiaryData = (): UseBusinessDiaryDataReturn => {
+  const [sales, setSales] = useState<SaleEntry[]>([]);
+  const [expenses, setExpenses] = useState<ExpenseEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchSalesData = useCallback(async () => {
+    try {
+      // Fetch POS transactions with items
+      const { data: posTransactions, error: posError } = await supabase
+        .from('pos_transactions')
+        .select(`
+          id,
+          transaction_number,
+          created_at,
+          total,
+          subtotal,
+          discount,
+          payment_method,
+          payment_status,
+          customer_id,
+          driver_id,
+          notes,
+          pos_transaction_items (
+            id,
+            product_name,
+            quantity,
+            unit_price,
+            total_price
+          )
+        `)
+        .eq('is_voided', false)
+        .order('created_at', { ascending: false })
+        .limit(500);
+
+      if (posError) throw posError;
+
+      // Fetch customer payments (due collections)
+      const { data: customerPayments, error: paymentError } = await supabase
+        .from('customer_payments')
+        .select(`
+          id,
+          customer_id,
+          amount,
+          cylinders_collected,
+          payment_date,
+          notes,
+          created_at,
+          customers (
+            name,
+            phone
+          )
+        `)
+        .order('created_at', { ascending: false })
+        .limit(200);
+
+      if (paymentError) throw paymentError;
+
+      // Fetch customers for name lookup
+      const { data: customers } = await supabase
+        .from('customers')
+        .select('id, name, phone');
+
+      const customerMap = new Map(customers?.map(c => [c.id, c]) || []);
+
+      // Process POS transactions
+      const posEntries: SaleEntry[] = (posTransactions || []).flatMap(txn => {
+        const customer = txn.customer_id ? customerMap.get(txn.customer_id) : null;
+        const items = txn.pos_transaction_items || [];
+        const isWholesale = items.length > 1;
+        
+        return items.map((item: any) => ({
+          id: item.id,
+          type: 'pos' as const,
+          date: format(new Date(txn.created_at), 'yyyy-MM-dd'),
+          timestamp: txn.created_at,
+          staffName: 'Staff',
+          staffId: null,
+          productName: item.product_name || 'Unknown Product',
+          productDetails: `${item.quantity} x ৳${item.unit_price}`,
+          quantity: item.quantity,
+          unitPrice: Number(item.unit_price),
+          totalAmount: Number(item.total_price),
+          paymentMethod: txn.payment_method,
+          paymentStatus: (txn.payment_status === 'paid' ? 'paid' : txn.payment_status === 'partial' ? 'partial' : 'due') as 'paid' | 'due' | 'partial',
+          customerName: customer?.name || 'Walk-in Customer',
+          customerId: txn.customer_id,
+          transactionType: isWholesale ? 'wholesale' : 'retail' as 'retail' | 'wholesale',
+          transactionNumber: txn.transaction_number,
+          source: 'POS',
+          sourceId: txn.id
+        }));
+      });
+
+      // Process customer payments (due collections)
+      const paymentEntries: SaleEntry[] = (customerPayments || []).map(payment => ({
+        id: payment.id,
+        type: 'payment' as const,
+        date: format(new Date(payment.payment_date), 'yyyy-MM-dd'),
+        timestamp: payment.created_at,
+        staffName: 'Staff',
+        staffId: null,
+        productName: 'Due Payment Received',
+        productDetails: payment.cylinders_collected ? `+ ${payment.cylinders_collected} cylinders returned` : '',
+        quantity: 1,
+        unitPrice: Number(payment.amount),
+        totalAmount: Number(payment.amount),
+        paymentMethod: 'cash',
+        paymentStatus: 'paid' as const,
+        customerName: (payment.customers as any)?.name || 'Unknown Customer',
+        customerId: payment.customer_id,
+        transactionType: 'retail' as const,
+        transactionNumber: `PAY-${payment.id.slice(0, 8)}`,
+        source: 'Customer Payment',
+        sourceId: payment.id
+      }));
+
+      setSales([...posEntries, ...paymentEntries].sort((a, b) => 
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+      ));
+    } catch (error) {
+      console.error('Error fetching sales data:', error);
+    }
+  }, []);
+
+  const fetchExpensesData = useCallback(async () => {
+    try {
+      // Fetch POB transactions
+      const { data: pobTransactions, error: pobError } = await supabase
+        .from('pob_transactions')
+        .select(`
+          id,
+          transaction_number,
+          created_at,
+          total,
+          supplier_name,
+          payment_method,
+          notes,
+          pob_transaction_items (
+            id,
+            product_name,
+            product_type,
+            quantity,
+            unit_price,
+            total_price
+          )
+        `)
+        .eq('is_voided', false)
+        .order('created_at', { ascending: false })
+        .limit(300);
+
+      if (pobError) throw pobError;
+
+      // Fetch staff payments
+      const { data: staffPayments, error: staffError } = await supabase
+        .from('staff_payments')
+        .select(`
+          id,
+          staff_id,
+          amount,
+          payment_date,
+          notes,
+          created_at,
+          staff (
+            name,
+            role
+          )
+        `)
+        .order('created_at', { ascending: false })
+        .limit(200);
+
+      if (staffError) throw staffError;
+
+      // Fetch vehicle costs
+      const { data: vehicleCosts, error: vehicleError } = await supabase
+        .from('vehicle_costs')
+        .select(`
+          id,
+          vehicle_id,
+          amount,
+          cost_type,
+          cost_date,
+          description,
+          liters_filled,
+          odometer_reading,
+          created_at,
+          vehicles (
+            name,
+            license_plate
+          )
+        `)
+        .order('created_at', { ascending: false })
+        .limit(200);
+
+      if (vehicleError) throw vehicleError;
+
+      // Fetch manual expenses
+      const { data: manualExpenses, error: expenseError } = await supabase
+        .from('daily_expenses')
+        .select('*')
+        .order('expense_date', { ascending: false })
+        .limit(300);
+
+      if (expenseError) throw expenseError;
+
+      // Process POB transactions
+      const pobEntries: ExpenseEntry[] = (pobTransactions || []).map(txn => {
+        const items = txn.pob_transaction_items || [];
+        const mainItem = items[0];
+        const productType = mainItem?.product_type || 'Other';
+        const categoryName = productType === 'lpg_cylinder' ? 'LPG Purchase' : 
+                            productType === 'stove' ? 'Gas Stove Purchase' : 
+                            productType === 'regulator' ? 'Regulator Purchase' : 'Other';
+        const catInfo = getCategoryInfo(categoryName);
+        
+        return {
+          id: txn.id,
+          type: 'pob' as const,
+          date: format(new Date(txn.created_at), 'yyyy-MM-dd'),
+          timestamp: txn.created_at,
+          staffName: 'Manager',
+          staffId: null,
+          category: categoryName,
+          categoryIcon: catInfo.icon,
+          categoryColor: catInfo.color,
+          description: items.map((i: any) => `${i.quantity}x ${i.product_name}`).join(', '),
+          amount: Number(txn.total),
+          source: 'POB',
+          sourceId: txn.id,
+          supplierName: txn.supplier_name
+        };
+      });
+
+      // Process staff payments
+      const salaryEntries: ExpenseEntry[] = (staffPayments || []).map(payment => {
+        const catInfo = getCategoryInfo('Staff Salary');
+        return {
+          id: payment.id,
+          type: 'salary' as const,
+          date: format(new Date(payment.payment_date), 'yyyy-MM-dd'),
+          timestamp: payment.created_at,
+          staffName: 'Manager',
+          staffId: null,
+          category: 'Staff Salary',
+          categoryIcon: catInfo.icon,
+          categoryColor: catInfo.color,
+          description: payment.notes || `Salary payment to ${(payment.staff as any)?.name || 'Staff'}`,
+          amount: Number(payment.amount),
+          source: 'Staff Salary',
+          sourceId: payment.id,
+          staffPayeeName: (payment.staff as any)?.name
+        };
+      });
+
+      // Process vehicle costs
+      const vehicleEntries: ExpenseEntry[] = (vehicleCosts || []).map(cost => {
+        const catName = cost.cost_type === 'fuel' ? 'Vehicle Fuel' : 'Vehicle Maintenance';
+        const catInfo = getCategoryInfo(catName);
+        return {
+          id: cost.id,
+          type: 'vehicle' as const,
+          date: format(new Date(cost.cost_date), 'yyyy-MM-dd'),
+          timestamp: cost.created_at,
+          staffName: 'Driver',
+          staffId: null,
+          category: catName,
+          categoryIcon: catInfo.icon,
+          categoryColor: catInfo.color,
+          description: cost.description || `${cost.cost_type} for ${(cost.vehicles as any)?.name || 'Vehicle'}${cost.liters_filled ? ` (${cost.liters_filled}L)` : ''}`,
+          amount: Number(cost.amount),
+          source: 'Vehicle Cost',
+          sourceId: cost.id,
+          vehicleName: (cost.vehicles as any)?.name
+        };
+      });
+
+      // Process manual expenses
+      const manualEntries: ExpenseEntry[] = (manualExpenses || []).map(expense => {
+        const catInfo = getCategoryInfo(expense.category);
+        return {
+          id: expense.id,
+          type: 'manual' as const,
+          date: expense.expense_date,
+          timestamp: expense.created_at,
+          staffName: 'Staff',
+          staffId: expense.created_by,
+          category: expense.category,
+          categoryIcon: catInfo.icon,
+          categoryColor: catInfo.color,
+          description: expense.description || expense.category,
+          amount: Number(expense.amount),
+          source: 'Manual Entry',
+          sourceId: expense.id
+        };
+      });
+
+      setExpenses([...pobEntries, ...salaryEntries, ...vehicleEntries, ...manualEntries].sort((a, b) => 
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+      ));
+    } catch (error) {
+      console.error('Error fetching expenses data:', error);
+    }
+  }, []);
+
+  const refetch = useCallback(async () => {
+    setLoading(true);
+    await Promise.all([fetchSalesData(), fetchExpensesData()]);
+    setLoading(false);
+  }, [fetchSalesData, fetchExpensesData]);
+
+  useEffect(() => {
+    refetch();
+
+    // Set up real-time subscriptions
+    const channels = [
+      supabase.channel('diary-pos').on('postgres_changes', { event: '*', schema: 'public', table: 'pos_transactions' }, () => fetchSalesData()),
+      supabase.channel('diary-payments').on('postgres_changes', { event: '*', schema: 'public', table: 'customer_payments' }, () => fetchSalesData()),
+      supabase.channel('diary-pob').on('postgres_changes', { event: '*', schema: 'public', table: 'pob_transactions' }, () => fetchExpensesData()),
+      supabase.channel('diary-staff').on('postgres_changes', { event: '*', schema: 'public', table: 'staff_payments' }, () => fetchExpensesData()),
+      supabase.channel('diary-vehicle').on('postgres_changes', { event: '*', schema: 'public', table: 'vehicle_costs' }, () => fetchExpensesData()),
+      supabase.channel('diary-expenses').on('postgres_changes', { event: '*', schema: 'public', table: 'daily_expenses' }, () => fetchExpensesData())
+    ];
+
+    channels.forEach(ch => ch.subscribe());
+
+    return () => {
+      channels.forEach(ch => supabase.removeChannel(ch));
+    };
+  }, [refetch, fetchSalesData, fetchExpensesData]);
+
+  // Calculate analytics
+  const analytics = useMemo(() => {
+    const today = new Date();
+    const todayStr = format(today, 'yyyy-MM-dd');
+    const weekStart = startOfWeek(today, { weekStartsOn: 0 });
+    const weekEnd = endOfWeek(today, { weekStartsOn: 0 });
+    const monthStart = startOfMonth(today);
+    const monthEnd = endOfMonth(today);
+    const yearStart = startOfYear(today);
+    const yearEnd = endOfYear(today);
+    const lastMonthStart = startOfMonth(subMonths(today, 1));
+    const lastMonthEnd = endOfMonth(subMonths(today, 1));
+
+    // Filter functions
+    const isToday = (date: string) => date === todayStr;
+    const isThisWeek = (date: string) => {
+      const d = new Date(date);
+      return d >= weekStart && d <= weekEnd;
+    };
+    const isThisMonth = (date: string) => {
+      const d = new Date(date);
+      return d >= monthStart && d <= monthEnd;
+    };
+    const isThisYear = (date: string) => {
+      const d = new Date(date);
+      return d >= yearStart && d <= yearEnd;
+    };
+    const isLastMonth = (date: string) => {
+      const d = new Date(date);
+      return d >= lastMonthStart && d <= lastMonthEnd;
+    };
+
+    // Income calculations
+    const todayIncome = sales.filter(s => isToday(s.date)).reduce((sum, s) => sum + s.totalAmount, 0);
+    const weeklyIncome = sales.filter(s => isThisWeek(s.date)).reduce((sum, s) => sum + s.totalAmount, 0);
+    const monthlyIncome = sales.filter(s => isThisMonth(s.date)).reduce((sum, s) => sum + s.totalAmount, 0);
+    const yearlyIncome = sales.filter(s => isThisYear(s.date)).reduce((sum, s) => sum + s.totalAmount, 0);
+    const lastMonthIncome = sales.filter(s => isLastMonth(s.date)).reduce((sum, s) => sum + s.totalAmount, 0);
+
+    // Expense calculations
+    const todayExpenses = expenses.filter(e => isToday(e.date)).reduce((sum, e) => sum + e.amount, 0);
+    const weeklyExpenses = expenses.filter(e => isThisWeek(e.date)).reduce((sum, e) => sum + e.amount, 0);
+    const monthlyExpenses = expenses.filter(e => isThisMonth(e.date)).reduce((sum, e) => sum + e.amount, 0);
+    const yearlyExpenses = expenses.filter(e => isThisYear(e.date)).reduce((sum, e) => sum + e.amount, 0);
+    const lastMonthExpenses = expenses.filter(e => isLastMonth(e.date)).reduce((sum, e) => sum + e.amount, 0);
+
+    // Profit calculations
+    const todayProfit = todayIncome - todayExpenses;
+    const weeklyProfit = weeklyIncome - weeklyExpenses;
+    const monthlyProfit = monthlyIncome - monthlyExpenses;
+    const yearlyProfit = yearlyIncome - yearlyExpenses;
+
+    // Growth calculations
+    const incomeGrowth = lastMonthIncome > 0 ? ((monthlyIncome - lastMonthIncome) / lastMonthIncome) * 100 : 0;
+    const expenseGrowth = lastMonthExpenses > 0 ? ((monthlyExpenses - lastMonthExpenses) / lastMonthExpenses) * 100 : 0;
+    const profitMargin = monthlyIncome > 0 ? (monthlyProfit / monthlyIncome) * 100 : 0;
+
+    // Top products
+    const productMap = new Map<string, { amount: number; count: number }>();
+    sales.filter(s => isThisMonth(s.date)).forEach(s => {
+      const existing = productMap.get(s.productName) || { amount: 0, count: 0 };
+      productMap.set(s.productName, { 
+        amount: existing.amount + s.totalAmount, 
+        count: existing.count + s.quantity 
+      });
+    });
+    const topProducts = Array.from(productMap.entries())
+      .map(([name, data]) => ({ name, ...data }))
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 5);
+
+    // Top expense categories
+    const categoryMap = new Map<string, { amount: number; icon: string; color: string }>();
+    expenses.filter(e => isThisMonth(e.date)).forEach(e => {
+      const existing = categoryMap.get(e.category) || { amount: 0, icon: e.categoryIcon, color: e.categoryColor };
+      categoryMap.set(e.category, { 
+        amount: existing.amount + e.amount, 
+        icon: e.categoryIcon, 
+        color: e.categoryColor 
+      });
+    });
+    const topExpenseCategories = Array.from(categoryMap.entries())
+      .map(([name, data]) => ({ name, ...data }))
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 5);
+
+    // Payment breakdown
+    const paymentMap = new Map<string, number>();
+    sales.filter(s => isThisMonth(s.date) && s.paymentStatus === 'paid').forEach(s => {
+      const existing = paymentMap.get(s.paymentMethod) || 0;
+      paymentMap.set(s.paymentMethod, existing + s.totalAmount);
+    });
+    const paymentBreakdown = Array.from(paymentMap.entries())
+      .map(([method, amount]) => ({ method, amount }))
+      .sort((a, b) => b.amount - a.amount);
+
+    return {
+      todayIncome,
+      todayExpenses,
+      todayProfit,
+      weeklyIncome,
+      weeklyExpenses,
+      weeklyProfit,
+      monthlyIncome,
+      monthlyExpenses,
+      monthlyProfit,
+      yearlyIncome,
+      yearlyExpenses,
+      yearlyProfit,
+      incomeGrowth,
+      expenseGrowth,
+      profitMargin,
+      topProducts,
+      topExpenseCategories,
+      paymentBreakdown
+    };
+  }, [sales, expenses]);
+
+  return {
+    sales,
+    expenses,
+    loading,
+    refetch,
+    analytics
+  };
+};
