@@ -92,6 +92,10 @@ export const ProductPricingModule = () => {
     retail_price: 0,
     package_price: 0,
   });
+  
+  // Custom product name for LPG when not linked to existing brand
+  const [useCustomLpgName, setUseCustomLpgName] = useState(false);
+  const [customLpgName, setCustomLpgName] = useState("");
 
   const weightOptions = sizeTab === "22mm" ? WEIGHT_OPTIONS_22MM : WEIGHT_OPTIONS_20MM;
 
@@ -565,35 +569,74 @@ export const ProductPricingModule = () => {
                   {/* LPG Brand Selection */}
                   {newProduct.product_type === "lpg" && (
                     <div className="space-y-2">
-                      <Label className="text-sm">Brand</Label>
-                      <Select 
-                        value={newProduct.brand_id} 
-                        onValueChange={v => {
-                          const brand = lpgBrands.find(b => b.id === v);
-                          setNewProduct({
-                            ...newProduct, 
-                            brand_id: v,
-                            product_name: brand ? `${brand.name} LP Gas ${brand.weight || '12kg'}` : ""
-                          });
-                        }}
-                      >
-                        <SelectTrigger className="h-10">
-                          <SelectValue placeholder="Select brand" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {lpgBrands.map(brand => (
-                            <SelectItem key={brand.id} value={brand.id}>
-                              <div className="flex items-center gap-2">
-                                <span 
-                                  className="h-3 w-3 rounded-full flex-shrink-0" 
-                                  style={{ backgroundColor: brand.color }}
-                                />
-                                {brand.name} ({brand.weight})
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm">Brand</Label>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 text-xs"
+                          onClick={() => {
+                            setUseCustomLpgName(!useCustomLpgName);
+                            if (!useCustomLpgName) {
+                              setNewProduct({ ...newProduct, brand_id: "", product_name: "" });
+                            } else {
+                              setCustomLpgName("");
+                            }
+                          }}
+                        >
+                          {useCustomLpgName ? "Select from list" : "+ Custom brand"}
+                        </Button>
+                      </div>
+                      {!useCustomLpgName ? (
+                        <Select 
+                          value={newProduct.brand_id} 
+                          onValueChange={v => {
+                            const brand = lpgBrands.find(b => b.id === v);
+                            setNewProduct({
+                              ...newProduct, 
+                              brand_id: v,
+                              product_name: brand ? `${brand.name} LP Gas ${brand.weight || '12kg'}` : ""
+                            });
+                          }}
+                        >
+                          <SelectTrigger className="h-10">
+                            <SelectValue placeholder="Select brand" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {lpgBrands.map(brand => (
+                              <SelectItem key={brand.id} value={brand.id}>
+                                <div className="flex items-center gap-2">
+                                  <span 
+                                    className="h-3 w-3 rounded-full flex-shrink-0" 
+                                    style={{ backgroundColor: brand.color }}
+                                  />
+                                  {brand.name} ({brand.weight})
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <div className="space-y-2">
+                          <Input
+                            value={customLpgName}
+                            onChange={(e) => {
+                              setCustomLpgName(e.target.value);
+                              setNewProduct({
+                                ...newProduct,
+                                product_name: `${e.target.value} LP Gas ${newProduct.size || '12kg'}`,
+                                brand_id: ""
+                              });
+                            }}
+                            placeholder="Enter brand name (e.g., Bashundhara)"
+                            className="h-10"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            This will create a pricing entry without linking to inventory
+                          </p>
+                        </div>
+                      )}
                     </div>
                   )}
                   

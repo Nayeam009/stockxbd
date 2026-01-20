@@ -104,7 +104,8 @@ export const CustomerManagementModule = () => {
     phone: "",
     address: "",
     total_due: "",
-    cylinders_due: ""
+    cylinders_due: "",
+    credit_limit: "10000"
   });
 
   useEffect(() => {
@@ -273,6 +274,7 @@ export const CustomerManagementModule = () => {
     
     const totalDue = parseFloat(newCustomer.total_due) || 0;
     const cylindersDue = parseInt(newCustomer.cylinders_due) || 0;
+    const creditLimit = parseFloat(newCustomer.credit_limit) || 10000;
     
     const { error } = await supabase
       .from('customers')
@@ -283,6 +285,7 @@ export const CustomerManagementModule = () => {
         address: newCustomer.address ? sanitizeString(newCustomer.address) : null,
         total_due: totalDue,
         cylinders_due: cylindersDue,
+        credit_limit: creditLimit,
         billing_status: totalDue > 0 || cylindersDue > 0 ? 'pending' : 'clear',
         created_by: user?.id
       });
@@ -295,7 +298,7 @@ export const CustomerManagementModule = () => {
 
     toast({ title: "Customer added successfully" });
     setAddCustomerDialogOpen(false);
-    setNewCustomer({ name: "", email: "", phone: "", address: "", total_due: "", cylinders_due: "" });
+    setNewCustomer({ name: "", email: "", phone: "", address: "", total_due: "", cylinders_due: "", credit_limit: "10000" });
     fetchCustomers();
   };
 
@@ -504,6 +507,17 @@ export const CustomerManagementModule = () => {
                     className="mt-1"
                   />
                 </div>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-foreground">Credit Limit ({BANGLADESHI_CURRENCY_SYMBOL})</label>
+                <Input
+                  type="number"
+                  value={newCustomer.credit_limit}
+                  onChange={(e) => setNewCustomer({ ...newCustomer, credit_limit: e.target.value })}
+                  placeholder="10000"
+                  className="mt-1"
+                />
+                <p className="text-xs text-muted-foreground mt-1">Maximum credit allowed for this customer</p>
               </div>
             </div>
             <DialogFooter>
