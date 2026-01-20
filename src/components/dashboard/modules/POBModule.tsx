@@ -4,9 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { Separator } from "@/components/ui/separator";
 import { 
   Plus, 
@@ -16,7 +14,6 @@ import {
   Loader2,
   X,
   User,
-  Search,
   Package,
   ChefHat,
   Gauge,
@@ -25,20 +22,19 @@ import {
   Building2,
   PackagePlus,
   Undo2,
-  TrendingUp,
-  AlertTriangle,
   ArrowDownToLine,
-  RefreshCcw,
-  Fuel,
-  RotateCcw
+  RotateCcw,
+  ArrowRight,
+  Calculator,
+  Sparkles,
+  Save
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
-import { LPG_BRANDS, STOVE_BRANDS, REGULATOR_BRANDS, getLpgBrandColor } from "@/lib/brandConstants";
+import { LPG_BRANDS, STOVE_BRANDS, REGULATOR_BRANDS, getLpgBrandColor, getLpgBrandsByMouthSize } from "@/lib/brandConstants";
 import { supabase } from "@/integrations/supabase/client";
-import { parsePositiveNumber } from "@/lib/validationSchemas";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -93,13 +89,16 @@ interface PurchaseItem {
   details: string;
   companyPrice: number;
   quantity: number;
-  cylinderType?: 'refill' | 'package' | 'empty';
+  cylinderType?: 'refill' | 'package';
   brandId?: string;
   stoveId?: string;
   regulatorId?: string;
   weight?: string;
-  mouthSize?: string;
+  valveSize?: string;
   brandColor?: string;
+  burnerType?: string;
+  model?: string;
+  regulatorType?: string;
 }
 
 interface RecentPurchase {
@@ -116,7 +115,7 @@ interface RecentPurchase {
 const WEIGHT_OPTIONS_22MM = ["5.5kg", "12kg", "12.5kg", "25kg", "35kg", "45kg"];
 const WEIGHT_OPTIONS_20MM = ["5kg", "10kg", "12kg", "15kg", "21kg", "35kg"];
 
-// Common supplier names in Bangladesh
+// Common supplier names
 const SUPPLIERS = [
   "Bashundhara LP Gas Ltd.",
   "Omera Petroleum Ltd.",
@@ -137,7 +136,7 @@ interface POBModuleProps {
   userName?: string;
 }
 
-// Role display config - matching POS style
+// Role display config
 const ROLE_CONFIG: Record<string, { label: string; color: string; bgColor: string }> = {
   owner: { label: 'Owner', color: 'text-indigo-700 dark:text-indigo-300', bgColor: 'bg-indigo-100 dark:bg-indigo-900/40 border-indigo-300 dark:border-indigo-700' },
   manager: { label: 'Manager', color: 'text-blue-700 dark:text-blue-300', bgColor: 'bg-blue-100 dark:bg-blue-900/40 border-blue-300 dark:border-blue-700' },
@@ -157,14 +156,32 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
   const [regulators, setRegulators] = useState<Regulator[]>([]);
   const [productPrices, setProductPrices] = useState<ProductPrice[]>([]);
   
-  // ===== PRODUCT SELECTION STATE =====
-  const [activeTab, setActiveTab] = useState("all");
-  const [cylinderType, setCylinderType] = useState<"refill" | "package" | "empty">("refill");
-  const [mouthSize, setMouthSize] = useState("22mm");
-  const [weight, setWeight] = useState("12kg");
-  const [productSearch, setProductSearch] = useState("");
+  // ===== STEP-BASED FLOW STATE =====
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
+  const [productType, setProductType] = useState<'lpg' | 'stove' | 'regulator' | null>(null);
   
-  // ===== CART STATE (Purchase Items) =====
+  // ===== LPG CONFIGURATION STATE =====
+  const [lpgBrandName, setLpgBrandName] = useState("");
+  const [lpgCylinderType, setLpgCylinderType] = useState<'refill' | 'package'>("refill");
+  const [lpgWeight, setLpgWeight] = useState("12kg");
+  const [lpgValveSize, setLpgValveSize] = useState("22mm");
+  const [lpgQuantity, setLpgQuantity] = useState(1);
+  const [lpgTotalDO, setLpgTotalDO] = useState(0);
+  
+  // ===== STOVE CONFIGURATION STATE =====
+  const [stoveBrand, setStoveBrand] = useState("");
+  const [stoveModel, setStoveModel] = useState("");
+  const [stoveBurnerType, setStoveBurnerType] = useState<'single' | 'double'>("single");
+  const [stoveQuantity, setStoveQuantity] = useState(1);
+  const [stoveTotalAmount, setStoveTotalAmount] = useState(0);
+  
+  // ===== REGULATOR CONFIGURATION STATE =====
+  const [regulatorBrand, setRegulatorBrand] = useState("");
+  const [regulatorType, setRegulatorType] = useState("22mm");
+  const [regulatorQuantity, setRegulatorQuantity] = useState(1);
+  const [regulatorTotalAmount, setRegulatorTotalAmount] = useState(0);
+  
+  // ===== CART STATE =====
   const [purchaseItems, setPurchaseItems] = useState<PurchaseItem[]>([]);
   
   // ===== SUPPLIER STATE =====
@@ -241,112 +258,21 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
     return () => channels.forEach(ch => supabase.removeChannel(ch));
   }, [fetchData]);
 
-  // ============= PRICE HELPERS =============
-  const normalizeSize = useCallback((size: string): string => {
-    return size.toLowerCase().replace(/\s+/g, '').trim();
-  }, []);
+  // ============= CALCULATED PRICES =============
+  const lpgCompanyPrice = useMemo(() => {
+    if (lpgQuantity <= 0 || lpgTotalDO <= 0) return 0;
+    return Math.round(lpgTotalDO / lpgQuantity);
+  }, [lpgQuantity, lpgTotalDO]);
 
-  const getVariantFromCylinderType = useCallback((cylType: 'refill' | 'package' | 'empty'): string => {
-    if (cylType === 'refill' || cylType === 'empty') return 'Refill';
-    return 'Package';
-  }, []);
+  const stoveCompanyPrice = useMemo(() => {
+    if (stoveQuantity <= 0 || stoveTotalAmount <= 0) return 0;
+    return Math.round(stoveTotalAmount / stoveQuantity);
+  }, [stoveQuantity, stoveTotalAmount]);
 
-  const getLPGCompanyPrice = useCallback((
-    brandId: string, 
-    weightVal: string, 
-    cylType: 'refill' | 'package' | 'empty',
-    valveSize: string
-  ): { price: number; found: boolean; priceType: string } => {
-    const normalizedWeight = normalizeSize(weightVal);
-    const targetVariant = getVariantFromCylinderType(cylType);
-    
-    const priceEntry = productPrices.find(p => {
-      const isLPG = p.product_type.toLowerCase() === 'lpg';
-      const matchesBrand = p.brand_id === brandId;
-      const matchesSize = p.size ? normalizeSize(p.size).includes(normalizedWeight.replace('kg', '')) : false;
-      const matchesVariant = p.variant?.toLowerCase() === targetVariant.toLowerCase();
-      const matchesValve = p.product_name?.includes(`(${valveSize})`) || !p.product_name?.includes('mm)');
-      
-      return isLPG && matchesBrand && matchesSize && matchesVariant && matchesValve;
-    });
-
-    const fallbackEntry = !priceEntry ? productPrices.find(p => {
-      const isLPG = p.product_type.toLowerCase() === 'lpg';
-      const matchesBrand = p.brand_id === brandId;
-      const matchesSize = p.size ? normalizeSize(p.size).includes(normalizedWeight.replace('kg', '')) : false;
-      const matchesVariant = p.variant?.toLowerCase() === targetVariant.toLowerCase();
-      
-      return isLPG && matchesBrand && matchesSize && matchesVariant;
-    }) : null;
-
-    const minimalEntry = !priceEntry && !fallbackEntry ? productPrices.find(p => {
-      const isLPG = p.product_type.toLowerCase() === 'lpg';
-      const matchesBrand = p.brand_id === brandId;
-      const matchesSize = p.size ? normalizeSize(p.size).includes(normalizedWeight.replace('kg', '')) : false;
-      
-      return isLPG && matchesBrand && matchesSize;
-    }) : null;
-
-    const entry = priceEntry || fallbackEntry || minimalEntry;
-    
-    let price = 0;
-    let priceType = 'Company';
-    if (entry) {
-      if (cylType === 'package' && entry.package_price > 0) {
-        price = entry.package_price;
-        priceType = 'Package';
-      } else {
-        price = entry.company_price;
-        priceType = 'Company';
-      }
-    }
-    
-    return { price, found: !!entry && price > 0, priceType };
-  }, [productPrices, normalizeSize, getVariantFromCylinderType]);
-
-  const getStoveCompanyPrice = useCallback((brand: string, model: string): { price: number; found: boolean } => {
-    const priceEntry = productPrices.find(
-      p => p.product_type.toLowerCase() === 'stove' && 
-           p.product_name.toLowerCase().includes(brand.toLowerCase()) &&
-           p.product_name.toLowerCase().includes(model.toLowerCase())
-    );
-    return { price: priceEntry?.company_price || 0, found: !!priceEntry && (priceEntry?.company_price || 0) > 0 };
-  }, [productPrices]);
-
-  const getRegulatorCompanyPrice = useCallback((brand: string, type: string): { price: number; found: boolean } => {
-    const priceEntry = productPrices.find(
-      p => p.product_type.toLowerCase() === 'regulator' && 
-           p.product_name.toLowerCase().includes(brand.toLowerCase()) &&
-           p.product_name.toLowerCase().includes(type.toLowerCase())
-    );
-    return { price: priceEntry?.company_price || 0, found: !!priceEntry && (priceEntry?.company_price || 0) > 0 };
-  }, [productPrices]);
-
-  // ============= FILTERED DATA =============
-  const filteredBrands = useMemo(() => {
-    return lpgBrands.filter(b => {
-      const matchesSize = b.size === mouthSize;
-      const matchesWeight = b.weight === weight;
-      const matchesSearch = !productSearch || b.name.toLowerCase().includes(productSearch.toLowerCase());
-      return matchesSize && matchesWeight && matchesSearch;
-    });
-  }, [lpgBrands, mouthSize, weight, productSearch]);
-
-  const filteredStoves = useMemo(() => {
-    if (!productSearch) return stoves;
-    return stoves.filter(s => 
-      s.brand.toLowerCase().includes(productSearch.toLowerCase()) ||
-      s.model.toLowerCase().includes(productSearch.toLowerCase())
-    );
-  }, [stoves, productSearch]);
-
-  const filteredRegulators = useMemo(() => {
-    if (!productSearch) return regulators;
-    return regulators.filter(r => 
-      r.brand.toLowerCase().includes(productSearch.toLowerCase()) ||
-      r.type.toLowerCase().includes(productSearch.toLowerCase())
-    );
-  }, [regulators, productSearch]);
+  const regulatorCompanyPrice = useMemo(() => {
+    if (regulatorQuantity <= 0 || regulatorTotalAmount <= 0) return 0;
+    return Math.round(regulatorTotalAmount / regulatorQuantity);
+  }, [regulatorQuantity, regulatorTotalAmount]);
 
   // ============= CART CALCULATIONS =============
   const purchaseItemsCount = useMemo(() => {
@@ -356,95 +282,355 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
   const subtotal = purchaseItems.reduce((sum, item) => sum + item.companyPrice * item.quantity, 0);
   const total = subtotal;
 
-  // ============= PRODUCT ACTIONS =============
-  const addLPGToCart = (brand: LPGBrand) => {
-    const priceResult = getLPGCompanyPrice(brand.id, weight, cylinderType, mouthSize);
-    
-    if (!priceResult.found) {
-      toast({ 
-        title: "Price not configured", 
-        description: `Please set ${priceResult.priceType} Price for ${brand.name} (${weight}, ${mouthSize}, ${cylinderType}) in Product Pricing first.`,
-        variant: "destructive" 
-      });
+  // ============= GET BRAND COLOR =============
+  const getBrandColor = (brandName: string): string => {
+    return getLpgBrandColor(brandName);
+  };
+
+  // ============= ADD PRODUCT TO CART & UPDATE PRICING =============
+  const addLPGToCart = async () => {
+    if (!lpgBrandName || lpgQuantity <= 0 || lpgTotalDO <= 0) {
+      toast({ title: "Please fill all fields", variant: "destructive" });
       return;
     }
-    
-    const existingItem = purchaseItems.find(
-      i => i.type === 'lpg' && i.brandId === brand.id && i.cylinderType === cylinderType && i.weight === weight
+
+    const companyPrice = lpgCompanyPrice;
+    const brandColor = getBrandColor(lpgBrandName);
+
+    // Find or create brand in inventory
+    let brandId = "";
+    const existingBrand = lpgBrands.find(b => 
+      b.name.toLowerCase() === lpgBrandName.toLowerCase() && 
+      b.size === lpgValveSize && 
+      b.weight === lpgWeight
     );
 
-    if (existingItem) {
-      setPurchaseItems(purchaseItems.map(i => 
-        i.id === existingItem.id ? { ...i, quantity: i.quantity + 1 } : i
-      ));
+    if (existingBrand) {
+      brandId = existingBrand.id;
     } else {
-      const newItem: PurchaseItem = {
-        id: `lpg-${Date.now()}`,
-        type: 'lpg',
-        name: brand.name,
-        details: `${weight} • ${mouthSize} • ${cylinderType === 'refill' ? 'Refill' : cylinderType === 'package' ? 'Package' : 'Empty'}`,
-        companyPrice: priceResult.price,
-        quantity: 1,
-        cylinderType,
-        brandId: brand.id,
-        weight,
-        mouthSize,
-        brandColor: brand.color
-      };
-      setPurchaseItems([...purchaseItems, newItem]);
+      // Create new brand entry
+      const { data: newBrand, error } = await supabase
+        .from('lpg_brands')
+        .insert({
+          name: lpgBrandName,
+          size: lpgValveSize,
+          weight: lpgWeight,
+          color: brandColor,
+          refill_cylinder: 0,
+          package_cylinder: 0,
+          empty_cylinder: 0,
+          problem_cylinder: 0
+        })
+        .select()
+        .single();
+
+      if (error) {
+        toast({ title: "Error creating brand", variant: "destructive" });
+        return;
+      }
+      brandId = newBrand.id;
     }
-    
-    toast({ title: `${brand.name} added to purchase` });
+
+    // Update product pricing
+    await updateProductPricing('lpg', lpgBrandName, companyPrice, {
+      brandId,
+      weight: lpgWeight,
+      valveSize: lpgValveSize,
+      cylinderType: lpgCylinderType
+    });
+
+    // Add to cart
+    const itemId = `lpg-${Date.now()}`;
+    const newItem: PurchaseItem = {
+      id: itemId,
+      type: 'lpg',
+      name: lpgBrandName,
+      details: `${lpgWeight} • ${lpgValveSize} • ${lpgCylinderType === 'refill' ? 'Refill' : 'Package'}`,
+      companyPrice,
+      quantity: lpgQuantity,
+      cylinderType: lpgCylinderType,
+      brandId,
+      weight: lpgWeight,
+      valveSize: lpgValveSize,
+      brandColor
+    };
+
+    setPurchaseItems([...purchaseItems, newItem]);
+    toast({ 
+      title: "Added to cart!", 
+      description: `${lpgQuantity}x ${lpgBrandName} @ ${BANGLADESHI_CURRENCY_SYMBOL}${companyPrice}/pc` 
+    });
+
+    // Reset form and go to step 3
+    resetLPGForm();
+    setCurrentStep(3);
   };
 
-  const addStoveToCart = (stove: Stove) => {
-    const priceResult = getStoveCompanyPrice(stove.brand, stove.model);
-    const companyPrice = priceResult.found ? priceResult.price : stove.price * 0.7;
-    const existingItem = purchaseItems.find(i => i.stoveId === stove.id);
-
-    if (existingItem) {
-      setPurchaseItems(purchaseItems.map(i => 
-        i.id === existingItem.id ? { ...i, quantity: i.quantity + 1 } : i
-      ));
-    } else {
-      const newItem: PurchaseItem = {
-        id: `stove-${Date.now()}`,
-        type: 'stove',
-        name: `${stove.brand} ${stove.model}`,
-        details: `${stove.burners} Burner`,
-        companyPrice,
-        quantity: 1,
-        stoveId: stove.id
-      };
-      setPurchaseItems([...purchaseItems, newItem]);
+  const addStoveToCart = async () => {
+    if (!stoveBrand || !stoveModel || stoveQuantity <= 0 || stoveTotalAmount <= 0) {
+      toast({ title: "Please fill all fields", variant: "destructive" });
+      return;
     }
-    toast({ title: "Stove added to purchase" });
+
+    const companyPrice = stoveCompanyPrice;
+    const burners = stoveBurnerType === 'single' ? 1 : 2;
+
+    // Find or create stove in inventory
+    let stoveId = "";
+    const existingStove = stoves.find(s => 
+      s.brand.toLowerCase() === stoveBrand.toLowerCase() && 
+      s.model.toLowerCase() === stoveModel.toLowerCase()
+    );
+
+    if (existingStove) {
+      stoveId = existingStove.id;
+    } else {
+      const { data: newStove, error } = await supabase
+        .from('stoves')
+        .insert({
+          brand: stoveBrand,
+          model: stoveModel,
+          burners,
+          price: 0,
+          quantity: 0
+        })
+        .select()
+        .single();
+
+      if (error) {
+        toast({ title: "Error creating stove", variant: "destructive" });
+        return;
+      }
+      stoveId = newStove.id;
+    }
+
+    // Update product pricing
+    await updateProductPricing('stove', `${stoveBrand} ${stoveModel}`, companyPrice, {
+      burnerType: stoveBurnerType
+    });
+
+    const newItem: PurchaseItem = {
+      id: `stove-${Date.now()}`,
+      type: 'stove',
+      name: `${stoveBrand} ${stoveModel}`,
+      details: `${stoveBurnerType === 'single' ? 'Single' : 'Double'} Burner`,
+      companyPrice,
+      quantity: stoveQuantity,
+      stoveId,
+      burnerType: stoveBurnerType,
+      model: stoveModel
+    };
+
+    setPurchaseItems([...purchaseItems, newItem]);
+    toast({ 
+      title: "Added to cart!", 
+      description: `${stoveQuantity}x ${stoveBrand} ${stoveModel} @ ${BANGLADESHI_CURRENCY_SYMBOL}${companyPrice}/pc` 
+    });
+
+    resetStoveForm();
+    setCurrentStep(3);
   };
 
-  const addRegulatorToCart = (regulator: Regulator) => {
-    const priceResult = getRegulatorCompanyPrice(regulator.brand, regulator.type);
-    const companyPrice = priceResult.found ? priceResult.price : (regulator.price || 0) * 0.7;
-    const existingItem = purchaseItems.find(i => i.regulatorId === regulator.id);
-
-    if (existingItem) {
-      setPurchaseItems(purchaseItems.map(i => 
-        i.id === existingItem.id ? { ...i, quantity: i.quantity + 1 } : i
-      ));
-    } else {
-      const newItem: PurchaseItem = {
-        id: `regulator-${Date.now()}`,
-        type: 'regulator',
-        name: `${regulator.brand} ${regulator.type}`,
-        details: regulator.type,
-        companyPrice,
-        quantity: 1,
-        regulatorId: regulator.id
-      };
-      setPurchaseItems([...purchaseItems, newItem]);
+  const addRegulatorToCart = async () => {
+    if (!regulatorBrand || regulatorQuantity <= 0 || regulatorTotalAmount <= 0) {
+      toast({ title: "Please fill all fields", variant: "destructive" });
+      return;
     }
-    toast({ title: "Regulator added to purchase" });
+
+    const companyPrice = regulatorCompanyPrice;
+
+    // Find or create regulator in inventory
+    let regId = "";
+    const existingReg = regulators.find(r => 
+      r.brand.toLowerCase() === regulatorBrand.toLowerCase() && 
+      r.type === regulatorType
+    );
+
+    if (existingReg) {
+      regId = existingReg.id;
+    } else {
+      const { data: newReg, error } = await supabase
+        .from('regulators')
+        .insert({
+          brand: regulatorBrand,
+          type: regulatorType,
+          quantity: 0,
+          price: 0
+        })
+        .select()
+        .single();
+
+      if (error) {
+        toast({ title: "Error creating regulator", variant: "destructive" });
+        return;
+      }
+      regId = newReg.id;
+    }
+
+    // Update product pricing
+    await updateProductPricing('regulator', `${regulatorBrand} ${regulatorType}`, companyPrice, {
+      regulatorType
+    });
+
+    const newItem: PurchaseItem = {
+      id: `regulator-${Date.now()}`,
+      type: 'regulator',
+      name: `${regulatorBrand} Regulator`,
+      details: `${regulatorType} Valve`,
+      companyPrice,
+      quantity: regulatorQuantity,
+      regulatorId: regId,
+      regulatorType
+    };
+
+    setPurchaseItems([...purchaseItems, newItem]);
+    toast({ 
+      title: "Added to cart!", 
+      description: `${regulatorQuantity}x ${regulatorBrand} @ ${BANGLADESHI_CURRENCY_SYMBOL}${companyPrice}/pc` 
+    });
+
+    resetRegulatorForm();
+    setCurrentStep(3);
   };
 
+  // ============= UPDATE PRODUCT PRICING =============
+  const updateProductPricing = async (
+    type: 'lpg' | 'stove' | 'regulator',
+    productName: string,
+    companyPrice: number,
+    options: {
+      brandId?: string;
+      weight?: string;
+      valveSize?: string;
+      cylinderType?: 'refill' | 'package';
+      burnerType?: string;
+      regulatorType?: string;
+    }
+  ) => {
+    try {
+      if (type === 'lpg' && options.brandId) {
+        const fullProductName = `${productName} LP Gas ${options.weight} Cylinder (${options.valveSize}) ${options.cylinderType === 'refill' ? 'Refill' : 'Package'}`;
+        const variant = options.cylinderType === 'refill' ? 'Refill' : 'Package';
+
+        // Check if pricing entry exists
+        const { data: existingPrice } = await supabase
+          .from('product_prices')
+          .select('id')
+          .eq('brand_id', options.brandId)
+          .eq('variant', variant)
+          .eq('product_type', 'lpg')
+          .maybeSingle();
+
+        if (existingPrice) {
+          // Update existing price
+          const updateField = options.cylinderType === 'package' ? 'package_price' : 'company_price';
+          await supabase
+            .from('product_prices')
+            .update({ [updateField]: companyPrice, updated_at: new Date().toISOString() })
+            .eq('id', existingPrice.id);
+        } else {
+          // Create new pricing entry
+          await supabase.from('product_prices').insert({
+            product_type: 'lpg',
+            product_name: fullProductName,
+            brand_id: options.brandId,
+            size: options.weight,
+            variant,
+            company_price: options.cylinderType === 'refill' ? companyPrice : 0,
+            package_price: options.cylinderType === 'package' ? companyPrice : 0,
+            distributor_price: 0,
+            retail_price: 0,
+            is_active: true
+          });
+        }
+      } else if (type === 'stove') {
+        const fullProductName = `${productName} - ${options.burnerType === 'single' ? 'Single' : 'Double'} Burner`;
+        
+        const { data: existingPrice } = await supabase
+          .from('product_prices')
+          .select('id')
+          .eq('product_name', fullProductName)
+          .eq('product_type', 'stove')
+          .maybeSingle();
+
+        if (existingPrice) {
+          await supabase
+            .from('product_prices')
+            .update({ company_price: companyPrice, updated_at: new Date().toISOString() })
+            .eq('id', existingPrice.id);
+        } else {
+          await supabase.from('product_prices').insert({
+            product_type: 'stove',
+            product_name: fullProductName,
+            size: options.burnerType === 'single' ? 'Single Burner' : 'Double Burner',
+            company_price: companyPrice,
+            distributor_price: 0,
+            retail_price: 0,
+            package_price: 0,
+            is_active: true
+          });
+        }
+      } else if (type === 'regulator') {
+        const fullProductName = `${productName} Regulator - ${options.regulatorType}`;
+        
+        const { data: existingPrice } = await supabase
+          .from('product_prices')
+          .select('id')
+          .eq('product_name', fullProductName)
+          .eq('product_type', 'regulator')
+          .maybeSingle();
+
+        if (existingPrice) {
+          await supabase
+            .from('product_prices')
+            .update({ company_price: companyPrice, updated_at: new Date().toISOString() })
+            .eq('id', existingPrice.id);
+        } else {
+          await supabase.from('product_prices').insert({
+            product_type: 'regulator',
+            product_name: fullProductName,
+            size: options.regulatorType,
+            company_price: companyPrice,
+            distributor_price: 0,
+            retail_price: 0,
+            package_price: 0,
+            is_active: true
+          });
+        }
+      }
+
+      console.log(`Product pricing updated for ${productName}: ${BANGLADESHI_CURRENCY_SYMBOL}${companyPrice}`);
+    } catch (error) {
+      console.error('Error updating product pricing:', error);
+    }
+  };
+
+  // ============= RESET FORMS =============
+  const resetLPGForm = () => {
+    setLpgBrandName("");
+    setLpgCylinderType("refill");
+    setLpgWeight("12kg");
+    setLpgValveSize("22mm");
+    setLpgQuantity(1);
+    setLpgTotalDO(0);
+  };
+
+  const resetStoveForm = () => {
+    setStoveBrand("");
+    setStoveModel("");
+    setStoveBurnerType("single");
+    setStoveQuantity(1);
+    setStoveTotalAmount(0);
+  };
+
+  const resetRegulatorForm = () => {
+    setRegulatorBrand("");
+    setRegulatorType("22mm");
+    setRegulatorQuantity(1);
+    setRegulatorTotalAmount(0);
+  };
+
+  // ============= CART ACTIONS =============
   const updateItemQuantity = (id: string, delta: number) => {
     setPurchaseItems(purchaseItems.map(item => {
       if (item.id === id) {
@@ -461,6 +647,8 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
 
   const clearCart = () => {
     setPurchaseItems([]);
+    setCurrentStep(1);
+    setProductType(null);
     toast({ title: "Cart cleared" });
   };
 
@@ -509,7 +697,7 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
         total_price: item.companyPrice * item.quantity,
         cylinder_type: item.cylinderType || null,
         weight: item.weight || null,
-        size: item.mouthSize || null
+        size: item.valveSize || null
       }));
 
       await supabase.from('pob_transaction_items').insert(items);
@@ -517,9 +705,7 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
       // Update inventory - INCREASE stock
       for (const item of purchaseItems) {
         if (item.type === 'lpg' && item.brandId) {
-          const stockField = item.cylinderType === 'refill' ? 'refill_cylinder' 
-            : item.cylinderType === 'package' ? 'package_cylinder' 
-            : 'empty_cylinder';
+          const stockField = item.cylinderType === 'refill' ? 'refill_cylinder' : 'package_cylinder';
           
           const brand = lpgBrands.find(b => b.id === item.brandId);
           if (brand) {
@@ -565,6 +751,8 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
       });
 
       setPurchaseItems([]);
+      setCurrentStep(1);
+      setProductType(null);
       await fetchData();
 
     } catch (error: any) {
@@ -593,9 +781,7 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
       if (items) {
         for (const item of items) {
           if (item.product_type === 'lpg' && item.brand_id) {
-            const stockField = item.cylinder_type === 'refill' ? 'refill_cylinder' 
-              : item.cylinder_type === 'package' ? 'package_cylinder' 
-              : 'empty_cylinder';
+            const stockField = item.cylinder_type === 'refill' ? 'refill_cylinder' : 'package_cylinder';
             
             const { data: brand } = await supabase
               .from('lpg_brands')
@@ -643,6 +829,12 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
     }
   };
 
+  // ============= GET AVAILABLE BRANDS =============
+  const lpgBrandOptions = useMemo(() => {
+    const brands = getLpgBrandsByMouthSize(lpgValveSize as "22mm" | "20mm");
+    return brands.map(b => b.name);
+  }, [lpgValveSize]);
+
   // ============= LOADING STATE =============
   if (loading) {
     return (
@@ -655,462 +847,685 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
 
   // ============= RENDER =============
   return (
-    <TooltipProvider>
-      <div className="space-y-3 pb-24 lg:pb-4">
-        {/* ===== HEADER ===== */}
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-              <ArrowDownToLine className="h-4 w-4 text-white" />
-            </div>
-            <h1 className="text-lg font-bold">Point of Buy</h1>
+    <div className="space-y-3 pb-24 lg:pb-4">
+      {/* ===== HEADER ===== */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+            <ArrowDownToLine className="h-4 w-4 text-white" />
           </div>
-          <div className="flex items-center gap-1.5">
-            <Badge className={`${ROLE_CONFIG[userRole]?.bgColor} ${ROLE_CONFIG[userRole]?.color} border text-xs`}>
-              <User className="h-3 w-3 mr-1" />
-              {userName}
-            </Badge>
-            {(purchaseItems.length > 0) && (
-              <Button onClick={clearCart} variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive">
-                <RotateCcw className="h-4 w-4" />
-              </Button>
-            )}
+          <div>
+            <h1 className="text-lg font-bold">Point of Buy</h1>
+            <p className="text-xs text-muted-foreground">Purchase from company</p>
           </div>
         </div>
+        <div className="flex items-center gap-1.5">
+          <Badge className="bg-indigo-600 text-white">
+            <ShoppingBag className="h-3 w-3 mr-1" />
+            Cart ({purchaseItemsCount})
+          </Badge>
+          <Badge className={`${ROLE_CONFIG[userRole]?.bgColor} ${ROLE_CONFIG[userRole]?.color} border text-xs`}>
+            <User className="h-3 w-3 mr-1" />
+            {userName}
+          </Badge>
+        </div>
+      </div>
 
-        {/* ===== TOP SECTION: PURCHASE CART (Matching POS) ===== */}
-        <Card className="border-2 border-indigo-200 dark:border-indigo-900">
+      {/* ===== 3-PART LAYOUT ===== */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+        
+        {/* ===== PART 1: SELECT PRODUCT TYPE ===== */}
+        <Card className={`border-2 ${currentStep === 1 ? 'border-indigo-500 shadow-lg' : 'border-muted'}`}>
+          <CardHeader className="py-2 px-3 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-950/30 dark:to-purple-950/30">
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <div className="w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-bold">1</div>
+              Select Product Type
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-3">
+            <div className="grid grid-cols-1 gap-2">
+              <Button
+                variant={productType === 'lpg' ? 'default' : 'outline'}
+                className={`h-16 justify-start gap-3 ${productType === 'lpg' ? 'bg-indigo-600 hover:bg-indigo-700' : ''}`}
+                onClick={() => { setProductType('lpg'); setCurrentStep(2); }}
+              >
+                <div className="w-10 h-10 rounded-lg bg-indigo-500/20 flex items-center justify-center">
+                  <Cylinder className="h-5 w-5 text-indigo-600" />
+                </div>
+                <div className="text-left">
+                  <p className="font-semibold">LPG Cylinder</p>
+                  <p className="text-xs opacity-70">Refill / Package</p>
+                </div>
+              </Button>
+
+              <Button
+                variant={productType === 'stove' ? 'default' : 'outline'}
+                className={`h-16 justify-start gap-3 ${productType === 'stove' ? 'bg-orange-500 hover:bg-orange-600' : ''}`}
+                onClick={() => { setProductType('stove'); setCurrentStep(2); }}
+              >
+                <div className="w-10 h-10 rounded-lg bg-orange-500/20 flex items-center justify-center">
+                  <ChefHat className="h-5 w-5 text-orange-600" />
+                </div>
+                <div className="text-left">
+                  <p className="font-semibold">Gas Stove</p>
+                  <p className="text-xs opacity-70">Single / Double Burner</p>
+                </div>
+              </Button>
+
+              <Button
+                variant={productType === 'regulator' ? 'default' : 'outline'}
+                className={`h-16 justify-start gap-3 ${productType === 'regulator' ? 'bg-purple-500 hover:bg-purple-600' : ''}`}
+                onClick={() => { setProductType('regulator'); setCurrentStep(2); }}
+              >
+                <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center">
+                  <Gauge className="h-5 w-5 text-purple-600" />
+                </div>
+                <div className="text-left">
+                  <p className="font-semibold">Regulator</p>
+                  <p className="text-xs opacity-70">22mm / 20mm</p>
+                </div>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* ===== PART 2: CONFIGURE PRODUCT ===== */}
+        <Card className={`border-2 ${currentStep === 2 ? 'border-indigo-500 shadow-lg' : 'border-muted'}`}>
+          <CardHeader className="py-2 px-3 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-950/30 dark:to-purple-950/30">
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${currentStep >= 2 ? 'bg-indigo-600 text-white' : 'bg-muted text-muted-foreground'}`}>2</div>
+              Configure Purchase
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-3">
+            {!productType ? (
+              <div className="flex flex-col items-center justify-center h-[300px] text-muted-foreground">
+                <Package className="h-12 w-12 opacity-30 mb-2" />
+                <p className="text-sm">Select a product type first</p>
+              </div>
+            ) : productType === 'lpg' ? (
+              <ScrollArea className="h-[340px] pr-2">
+                <div className="space-y-3">
+                  {/* Brand Name */}
+                  <div>
+                    <Label className="text-xs font-medium">Brand Name</Label>
+                    <Select value={lpgBrandName} onValueChange={setLpgBrandName}>
+                      <SelectTrigger className="h-10 mt-1">
+                        <SelectValue placeholder="Select brand..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {lpgBrandOptions.map(brand => (
+                          <SelectItem key={brand} value={brand}>{brand}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Cylinder Type */}
+                  <div>
+                    <Label className="text-xs font-medium">Cylinder Type</Label>
+                    <div className="flex gap-2 mt-1">
+                      <Button
+                        type="button"
+                        variant={lpgCylinderType === 'refill' ? 'default' : 'outline'}
+                        className={`flex-1 h-9 ${lpgCylinderType === 'refill' ? 'bg-indigo-600' : ''}`}
+                        onClick={() => setLpgCylinderType('refill')}
+                      >
+                        Refill
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={lpgCylinderType === 'package' ? 'default' : 'outline'}
+                        className={`flex-1 h-9 ${lpgCylinderType === 'package' ? 'bg-indigo-600' : ''}`}
+                        onClick={() => setLpgCylinderType('package')}
+                      >
+                        Package
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Valve Size */}
+                  <div>
+                    <Label className="text-xs font-medium">Valve Size</Label>
+                    <div className="flex gap-2 mt-1">
+                      <Button
+                        type="button"
+                        variant={lpgValveSize === '22mm' ? 'default' : 'outline'}
+                        className={`flex-1 h-9 ${lpgValveSize === '22mm' ? 'bg-indigo-600' : ''}`}
+                        onClick={() => { setLpgValveSize('22mm'); setLpgBrandName(''); }}
+                      >
+                        22mm
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={lpgValveSize === '20mm' ? 'default' : 'outline'}
+                        className={`flex-1 h-9 ${lpgValveSize === '20mm' ? 'bg-indigo-600' : ''}`}
+                        onClick={() => { setLpgValveSize('20mm'); setLpgBrandName(''); }}
+                      >
+                        20mm
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Weight */}
+                  <div>
+                    <Label className="text-xs font-medium">Weight</Label>
+                    <div className="flex flex-wrap gap-1.5 mt-1">
+                      {(lpgValveSize === '22mm' ? WEIGHT_OPTIONS_22MM : WEIGHT_OPTIONS_20MM).map(w => (
+                        <Button
+                          key={w}
+                          type="button"
+                          size="sm"
+                          variant={lpgWeight === w ? 'default' : 'outline'}
+                          className={`h-8 px-3 ${lpgWeight === w ? 'bg-indigo-600' : ''}`}
+                          onClick={() => setLpgWeight(w)}
+                        >
+                          {w}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Number of Cylinders */}
+                  <div>
+                    <Label className="text-xs font-medium">Number of Cylinders</Label>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-10 w-10"
+                        onClick={() => setLpgQuantity(Math.max(1, lpgQuantity - 1))}
+                      >
+                        <Minus className="h-4 w-4" />
+                      </Button>
+                      <Input
+                        type="number"
+                        value={lpgQuantity}
+                        onChange={(e) => setLpgQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                        className="h-10 text-center font-bold text-lg"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-10 w-10"
+                        onClick={() => setLpgQuantity(lpgQuantity + 1)}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Total D.O. Amount */}
+                  <div>
+                    <Label className="text-xs font-medium">Total D.O. Amount ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
+                    <Input
+                      type="number"
+                      placeholder="Enter total amount paid..."
+                      value={lpgTotalDO || ''}
+                      onChange={(e) => setLpgTotalDO(parseFloat(e.target.value) || 0)}
+                      className="h-10 mt-1 text-lg font-semibold"
+                    />
+                  </div>
+
+                  {/* Calculated Company Price */}
+                  {lpgTotalDO > 0 && lpgQuantity > 0 && (
+                    <div className="p-3 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-950/30 dark:to-purple-950/30 rounded-lg border border-indigo-200 dark:border-indigo-800">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Calculator className="h-4 w-4 text-indigo-600" />
+                        <span className="text-xs font-medium text-indigo-700 dark:text-indigo-300">Auto-calculated Company Price</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm">Per Cylinder:</span>
+                        <span className="text-xl font-bold text-indigo-600">{BANGLADESHI_CURRENCY_SYMBOL}{lpgCompanyPrice.toLocaleString()}</span>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground mt-1">
+                        <Sparkles className="h-3 w-3 inline mr-1" />
+                        This price will update Product Pricing automatically
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Add to Cart Button */}
+                  <Button
+                    className="w-full h-11 bg-indigo-600 hover:bg-indigo-700"
+                    disabled={!lpgBrandName || lpgQuantity <= 0 || lpgTotalDO <= 0}
+                    onClick={addLPGToCart}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add to Cart
+                  </Button>
+                </div>
+              </ScrollArea>
+            ) : productType === 'stove' ? (
+              <ScrollArea className="h-[340px] pr-2">
+                <div className="space-y-3">
+                  {/* Brand Name */}
+                  <div>
+                    <Label className="text-xs font-medium">Brand Name</Label>
+                    <Select value={stoveBrand} onValueChange={setStoveBrand}>
+                      <SelectTrigger className="h-10 mt-1">
+                        <SelectValue placeholder="Select brand..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {STOVE_BRANDS.map(brand => (
+                          <SelectItem key={brand.name} value={brand.name}>{brand.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Model Number */}
+                  <div>
+                    <Label className="text-xs font-medium">Model Number</Label>
+                    <Input
+                      placeholder="e.g., RFL-101, GS-2000..."
+                      value={stoveModel}
+                      onChange={(e) => setStoveModel(e.target.value)}
+                      className="h-10 mt-1"
+                    />
+                  </div>
+
+                  {/* Burner Type */}
+                  <div>
+                    <Label className="text-xs font-medium">Burner Type</Label>
+                    <div className="flex gap-2 mt-1">
+                      <Button
+                        type="button"
+                        variant={stoveBurnerType === 'single' ? 'default' : 'outline'}
+                        className={`flex-1 h-9 ${stoveBurnerType === 'single' ? 'bg-orange-500' : ''}`}
+                        onClick={() => setStoveBurnerType('single')}
+                      >
+                        Single Burner
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={stoveBurnerType === 'double' ? 'default' : 'outline'}
+                        className={`flex-1 h-9 ${stoveBurnerType === 'double' ? 'bg-orange-500' : ''}`}
+                        onClick={() => setStoveBurnerType('double')}
+                      >
+                        Double Burner
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Quantity */}
+                  <div>
+                    <Label className="text-xs font-medium">Number of Stoves</Label>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-10 w-10"
+                        onClick={() => setStoveQuantity(Math.max(1, stoveQuantity - 1))}
+                      >
+                        <Minus className="h-4 w-4" />
+                      </Button>
+                      <Input
+                        type="number"
+                        value={stoveQuantity}
+                        onChange={(e) => setStoveQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                        className="h-10 text-center font-bold text-lg"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-10 w-10"
+                        onClick={() => setStoveQuantity(stoveQuantity + 1)}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Total Amount */}
+                  <div>
+                    <Label className="text-xs font-medium">Total Amount Paid ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
+                    <Input
+                      type="number"
+                      placeholder="Enter total amount..."
+                      value={stoveTotalAmount || ''}
+                      onChange={(e) => setStoveTotalAmount(parseFloat(e.target.value) || 0)}
+                      className="h-10 mt-1 text-lg font-semibold"
+                    />
+                  </div>
+
+                  {/* Calculated Price */}
+                  {stoveTotalAmount > 0 && stoveQuantity > 0 && (
+                    <div className="p-3 bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-950/30 dark:to-amber-950/30 rounded-lg border border-orange-200 dark:border-orange-800">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Calculator className="h-4 w-4 text-orange-600" />
+                        <span className="text-xs font-medium text-orange-700 dark:text-orange-300">Auto-calculated Company Price</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm">Per Stove:</span>
+                        <span className="text-xl font-bold text-orange-600">{BANGLADESHI_CURRENCY_SYMBOL}{stoveCompanyPrice.toLocaleString()}</span>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground mt-1">
+                        <Sparkles className="h-3 w-3 inline mr-1" />
+                        This price will update Product Pricing automatically
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Add Button */}
+                  <Button
+                    className="w-full h-11 bg-orange-500 hover:bg-orange-600"
+                    disabled={!stoveBrand || !stoveModel || stoveQuantity <= 0 || stoveTotalAmount <= 0}
+                    onClick={addStoveToCart}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add to Cart
+                  </Button>
+                </div>
+              </ScrollArea>
+            ) : productType === 'regulator' ? (
+              <ScrollArea className="h-[340px] pr-2">
+                <div className="space-y-3">
+                  {/* Brand Name */}
+                  <div>
+                    <Label className="text-xs font-medium">Brand Name</Label>
+                    <Select value={regulatorBrand} onValueChange={setRegulatorBrand}>
+                      <SelectTrigger className="h-10 mt-1">
+                        <SelectValue placeholder="Select brand..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {REGULATOR_BRANDS.map(brand => (
+                          <SelectItem key={brand.name} value={brand.name}>{brand.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Valve Type */}
+                  <div>
+                    <Label className="text-xs font-medium">Valve Type</Label>
+                    <div className="flex gap-2 mt-1">
+                      <Button
+                        type="button"
+                        variant={regulatorType === '22mm' ? 'default' : 'outline'}
+                        className={`flex-1 h-9 ${regulatorType === '22mm' ? 'bg-purple-500' : ''}`}
+                        onClick={() => setRegulatorType('22mm')}
+                      >
+                        22mm
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={regulatorType === '20mm' ? 'default' : 'outline'}
+                        className={`flex-1 h-9 ${regulatorType === '20mm' ? 'bg-purple-500' : ''}`}
+                        onClick={() => setRegulatorType('20mm')}
+                      >
+                        20mm
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Quantity */}
+                  <div>
+                    <Label className="text-xs font-medium">Number of Regulators</Label>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-10 w-10"
+                        onClick={() => setRegulatorQuantity(Math.max(1, regulatorQuantity - 1))}
+                      >
+                        <Minus className="h-4 w-4" />
+                      </Button>
+                      <Input
+                        type="number"
+                        value={regulatorQuantity}
+                        onChange={(e) => setRegulatorQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                        className="h-10 text-center font-bold text-lg"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-10 w-10"
+                        onClick={() => setRegulatorQuantity(regulatorQuantity + 1)}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Total Amount */}
+                  <div>
+                    <Label className="text-xs font-medium">Total Amount Paid ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
+                    <Input
+                      type="number"
+                      placeholder="Enter total amount..."
+                      value={regulatorTotalAmount || ''}
+                      onChange={(e) => setRegulatorTotalAmount(parseFloat(e.target.value) || 0)}
+                      className="h-10 mt-1 text-lg font-semibold"
+                    />
+                  </div>
+
+                  {/* Calculated Price */}
+                  {regulatorTotalAmount > 0 && regulatorQuantity > 0 && (
+                    <div className="p-3 bg-gradient-to-r from-purple-50 to-violet-50 dark:from-purple-950/30 dark:to-violet-950/30 rounded-lg border border-purple-200 dark:border-purple-800">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Calculator className="h-4 w-4 text-purple-600" />
+                        <span className="text-xs font-medium text-purple-700 dark:text-purple-300">Auto-calculated Company Price</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm">Per Regulator:</span>
+                        <span className="text-xl font-bold text-purple-600">{BANGLADESHI_CURRENCY_SYMBOL}{regulatorCompanyPrice.toLocaleString()}</span>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground mt-1">
+                        <Sparkles className="h-3 w-3 inline mr-1" />
+                        This price will update Product Pricing automatically
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Add Button */}
+                  <Button
+                    className="w-full h-11 bg-purple-500 hover:bg-purple-600"
+                    disabled={!regulatorBrand || regulatorQuantity <= 0 || regulatorTotalAmount <= 0}
+                    onClick={addRegulatorToCart}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add to Cart
+                  </Button>
+                </div>
+              </ScrollArea>
+            ) : null}
+          </CardContent>
+        </Card>
+
+        {/* ===== PART 3: PURCHASE SUMMARY ===== */}
+        <Card className={`border-2 ${currentStep === 3 || purchaseItems.length > 0 ? 'border-indigo-500 shadow-lg' : 'border-muted'}`}>
           <CardHeader className="py-2 px-3 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-950/30 dark:to-purple-950/30">
             <CardTitle className="flex items-center justify-between text-sm">
               <span className="flex items-center gap-2">
-                <ShoppingBag className="h-4 w-4 text-indigo-600" />
-                Purchase Cart
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${purchaseItems.length > 0 ? 'bg-indigo-600 text-white' : 'bg-muted text-muted-foreground'}`}>3</div>
+                Purchase Summary
               </span>
-              <Badge className="bg-indigo-600">{purchaseItemsCount}</Badge>
+              {purchaseItems.length > 0 && (
+                <Button variant="ghost" size="sm" className="h-7 text-destructive" onClick={clearCart}>
+                  <RotateCcw className="h-3.5 w-3.5 mr-1" />
+                  Clear
+                </Button>
+              )}
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-2">
-            <ScrollArea className="h-[140px] sm:h-[160px]">
-              {purchaseItems.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full text-muted-foreground py-6">
-                  <PackagePlus className="h-8 w-8 opacity-30 mb-2" />
-                  <p className="text-xs">Select products below to add</p>
-                  <p className="text-[10px] mt-1">Products are bought at Company Price</p>
-                </div>
-              ) : (
-                <div className="space-y-1.5">
-                  {purchaseItems.map(item => (
-                    <div key={item.id} className="flex items-center gap-2 p-2 rounded-lg bg-card border">
-                      <div 
-                        className="w-7 h-7 rounded flex items-center justify-center flex-shrink-0"
-                        style={{ backgroundColor: item.brandColor || (item.type === 'stove' ? '#f97316' : item.type === 'regulator' ? '#8b5cf6' : '#6366f1') }}
-                      >
-                        {item.type === 'lpg' && <Cylinder className="h-3.5 w-3.5 text-white" />}
-                        {item.type === 'stove' && <ChefHat className="h-3.5 w-3.5 text-white" />}
-                        {item.type === 'regulator' && <Gauge className="h-3.5 w-3.5 text-white" />}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-xs truncate">{item.name}</p>
-                        <p className="text-[10px] text-muted-foreground truncate">{item.details}</p>
-                      </div>
-                      <div className="flex items-center gap-1 bg-muted rounded px-1">
-                        <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => updateItemQuantity(item.id, -1)}>
-                          <Minus className="h-3 w-3" />
+          <CardContent className="p-3">
+            {purchaseItems.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-[300px] text-muted-foreground">
+                <ShoppingBag className="h-12 w-12 opacity-30 mb-2" />
+                <p className="text-sm">Your cart is empty</p>
+                <p className="text-xs mt-1">Add products to see summary</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {/* Cart Items */}
+                <ScrollArea className="h-[180px]">
+                  <div className="space-y-2">
+                    {purchaseItems.map(item => (
+                      <div key={item.id} className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 border">
+                        <div 
+                          className="w-8 h-8 rounded flex items-center justify-center flex-shrink-0"
+                          style={{ backgroundColor: item.brandColor || (item.type === 'stove' ? '#f97316' : item.type === 'regulator' ? '#8b5cf6' : '#6366f1') }}
+                        >
+                          {item.type === 'lpg' && <Cylinder className="h-4 w-4 text-white" />}
+                          {item.type === 'stove' && <ChefHat className="h-4 w-4 text-white" />}
+                          {item.type === 'regulator' && <Gauge className="h-4 w-4 text-white" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-xs truncate">{item.name}</p>
+                          <p className="text-[10px] text-muted-foreground">{item.details}</p>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => updateItemQuantity(item.id, -1)}>
+                            <Minus className="h-3 w-3" />
+                          </Button>
+                          <span className="w-5 text-center text-xs font-bold">{item.quantity}</span>
+                          <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => updateItemQuantity(item.id, 1)}>
+                            <Plus className="h-3 w-3" />
+                          </Button>
+                        </div>
+                        <p className="font-bold text-xs text-indigo-600 w-16 text-right">
+                          {BANGLADESHI_CURRENCY_SYMBOL}{(item.companyPrice * item.quantity).toLocaleString()}
+                        </p>
+                        <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive" onClick={() => removeItem(item.id)}>
+                          <X className="h-3 w-3" />
                         </Button>
-                        <span className="w-5 text-center text-xs font-bold">{item.quantity}</span>
-                        <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => updateItemQuantity(item.id, 1)}>
-                          <Plus className="h-3 w-3" />
-                        </Button>
                       </div>
-                      <p className="font-bold text-xs text-indigo-600 w-14 sm:w-16 text-right flex-shrink-0">
-                        {BANGLADESHI_CURRENCY_SYMBOL}{(item.companyPrice * item.quantity).toLocaleString()}
-                      </p>
-                      <Button 
-                        size="icon" 
-                        variant="ghost" 
-                        className="h-7 w-7 min-w-[28px] text-destructive hover:bg-destructive/10 flex-shrink-0" 
-                        onClick={() => removeItem(item.id)}
-                      >
+                    ))}
+                  </div>
+                </ScrollArea>
+
+                <Separator />
+
+                {/* Supplier Selection */}
+                <div>
+                  <Label className="text-xs font-medium">Supplier</Label>
+                  {!showCustomSupplierInput ? (
+                    <Select value={supplierName} onValueChange={(val) => {
+                      if (val === 'custom') {
+                        setShowCustomSupplierInput(true);
+                      } else {
+                        setSupplierName(val);
+                      }
+                    }}>
+                      <SelectTrigger className="h-9 mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SUPPLIERS.map(s => (
+                          <SelectItem key={s} value={s}>{s}</SelectItem>
+                        ))}
+                        <SelectItem value="custom">+ Add Custom Supplier</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <div className="flex gap-2 mt-1">
+                      <Input
+                        placeholder="Custom supplier name..."
+                        value={customSupplier}
+                        onChange={(e) => setCustomSupplier(e.target.value)}
+                        className="h-9"
+                      />
+                      <Button variant="ghost" size="sm" className="h-9" onClick={() => setShowCustomSupplierInput(false)}>
                         <X className="h-4 w-4" />
                       </Button>
                     </div>
-                  ))}
+                  )}
                 </div>
-              )}
-            </ScrollArea>
-            {purchaseItems.length > 0 && (
-              <div className="mt-2 pt-2 border-t flex justify-between items-center">
-                <span className="text-xs text-muted-foreground">Total (Company Price)</span>
-                <span className="font-bold text-indigo-600">{BANGLADESHI_CURRENCY_SYMBOL}{total.toLocaleString()}</span>
+
+                {/* Total */}
+                <div className="p-3 bg-gradient-to-r from-indigo-100 to-purple-100 dark:from-indigo-900/50 dark:to-purple-900/50 rounded-lg">
+                  <div className="flex justify-between items-center">
+                    <span className="font-medium">Total Purchase</span>
+                    <span className="text-2xl font-bold text-indigo-600">{BANGLADESHI_CURRENCY_SYMBOL}{total.toLocaleString()}</span>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    variant="outline"
+                    className="h-11"
+                    onClick={() => handleCompletePurchase('pending')}
+                    disabled={processing}
+                  >
+                    {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                    Save as Credit
+                  </Button>
+                  <Button
+                    className="h-11 bg-indigo-600 hover:bg-indigo-700"
+                    onClick={() => handleCompletePurchase('completed')}
+                    disabled={processing}
+                  >
+                    {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
+                    Complete
+                  </Button>
+                </div>
               </div>
             )}
           </CardContent>
         </Card>
-
-        {/* ===== MIDDLE SECTION: TYPE TOGGLES & FILTERS ===== */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Cylinder Type */}
-          <div className="flex bg-muted rounded-lg p-0.5">
-            <Button
-              size="sm"
-              variant={cylinderType === 'refill' ? 'default' : 'ghost'}
-              onClick={() => setCylinderType('refill')}
-              className={`h-7 text-xs px-2.5 ${cylinderType === 'refill' ? 'bg-indigo-600 hover:bg-indigo-700' : ''}`}
-            >
-              Refill
-            </Button>
-            <Button
-              size="sm"
-              variant={cylinderType === 'package' ? 'default' : 'ghost'}
-              onClick={() => setCylinderType('package')}
-              className={`h-7 text-xs px-2.5 ${cylinderType === 'package' ? 'bg-indigo-600 hover:bg-indigo-700' : ''}`}
-            >
-              Package
-            </Button>
-            <Button
-              size="sm"
-              variant={cylinderType === 'empty' ? 'default' : 'ghost'}
-              onClick={() => setCylinderType('empty')}
-              className={`h-7 text-xs px-2.5 ${cylinderType === 'empty' ? 'bg-purple-600 hover:bg-purple-700' : ''}`}
-            >
-              Empty
-            </Button>
-          </div>
-          {/* Mouth Size */}
-          <div className="flex bg-muted rounded-lg p-0.5">
-            <Button size="sm" variant={mouthSize === "22mm" ? "default" : "ghost"} className={`h-7 text-xs px-2 ${mouthSize === '22mm' ? 'bg-indigo-600 hover:bg-indigo-700' : ''}`} onClick={() => { setMouthSize("22mm"); setWeight("12kg"); }}>22mm</Button>
-            <Button size="sm" variant={mouthSize === "20mm" ? "default" : "ghost"} className={`h-7 text-xs px-2 ${mouthSize === '20mm' ? 'bg-indigo-600 hover:bg-indigo-700' : ''}`} onClick={() => { setMouthSize("20mm"); setWeight("12kg"); }}>20mm</Button>
-          </div>
-          {/* Weight */}
-          <div className="flex flex-wrap gap-1">
-            {(mouthSize === "22mm" ? WEIGHT_OPTIONS_22MM : WEIGHT_OPTIONS_20MM).slice(0, 5).map(w => (
-              <Button
-                key={w}
-                size="sm"
-                variant={weight === w ? "default" : "outline"}
-                className={`h-7 text-xs px-2 ${weight === w ? 'bg-indigo-600 hover:bg-indigo-700' : ''}`}
-                onClick={() => setWeight(w)}
-              >
-                {w}
-              </Button>
-            ))}
-          </div>
-        </div>
-
-        {/* ===== PRODUCT CARDS SECTION ===== */}
-        <Card>
-          <CardHeader className="pb-2 px-3 pt-3">
-            <div className="flex items-center gap-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search products..."
-                  value={productSearch}
-                  onChange={(e) => setProductSearch(e.target.value)}
-                  className="h-9 pl-8"
-                />
-              </div>
-            </div>
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-2">
-              <TabsList className="h-9 w-full grid grid-cols-4">
-                <TabsTrigger value="all" className="text-xs">All</TabsTrigger>
-                <TabsTrigger value="lpg" className="text-xs data-[state=active]:bg-indigo-600 data-[state=active]:text-white">
-                  <Fuel className="h-3.5 w-3.5 mr-1" />LPG
-                </TabsTrigger>
-                <TabsTrigger value="stove" className="text-xs data-[state=active]:bg-orange-500 data-[state=active]:text-white">
-                  <ChefHat className="h-3.5 w-3.5 mr-1" />Stove
-                </TabsTrigger>
-                <TabsTrigger value="regulator" className="text-xs data-[state=active]:bg-violet-500 data-[state=active]:text-white">
-                  <Gauge className="h-3.5 w-3.5 mr-1" />Reg
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </CardHeader>
-          <CardContent className="px-3 pb-3">
-            <ScrollArea className="h-[240px] sm:h-[280px]">
-              {/* LPG Cylinders */}
-              {(activeTab === 'lpg' || activeTab === 'all') && (
-                <div className="mb-3">
-                  {activeTab === 'all' && <p className="text-xs font-medium text-muted-foreground mb-2">LPG Cylinders ({filteredBrands.length})</p>}
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
-                    {(activeTab === 'all' ? filteredBrands.slice(0, 5) : filteredBrands).map(brand => {
-                      const priceResult = getLPGCompanyPrice(brand.id, weight, cylinderType, mouthSize);
-                      const currentStock = cylinderType === 'refill' ? brand.refill_cylinder 
-                        : cylinderType === 'package' ? brand.package_cylinder 
-                        : brand.empty_cylinder;
-                      
-                      return (
-                        <button
-                          key={brand.id}
-                          onClick={() => addLPGToCart(brand)}
-                          className={`p-2.5 rounded-lg border-2 text-left transition-all hover:shadow-md relative bg-card ${
-                            priceResult.found 
-                              ? 'border-transparent hover:border-indigo-500/50' 
-                              : 'border-destructive/30 opacity-75'
-                          }`}
-                        >
-                          {/* Brand Color Header */}
-                          <div 
-                            className="absolute top-0 left-0 right-0 h-1 rounded-t-lg"
-                            style={{ backgroundColor: brand.color }}
-                          />
-                          <div className="flex items-start gap-2 pt-1">
-                            <div 
-                              className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
-                              style={{ backgroundColor: brand.color }}
-                            >
-                              <Cylinder className="h-5 w-5 text-white" />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <p className="font-semibold text-xs truncate">{brand.name}</p>
-                              <p className="text-[10px] text-muted-foreground">{weight}</p>
-                            </div>
-                          </div>
-                          <div className="flex items-center justify-between mt-2">
-                            <div className="flex flex-col">
-                              <span className={`font-bold text-sm ${priceResult.found ? 'text-indigo-600' : 'text-destructive'}`}>
-                                {priceResult.found ? `${BANGLADESHI_CURRENCY_SYMBOL}${priceResult.price}` : 'No Price'}
-                              </span>
-                              {priceResult.found && (
-                                <span className="text-[8px] text-muted-foreground">{priceResult.priceType}</span>
-                              )}
-                            </div>
-                            <Badge variant={currentStock < 10 ? "destructive" : "secondary"} className="text-[9px] px-1.5">
-                              {currentStock < 10 && <AlertTriangle className="h-2.5 w-2.5 mr-0.5" />}
-                              {currentStock}
-                            </Badge>
-                          </div>
-                        </button>
-                      );
-                    })}
-                    {filteredBrands.length === 0 && activeTab === 'lpg' && (
-                      <div className="col-span-full text-center py-8 text-muted-foreground">
-                        <Cylinder className="h-10 w-10 mx-auto mb-2 opacity-30" />
-                        <p className="text-sm">No cylinders found for {mouthSize} / {weight}</p>
-                        <p className="text-xs mt-1">Add brands in Inventory module</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Stoves */}
-              {(activeTab === 'stove' || activeTab === 'all') && (
-                <div className="mb-3">
-                  {activeTab === 'all' && <p className="text-xs font-medium text-muted-foreground mb-2">Gas Stoves ({filteredStoves.length})</p>}
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
-                    {(activeTab === 'all' ? filteredStoves.slice(0, 3) : filteredStoves).map(stove => {
-                      const priceResult = getStoveCompanyPrice(stove.brand, stove.model);
-                      const companyPrice = priceResult.found ? priceResult.price : Math.round(stove.price * 0.7);
-                      return (
-                        <button
-                          key={stove.id}
-                          onClick={() => addStoveToCart(stove)}
-                          className="p-2.5 rounded-lg border-2 text-left transition-all hover:shadow-md relative border-transparent hover:border-orange-500/50 bg-card"
-                        >
-                          <div className="absolute top-0 left-0 right-0 h-1 rounded-t-lg bg-orange-500" />
-                          <div className="flex items-start gap-2 pt-1">
-                            <div className="w-9 h-9 rounded-lg bg-orange-500 flex items-center justify-center flex-shrink-0">
-                              <ChefHat className="h-5 w-5 text-white" />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <p className="font-semibold text-xs truncate">{stove.brand}</p>
-                              <p className="text-[10px] text-muted-foreground">{stove.burners}B • {stove.model}</p>
-                            </div>
-                          </div>
-                          <div className="flex items-center justify-between mt-2">
-                            <span className="font-bold text-sm text-orange-600">{BANGLADESHI_CURRENCY_SYMBOL}{companyPrice}</span>
-                            <Badge variant="secondary" className="text-[9px] px-1.5">{stove.quantity}</Badge>
-                          </div>
-                        </button>
-                      );
-                    })}
-                    {filteredStoves.length === 0 && activeTab === 'stove' && (
-                      <div className="col-span-full text-center py-8 text-muted-foreground">
-                        <ChefHat className="h-10 w-10 mx-auto mb-2 opacity-30" />
-                        <p className="text-sm">No stoves found</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Regulators */}
-              {(activeTab === 'regulator' || activeTab === 'all') && (
-                <div>
-                  {activeTab === 'all' && <p className="text-xs font-medium text-muted-foreground mb-2">Regulators ({filteredRegulators.length})</p>}
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
-                    {(activeTab === 'all' ? filteredRegulators.slice(0, 3) : filteredRegulators).map(reg => {
-                      const priceResult = getRegulatorCompanyPrice(reg.brand, reg.type);
-                      const companyPrice = priceResult.found ? priceResult.price : Math.round((reg.price || 0) * 0.7);
-                      return (
-                        <button
-                          key={reg.id}
-                          onClick={() => addRegulatorToCart(reg)}
-                          className="p-2.5 rounded-lg border-2 text-left transition-all hover:shadow-md relative border-transparent hover:border-violet-500/50 bg-card"
-                        >
-                          <div className="absolute top-0 left-0 right-0 h-1 rounded-t-lg bg-violet-500" />
-                          <div className="flex items-start gap-2 pt-1">
-                            <div className="w-9 h-9 rounded-lg bg-violet-500 flex items-center justify-center flex-shrink-0">
-                              <Gauge className="h-5 w-5 text-white" />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <p className="font-semibold text-xs truncate">{reg.brand}</p>
-                              <p className="text-[10px] text-muted-foreground">{reg.type}</p>
-                            </div>
-                          </div>
-                          <div className="flex items-center justify-between mt-2">
-                            <span className="font-bold text-sm text-violet-600">{BANGLADESHI_CURRENCY_SYMBOL}{companyPrice}</span>
-                            <Badge variant="secondary" className="text-[9px] px-1.5">{reg.quantity}</Badge>
-                          </div>
-                        </button>
-                      );
-                    })}
-                    {filteredRegulators.length === 0 && activeTab === 'regulator' && (
-                      <div className="col-span-full text-center py-8 text-muted-foreground">
-                        <Gauge className="h-10 w-10 mx-auto mb-2 opacity-30" />
-                        <p className="text-sm">No regulators found</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </ScrollArea>
-          </CardContent>
-        </Card>
-
-        {/* ===== CHECKOUT SECTION ===== */}
-        <Card>
-          <CardContent className="p-3">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-              {/* Supplier Selection */}
-              <div className="space-y-1.5">
-                <Label className="text-xs">Supplier</Label>
-                <div className="flex gap-1.5">
-                  {showCustomSupplierInput ? (
-                    <div className="flex gap-1 flex-1">
-                      <Input 
-                        value={customSupplier}
-                        onChange={(e) => setCustomSupplier(e.target.value)}
-                        placeholder="Enter supplier"
-                        className="h-9 flex-1"
-                      />
-                      <Button size="sm" variant="ghost" className="h-9 w-9 p-0" onClick={() => setShowCustomSupplierInput(false)}>
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <>
-                      <Select value={supplierName} onValueChange={setSupplierName}>
-                        <SelectTrigger className="h-9 flex-1">
-                          <SelectValue placeholder="Select supplier" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {SUPPLIERS.map(s => (
-                            <SelectItem key={s} value={s}>{s}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Button size="sm" variant="outline" className="h-9 w-9 p-0" onClick={() => setShowCustomSupplierInput(true)}>
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* Buyer Indicator */}
-              <div className="space-y-1.5">
-                <Label className="text-xs">Buyer</Label>
-                <div className={`h-9 px-3 flex items-center gap-2 rounded-md border ${ROLE_CONFIG[userRole]?.bgColor || 'bg-muted border-border'}`}>
-                  <User className={`h-4 w-4 ${ROLE_CONFIG[userRole]?.color || 'text-foreground'}`} />
-                  <span className={`text-sm font-medium ${ROLE_CONFIG[userRole]?.color || 'text-foreground'}`}>
-                    {ROLE_CONFIG[userRole]?.label || 'User'}
-                  </span>
-                </div>
-              </div>
-
-              {/* Summary & Actions */}
-              <div className="lg:col-span-2 space-y-1.5">
-                <div className="flex justify-between items-center">
-                  <Label className="text-xs">Grand Total (Company Price)</Label>
-                  <span className="text-xl font-bold text-indigo-600">{BANGLADESHI_CURRENCY_SYMBOL}{total.toLocaleString()}</span>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    onClick={() => handleCompletePurchase('completed')}
-                    disabled={purchaseItems.length === 0 || processing}
-                    className="flex-1 h-10 bg-indigo-600 hover:bg-indigo-700"
-                  >
-                    {processing ? (
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    ) : (
-                      <CheckCircle2 className="h-4 w-4 mr-2" />
-                    )}
-                    Complete Purchase
-                  </Button>
-                  <Button
-                    onClick={() => handleCompletePurchase('pending')}
-                    disabled={purchaseItems.length === 0 || processing}
-                    variant="outline"
-                    className="h-10"
-                  >
-                    <Building2 className="h-4 w-4 mr-2" />
-                    Credit
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* ===== RECENT PURCHASES (Voidable within 5 min) ===== */}
-        {recentPurchases.length > 0 && (
-          <Card>
-            <CardHeader className="py-2 px-3">
-              <CardTitle className="text-sm flex items-center gap-2 text-muted-foreground">
-                <Undo2 className="h-4 w-4" />
-                Recent Purchases (Void within 5 min)
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-2">
-              <div className="flex gap-2 flex-wrap">
-                {recentPurchases.map(p => (
-                  <Button
-                    key={p.id}
-                    variant="outline"
-                    size="sm"
-                    className="h-8 text-xs"
-                    onClick={() => { setPurchaseToVoid(p); setShowVoidDialog(true); }}
-                  >
-                    {p.transactionNumber} • {BANGLADESHI_CURRENCY_SYMBOL}{p.total}
-                  </Button>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* ===== VOID DIALOG ===== */}
-        <Dialog open={showVoidDialog} onOpenChange={setShowVoidDialog}>
-          <DialogContent className="max-w-sm">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Undo2 className="h-5 w-5 text-destructive" />
-                Void Purchase
-              </DialogTitle>
-              <DialogDescription>
-                Are you sure you want to void {purchaseToVoid?.transactionNumber}? This will reverse inventory changes.
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter className="gap-2">
-              <Button variant="outline" onClick={() => setShowVoidDialog(false)}>Cancel</Button>
-              <Button variant="destructive" onClick={handleVoidPurchase}>Void Purchase</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
       </div>
-    </TooltipProvider>
+
+      {/* ===== RECENT PURCHASES (Void within 5 mins) ===== */}
+      {recentPurchases.length > 0 && (
+        <Card>
+          <CardHeader className="py-2 px-3">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Building2 className="h-4 w-4 text-muted-foreground" />
+              Recent Purchases (5 min void window)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-2">
+            <div className="space-y-1.5">
+              {recentPurchases.map(purchase => (
+                <div key={purchase.id} className="flex items-center justify-between p-2 rounded-lg bg-muted/50 border">
+                  <div className="flex-1">
+                    <p className="font-medium text-xs">{purchase.transactionNumber}</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {purchase.supplierName} • {purchase.items.map(i => `${i.quantity}x ${i.name}`).join(', ')}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-sm text-indigo-600">{BANGLADESHI_CURRENCY_SYMBOL}{purchase.total.toLocaleString()}</span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 text-destructive hover:bg-destructive/10"
+                      onClick={() => { setPurchaseToVoid(purchase); setShowVoidDialog(true); }}
+                    >
+                      <Undo2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ===== VOID DIALOG ===== */}
+      <Dialog open={showVoidDialog} onOpenChange={setShowVoidDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Void Purchase?</DialogTitle>
+            <DialogDescription>
+              This will reverse the inventory changes and remove the expense entry for {purchaseToVoid?.transactionNumber}.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowVoidDialog(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleVoidPurchase}>Void Purchase</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 };
 
