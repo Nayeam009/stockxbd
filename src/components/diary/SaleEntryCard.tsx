@@ -7,10 +7,10 @@ import {
   Banknote, 
   Smartphone, 
   User, 
-  Package, 
   Clock,
   ArrowUpRight,
-  Eye
+  Eye,
+  Hash
 } from "lucide-react";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
 import { format } from "date-fns";
@@ -21,71 +21,82 @@ interface SaleEntryCardProps {
   onViewDetails?: (entry: SaleEntry) => void;
 }
 
-const paymentMethodConfig: Record<string, { icon: React.ComponentType<any>; color: string; label: string }> = {
-  cash: { icon: Banknote, color: 'text-green-600 bg-green-100 dark:bg-green-900/30', label: 'Cash' },
-  bkash: { icon: Smartphone, color: 'text-pink-600 bg-pink-100 dark:bg-pink-900/30', label: 'bKash' },
-  nagad: { icon: Smartphone, color: 'text-orange-600 bg-orange-100 dark:bg-orange-900/30', label: 'Nagad' },
-  rocket: { icon: Smartphone, color: 'text-purple-600 bg-purple-100 dark:bg-purple-900/30', label: 'Rocket' },
-  card: { icon: CreditCard, color: 'text-blue-600 bg-blue-100 dark:bg-blue-900/30', label: 'Card' }
+const paymentMethodConfig: Record<string, { icon: React.ComponentType<any>; color: string; bgColor: string; label: string }> = {
+  cash: { icon: Banknote, color: 'text-emerald-600 dark:text-emerald-400', bgColor: 'bg-emerald-100 dark:bg-emerald-900/40', label: 'Cash' },
+  bkash: { icon: Smartphone, color: 'text-pink-600 dark:text-pink-400', bgColor: 'bg-pink-100 dark:bg-pink-900/40', label: 'bKash' },
+  nagad: { icon: Smartphone, color: 'text-orange-600 dark:text-orange-400', bgColor: 'bg-orange-100 dark:bg-orange-900/40', label: 'Nagad' },
+  rocket: { icon: Smartphone, color: 'text-purple-600 dark:text-purple-400', bgColor: 'bg-purple-100 dark:bg-purple-900/40', label: 'Rocket' },
+  card: { icon: CreditCard, color: 'text-blue-600 dark:text-blue-400', bgColor: 'bg-blue-100 dark:bg-blue-900/40', label: 'Card' }
 };
 
-const statusConfig: Record<string, { color: string; label: string }> = {
-  paid: { color: 'bg-green-500/20 text-green-700 dark:text-green-400 border-green-500/30', label: 'Paid' },
-  due: { color: 'bg-red-500/20 text-red-700 dark:text-red-400 border-red-500/30', label: 'Due' },
-  partial: { color: 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 border-yellow-500/30', label: 'Partial' }
+const statusConfig: Record<string, { color: string; bgColor: string; label: string }> = {
+  paid: { color: 'text-emerald-700 dark:text-emerald-300', bgColor: 'bg-emerald-100 dark:bg-emerald-900/40 border-emerald-200 dark:border-emerald-800', label: 'Paid' },
+  due: { color: 'text-rose-700 dark:text-rose-300', bgColor: 'bg-rose-100 dark:bg-rose-900/40 border-rose-200 dark:border-rose-800', label: 'Due' },
+  partial: { color: 'text-amber-700 dark:text-amber-300', bgColor: 'bg-amber-100 dark:bg-amber-900/40 border-amber-200 dark:border-amber-800', label: 'Partial' }
 };
 
 export const SaleEntryCard = ({ entry, onViewDetails }: SaleEntryCardProps) => {
   const paymentConfig = paymentMethodConfig[entry.paymentMethod] || paymentMethodConfig.cash;
   const PaymentIcon = paymentConfig.icon;
-  const statusConf = statusConfig[entry.paymentStatus];
+  const statusConf = statusConfig[entry.paymentStatus] || statusConfig.paid;
   
   const isPayment = entry.type === 'payment';
 
   return (
-    <Card className={`border transition-all duration-200 hover:shadow-md ${isPayment ? 'border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20' : 'border-border'}`}>
-      <CardContent className="p-3 sm:p-4">
+    <Card className={`
+      border overflow-hidden transition-all duration-300 hover:shadow-lg group
+      ${isPayment 
+        ? 'bg-gradient-to-r from-emerald-50/80 to-card dark:from-emerald-950/30 dark:to-card border-emerald-200/60 dark:border-emerald-800/40' 
+        : 'bg-card hover:bg-gradient-to-r hover:from-muted/30 hover:to-card border-border/60'
+      }
+    `}>
+      {/* Top Color Bar */}
+      <div className={`h-0.5 ${isPayment ? 'bg-emerald-400' : 'bg-primary/60'}`} />
+      
+      <CardContent className="p-3.5 sm:p-4">
         <div className="flex items-start justify-between gap-3">
           {/* Left: Product/Transaction Info */}
-          <div className="flex-1 min-w-0 space-y-2">
-            {/* Header Row */}
+          <div className="flex-1 min-w-0 space-y-2.5">
+            {/* Header Row with Badges */}
             <div className="flex items-center gap-2 flex-wrap">
               {isPayment ? (
-                <Badge variant="outline" className="bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 text-xs">
+                <Badge variant="outline" className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700 text-xs font-medium">
                   <ArrowUpRight className="h-3 w-3 mr-1" />
                   Payment
                 </Badge>
               ) : (
-                <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30 text-xs">
+                <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30 text-xs font-medium">
                   <Receipt className="h-3 w-3 mr-1" />
                   Sale
                 </Badge>
               )}
-              <Badge variant="outline" className={statusConf.color + " text-xs"}>
+              <Badge variant="outline" className={`${statusConf.bgColor} ${statusConf.color} text-xs font-medium border`}>
                 {statusConf.label}
               </Badge>
               {entry.transactionType === 'wholesale' && (
-                <Badge variant="secondary" className="text-xs">Wholesale</Badge>
+                <Badge variant="secondary" className="text-xs bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border-0">
+                  Wholesale
+                </Badge>
               )}
             </div>
 
             {/* Product Name */}
             <div>
-              <h4 className="font-semibold text-sm sm:text-base text-foreground truncate">
+              <h4 className="font-semibold text-sm sm:text-base text-foreground leading-tight line-clamp-1 group-hover:text-primary transition-colors">
                 {entry.productName}
               </h4>
               {entry.productDetails && (
-                <p className="text-xs text-muted-foreground">{entry.productDetails}</p>
+                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{entry.productDetails}</p>
               )}
             </div>
 
-            {/* Customer & Staff Info */}
+            {/* Customer & Time Info */}
             <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
-              <span className="flex items-center gap-1">
+              <span className="flex items-center gap-1.5 bg-muted/50 px-2 py-1 rounded-md">
                 <User className="h-3 w-3" />
-                {entry.customerName}
+                <span className="font-medium">{entry.customerName}</span>
               </span>
-              <span className="flex items-center gap-1">
+              <span className="flex items-center gap-1.5">
                 <Clock className="h-3 w-3" />
                 {format(new Date(entry.timestamp), 'hh:mm a')}
               </span>
@@ -93,39 +104,40 @@ export const SaleEntryCard = ({ entry, onViewDetails }: SaleEntryCardProps) => {
 
             {/* Transaction Number */}
             <div className="flex items-center gap-2">
-              <span className="text-[10px] text-muted-foreground font-mono bg-muted px-1.5 py-0.5 rounded">
+              <span className="text-[10px] text-muted-foreground font-mono bg-muted/70 px-2 py-1 rounded flex items-center gap-1">
+                <Hash className="h-2.5 w-2.5" />
                 {entry.transactionNumber}
               </span>
               <span className="text-[10px] text-muted-foreground">
-                via {entry.source}
+                via <span className="font-medium">{entry.source}</span>
               </span>
             </div>
           </div>
 
           {/* Right: Amount & Payment */}
-          <div className="flex flex-col items-end gap-2 shrink-0">
-            {/* Amount */}
+          <div className="flex flex-col items-end gap-2.5 shrink-0">
+            {/* Amount with Emphasis */}
             <div className="text-right">
-              <p className="text-lg sm:text-xl font-bold text-green-600 dark:text-green-400">
+              <p className="text-lg sm:text-xl lg:text-2xl font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
                 +{BANGLADESHI_CURRENCY_SYMBOL}{entry.totalAmount.toLocaleString()}
               </p>
             </div>
 
             {/* Payment Method Badge */}
-            <Badge variant="outline" className={paymentConfig.color + " text-xs"}>
-              <PaymentIcon className="h-3 w-3 mr-1" />
+            <Badge variant="outline" className={`${paymentConfig.bgColor} ${paymentConfig.color} border-0 text-xs font-medium px-2.5 py-1`}>
+              <PaymentIcon className="h-3 w-3 mr-1.5" />
               {paymentConfig.label}
             </Badge>
 
-            {/* View Details Button (Mobile-friendly) */}
+            {/* View Details Button */}
             {onViewDetails && (
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="h-7 px-2 text-xs"
+                className="h-8 px-3 text-xs hover:bg-primary/10 hover:text-primary"
                 onClick={() => onViewDetails(entry)}
               >
-                <Eye className="h-3 w-3 mr-1" />
+                <Eye className="h-3.5 w-3.5 mr-1" />
                 View
               </Button>
             )}

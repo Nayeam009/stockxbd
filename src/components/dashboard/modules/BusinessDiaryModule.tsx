@@ -15,9 +15,11 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   BookOpen,
-  Filter
+  Wallet,
+  Receipt,
+  CircleDollarSign
 } from "lucide-react";
-import { format, subDays } from "date-fns";
+import { format } from "date-fns";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
 import { useBusinessDiaryData } from "@/hooks/useBusinessDiaryData";
 import { SaleEntryCard } from "@/components/diary/SaleEntryCard";
@@ -69,8 +71,11 @@ export const BusinessDiaryModule = () => {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center space-y-4">
-          <Loader2 className="h-10 w-10 animate-spin text-primary mx-auto" />
-          <p className="text-muted-foreground">Loading Business Diary...</p>
+          <div className="relative">
+            <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl animate-pulse" />
+            <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto relative" />
+          </div>
+          <p className="text-muted-foreground font-medium">Loading Business Diary...</p>
         </div>
       </div>
     );
@@ -90,108 +95,197 @@ export const BusinessDiaryModule = () => {
   };
 
   return (
-    <div className="space-y-4 pb-4">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground flex items-center gap-2">
-            <BookOpen className="h-6 w-6 text-primary" />
-            Business Diary
-          </h2>
-          <p className="text-xs sm:text-sm text-muted-foreground">Track all money IN & OUT</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Input
-            type="date"
-            value={dateFilter}
-            onChange={(e) => setDateFilter(e.target.value)}
-            className="w-auto min-w-[140px] h-11 text-sm touch-manipulation"
-          />
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={refetch} 
-            className="h-11 w-11 p-0 touch-manipulation"
-            aria-label="Refresh data"
-          >
-            <RefreshCcw className="h-4 w-4" />
-          </Button>
+    <div className="space-y-4 sm:space-y-6 pb-4">
+      {/* Premium Header */}
+      <div className="relative">
+        <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-secondary/5 rounded-xl -z-10" />
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-0">
+          <div className="space-y-1">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg">
+                <BookOpen className="h-5 w-5 sm:h-6 sm:w-6 text-primary-foreground" />
+              </div>
+              <div>
+                <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground tracking-tight">
+                  Business Diary
+                </h2>
+                <p className="text-xs sm:text-sm text-muted-foreground">
+                  Track all money IN & OUT • Real-time sync
+                </p>
+              </div>
+            </div>
+          </div>
+          
+          {/* Control Bar */}
+          <div className="flex items-center gap-2 bg-card/80 backdrop-blur-sm rounded-xl p-2 border border-border/50 shadow-sm">
+            <div className="relative">
+              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+              <Input
+                type="date"
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value)}
+                className="w-auto min-w-[150px] h-11 pl-9 text-sm touch-manipulation border-border/50 bg-background/50"
+              />
+            </div>
+            <Button 
+              variant="outline" 
+              size="icon"
+              onClick={refetch} 
+              className="h-11 w-11 shrink-0 touch-manipulation border-border/50 hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-colors"
+              aria-label="Refresh data"
+            >
+              <RefreshCcw className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </div>
 
-      {/* Summary Cards */}
+      {/* Premium Summary Cards */}
       <div className="grid grid-cols-3 gap-2 sm:gap-4">
-        <Card className="bg-gradient-to-br from-green-500/10 via-card to-card border-green-500/20">
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center justify-between">
-              <div className="min-w-0">
-                <p className="text-[10px] sm:text-xs text-muted-foreground">Income</p>
-                <p className="text-sm sm:text-lg lg:text-xl font-bold text-green-600 dark:text-green-400 truncate">
+        {/* Income Card */}
+        <Card className="relative overflow-hidden border-0 shadow-lg group hover:shadow-xl transition-all duration-300">
+          <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-transparent" />
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-emerald-400" />
+          <CardContent className="relative p-3 sm:p-5">
+            <div className="flex items-start justify-between">
+              <div className="space-y-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <div className="h-6 w-6 sm:h-7 sm:w-7 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+                    <ArrowUpRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  <p className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wider">Income</p>
+                </div>
+                <p className="text-lg sm:text-2xl lg:text-3xl font-bold text-emerald-600 dark:text-emerald-400 truncate tabular-nums">
                   +{BANGLADESHI_CURRENCY_SYMBOL}{dayTotals.income.toLocaleString()}
                 </p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">
+                  {filteredSales.length} transaction{filteredSales.length !== 1 ? 's' : ''}
+                </p>
               </div>
-              <ArrowUpRight className="h-4 w-4 sm:h-5 sm:w-5 text-green-500 shrink-0" />
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-gradient-to-br from-red-500/10 via-card to-card border-red-500/20">
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center justify-between">
-              <div className="min-w-0">
-                <p className="text-[10px] sm:text-xs text-muted-foreground">Expenses</p>
-                <p className="text-sm sm:text-lg lg:text-xl font-bold text-red-600 dark:text-red-400 truncate">
+
+        {/* Expenses Card */}
+        <Card className="relative overflow-hidden border-0 shadow-lg group hover:shadow-xl transition-all duration-300">
+          <div className="absolute inset-0 bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-transparent" />
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-rose-500 to-rose-400" />
+          <CardContent className="relative p-3 sm:p-5">
+            <div className="flex items-start justify-between">
+              <div className="space-y-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <div className="h-6 w-6 sm:h-7 sm:w-7 rounded-lg bg-rose-500/20 flex items-center justify-center">
+                    <ArrowDownRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-rose-600 dark:text-rose-400" />
+                  </div>
+                  <p className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wider">Expenses</p>
+                </div>
+                <p className="text-lg sm:text-2xl lg:text-3xl font-bold text-rose-600 dark:text-rose-400 truncate tabular-nums">
                   -{BANGLADESHI_CURRENCY_SYMBOL}{dayTotals.expenses.toLocaleString()}
                 </p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">
+                  {filteredExpenses.length} transaction{filteredExpenses.length !== 1 ? 's' : ''}
+                </p>
               </div>
-              <ArrowDownRight className="h-4 w-4 sm:h-5 sm:w-5 text-red-500 shrink-0" />
             </div>
           </CardContent>
         </Card>
-        <Card className={`bg-gradient-to-br ${dayTotals.profit >= 0 ? 'from-primary/10' : 'from-destructive/10'} via-card to-card`}>
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center justify-between">
-              <div className="min-w-0">
-                <p className="text-[10px] sm:text-xs text-muted-foreground">{dayTotals.profit >= 0 ? 'Profit' : 'Loss'}</p>
-                <p className={`text-sm sm:text-lg lg:text-xl font-bold truncate ${dayTotals.profit >= 0 ? 'text-primary' : 'text-destructive'}`}>
+
+        {/* Profit/Loss Card */}
+        <Card className={`relative overflow-hidden border-0 shadow-lg group hover:shadow-xl transition-all duration-300`}>
+          <div className={`absolute inset-0 bg-gradient-to-br ${dayTotals.profit >= 0 ? 'from-primary/10 via-primary/5' : 'from-destructive/10 via-destructive/5'} to-transparent`} />
+          <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${dayTotals.profit >= 0 ? 'from-primary to-primary/80' : 'from-destructive to-destructive/80'}`} />
+          <CardContent className="relative p-3 sm:p-5">
+            <div className="flex items-start justify-between">
+              <div className="space-y-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <div className={`h-6 w-6 sm:h-7 sm:w-7 rounded-lg ${dayTotals.profit >= 0 ? 'bg-primary/20' : 'bg-destructive/20'} flex items-center justify-center`}>
+                    {dayTotals.profit >= 0 ? (
+                      <TrendingUp className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary" />
+                    ) : (
+                      <TrendingDown className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-destructive" />
+                    )}
+                  </div>
+                  <p className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    {dayTotals.profit >= 0 ? 'Profit' : 'Loss'}
+                  </p>
+                </div>
+                <p className={`text-lg sm:text-2xl lg:text-3xl font-bold truncate tabular-nums ${dayTotals.profit >= 0 ? 'text-primary' : 'text-destructive'}`}>
                   {BANGLADESHI_CURRENCY_SYMBOL}{Math.abs(dayTotals.profit).toLocaleString()}
                 </p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">
+                  Net {dayTotals.profit >= 0 ? 'gain' : 'loss'} today
+                </p>
               </div>
-              {dayTotals.profit >= 0 ? <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-primary shrink-0" /> : <TrendingDown className="h-4 w-4 sm:h-5 sm:w-5 text-destructive shrink-0" />}
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Search */}
+      {/* Enhanced Search Bar */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+          <Search className="h-4 w-4 text-muted-foreground" />
+        </div>
         <Input
-          placeholder="Search transactions..."
+          placeholder="Search by product, customer, or transaction..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-9 h-11 text-sm touch-manipulation"
+          className="pl-10 h-12 text-sm touch-manipulation bg-card/50 border-border/50 focus:border-primary/50 focus:ring-primary/20 rounded-xl"
         />
       </div>
 
-      {/* Main Content - Dual Panel on Desktop, Tabs on Mobile */}
+      {/* Main Content - Dual Panel on Desktop, Premium Tabs on Mobile */}
       {isMobile ? (
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'sales' | 'expenses')}>
-          <TabsList className="grid w-full grid-cols-2 h-12">
-            <TabsTrigger value="sales" className="text-xs gap-1 h-11 touch-manipulation">
-              <ArrowUpRight className="h-3.5 w-3.5" /> Sales ({filteredSales.length})
-            </TabsTrigger>
-            <TabsTrigger value="expenses" className="text-xs gap-1 h-11 touch-manipulation">
-              <ArrowDownRight className="h-3.5 w-3.5" /> Expense ({filteredExpenses.length})
-            </TabsTrigger>
-          </TabsList>
+          {/* Premium Tab Switcher */}
+          <div className="bg-muted/50 p-1.5 rounded-xl border border-border/50">
+            <TabsList className="grid w-full grid-cols-2 h-auto gap-1 bg-transparent p-0">
+              <TabsTrigger 
+                value="sales" 
+                className="h-12 rounded-lg data-[state=active]:bg-emerald-500 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=inactive]:bg-transparent data-[state=inactive]:hover:bg-background/80 transition-all duration-200 touch-manipulation"
+              >
+                <div className="flex items-center gap-2">
+                  <ArrowUpRight className="h-4 w-4" />
+                  <span className="font-medium">Sales</span>
+                  <Badge variant="secondary" className="h-5 px-1.5 text-[10px] data-[state=active]:bg-white/20 data-[state=active]:text-white">
+                    {filteredSales.length}
+                  </Badge>
+                </div>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="expenses" 
+                className="h-12 rounded-lg data-[state=active]:bg-rose-500 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=inactive]:bg-transparent data-[state=inactive]:hover:bg-background/80 transition-all duration-200 touch-manipulation"
+              >
+                <div className="flex items-center gap-2">
+                  <ArrowDownRight className="h-4 w-4" />
+                  <span className="font-medium">Expenses</span>
+                  <Badge variant="secondary" className="h-5 px-1.5 text-[10px] data-[state=active]:bg-white/20 data-[state=active]:text-white">
+                    {filteredExpenses.length}
+                  </Badge>
+                </div>
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
-          <TabsContent value="sales" className="mt-3 space-y-3">
+          <TabsContent value="sales" className="mt-4 space-y-3">
             {filteredSales.length === 0 ? (
-              <Card className="border-dashed">
-                <CardContent className="flex flex-col items-center justify-center py-10">
-                  <ArrowUpRight className="h-10 w-10 text-muted-foreground/50 mb-3" />
-                  <p className="text-sm font-medium text-muted-foreground">No sales found for this day</p>
-                  <p className="text-xs text-muted-foreground/70 mt-1">Try selecting a different date</p>
+              <Card className="border-dashed border-2 border-emerald-200 dark:border-emerald-800/50 bg-emerald-50/50 dark:bg-emerald-950/20">
+                <CardContent className="flex flex-col items-center justify-center py-12">
+                  <div className="h-16 w-16 rounded-2xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mb-4">
+                    <Receipt className="h-8 w-8 text-emerald-500" />
+                  </div>
+                  <p className="text-base font-semibold text-foreground">No sales found</p>
+                  <p className="text-sm text-muted-foreground mt-1 text-center max-w-[250px]">
+                    No sales recorded for {format(new Date(dateFilter), 'MMM dd, yyyy')}
+                  </p>
+                  <Button 
+                    variant="outline" 
+                    className="mt-4 h-11 touch-manipulation border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/50"
+                    onClick={() => window.dispatchEvent(new CustomEvent('navigate-module', { detail: 'pos' }))}
+                  >
+                    <Wallet className="h-4 w-4 mr-2" />
+                    Go to POS
+                  </Button>
                 </CardContent>
               </Card>
             ) : (
@@ -199,13 +293,25 @@ export const BusinessDiaryModule = () => {
             )}
           </TabsContent>
 
-          <TabsContent value="expenses" className="mt-3 space-y-3">
+          <TabsContent value="expenses" className="mt-4 space-y-3">
             {filteredExpenses.length === 0 ? (
-              <Card className="border-dashed">
-                <CardContent className="flex flex-col items-center justify-center py-10">
-                  <ArrowDownRight className="h-10 w-10 text-muted-foreground/50 mb-3" />
-                  <p className="text-sm font-medium text-muted-foreground">No expenses found for this day</p>
-                  <p className="text-xs text-muted-foreground/70 mt-1">Expenses from POB, Staff, and Vehicle will appear here</p>
+              <Card className="border-dashed border-2 border-rose-200 dark:border-rose-800/50 bg-rose-50/50 dark:bg-rose-950/20">
+                <CardContent className="flex flex-col items-center justify-center py-12">
+                  <div className="h-16 w-16 rounded-2xl bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center mb-4">
+                    <CircleDollarSign className="h-8 w-8 text-rose-500" />
+                  </div>
+                  <p className="text-base font-semibold text-foreground">No expenses found</p>
+                  <p className="text-sm text-muted-foreground mt-1 text-center max-w-[250px]">
+                    Expenses from POB, Staff Salary, and Vehicle Costs will appear here
+                  </p>
+                  <Button 
+                    variant="outline" 
+                    className="mt-4 h-11 touch-manipulation border-rose-200 dark:border-rose-800 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50"
+                    onClick={() => window.dispatchEvent(new CustomEvent('navigate-module', { detail: 'inventory' }))}
+                  >
+                    <ArrowDownRight className="h-4 w-4 mr-2" />
+                    Go to Inventory
+                  </Button>
                 </CardContent>
               </Card>
             ) : (
@@ -217,23 +323,34 @@ export const BusinessDiaryModule = () => {
         </Tabs>
       ) : (
         <div className="space-y-4">
-          {/* Desktop: Side by Side */}
-          <div className="grid lg:grid-cols-2 gap-4">
+          {/* Desktop: Side by Side Premium Panels */}
+          <div className="grid lg:grid-cols-2 gap-4 lg:gap-6">
             {/* Sales Panel */}
-            <Card>
-              <CardHeader className="pb-2 px-4 pt-4">
-                <CardTitle className="text-base font-semibold flex items-center gap-2 text-green-600 dark:text-green-500">
-                  <ArrowUpRight className="h-4 w-4" />
-                  Daily Sales ({filteredSales.length})
+            <Card className="border-0 shadow-lg overflow-hidden">
+              <div className="h-1 bg-gradient-to-r from-emerald-500 to-emerald-400" />
+              <CardHeader className="pb-3 px-5 pt-5 bg-gradient-to-b from-emerald-50/50 dark:from-emerald-950/20 to-transparent">
+                <CardTitle className="text-base font-semibold flex items-center justify-between">
+                  <div className="flex items-center gap-2.5 text-emerald-600 dark:text-emerald-400">
+                    <div className="h-8 w-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+                      <ArrowUpRight className="h-4 w-4" />
+                    </div>
+                    Daily Sales
+                  </div>
+                  <Badge variant="secondary" className="bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border-0">
+                    {filteredSales.length} entries
+                  </Badge>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="px-4 pb-4">
-                <ScrollArea className="h-[400px] pr-2">
+              <CardContent className="px-5 pb-5">
+                <ScrollArea className="h-[450px] pr-3">
                   <div className="space-y-3">
                     {filteredSales.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                        <ArrowUpRight className="h-8 w-8 text-muted-foreground/40 mb-2" />
-                        <p className="text-sm">No sales found</p>
+                      <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                        <div className="h-14 w-14 rounded-2xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mb-4">
+                          <Receipt className="h-7 w-7 text-emerald-400" />
+                        </div>
+                        <p className="text-sm font-medium">No sales found</p>
+                        <p className="text-xs text-muted-foreground mt-1">Select a different date</p>
                       </div>
                     ) : (
                       filteredSales.map(entry => <SaleEntryCard key={entry.id} entry={entry} />)
@@ -244,20 +361,31 @@ export const BusinessDiaryModule = () => {
             </Card>
 
             {/* Expenses Panel */}
-            <Card>
-              <CardHeader className="pb-2 px-4 pt-4">
-                <CardTitle className="text-base font-semibold flex items-center gap-2 text-red-600 dark:text-red-500">
-                  <ArrowDownRight className="h-4 w-4" />
-                  Daily Expenses ({filteredExpenses.length})
+            <Card className="border-0 shadow-lg overflow-hidden">
+              <div className="h-1 bg-gradient-to-r from-rose-500 to-rose-400" />
+              <CardHeader className="pb-3 px-5 pt-5 bg-gradient-to-b from-rose-50/50 dark:from-rose-950/20 to-transparent">
+                <CardTitle className="text-base font-semibold flex items-center justify-between">
+                  <div className="flex items-center gap-2.5 text-rose-600 dark:text-rose-400">
+                    <div className="h-8 w-8 rounded-lg bg-rose-500/20 flex items-center justify-center">
+                      <ArrowDownRight className="h-4 w-4" />
+                    </div>
+                    Daily Expenses
+                  </div>
+                  <Badge variant="secondary" className="bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 border-0">
+                    {filteredExpenses.length} entries
+                  </Badge>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="px-4 pb-4">
-                <ScrollArea className="h-[400px] pr-2">
+              <CardContent className="px-5 pb-5">
+                <ScrollArea className="h-[450px] pr-3">
                   <div className="space-y-3">
                     {filteredExpenses.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                        <ArrowDownRight className="h-8 w-8 text-muted-foreground/40 mb-2" />
-                        <p className="text-sm">No expenses found</p>
+                      <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                        <div className="h-14 w-14 rounded-2xl bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center mb-4">
+                          <CircleDollarSign className="h-7 w-7 text-rose-400" />
+                        </div>
+                        <p className="text-sm font-medium">No expenses found</p>
+                        <p className="text-xs text-muted-foreground mt-1">POB & costs appear here</p>
                       </div>
                     ) : (
                       filteredExpenses.map(entry => (
