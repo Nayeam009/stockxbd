@@ -99,6 +99,7 @@ export const translations: Translations = {
   "search": { en: "Search & Reports", bn: "অনুসন্ধান ও রিপোর্ট" },
   "logout": { en: "Sign Out", bn: "সাইন আউট" },
   "exchange": { en: "Exchange", bn: "এক্সচেঞ্জ" },
+  "business_diary": { en: "Business Diary", bn: "ব্যবসার ডায়েরি" },
   "more": { en: "More", bn: "আরও" },
   "all_modules": { en: "All Modules", bn: "সব মডিউল" },
   // ==================== Dashboard Overview ====================
