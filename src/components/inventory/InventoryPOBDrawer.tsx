@@ -1220,9 +1220,9 @@ export const InventoryPOBDrawer = ({
     </div>
   );
 
-  // Checkout view
+  // Checkout view (optimized for mobile)
   const renderCheckout = () => (
-    <div className="space-y-4 p-4">
+    <div className="space-y-4">
       {/* Supplier */}
       <Card>
         <CardHeader className="py-3 px-4 border-b">
@@ -1256,12 +1256,25 @@ export const InventoryPOBDrawer = ({
             <span className="text-2xl font-extrabold text-primary">{BANGLADESHI_CURRENCY_SYMBOL}{total.toLocaleString()}</span>
           </div>
 
-          <div className="space-y-2 pt-2">
-            <Button type="button" size="lg" className="w-full h-14 font-semibold" onClick={() => handleCompletePurchase('completed')} disabled={processing || purchaseItems.length === 0}>
+          <div className="space-y-3 pt-2">
+            <Button 
+              type="button" 
+              size="lg" 
+              className="w-full h-14 font-semibold" 
+              onClick={() => handleCompletePurchase('completed')} 
+              disabled={processing || purchaseItems.length === 0}
+            >
               {processing ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <CheckCircle2 className="h-5 w-5 mr-2" />}
               Complete (Paid)
             </Button>
-            <Button type="button" variant="outline" size="lg" className="w-full h-14 font-semibold border-warning text-warning" onClick={() => handleCompletePurchase('pending')} disabled={processing || purchaseItems.length === 0}>
+            <Button 
+              type="button" 
+              variant="outline" 
+              size="lg" 
+              className="w-full h-14 font-semibold border-warning text-warning hover:bg-warning/10" 
+              onClick={() => handleCompletePurchase('pending')} 
+              disabled={processing || purchaseItems.length === 0}
+            >
               <Save className="h-5 w-5 mr-2" />Save as Credit
             </Button>
           </div>
@@ -1277,7 +1290,7 @@ export const InventoryPOBDrawer = ({
             </CardTitle>
           </CardHeader>
           <CardContent className="p-2">
-            <ScrollArea className="max-h-[140px]">
+            <div className="max-h-[140px] overflow-y-auto">
               <div className="space-y-1">
                 {recentPurchases.map(purchase => (
                   <div key={purchase.id} className="flex items-center justify-between p-2.5 rounded-lg bg-muted/50">
@@ -1285,13 +1298,19 @@ export const InventoryPOBDrawer = ({
                       <p className="text-xs font-semibold">{purchase.transactionNumber}</p>
                       <p className="text-xs text-muted-foreground">{BANGLADESHI_CURRENCY_SYMBOL}{purchase.total.toLocaleString()}</p>
                     </div>
-                    <Button type="button" variant="ghost" size="sm" className="h-9 w-9 p-0 text-destructive" onClick={() => { setPurchaseToVoid(purchase); setShowVoidDialog(true); }}>
+                    <Button 
+                      type="button" 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-10 w-10 p-0 text-destructive" 
+                      onClick={() => { setPurchaseToVoid(purchase); setShowVoidDialog(true); }}
+                    >
                       <Undo2 className="h-4 w-4" />
                     </Button>
                   </div>
                 ))}
               </div>
-            </ScrollArea>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -1317,11 +1336,79 @@ export const InventoryPOBDrawer = ({
     }
   };
 
+  // Mobile cart view (without h-full constraint)
+  const renderCartMobile = () => (
+    <div className="pb-6">
+      {purchaseItems.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+          <ShoppingBag className="h-16 w-16 opacity-30 mb-4" />
+          <p className="font-semibold">Cart is empty</p>
+          <p className="text-sm">Add products to get started</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {purchaseItems.map((item) => (
+            <Card key={item.id} className="overflow-hidden border" style={{ borderLeftWidth: '4px', borderLeftColor: item.brandColor || (item.type === 'stove' ? 'hsl(var(--warning))' : item.type === 'regulator' ? 'hsl(var(--info))' : 'hsl(var(--primary))') }}>
+              <div className="flex items-center justify-between p-3">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-lg flex items-center justify-center bg-muted">
+                    {item.type === 'lpg' && <Cylinder className="h-5 w-5" style={{ color: item.brandColor || 'hsl(var(--primary))' }} />}
+                    {item.type === 'stove' && <ChefHat className="h-5 w-5 text-warning" />}
+                    {item.type === 'regulator' && <Gauge className="h-5 w-5 text-info" />}
+                  </div>
+                  <div>
+                    <p className="font-semibold text-sm">{item.name}</p>
+                    <p className="text-xs text-muted-foreground">{item.details}</p>
+                    <p className="text-xs font-medium text-primary">{item.quantity} × {BANGLADESHI_CURRENCY_SYMBOL}{item.companyPrice.toLocaleString()}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="font-bold">{BANGLADESHI_CURRENCY_SYMBOL}{(item.quantity * item.companyPrice).toLocaleString()}</p>
+                  <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => removeItem(item.id)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          ))}
+          
+          {/* Cart Summary */}
+          <div className="pt-4 space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <Card className="border-2 border-success/30 bg-success/10">
+                <CardContent className="p-3 text-center">
+                  <p className="text-xs font-bold text-success">Total Qty</p>
+                  <p className="text-2xl font-black text-success">{purchaseItemsCount}</p>
+                </CardContent>
+              </Card>
+              <Card className="border-2 border-primary/30 bg-primary/10">
+                <CardContent className="p-3 text-center">
+                  <p className="text-xs font-bold text-primary">Total D.O.</p>
+                  <p className="text-xl font-black text-primary">{BANGLADESHI_CURRENCY_SYMBOL}{total.toLocaleString()}</p>
+                </CardContent>
+              </Card>
+            </div>
+            <Button type="button" size="lg" className="w-full h-14 font-bold" onClick={() => setMobileStep('checkout')}>
+              <CheckCircle2 className="h-5 w-5 mr-2" />Proceed to Checkout
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <>
       <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent side={isMobile ? "bottom" : "right"} className={isMobile ? "h-[95vh] rounded-t-2xl" : "w-full sm:max-w-xl"}>
-          <SheetHeader className="pb-4 border-b">
+        <SheetContent 
+          side={isMobile ? "bottom" : "right"} 
+          className={isMobile 
+            ? "h-[95vh] rounded-t-2xl flex flex-col overflow-hidden" 
+            : "w-full sm:max-w-xl flex flex-col"
+          }
+        >
+          {/* Fixed Header */}
+          <SheetHeader className="pb-4 border-b flex-shrink-0">
             <SheetTitle className="flex items-center gap-2">
               {getIcon()}
               {getTitle()}
@@ -1335,38 +1422,64 @@ export const InventoryPOBDrawer = ({
           </SheetHeader>
 
           {loading ? (
-            <div className="flex items-center justify-center h-64">
+            <div className="flex items-center justify-center h-64 flex-shrink-0">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
           ) : (
             <>
-              {/* Mobile Step Navigation */}
+              {/* Mobile Step Navigation - Fixed */}
               {isMobile && (
-                <div className="flex items-center justify-between bg-muted/50 rounded-xl p-1 my-4">
-                  <Button variant={mobileStep === 'product' ? 'default' : 'ghost'} size="sm" className="flex-1 h-10" onClick={() => setMobileStep('product')}>
+                <div className="flex items-center justify-between bg-muted/50 rounded-xl p-1 my-4 mx-1 flex-shrink-0">
+                  <Button 
+                    variant={mobileStep === 'product' ? 'default' : 'ghost'} 
+                    size="sm" 
+                    className="flex-1 h-11 font-medium" 
+                    onClick={() => setMobileStep('product')}
+                  >
                     Product
                   </Button>
-                  <Button variant={mobileStep === 'cart' ? 'default' : 'ghost'} size="sm" className="flex-1 h-10 relative" onClick={() => setMobileStep('cart')}>
+                  <Button 
+                    variant={mobileStep === 'cart' ? 'default' : 'ghost'} 
+                    size="sm" 
+                    className="flex-1 h-11 relative font-medium" 
+                    onClick={() => setMobileStep('cart')}
+                  >
                     Cart
                     {purchaseItemsCount > 0 && (
                       <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-[10px]">{purchaseItemsCount}</Badge>
                     )}
                   </Button>
-                  <Button variant={mobileStep === 'checkout' ? 'default' : 'ghost'} size="sm" className="flex-1 h-10" onClick={() => setMobileStep('checkout')}>
+                  <Button 
+                    variant={mobileStep === 'checkout' ? 'default' : 'ghost'} 
+                    size="sm" 
+                    className="flex-1 h-11 font-medium" 
+                    onClick={() => setMobileStep('checkout')}
+                  >
                     Checkout
                   </Button>
                 </div>
               )}
 
-              {/* Desktop: side-by-side, Mobile: step-based */}
+              {/* Mobile: Scrollable Content Area */}
               {isMobile ? (
-                <div className="flex-1 overflow-auto">
-                  {mobileStep === 'product' && <div className="p-4">{renderProductForm()}</div>}
-                  {mobileStep === 'cart' && renderCart()}
-                  {mobileStep === 'checkout' && renderCheckout()}
-                </div>
+                <ScrollArea className="flex-1 min-h-0">
+                  <div className="px-4 pb-8">
+                    {mobileStep === 'product' && (
+                      <div className="space-y-5 py-2">
+                        {renderProductForm()}
+                      </div>
+                    )}
+                    {mobileStep === 'cart' && renderCartMobile()}
+                    {mobileStep === 'checkout' && (
+                      <div className="py-2">
+                        {renderCheckout()}
+                      </div>
+                    )}
+                  </div>
+                </ScrollArea>
               ) : (
-                <div className="flex flex-col h-[calc(100vh-120px)]">
+                /* Desktop: Side-by-side scrollable */
+                <div className="flex flex-col flex-1 min-h-0">
                   <ScrollArea className="flex-1">
                     <div className="p-4 space-y-4">
                       {renderProductForm()}
@@ -1385,7 +1498,7 @@ export const InventoryPOBDrawer = ({
 
       {/* Void Dialog */}
       <Dialog open={showVoidDialog} onOpenChange={setShowVoidDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-[95vw] sm:max-w-md rounded-xl">
           <DialogHeader>
             <DialogTitle>Void Purchase?</DialogTitle>
             <DialogDescription>
@@ -1393,8 +1506,8 @@ export const InventoryPOBDrawer = ({
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={() => setShowVoidDialog(false)}>Cancel</Button>
-            <Button variant="destructive" onClick={handleVoidPurchase}>
+            <Button variant="outline" className="h-11" onClick={() => setShowVoidDialog(false)}>Cancel</Button>
+            <Button variant="destructive" className="h-11" onClick={handleVoidPurchase}>
               <Undo2 className="h-4 w-4 mr-2" />Void Purchase
             </Button>
           </DialogFooter>
