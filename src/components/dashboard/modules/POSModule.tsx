@@ -1700,7 +1700,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
 
               {/* Discount */}
               <div className="space-y-1.5">
-                <Label className="text-xs">Discount</Label>
+                <Label className="text-xs">Settlement</Label>
                 <Input
                   type="number"
                   value={discount}
