@@ -1,10 +1,10 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
@@ -14,9 +14,7 @@ import {
   Minus, 
   Trash2, 
   ShoppingCart, 
-  Printer, 
   Loader2,
-  FileText,
   X,
   User,
   Phone,
@@ -24,21 +22,16 @@ import {
   UserPlus,
   Search,
   Package,
-  AlertTriangle,
   ScanLine,
-  AlertCircle,
   Undo2,
   Fuel,
   ChefHat,
   Gauge,
   ArrowLeftRight,
   Cylinder,
-  ChevronRight,
-  Check,
   CreditCard,
   Wallet,
   CheckCircle2,
-  ArrowDown,
   RotateCcw
 } from "lucide-react";
 import { BarcodeScanner } from "@/components/pos/BarcodeScanner";
@@ -121,15 +114,13 @@ interface SaleItem {
   details: string;
   price: number;
   quantity: number;
-  returnBrand?: string;
-  returnBrandId?: string;
   cylinderType?: 'refill' | 'package';
   brandId?: string;
   stoveId?: string;
   regulatorId?: string;
-  isLeakedReturn?: boolean;
   weight?: string;
   mouthSize?: string;
+  brandColor?: string;
 }
 
 interface ReturnItem {
@@ -155,12 +146,11 @@ interface RecentTransaction {
 // Weight options
 const WEIGHT_OPTIONS_22MM = ["5.5kg", "12kg", "12.5kg", "25kg", "35kg", "45kg"];
 const WEIGHT_OPTIONS_20MM = ["5kg", "10kg", "12kg", "15kg", "21kg", "35kg"];
-const BRAND_MOUTH_SIZE_MAP = getBrandMouthSizeMap();
 const DEFAULT_CREDIT_LIMIT = 10000;
 
 // ============= MAIN POS MODULE =============
 export const POSModule = () => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   
   // ===== DATA STATE =====
   const [loading, setLoading] = useState(true);
@@ -172,8 +162,11 @@ export const POSModule = () => {
   const [productPrices, setProductPrices] = useState<ProductPrice[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);
   
+  // ===== ACTIVE TABLE STATE (Sale or Return) =====
+  const [activeTable, setActiveTable] = useState<'sale' | 'return'>('sale');
+  
   // ===== PRODUCT SELECTION STATE =====
-  const [activeTab, setActiveTab] = useState("lpg");
+  const [activeTab, setActiveTab] = useState("all");
   const [cylinderType, setCylinderType] = useState<"refill" | "package">("refill");
   const [saleType, setSaleType] = useState<"retail" | "wholesale">("retail");
   const [mouthSize, setMouthSize] = useState("22mm");
@@ -207,7 +200,6 @@ export const POSModule = () => {
   const [recentTransactions, setRecentTransactions] = useState<RecentTransaction[]>([]);
   const [showVoidDialog, setShowVoidDialog] = useState(false);
   const [transactionToVoid, setTransactionToVoid] = useState<RecentTransaction | null>(null);
-  const [showCheckoutPanel, setShowCheckoutPanel] = useState(false);
 
   // ============= DATA FETCHING =============
   const fetchData = useCallback(async () => {
@@ -334,12 +326,10 @@ export const POSModule = () => {
     });
   }, [lpgBrands, mouthSize, weight, productSearch]);
 
-  // Brands available for return (matching weight of items being sold)
+  // All brands for return (matching current weight selection)
   const brandsForReturn = useMemo(() => {
-    const lpgItem = saleItems.find(i => i.type === 'lpg');
-    const targetWeight = lpgItem?.weight || weight;
-    return lpgBrands.filter(b => b.weight === targetWeight);
-  }, [lpgBrands, saleItems, weight]);
+    return lpgBrands.filter(b => b.weight === weight);
+  }, [lpgBrands, weight]);
 
   const filteredStoves = useMemo(() => {
     if (!productSearch) return stoves;
@@ -366,19 +356,16 @@ export const POSModule = () => {
   }, [customers, customerSearch]);
 
   // ============= CART CALCULATIONS =============
-  // Count of refill LPG cylinders being sold
   const refillCylindersCount = useMemo(() => {
     return saleItems
       .filter(i => i.type === 'lpg' && i.cylinderType === 'refill')
       .reduce((sum, i) => sum + i.quantity, 0);
   }, [saleItems]);
 
-  // Count of return cylinders
   const returnCylindersCount = useMemo(() => {
     return returnItems.reduce((sum, i) => sum + i.quantity, 0);
   }, [returnItems]);
 
-  // Check if return count matches (for Refill sales)
   const isReturnCountMatched = refillCylindersCount === 0 || refillCylindersCount === returnCylindersCount;
   const hasRefillInCart = refillCylindersCount > 0;
 
@@ -419,11 +406,12 @@ export const POSModule = () => {
         cylinderType,
         brandId: brand.id,
         weight,
-        mouthSize
+        mouthSize,
+        brandColor: brand.color
       };
       setSaleItems([...saleItems, newItem]);
     }
-    toast({ title: `${brand.name} added` });
+    toast({ title: `${brand.name} added to sale` });
   };
 
   const addStoveToCart = (stove: Stove) => {
@@ -455,7 +443,7 @@ export const POSModule = () => {
       };
       setSaleItems([...saleItems, newItem]);
     }
-    toast({ title: "Stove added" });
+    toast({ title: "Stove added to sale" });
   };
 
   const addRegulatorToCart = (regulator: Regulator) => {
@@ -487,7 +475,7 @@ export const POSModule = () => {
       };
       setSaleItems([...saleItems, newItem]);
     }
-    toast({ title: "Regulator added" });
+    toast({ title: "Regulator added to sale" });
   };
 
   const updateItemQuantity = (id: string, change: number) => {
@@ -514,7 +502,6 @@ export const POSModule = () => {
         r.id === existingReturn.id ? { ...r, quantity: r.quantity + 1 } : r
       ));
     } else {
-      const lpgItem = saleItems.find(i => i.type === 'lpg');
       setReturnItems([...returnItems, {
         id: `return-${Date.now()}`,
         brandId: brand.id,
@@ -522,10 +509,10 @@ export const POSModule = () => {
         brandColor: brand.color,
         quantity: 1,
         isLeaked: false,
-        weight: lpgItem?.weight || weight
+        weight: weight
       }]);
     }
-    toast({ title: `Return: ${brand.name}` });
+    toast({ title: `${brand.name} added to return` });
   };
 
   const updateReturnQuantity = (id: string, change: number) => {
@@ -561,7 +548,6 @@ export const POSModule = () => {
       if (!user) throw new Error("Not authenticated");
 
       const { data: ownerId } = await supabase.rpc("get_owner_id");
-      const lpgItem = saleItems.find(i => i.type === 'lpg');
 
       // Create new brand
       const { data: newBrand, error: brandError } = await supabase
@@ -569,7 +555,7 @@ export const POSModule = () => {
         .insert({
           name: sanitizeString(customReturnBrand),
           size: mouthSize,
-          weight: lpgItem?.weight || weight,
+          weight: weight,
           color: '#6b7280',
           package_cylinder: 0,
           refill_cylinder: 0,
@@ -586,9 +572,9 @@ export const POSModule = () => {
       // Create pricing entry
       await supabase.from('product_prices').insert({
         product_type: 'lpg',
-        product_name: `${customReturnBrand} ${lpgItem?.weight || weight}`,
+        product_name: `${customReturnBrand} ${weight}`,
         brand_id: newBrand.id,
-        size: lpgItem?.weight || weight,
+        size: weight,
         variant: 'Refill',
         company_price: 0,
         distributor_price: 0,
@@ -606,7 +592,7 @@ export const POSModule = () => {
         brandColor: newBrand.color,
         quantity: 1,
         isLeaked: false,
-        weight: lpgItem?.weight || weight
+        weight: weight
       }]);
 
       toast({ title: "Custom brand added" });
@@ -651,6 +637,7 @@ export const POSModule = () => {
     }
 
     const { data: { user } } = await supabase.auth.getUser();
+    const { data: ownerId } = await supabase.rpc("get_owner_id");
     
     const { data, error } = await supabase
       .from('customers')
@@ -658,7 +645,8 @@ export const POSModule = () => {
         name: sanitizeString(customerName),
         phone: customerPhone || null,
         address: customerAddress || null,
-        created_by: user?.id
+        created_by: user?.id,
+        owner_id: ownerId || user?.id
       })
       .select()
       .single();
@@ -724,6 +712,7 @@ export const POSModule = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Please log in");
 
+      const { data: ownerId } = await supabase.rpc("get_owner_id");
       const { data: txnNum } = await supabase.rpc('generate_transaction_number');
       const transactionNumber = txnNum || `TXN-${Date.now()}`;
 
@@ -737,7 +726,8 @@ export const POSModule = () => {
             name: sanitizeString(customerName),
             phone: customerPhone || null,
             address: customerAddress || null,
-            created_by: user.id 
+            created_by: user.id,
+            owner_id: ownerId || user.id
           })
           .select()
           .single();
@@ -756,7 +746,8 @@ export const POSModule = () => {
           payment_method: 'cash' as const,
           payment_status: paymentStatus,
           driver_id: selectedDriverId || null,
-          created_by: user.id
+          created_by: user.id,
+          owner_id: ownerId || user.id
         })
         .select()
         .single();
@@ -837,7 +828,7 @@ export const POSModule = () => {
         }
       }
 
-      // Prepare invoice
+      // Prepare invoice with return items
       setLastTransaction({
         invoiceNumber: transactionNumber,
         date: new Date(),
@@ -848,6 +839,11 @@ export const POSModule = () => {
           quantity: i.quantity,
           unitPrice: i.price,
           total: i.price * i.quantity
+        })),
+        returnItems: returnItems.map(r => ({
+          brandName: r.brandName,
+          quantity: r.quantity,
+          isLeaked: r.isLeaked
         })),
         subtotal,
         discount: discountAmount,
@@ -866,7 +862,6 @@ export const POSModule = () => {
       setCustomerName("");
       setCustomerPhone("");
       setCustomerAddress("");
-      setShowCheckoutPanel(false);
 
       toast({ 
         title: paymentStatus === 'completed' ? "Sale completed!" : "Saved as due",
@@ -918,41 +913,200 @@ export const POSModule = () => {
     );
   }
 
+  const saleItemsCount = saleItems.reduce((s, i) => s + i.quantity, 0);
+
   return (
     <TooltipProvider>
-      <div className="space-y-4 pb-24 lg:pb-6">
-        {/* Header */}
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-primary flex items-center justify-center">
-              <ShoppingCart className="h-5 w-5 sm:h-6 sm:w-6 text-primary-foreground" />
-            </div>
-            <div>
-              <h1 className="text-lg sm:text-xl font-bold">{t('pos')}</h1>
-              <p className="text-xs text-muted-foreground hidden sm:block">Quick & Easy Sales</p>
-            </div>
-          </div>
+      <div className="space-y-3 pb-24 lg:pb-4">
+        {/* ===== HEADER ===== */}
+        <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <Button onClick={() => setShowBarcodeScanner(true)} variant="outline" size="sm" className="h-9">
+            <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center">
+              <ShoppingCart className="h-4 w-4 text-primary-foreground" />
+            </div>
+            <h1 className="text-lg font-bold">{t('pos')}</h1>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Button onClick={() => setShowBarcodeScanner(true)} variant="outline" size="sm" className="h-8 w-8 p-0">
               <ScanLine className="h-4 w-4" />
             </Button>
-            {saleItems.length > 0 && (
-              <Button onClick={clearAll} variant="ghost" size="sm" className="h-9 text-destructive">
+            {(saleItems.length > 0 || returnItems.length > 0) && (
+              <Button onClick={clearAll} variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive">
                 <RotateCcw className="h-4 w-4" />
               </Button>
             )}
           </div>
         </div>
 
-        {/* Type Toggles */}
+        {/* ===== MOBILE TABLE TOGGLE ===== */}
+        <div className="lg:hidden">
+          <div className="grid grid-cols-2 gap-2 p-1 bg-muted rounded-lg">
+            <Button
+              variant={activeTable === 'sale' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setActiveTable('sale')}
+              className={`h-10 ${activeTable === 'sale' ? 'bg-emerald-600 hover:bg-emerald-700' : ''}`}
+            >
+              <ShoppingCart className="h-4 w-4 mr-2" />
+              Selling
+              {saleItemsCount > 0 && <Badge className="ml-2 bg-white/20">{saleItemsCount}</Badge>}
+            </Button>
+            <Button
+              variant={activeTable === 'return' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setActiveTable('return')}
+              className={`h-10 ${activeTable === 'return' ? 'bg-amber-500 hover:bg-amber-600' : ''}`}
+            >
+              <ArrowLeftRight className="h-4 w-4 mr-2" />
+              Return
+              {returnCylindersCount > 0 && <Badge className="ml-2 bg-white/20">{returnCylindersCount}</Badge>}
+            </Button>
+          </div>
+        </div>
+
+        {/* ===== TOP SECTION: TWO TABLES (Desktop: side-by-side, Mobile: one at a time) ===== */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          {/* SALE TABLE */}
+          <Card className={`border-2 border-emerald-200 dark:border-emerald-900 ${activeTable !== 'sale' ? 'hidden lg:block' : ''}`}>
+            <CardHeader 
+              className="py-2 px-3 bg-emerald-50 dark:bg-emerald-950/30 cursor-pointer" 
+              onClick={() => setActiveTable('sale')}
+            >
+              <CardTitle className="flex items-center justify-between text-sm">
+                <span className="flex items-center gap-2">
+                  <ShoppingCart className="h-4 w-4 text-emerald-600" />
+                  Products Sold
+                </span>
+                <Badge className="bg-emerald-600">{saleItemsCount}</Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-2">
+              <ScrollArea className="h-[140px] sm:h-[160px]">
+                {saleItems.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-muted-foreground py-6">
+                    <ShoppingCart className="h-8 w-8 opacity-30 mb-2" />
+                    <p className="text-xs">Select products below</p>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    {saleItems.map(item => (
+                      <div key={item.id} className="flex items-center gap-2 p-2 rounded-lg bg-card border">
+                        <div 
+                          className="w-7 h-7 rounded flex items-center justify-center flex-shrink-0"
+                          style={{ backgroundColor: item.brandColor || (item.type === 'stove' ? '#f97316' : item.type === 'regulator' ? '#8b5cf6' : '#10b981') }}
+                        >
+                          {item.type === 'lpg' && <Cylinder className="h-3.5 w-3.5 text-white" />}
+                          {item.type === 'stove' && <ChefHat className="h-3.5 w-3.5 text-white" />}
+                          {item.type === 'regulator' && <Gauge className="h-3.5 w-3.5 text-white" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-xs truncate">{item.name}</p>
+                          <p className="text-[10px] text-muted-foreground truncate">{item.details}</p>
+                        </div>
+                        <div className="flex items-center gap-1 bg-muted rounded px-1">
+                          <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => updateItemQuantity(item.id, -1)}>
+                            <Minus className="h-3 w-3" />
+                          </Button>
+                          <span className="w-5 text-center text-xs font-bold">{item.quantity}</span>
+                          <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => updateItemQuantity(item.id, 1)}>
+                            <Plus className="h-3 w-3" />
+                          </Button>
+                        </div>
+                        <p className="font-bold text-xs text-emerald-600 w-16 text-right">{BANGLADESHI_CURRENCY_SYMBOL}{(item.price * item.quantity).toLocaleString()}</p>
+                        <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive" onClick={() => removeItem(item.id)}>
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </ScrollArea>
+              {saleItems.length > 0 && (
+                <div className="mt-2 pt-2 border-t flex justify-between items-center">
+                  <span className="text-xs text-muted-foreground">Total</span>
+                  <span className="font-bold text-emerald-600">{BANGLADESHI_CURRENCY_SYMBOL}{subtotal.toLocaleString()}</span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* RETURN TABLE */}
+          <Card className={`border-2 ${hasRefillInCart ? 'border-amber-200 dark:border-amber-900' : 'border-muted'} ${activeTable !== 'return' ? 'hidden lg:block' : ''}`}>
+            <CardHeader 
+              className={`py-2 px-3 cursor-pointer ${hasRefillInCart ? 'bg-amber-50 dark:bg-amber-950/30' : 'bg-muted/30'}`}
+              onClick={() => setActiveTable('return')}
+            >
+              <CardTitle className="flex items-center justify-between text-sm">
+                <span className="flex items-center gap-2">
+                  <ArrowLeftRight className="h-4 w-4 text-amber-600" />
+                  Cylinders Return
+                </span>
+                <Badge variant={isReturnCountMatched ? "secondary" : "destructive"}>
+                  {returnCylindersCount}/{refillCylindersCount}
+                </Badge>
+              </CardTitle>
+              {hasRefillInCart && !isReturnCountMatched && (
+                <p className="text-[10px] text-destructive">⚠ Must return {refillCylindersCount} cylinder(s)</p>
+              )}
+            </CardHeader>
+            <CardContent className="p-2">
+              <ScrollArea className="h-[140px] sm:h-[160px]">
+                {returnItems.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-muted-foreground py-6">
+                    <ArrowLeftRight className="h-8 w-8 opacity-30 mb-2" />
+                    <p className="text-xs">{hasRefillInCart ? 'Select return cylinders below' : 'Return applies to Refill sales'}</p>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    {returnItems.map(item => (
+                      <div key={item.id} className="flex items-center gap-2 p-2 rounded-lg bg-card border">
+                        <div 
+                          className="w-7 h-7 rounded flex items-center justify-center flex-shrink-0"
+                          style={{ backgroundColor: item.brandColor }}
+                        >
+                          <Cylinder className="h-3.5 w-3.5 text-white" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-xs truncate">{item.brandName}</p>
+                          <div className="flex items-center gap-1">
+                            <Checkbox 
+                              checked={item.isLeaked}
+                              onCheckedChange={() => toggleReturnLeaked(item.id)}
+                              className="h-3 w-3"
+                            />
+                            <span className="text-[9px] text-muted-foreground">Leaked</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 bg-muted rounded px-1">
+                          <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => updateReturnQuantity(item.id, -1)}>
+                            <Minus className="h-3 w-3" />
+                          </Button>
+                          <span className="w-5 text-center text-xs font-bold">{item.quantity}</span>
+                          <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => updateReturnQuantity(item.id, 1)}>
+                            <Plus className="h-3 w-3" />
+                          </Button>
+                        </div>
+                        <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive" onClick={() => removeReturnItem(item.id)}>
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* ===== MIDDLE SECTION: TYPE TOGGLES & FILTERS ===== */}
         <div className="flex flex-wrap items-center gap-2">
           {/* Cylinder Type */}
-          <div className="flex bg-muted rounded-lg p-1">
+          <div className="flex bg-muted rounded-lg p-0.5">
             <Button
               size="sm"
               variant={cylinderType === 'refill' ? 'default' : 'ghost'}
               onClick={() => setCylinderType('refill')}
-              className="h-8 text-xs px-3"
+              className="h-7 text-xs px-2.5"
             >
               Refill
             </Button>
@@ -960,19 +1114,18 @@ export const POSModule = () => {
               size="sm"
               variant={cylinderType === 'package' ? 'default' : 'ghost'}
               onClick={() => setCylinderType('package')}
-              className={`h-8 text-xs px-3 ${cylinderType === 'package' ? 'bg-emerald-600 hover:bg-emerald-700' : ''}`}
+              className={`h-7 text-xs px-2.5 ${cylinderType === 'package' ? 'bg-emerald-600 hover:bg-emerald-700' : ''}`}
             >
-              <Package className="h-3 w-3 mr-1" />
               Package
             </Button>
           </div>
           {/* Sale Type */}
-          <div className="flex bg-muted rounded-lg p-1">
+          <div className="flex bg-muted rounded-lg p-0.5">
             <Button
               size="sm"
               variant={saleType === 'retail' ? 'default' : 'ghost'}
               onClick={() => setSaleType('retail')}
-              className="h-8 text-xs px-3"
+              className="h-7 text-xs px-2.5"
             >
               Retail
             </Button>
@@ -980,23 +1133,24 @@ export const POSModule = () => {
               size="sm"
               variant={saleType === 'wholesale' ? 'default' : 'ghost'}
               onClick={() => setSaleType('wholesale')}
-              className={`h-8 text-xs px-3 ${saleType === 'wholesale' ? 'bg-violet-600 hover:bg-violet-700' : ''}`}
+              className={`h-7 text-xs px-2.5 ${saleType === 'wholesale' ? 'bg-violet-600 hover:bg-violet-700' : ''}`}
             >
               Wholesale
             </Button>
           </div>
-          {/* Mouth Size & Weight */}
-          <div className="flex bg-muted rounded-lg p-1">
-            <Button size="sm" variant={mouthSize === "22mm" ? "default" : "ghost"} className="h-8 text-xs" onClick={() => { setMouthSize("22mm"); setWeight("12kg"); }}>22mm</Button>
-            <Button size="sm" variant={mouthSize === "20mm" ? "default" : "ghost"} className="h-8 text-xs" onClick={() => { setMouthSize("20mm"); setWeight("12kg"); }}>20mm</Button>
+          {/* Mouth Size */}
+          <div className="flex bg-muted rounded-lg p-0.5">
+            <Button size="sm" variant={mouthSize === "22mm" ? "default" : "ghost"} className="h-7 text-xs px-2" onClick={() => { setMouthSize("22mm"); setWeight("12kg"); }}>22mm</Button>
+            <Button size="sm" variant={mouthSize === "20mm" ? "default" : "ghost"} className="h-7 text-xs px-2" onClick={() => { setMouthSize("20mm"); setWeight("12kg"); }}>20mm</Button>
           </div>
+          {/* Weight */}
           <div className="flex flex-wrap gap-1">
-            {(mouthSize === "22mm" ? WEIGHT_OPTIONS_22MM : WEIGHT_OPTIONS_20MM).slice(0, 4).map(w => (
+            {(mouthSize === "22mm" ? WEIGHT_OPTIONS_22MM : WEIGHT_OPTIONS_20MM).slice(0, 5).map(w => (
               <Button
                 key={w}
                 size="sm"
                 variant={weight === w ? "default" : "outline"}
-                className="h-8 text-xs px-2"
+                className="h-7 text-xs px-2"
                 onClick={() => setWeight(w)}
               >
                 {w}
@@ -1005,435 +1159,238 @@ export const POSModule = () => {
           </div>
         </div>
 
-        {/* Main Grid: Products | Selling Cart | Return Cart */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-          {/* Product Selection */}
-          <div className="lg:col-span-5">
-            <Card className="h-full">
-              <CardHeader className="pb-2 px-3 pt-3">
-                <div className="flex items-center gap-2">
-                  <Input
-                    placeholder="Search products..."
-                    value={productSearch}
-                    onChange={(e) => setProductSearch(e.target.value)}
-                    className="h-9"
-                  />
-                </div>
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-2">
-                  <TabsList className="grid grid-cols-4 h-9">
-                    <TabsTrigger value="lpg" className="text-xs data-[state=active]:bg-emerald-600 data-[state=active]:text-white">
-                      <Fuel className="h-3.5 w-3.5 mr-1" />LPG
-                    </TabsTrigger>
-                    <TabsTrigger value="stove" className="text-xs data-[state=active]:bg-orange-500 data-[state=active]:text-white">
-                      <ChefHat className="h-3.5 w-3.5 mr-1" />Stove
-                    </TabsTrigger>
-                    <TabsTrigger value="regulator" className="text-xs data-[state=active]:bg-violet-500 data-[state=active]:text-white">
-                      <Gauge className="h-3.5 w-3.5 mr-1" />Reg
-                    </TabsTrigger>
-                    <TabsTrigger value="all" className="text-xs">All</TabsTrigger>
-                  </TabsList>
-                </Tabs>
-              </CardHeader>
-              <CardContent className="px-3 pb-3">
-                <ScrollArea className="h-[300px] sm:h-[400px]">
-                  {/* LPG Products */}
-                  {(activeTab === 'lpg' || activeTab === 'all') && (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-3">
-                      {(activeTab === 'all' ? filteredBrands.slice(0, 6) : filteredBrands).map(brand => {
-                        const stock = cylinderType === 'refill' ? brand.refill_cylinder : brand.package_cylinder;
-                        const price = getLPGPrice(brand.id, weight, cylinderType, saleType);
-                        return (
-                          <button
-                            key={brand.id}
-                            onClick={() => addLPGToCart(brand)}
-                            disabled={stock === 0}
-                            className={`p-2 rounded-lg border-2 text-left transition-all hover:shadow-md ${
-                              stock === 0 ? 'opacity-50 cursor-not-allowed border-muted' : 'border-transparent hover:border-primary/50 bg-card'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2 mb-1">
-                              <div 
-                                className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                                style={{ backgroundColor: brand.color }}
-                              >
-                                <Cylinder className="h-4 w-4 text-white" />
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <p className="font-semibold text-xs truncate">{brand.name}</p>
-                                <p className="text-[10px] text-muted-foreground">{weight}</p>
-                              </div>
+        {/* ===== PRODUCT CARDS SECTION ===== */}
+        <Card>
+          <CardHeader className="pb-2 px-3 pt-3">
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search products..."
+                  value={productSearch}
+                  onChange={(e) => setProductSearch(e.target.value)}
+                  className="h-9 pl-8"
+                />
+              </div>
+            </div>
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-2">
+              <TabsList className="h-9 w-full grid grid-cols-4">
+                <TabsTrigger value="all" className="text-xs">All</TabsTrigger>
+                <TabsTrigger value="lpg" className="text-xs data-[state=active]:bg-emerald-600 data-[state=active]:text-white">
+                  <Fuel className="h-3.5 w-3.5 mr-1" />LPG
+                </TabsTrigger>
+                <TabsTrigger value="stove" className="text-xs data-[state=active]:bg-orange-500 data-[state=active]:text-white">
+                  <ChefHat className="h-3.5 w-3.5 mr-1" />Stove
+                </TabsTrigger>
+                <TabsTrigger value="regulator" className="text-xs data-[state=active]:bg-violet-500 data-[state=active]:text-white">
+                  <Gauge className="h-3.5 w-3.5 mr-1" />Reg
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </CardHeader>
+          <CardContent className="px-3 pb-3">
+            <ScrollArea className="h-[240px] sm:h-[280px]">
+              {/* LPG Cylinders */}
+              {(activeTab === 'lpg' || activeTab === 'all') && (
+                <div className="mb-3">
+                  {activeTab === 'all' && <p className="text-xs font-medium text-muted-foreground mb-2">LPG Cylinders</p>}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+                    {(activeTab === 'all' ? filteredBrands.slice(0, 5) : filteredBrands).map(brand => {
+                      const stock = cylinderType === 'refill' ? brand.refill_cylinder : brand.package_cylinder;
+                      const price = getLPGPrice(brand.id, weight, cylinderType, saleType);
+                      const isSaleMode = activeTable === 'sale';
+                      
+                      return (
+                        <button
+                          key={brand.id}
+                          onClick={() => isSaleMode ? addLPGToCart(brand) : addReturnCylinder(brand)}
+                          disabled={isSaleMode && stock === 0}
+                          className={`p-2.5 rounded-lg border-2 text-left transition-all hover:shadow-md relative ${
+                            isSaleMode && stock === 0 
+                              ? 'opacity-50 cursor-not-allowed border-muted' 
+                              : isSaleMode 
+                                ? 'border-transparent hover:border-emerald-500/50 bg-card' 
+                                : 'border-transparent hover:border-amber-500/50 bg-card'
+                          }`}
+                        >
+                          {/* Brand Color Header */}
+                          <div 
+                            className="absolute top-0 left-0 right-0 h-1 rounded-t-lg"
+                            style={{ backgroundColor: brand.color }}
+                          />
+                          <div className="flex items-start gap-2 pt-1">
+                            <div 
+                              className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+                              style={{ backgroundColor: brand.color }}
+                            >
+                              <Cylinder className="h-5 w-5 text-white" />
                             </div>
-                            <div className="flex items-center justify-between">
-                              <span className="font-bold text-sm text-primary">{BANGLADESHI_CURRENCY_SYMBOL}{price}</span>
+                            <div className="min-w-0 flex-1">
+                              <p className="font-semibold text-xs truncate">{brand.name}</p>
+                              <p className="text-[10px] text-muted-foreground">{weight}</p>
+                            </div>
+                          </div>
+                          {isSaleMode ? (
+                            <div className="flex items-center justify-between mt-2">
+                              <span className="font-bold text-sm text-emerald-600">{BANGLADESHI_CURRENCY_SYMBOL}{price}</span>
                               <Badge variant={stock > 5 ? "secondary" : stock > 0 ? "outline" : "destructive"} className="text-[9px] px-1.5">
                                 {stock > 0 ? stock : 'Out'}
                               </Badge>
                             </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* Stoves */}
-                  {(activeTab === 'stove' || activeTab === 'all') && (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-3">
-                      {(activeTab === 'all' ? filteredStoves.slice(0, 3) : filteredStoves).map(stove => {
-                        const price = getStovePrice(stove.brand, stove.model) || stove.price;
-                        return (
-                          <button
-                            key={stove.id}
-                            onClick={() => addStoveToCart(stove)}
-                            disabled={stove.quantity === 0}
-                            className={`p-2 rounded-lg border-2 text-left transition-all hover:shadow-md ${
-                              stove.quantity === 0 ? 'opacity-50 cursor-not-allowed border-muted' : 'border-transparent hover:border-orange-500/50 bg-card'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2 mb-1">
-                              <div className="w-8 h-8 rounded-lg bg-orange-500 flex items-center justify-center flex-shrink-0">
-                                <ChefHat className="h-4 w-4 text-white" />
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <p className="font-semibold text-xs truncate">{stove.brand}</p>
-                                <p className="text-[10px] text-muted-foreground">{stove.burners}B • {stove.model}</p>
-                              </div>
+                          ) : (
+                            <div className="mt-2 text-center">
+                              <Badge variant="outline" className="text-[9px]">Tap to add</Badge>
                             </div>
-                            <div className="flex items-center justify-between">
-                              <span className="font-bold text-sm text-orange-600">{BANGLADESHI_CURRENCY_SYMBOL}{price}</span>
-                              <Badge variant="secondary" className="text-[9px] px-1.5">{stove.quantity}</Badge>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* Regulators */}
-                  {(activeTab === 'regulator' || activeTab === 'all') && (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                      {(activeTab === 'all' ? filteredRegulators.slice(0, 3) : filteredRegulators).map(reg => {
-                        const price = getRegulatorPrice(reg.brand, reg.type) || reg.price || 0;
-                        return (
-                          <button
-                            key={reg.id}
-                            onClick={() => addRegulatorToCart(reg)}
-                            disabled={reg.quantity === 0}
-                            className={`p-2 rounded-lg border-2 text-left transition-all hover:shadow-md ${
-                              reg.quantity === 0 ? 'opacity-50 cursor-not-allowed border-muted' : 'border-transparent hover:border-violet-500/50 bg-card'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2 mb-1">
-                              <div className="w-8 h-8 rounded-lg bg-violet-500 flex items-center justify-center flex-shrink-0">
-                                <Gauge className="h-4 w-4 text-white" />
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <p className="font-semibold text-xs truncate">{reg.brand}</p>
-                                <p className="text-[10px] text-muted-foreground">{reg.type}</p>
-                              </div>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <span className="font-bold text-sm text-violet-600">{BANGLADESHI_CURRENCY_SYMBOL}{price}</span>
-                              <Badge variant="secondary" className="text-[9px] px-1.5">{reg.quantity}</Badge>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {filteredBrands.length === 0 && activeTab === 'lpg' && (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <Cylinder className="h-10 w-10 mx-auto mb-2 opacity-30" />
-                      <p className="text-sm">No cylinders found</p>
-                    </div>
-                  )}
-                </ScrollArea>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Selling Cart */}
-          <div className="lg:col-span-4">
-            <Card className="h-full border-2 border-emerald-200 dark:border-emerald-900">
-              <CardHeader className="pb-2 px-3 pt-3 bg-emerald-50 dark:bg-emerald-950/30">
-                <CardTitle className="flex items-center justify-between text-sm">
-                  <span className="flex items-center gap-2">
-                    <ShoppingCart className="h-4 w-4 text-emerald-600" />
-                    Selling
-                  </span>
-                  <Badge className="bg-emerald-600">{saleItems.reduce((s, i) => s + i.quantity, 0)}</Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="px-3 pb-3">
-                <ScrollArea className="h-[200px] sm:h-[280px]">
-                  {saleItems.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <ShoppingCart className="h-8 w-8 mx-auto mb-2 opacity-30" />
-                      <p className="text-xs">Select products to sell</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {saleItems.map(item => (
-                        <div key={item.id} className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 border">
-                          <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-xs truncate">{item.name}</p>
-                            <p className="text-[10px] text-muted-foreground truncate">{item.details}</p>
-                            <p className="font-bold text-sm text-emerald-600">{BANGLADESHI_CURRENCY_SYMBOL}{(item.price * item.quantity).toLocaleString()}</p>
-                          </div>
-                          <div className="flex flex-col items-end gap-1">
-                            <div className="flex items-center gap-0.5 bg-background rounded p-0.5">
-                              <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => updateItemQuantity(item.id, -1)}>
-                                <Minus className="h-3 w-3" />
-                              </Button>
-                              <span className="w-5 text-center text-xs font-bold">{item.quantity}</span>
-                              <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => updateItemQuantity(item.id, 1)}>
-                                <Plus className="h-3 w-3" />
-                              </Button>
-                            </div>
-                            <Button size="icon" variant="ghost" className="h-5 w-5 text-destructive" onClick={() => removeItem(item.id)}>
-                              <X className="h-3 w-3" />
-                            </Button>
+                          )}
+                        </button>
+                      );
+                    })}
+                    {/* Custom Brand for Return */}
+                    {activeTable === 'return' && (
+                      <button
+                        onClick={() => setShowCustomBrandInput(true)}
+                        className="p-2.5 rounded-lg border-2 border-dashed border-muted-foreground/30 hover:border-amber-500/50 bg-card text-left transition-all"
+                      >
+                        <div className="flex items-center justify-center h-full min-h-[60px]">
+                          <div className="text-center">
+                            <Plus className="h-5 w-5 mx-auto text-muted-foreground mb-1" />
+                            <p className="text-xs text-muted-foreground">Custom</p>
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </ScrollArea>
-
-                <Separator className="my-3" />
-
-                {/* Totals */}
-                <div className="space-y-1 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Subtotal</span>
-                    <span>{BANGLADESHI_CURRENCY_SYMBOL}{subtotal.toLocaleString()}</span>
-                  </div>
-                  {discountAmount > 0 && (
-                    <div className="flex justify-between text-emerald-600">
-                      <span>Discount</span>
-                      <span>-{BANGLADESHI_CURRENCY_SYMBOL}{discountAmount}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between font-bold text-lg pt-1 border-t">
-                    <span>Total</span>
-                    <span className="text-emerald-600">{BANGLADESHI_CURRENCY_SYMBOL}{total.toLocaleString()}</span>
+                      </button>
+                    )}
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Return Cart */}
-          <div className="lg:col-span-3">
-            <Card className={`h-full border-2 ${hasRefillInCart ? 'border-amber-200 dark:border-amber-900' : 'border-muted'}`}>
-              <CardHeader className={`pb-2 px-3 pt-3 ${hasRefillInCart ? 'bg-amber-50 dark:bg-amber-950/30' : 'bg-muted/30'}`}>
-                <CardTitle className="flex items-center justify-between text-sm">
-                  <span className="flex items-center gap-2">
-                    <ArrowLeftRight className="h-4 w-4 text-amber-600" />
-                    Return
-                  </span>
-                  <Badge variant={isReturnCountMatched ? "secondary" : "destructive"}>
-                    {returnCylindersCount}/{refillCylindersCount}
-                  </Badge>
-                </CardTitle>
-                {hasRefillInCart && !isReturnCountMatched && (
-                  <p className="text-[10px] text-destructive mt-1">
-                    ⚠ Must return {refillCylindersCount} cylinder(s)
-                  </p>
-                )}
-              </CardHeader>
-              <CardContent className="px-3 pb-3">
-                {!hasRefillInCart ? (
-                  <div className="text-center py-6 text-muted-foreground">
-                    <ArrowLeftRight className="h-8 w-8 mx-auto mb-2 opacity-30" />
-                    <p className="text-xs">Return applies to Refill only</p>
-                  </div>
-                ) : (
-                  <>
-                    {/* Return Items List */}
-                    <ScrollArea className="h-[120px] sm:h-[150px] mb-3">
-                      {returnItems.length === 0 ? (
-                        <div className="text-center py-4 text-muted-foreground">
-                          <p className="text-xs">Select return cylinders below</p>
-                        </div>
-                      ) : (
-                        <div className="space-y-2">
-                          {returnItems.map(item => (
-                            <div key={item.id} className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 border">
-                              <div 
-                                className="w-6 h-6 rounded flex-shrink-0 flex items-center justify-center"
-                                style={{ backgroundColor: item.brandColor }}
-                              >
-                                <Cylinder className="h-3 w-3 text-white" />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="font-semibold text-xs truncate">{item.brandName}</p>
-                                <div className="flex items-center gap-1">
-                                  <Checkbox 
-                                    checked={item.isLeaked}
-                                    onCheckedChange={() => toggleReturnLeaked(item.id)}
-                                    className="h-3 w-3"
-                                  />
-                                  <span className="text-[9px] text-muted-foreground">Leaked</span>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-0.5 bg-background rounded p-0.5">
-                                <Button size="icon" variant="ghost" className="h-5 w-5" onClick={() => updateReturnQuantity(item.id, -1)}>
-                                  <Minus className="h-2.5 w-2.5" />
-                                </Button>
-                                <span className="w-4 text-center text-xs font-bold">{item.quantity}</span>
-                                <Button size="icon" variant="ghost" className="h-5 w-5" onClick={() => updateReturnQuantity(item.id, 1)}>
-                                  <Plus className="h-2.5 w-2.5" />
-                                </Button>
-                              </div>
-                              <Button size="icon" variant="ghost" className="h-5 w-5 text-destructive" onClick={() => removeReturnItem(item.id)}>
-                                <X className="h-2.5 w-2.5" />
-                              </Button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </ScrollArea>
-
-                    <Separator className="my-2" />
-
-                    {/* Available Brands for Return */}
-                    <p className="text-[10px] text-muted-foreground mb-2">Quick Add:</p>
-                    <div className="grid grid-cols-3 gap-1.5">
-                      {brandsForReturn.slice(0, 6).map(brand => (
-                        <button
-                          key={brand.id}
-                          onClick={() => addReturnCylinder(brand)}
-                          className="p-1.5 rounded border hover:border-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-all"
-                        >
-                          <div 
-                            className="w-6 h-6 mx-auto rounded flex items-center justify-center"
-                            style={{ backgroundColor: brand.color }}
-                          >
-                            <Cylinder className="h-3 w-3 text-white" />
-                          </div>
-                          <p className="text-[9px] text-center mt-1 truncate">{brand.name}</p>
-                        </button>
-                      ))}
-                    </div>
-
-                    {/* Custom Brand */}
-                    {showCustomBrandInput ? (
-                      <div className="mt-2 flex gap-1">
-                        <Input
-                          value={customReturnBrand}
-                          onChange={(e) => setCustomReturnBrand(e.target.value)}
-                          placeholder="Brand name"
-                          className="h-7 text-xs"
-                        />
-                        <Button size="sm" className="h-7 px-2" onClick={handleAddCustomBrand}>
-                          <Check className="h-3 w-3" />
-                        </Button>
-                        <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setShowCustomBrandInput(false)}>
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    ) : (
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="w-full mt-2 h-7 text-xs"
-                        onClick={() => setShowCustomBrandInput(true)}
-                      >
-                        <Plus className="h-3 w-3 mr-1" />
-                        Custom Brand
-                      </Button>
-                    )}
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-
-        {/* Checkout Panel */}
-        <Card className="border-2">
-          <CardHeader className="pb-3 px-4 pt-4">
-            <CardTitle className="flex items-center justify-between text-base">
-              <span className="flex items-center gap-2">
-                <CreditCard className="h-5 w-5 text-primary" />
-                Checkout
-              </span>
-              {selectedCustomer && (
-                <Badge variant="outline">Due: {BANGLADESHI_CURRENCY_SYMBOL}{selectedCustomer.total_due || 0}</Badge>
               )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 pb-4 space-y-4">
-            {/* Customer Selection */}
-            <div className="space-y-2">
-              <Label className="text-xs">Customer</Label>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant={selectedCustomerId === 'walkin' ? 'default' : 'outline'}
-                  size="sm"
-                  className="h-8"
-                  onClick={() => handleCustomerSelect('walkin')}
-                >
-                  <User className="h-3 w-3 mr-1" />
-                  Walk-in
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8"
-                  onClick={() => setShowAddCustomerDialog(true)}
-                >
-                  <UserPlus className="h-3 w-3 mr-1" />
-                  New
-                </Button>
-                <div className="flex-1 min-w-[150px]">
-                  <Select value={selectedCustomerId === 'walkin' ? '' : selectedCustomerId || ''} onValueChange={handleCustomerSelect}>
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue placeholder="Select customer..." />
+
+              {/* Stoves - Only in Sale Mode */}
+              {(activeTab === 'stove' || activeTab === 'all') && activeTable === 'sale' && (
+                <div className="mb-3">
+                  {activeTab === 'all' && <p className="text-xs font-medium text-muted-foreground mb-2">Gas Stoves</p>}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+                    {(activeTab === 'all' ? filteredStoves.slice(0, 3) : filteredStoves).map(stove => {
+                      const price = getStovePrice(stove.brand, stove.model) || stove.price;
+                      return (
+                        <button
+                          key={stove.id}
+                          onClick={() => addStoveToCart(stove)}
+                          disabled={stove.quantity === 0}
+                          className={`p-2.5 rounded-lg border-2 text-left transition-all hover:shadow-md relative ${
+                            stove.quantity === 0 ? 'opacity-50 cursor-not-allowed border-muted' : 'border-transparent hover:border-orange-500/50 bg-card'
+                          }`}
+                        >
+                          <div className="absolute top-0 left-0 right-0 h-1 rounded-t-lg bg-orange-500" />
+                          <div className="flex items-start gap-2 pt-1">
+                            <div className="w-9 h-9 rounded-lg bg-orange-500 flex items-center justify-center flex-shrink-0">
+                              <ChefHat className="h-5 w-5 text-white" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="font-semibold text-xs truncate">{stove.brand}</p>
+                              <p className="text-[10px] text-muted-foreground">{stove.burners}B • {stove.model}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between mt-2">
+                            <span className="font-bold text-sm text-orange-600">{BANGLADESHI_CURRENCY_SYMBOL}{price}</span>
+                            <Badge variant="secondary" className="text-[9px] px-1.5">{stove.quantity}</Badge>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Regulators - Only in Sale Mode */}
+              {(activeTab === 'regulator' || activeTab === 'all') && activeTable === 'sale' && (
+                <div>
+                  {activeTab === 'all' && <p className="text-xs font-medium text-muted-foreground mb-2">Regulators</p>}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+                    {(activeTab === 'all' ? filteredRegulators.slice(0, 3) : filteredRegulators).map(reg => {
+                      const price = getRegulatorPrice(reg.brand, reg.type) || reg.price || 0;
+                      return (
+                        <button
+                          key={reg.id}
+                          onClick={() => addRegulatorToCart(reg)}
+                          disabled={reg.quantity === 0}
+                          className={`p-2.5 rounded-lg border-2 text-left transition-all hover:shadow-md relative ${
+                            reg.quantity === 0 ? 'opacity-50 cursor-not-allowed border-muted' : 'border-transparent hover:border-violet-500/50 bg-card'
+                          }`}
+                        >
+                          <div className="absolute top-0 left-0 right-0 h-1 rounded-t-lg bg-violet-500" />
+                          <div className="flex items-start gap-2 pt-1">
+                            <div className="w-9 h-9 rounded-lg bg-violet-500 flex items-center justify-center flex-shrink-0">
+                              <Gauge className="h-5 w-5 text-white" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="font-semibold text-xs truncate">{reg.brand}</p>
+                              <p className="text-[10px] text-muted-foreground">{reg.type}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between mt-2">
+                            <span className="font-bold text-sm text-violet-600">{BANGLADESHI_CURRENCY_SYMBOL}{price}</span>
+                            <Badge variant="secondary" className="text-[9px] px-1.5">{reg.quantity}</Badge>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Return Mode Message for Non-LPG */}
+              {activeTable === 'return' && (activeTab === 'stove' || activeTab === 'regulator') && (
+                <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                  <ArrowLeftRight className="h-10 w-10 opacity-30 mb-2" />
+                  <p className="text-sm">Only LPG cylinders can be returned</p>
+                </div>
+              )}
+
+              {/* Empty State */}
+              {filteredBrands.length === 0 && activeTab === 'lpg' && (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Cylinder className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                  <p className="text-sm">No cylinders found for {mouthSize} / {weight}</p>
+                </div>
+              )}
+            </ScrollArea>
+          </CardContent>
+        </Card>
+
+        {/* ===== CHECKOUT SECTION ===== */}
+        <Card>
+          <CardContent className="p-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+              {/* Customer Selection */}
+              <div className="space-y-1.5">
+                <Label className="text-xs">Customer</Label>
+                <div className="flex gap-1.5">
+                  <Select value={selectedCustomerId || "walkin"} onValueChange={handleCustomerSelect}>
+                    <SelectTrigger className="h-9 flex-1">
+                      <SelectValue placeholder="Select customer" />
                     </SelectTrigger>
                     <SelectContent>
-                      <div className="p-2">
-                        <Input
-                          placeholder="Search..."
-                          value={customerSearch}
-                          onChange={(e) => setCustomerSearch(e.target.value)}
-                          className="h-7 text-xs"
-                        />
-                      </div>
-                      {filteredCustomers.slice(0, 10).map(c => (
-                        <SelectItem key={c.id} value={c.id} className="text-xs">
-                          {c.name} {c.phone && `• ${c.phone}`}
+                      <SelectItem value="walkin">
+                        <span className="flex items-center gap-2"><User className="h-3 w-3" /> Walk-in</span>
+                      </SelectItem>
+                      {customers.slice(0, 20).map(c => (
+                        <SelectItem key={c.id} value={c.id}>
+                          <span className="flex items-center justify-between w-full">
+                            <span>{c.name}</span>
+                            {(c.total_due || 0) > 0 && <Badge variant="destructive" className="ml-2 text-[9px]">Due: {BANGLADESHI_CURRENCY_SYMBOL}{c.total_due}</Badge>}
+                          </span>
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  <Button size="sm" variant="outline" className="h-9 w-9 p-0" onClick={() => setShowAddCustomerDialog(true)}>
+                    <UserPlus className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
-            </div>
 
-            {/* Customer Details (if selected) */}
-            {selectedCustomer && (
-              <div className="grid grid-cols-3 gap-2 p-2 bg-muted/30 rounded-lg text-xs">
-                <div>
-                  <span className="text-muted-foreground">Name:</span>
-                  <p className="font-medium">{selectedCustomer.name}</p>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Phone:</span>
-                  <p className="font-medium">{selectedCustomer.phone || '-'}</p>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Due:</span>
-                  <p className="font-medium text-destructive">{BANGLADESHI_CURRENCY_SYMBOL}{selectedCustomer.total_due || 0}</p>
-                </div>
-              </div>
-            )}
-
-            {/* Discount & Driver */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-xs">Discount (৳)</Label>
+              {/* Discount */}
+              <div className="space-y-1.5">
+                <Label className="text-xs">Discount</Label>
                 <Input
                   type="number"
                   value={discount}
@@ -1442,92 +1399,78 @@ export const POSModule = () => {
                   className="h-9"
                 />
               </div>
-              {drivers.length > 0 && (
-                <div>
-                  <Label className="text-xs">Driver</Label>
-                  <Select value={selectedDriverId || ""} onValueChange={(v) => setSelectedDriverId(v || null)}>
-                    <SelectTrigger className="h-9">
-                      <SelectValue placeholder="Optional" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">None</SelectItem>
-                      {drivers.map(d => (
-                        <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-            </div>
 
-            {/* Validation Warning */}
-            {hasRefillInCart && !isReturnCountMatched && (
-              <div className="flex items-center gap-2 p-2 bg-destructive/10 text-destructive rounded-lg text-xs">
-                <AlertTriangle className="h-4 w-4" />
-                <span>Return {refillCylindersCount} cylinder(s) to complete sale</span>
+              {/* Driver */}
+              <div className="space-y-1.5">
+                <Label className="text-xs">Driver (Optional)</Label>
+                <Select value={selectedDriverId || ""} onValueChange={setSelectedDriverId}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="Select driver" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">No driver</SelectItem>
+                    {drivers.map(d => (
+                      <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-            )}
 
-            {/* Action Buttons */}
-            <div className="grid grid-cols-2 gap-3">
-              <Button 
-                className="h-12 text-sm font-bold bg-emerald-600 hover:bg-emerald-700" 
-                disabled={processing || saleItems.length === 0 || (hasRefillInCart && !isReturnCountMatched)}
-                onClick={() => handleCompleteSale('completed')}
-              >
-                {processing ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : (
-                  <Wallet className="h-4 w-4 mr-2" />
-                )}
-                Pay Now
-              </Button>
-              <Button 
-                variant="outline"
-                className="h-12 text-sm font-bold border-amber-500 text-amber-600 hover:bg-amber-50"
-                disabled={processing || saleItems.length === 0 || selectedCustomerId === 'walkin' || (hasRefillInCart && !isReturnCountMatched)}
-                onClick={() => handleCompleteSale('pending')}
-              >
-                <CreditCard className="h-4 w-4 mr-2" />
-                Save Due
-              </Button>
+              {/* Summary & Actions */}
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <Label className="text-xs">Grand Total</Label>
+                  <span className="font-bold text-lg text-emerald-600">{BANGLADESHI_CURRENCY_SYMBOL}{total.toLocaleString()}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <Button
+                    onClick={() => handleCompleteSale('completed')}
+                    disabled={processing || saleItems.length === 0}
+                    className="h-9 bg-emerald-600 hover:bg-emerald-700"
+                  >
+                    {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Wallet className="h-4 w-4 mr-1" /> Cash</>}
+                  </Button>
+                  <Button
+                    onClick={() => handleCompleteSale('pending')}
+                    disabled={processing || saleItems.length === 0 || selectedCustomerId === "walkin"}
+                    variant="outline"
+                    className="h-9 border-amber-500 text-amber-600 hover:bg-amber-50"
+                  >
+                    <CreditCard className="h-4 w-4 mr-1" /> Due
+                  </Button>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Recent Transactions */}
+        {/* ===== RECENT TRANSACTIONS ===== */}
         {recentTransactions.length > 0 && (
           <Card>
-            <CardHeader className="pb-2 px-4 pt-3">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <FileText className="h-4 w-4" />
-                Recent (Last 5 min)
+            <CardHeader className="py-2 px-3">
+              <CardTitle className="text-xs flex items-center gap-2">
+                <Undo2 className="h-3.5 w-3.5" /> Recent (Void within 5 min)
               </CardTitle>
             </CardHeader>
-            <CardContent className="px-4 pb-3">
-              <div className="flex gap-2 overflow-x-auto pb-2">
+            <CardContent className="p-2">
+              <div className="flex gap-2 overflow-x-auto pb-1">
                 {recentTransactions.map(txn => (
-                  <div key={txn.id} className="flex-shrink-0 p-2 rounded-lg border bg-muted/30 min-w-[140px]">
+                  <div key={txn.id} className="flex-shrink-0 p-2 rounded-lg border bg-card min-w-[140px]">
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-[10px] font-mono text-muted-foreground">{txn.transactionNumber}</span>
-                      <Badge variant={txn.status === 'completed' ? 'default' : 'secondary'} className="text-[8px] h-4">
+                      <Badge variant={txn.status === 'completed' ? 'secondary' : 'outline'} className="text-[8px]">
                         {txn.status === 'completed' ? 'Paid' : 'Due'}
                       </Badge>
                     </div>
-                    <p className="font-bold text-sm">{BANGLADESHI_CURRENCY_SYMBOL}{txn.total}</p>
-                    <div className="flex items-center justify-between mt-1">
-                      <span className="text-[9px] text-muted-foreground">
-                        {txn.items.length} item(s)
-                      </span>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-5 px-1 text-[9px] text-destructive hover:text-destructive"
-                        onClick={() => { setTransactionToVoid(txn); setShowVoidDialog(true); }}
-                      >
-                        <Undo2 className="h-3 w-3" />
-                      </Button>
-                    </div>
+                    <p className="font-bold text-sm">{BANGLADESHI_CURRENCY_SYMBOL}{txn.total.toLocaleString()}</p>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="w-full h-6 mt-1 text-destructive text-[10px]"
+                      onClick={() => { setTransactionToVoid(txn); setShowVoidDialog(true); }}
+                    >
+                      <Trash2 className="h-3 w-3 mr-1" /> Void
+                    </Button>
                   </div>
                 ))}
               </div>
@@ -1535,39 +1478,81 @@ export const POSModule = () => {
           </Card>
         )}
 
-        {/* Dialogs */}
+        {/* ===== DIALOGS ===== */}
+        {/* Barcode Scanner */}
+        <BarcodeScanner
+          open={showBarcodeScanner}
+          onOpenChange={setShowBarcodeScanner}
+          onProductFound={(product) => {
+            if (product.type === 'lpg') {
+              const brand = lpgBrands.find(b => b.name.toLowerCase() === product.name.toLowerCase());
+              if (brand) addLPGToCart(brand);
+            } else if (product.type === 'stove') {
+              const stove = stoves.find(s => `${s.brand} ${s.model}`.toLowerCase() === product.name.toLowerCase());
+              if (stove) addStoveToCart(stove);
+            } else if (product.type === 'regulator') {
+              const reg = regulators.find(r => r.brand.toLowerCase() === product.name.toLowerCase());
+              if (reg) addRegulatorToCart(reg);
+            }
+            toast({ title: "Product added", description: product.name });
+            setShowBarcodeScanner(false);
+          }}
+        />
+
+        {/* Add Customer Dialog */}
         <Dialog open={showAddCustomerDialog} onOpenChange={setShowAddCustomerDialog}>
-          <DialogContent className="max-w-sm">
+          <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>Add Customer</DialogTitle>
             </DialogHeader>
             <div className="space-y-3">
               <div>
-                <Label className="text-xs">Name *</Label>
+                <Label>Name *</Label>
                 <Input value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Customer name" />
               </div>
               <div>
-                <Label className="text-xs">Phone</Label>
-                <Input value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} placeholder="Phone number" />
+                <Label>Phone</Label>
+                <Input value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} placeholder="01XXXXXXXXX" />
               </div>
               <div>
-                <Label className="text-xs">Address</Label>
+                <Label>Address</Label>
                 <Input value={customerAddress} onChange={(e) => setCustomerAddress(e.target.value)} placeholder="Address" />
               </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowAddCustomerDialog(false)}>Cancel</Button>
-              <Button onClick={handleAddCustomer}>Add</Button>
+              <Button onClick={handleAddCustomer}>Add Customer</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
 
+        {/* Custom Brand Dialog */}
+        <Dialog open={showCustomBrandInput} onOpenChange={setShowCustomBrandInput}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Add Custom Brand</DialogTitle>
+              <DialogDescription>Enter the brand name for the returned cylinder.</DialogDescription>
+            </DialogHeader>
+            <Input
+              value={customReturnBrand}
+              onChange={(e) => setCustomReturnBrand(e.target.value)}
+              placeholder="Brand name"
+              autoFocus
+            />
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowCustomBrandInput(false)}>Cancel</Button>
+              <Button onClick={handleAddCustomBrand}>Add</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Void Confirmation */}
         <Dialog open={showVoidDialog} onOpenChange={setShowVoidDialog}>
           <DialogContent className="max-w-sm">
             <DialogHeader>
               <DialogTitle>Void Transaction?</DialogTitle>
               <DialogDescription>
-                This will reverse {transactionToVoid?.transactionNumber}. This action cannot be undone.
+                This will void {transactionToVoid?.transactionNumber}. This cannot be undone.
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
@@ -1577,36 +1562,27 @@ export const POSModule = () => {
           </DialogContent>
         </Dialog>
 
+        {/* Print Type Dialog */}
         <Dialog open={showPrintTypeDialog} onOpenChange={setShowPrintTypeDialog}>
-          <DialogContent className="max-w-xs">
+          <DialogContent className="max-w-sm">
             <DialogHeader>
-              <DialogTitle>Print Receipt</DialogTitle>
+              <DialogTitle className="flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                Sale Complete!
+              </DialogTitle>
             </DialogHeader>
             <div className="grid grid-cols-2 gap-3">
-              <Button variant="outline" className="h-16 flex-col" onClick={() => { setShowPrintTypeDialog(false); setShowInvoiceDialog(true); }}>
-                <FileText className="h-5 w-5 mb-1" />
-                <span className="text-xs">Customer Bill</span>
+              <Button variant="outline" onClick={() => { setShowInvoiceDialog(true); setShowPrintTypeDialog(false); }}>
+                Print Invoice
               </Button>
-              <Button variant="outline" className="h-16 flex-col" onClick={() => { setShowPrintTypeDialog(false); setShowInvoiceDialog(true); }}>
-                <Printer className="h-5 w-5 mb-1" />
-                <span className="text-xs">Gate Pass</span>
+              <Button variant="outline" onClick={() => setShowPrintTypeDialog(false)}>
+                Skip Print
               </Button>
             </div>
-            <Button variant="ghost" className="w-full" onClick={() => setShowPrintTypeDialog(false)}>
-              Skip
-            </Button>
           </DialogContent>
         </Dialog>
 
-        <BarcodeScanner
-          open={showBarcodeScanner}
-          onOpenChange={setShowBarcodeScanner}
-          onProductFound={(product) => {
-            toast({ title: "Found", description: product.name });
-            setShowBarcodeScanner(false);
-          }}
-        />
-
+        {/* Invoice Dialog */}
         {lastTransaction && (
           <InvoiceDialog
             open={showInvoiceDialog}
