@@ -32,16 +32,12 @@ const navItems = [{
   roles: ['owner', 'manager']
 }];
 const moreItems = [{
-  id: 'daily-sales',
-  labelKey: 'daily_sales',
+  id: 'business-diary',
+  labelKey: 'business_diary',
   roles: ['owner', 'manager']
 }, {
-  id: 'daily-expenses',
-  labelKey: 'daily_expenses',
-  roles: ['owner', 'manager']
-}, {
-  id: 'analytics',
-  labelKey: 'analysis',
+  id: 'pob',
+  labelKey: 'pob',
   roles: ['owner', 'manager']
 }, {
   id: 'orders',
