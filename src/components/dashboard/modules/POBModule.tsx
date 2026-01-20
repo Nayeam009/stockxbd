@@ -231,30 +231,36 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
     return () => channels.forEach(ch => supabase.removeChannel(ch));
   }, [fetchData]);
 
-  // ============= PRICE HELPERS =============
-  const getLPGCompanyPrice = useCallback((brandId: string, weightVal: string) => {
+  // ============= PRICE HELPERS (Always use Company Price from Product Pricing) =============
+  // Business Logic: Shop owner buys at Company Price (D.O Rate), sells at Distributor/Retail Price
+  const getLPGCompanyPrice = useCallback((brandId: string, weightVal: string): { price: number; found: boolean } => {
     const priceEntry = productPrices.find(
-      p => p.product_type === 'lpg' && p.brand_id === brandId && p.size?.includes(weightVal)
+      p => p.product_type === 'LPG' && p.brand_id === brandId && p.size?.includes(weightVal)
     );
-    return priceEntry?.company_price || 0;
+    // Also try matching by product_type 'lpg' (lowercase) for backward compatibility
+    const priceEntryAlt = productPrices.find(
+      p => p.product_type.toLowerCase() === 'lpg' && p.brand_id === brandId && p.size?.includes(weightVal)
+    );
+    const entry = priceEntry || priceEntryAlt;
+    return { price: entry?.company_price || 0, found: !!entry };
   }, [productPrices]);
 
-  const getStoveCompanyPrice = useCallback((brand: string, model: string) => {
+  const getStoveCompanyPrice = useCallback((brand: string, model: string): { price: number; found: boolean } => {
     const priceEntry = productPrices.find(
-      p => p.product_type === 'stove' && 
+      p => p.product_type.toLowerCase() === 'stove' && 
            p.product_name.toLowerCase().includes(brand.toLowerCase()) &&
            p.product_name.toLowerCase().includes(model.toLowerCase())
     );
-    return priceEntry?.company_price || 0;
+    return { price: priceEntry?.company_price || 0, found: !!priceEntry };
   }, [productPrices]);
 
-  const getRegulatorCompanyPrice = useCallback((brand: string, type: string) => {
+  const getRegulatorCompanyPrice = useCallback((brand: string, type: string): { price: number; found: boolean } => {
     const priceEntry = productPrices.find(
-      p => p.product_type === 'regulator' && 
+      p => p.product_type.toLowerCase() === 'regulator' && 
            p.product_name.toLowerCase().includes(brand.toLowerCase()) &&
            p.product_name.toLowerCase().includes(type.toLowerCase())
     );
-    return priceEntry?.company_price || 0;
+    return { price: priceEntry?.company_price || 0, found: !!priceEntry };
   }, [productPrices]);
 
   // ============= FILTERED DATA =============
@@ -293,7 +299,16 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
 
   // ============= PRODUCT ACTIONS =============
   const addLPGToCart = (brand: LPGBrand) => {
-    const companyPrice = getLPGCompanyPrice(brand.id, weight);
+    const priceResult = getLPGCompanyPrice(brand.id, weight);
+    
+    if (!priceResult.found) {
+      toast({ 
+        title: "Price not configured", 
+        description: `Please set Company Price for ${brand.name} (${weight}) in Product Pricing first.`,
+        variant: "destructive" 
+      });
+      return;
+    }
     
     const existingItem = purchaseItems.find(
       i => i.type === 'lpg' && i.brandId === brand.id && i.cylinderType === cylinderType && i.weight === weight
@@ -309,7 +324,7 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
         type: 'lpg',
         name: brand.name,
         details: `${weight} • ${cylinderType === 'refill' ? 'Refill' : cylinderType === 'package' ? 'Package' : 'Empty'}`,
-        companyPrice,
+        companyPrice: priceResult.price,
         quantity: 1,
         cylinderType,
         brandId: brand.id,
@@ -323,7 +338,9 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
   };
 
   const addStoveToCart = (stove: Stove) => {
-    const companyPrice = getStoveCompanyPrice(stove.brand, stove.model) || stove.price * 0.7;
+    const priceResult = getStoveCompanyPrice(stove.brand, stove.model);
+    // Fallback to 70% of retail price if company price not set
+    const companyPrice = priceResult.found ? priceResult.price : stove.price * 0.7;
     const existingItem = purchaseItems.find(i => i.stoveId === stove.id);
 
     if (existingItem) {
@@ -346,7 +363,9 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
   };
 
   const addRegulatorToCart = (regulator: Regulator) => {
-    const companyPrice = getRegulatorCompanyPrice(regulator.brand, regulator.type) || (regulator.price || 0) * 0.7;
+    const priceResult = getRegulatorCompanyPrice(regulator.brand, regulator.type);
+    // Fallback to 70% of retail price if company price not set
+    const companyPrice = priceResult.found ? priceResult.price : (regulator.price || 0) * 0.7;
     const existingItem = purchaseItems.find(i => i.regulatorId === regulator.id);
 
     if (existingItem) {
@@ -759,7 +778,9 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
                   {activeTab === 'all' && <p className="text-xs font-medium text-muted-foreground mb-2">LPG Cylinders</p>}
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
                     {(activeTab === 'all' ? filteredBrands.slice(0, 5) : filteredBrands).map(brand => {
-                      const companyPrice = getLPGCompanyPrice(brand.id, weight);
+                      const priceResult = getLPGCompanyPrice(brand.id, weight);
+                      const companyPrice = priceResult.price;
+                      const priceConfigured = priceResult.found;
                       const currentStock = cylinderType === 'refill' ? brand.refill_cylinder 
                         : cylinderType === 'package' ? brand.package_cylinder 
                         : brand.empty_cylinder;
@@ -768,7 +789,9 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
                         <button
                           key={brand.id}
                           onClick={() => addLPGToCart(brand)}
-                          className="p-2.5 rounded-lg border-2 text-left transition-all hover:shadow-md relative border-transparent hover:border-blue-500/50 bg-card"
+                          className={`p-2.5 rounded-lg border-2 text-left transition-all hover:shadow-md relative bg-card ${
+                            priceConfigured ? 'border-transparent hover:border-blue-500/50' : 'border-destructive/30 opacity-75'
+                          }`}
                         >
                           <div 
                             className="absolute top-0 left-0 right-0 h-1 rounded-t-lg"
@@ -787,7 +810,9 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
                             </div>
                           </div>
                           <div className="flex items-center justify-between mt-2">
-                            <span className="font-bold text-sm text-blue-600">{BANGLADESHI_CURRENCY_SYMBOL}{companyPrice}</span>
+                            <span className={`font-bold text-sm ${priceConfigured ? 'text-primary' : 'text-destructive'}`}>
+                              {priceConfigured ? `${BANGLADESHI_CURRENCY_SYMBOL}${companyPrice}` : 'No Price'}
+                            </span>
                             <Badge variant="secondary" className="text-[9px] px-1.5">
                               <TrendingUp className="h-2.5 w-2.5 mr-0.5" />
                               {currentStock}
@@ -806,17 +831,18 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
                   {activeTab === 'all' && <p className="text-xs font-medium text-muted-foreground mb-2">Gas Stoves</p>}
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
                     {(activeTab === 'all' ? filteredStoves.slice(0, 3) : filteredStoves).map(stove => {
-                      const companyPrice = getStoveCompanyPrice(stove.brand, stove.model) || stove.price * 0.7;
+                      const priceResult = getStoveCompanyPrice(stove.brand, stove.model);
+                      const companyPrice = priceResult.found ? priceResult.price : stove.price * 0.7;
                       return (
                         <button
                           key={stove.id}
                           onClick={() => addStoveToCart(stove)}
-                          className="p-2.5 rounded-lg border-2 text-left transition-all hover:shadow-md relative border-transparent hover:border-orange-500/50 bg-card"
+                          className="p-2.5 rounded-lg border-2 text-left transition-all hover:shadow-md relative border-transparent hover:border-accent/50 bg-card"
                         >
-                          <div className="absolute top-0 left-0 right-0 h-1 rounded-t-lg bg-orange-500" />
+                          <div className="absolute top-0 left-0 right-0 h-1 rounded-t-lg bg-accent" />
                           <div className="flex items-start gap-2 pt-1">
-                            <div className="w-9 h-9 rounded-lg bg-orange-500 flex items-center justify-center flex-shrink-0">
-                              <ChefHat className="h-5 w-5 text-white" />
+                            <div className="w-9 h-9 rounded-lg bg-accent flex items-center justify-center flex-shrink-0">
+                              <ChefHat className="h-5 w-5 text-accent-foreground" />
                             </div>
                             <div className="min-w-0 flex-1">
                               <p className="font-semibold text-xs truncate">{stove.brand}</p>
@@ -824,7 +850,7 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
                             </div>
                           </div>
                           <div className="flex items-center justify-between mt-2">
-                            <span className="font-bold text-sm text-orange-600">{BANGLADESHI_CURRENCY_SYMBOL}{Math.round(companyPrice)}</span>
+                            <span className="font-bold text-sm text-primary">{BANGLADESHI_CURRENCY_SYMBOL}{Math.round(companyPrice)}</span>
                             <Badge variant="secondary" className="text-[9px] px-1.5">
                               <TrendingUp className="h-2.5 w-2.5 mr-0.5" />
                               {stove.quantity}
@@ -843,17 +869,18 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
                   {activeTab === 'all' && <p className="text-xs font-medium text-muted-foreground mb-2">Regulators</p>}
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
                     {(activeTab === 'all' ? filteredRegulators.slice(0, 3) : filteredRegulators).map(reg => {
-                      const companyPrice = getRegulatorCompanyPrice(reg.brand, reg.type) || (reg.price || 0) * 0.7;
+                      const priceResult = getRegulatorCompanyPrice(reg.brand, reg.type);
+                      const companyPrice = priceResult.found ? priceResult.price : (reg.price || 0) * 0.7;
                       return (
                         <button
                           key={reg.id}
                           onClick={() => addRegulatorToCart(reg)}
-                          className="p-2.5 rounded-lg border-2 text-left transition-all hover:shadow-md relative border-transparent hover:border-violet-500/50 bg-card"
+                          className="p-2.5 rounded-lg border-2 text-left transition-all hover:shadow-md relative border-transparent hover:border-secondary/50 bg-card"
                         >
-                          <div className="absolute top-0 left-0 right-0 h-1 rounded-t-lg bg-violet-500" />
+                          <div className="absolute top-0 left-0 right-0 h-1 rounded-t-lg bg-secondary" />
                           <div className="flex items-start gap-2 pt-1">
-                            <div className="w-9 h-9 rounded-lg bg-violet-500 flex items-center justify-center flex-shrink-0">
-                              <Gauge className="h-5 w-5 text-white" />
+                            <div className="w-9 h-9 rounded-lg bg-secondary flex items-center justify-center flex-shrink-0">
+                              <Gauge className="h-5 w-5 text-secondary-foreground" />
                             </div>
                             <div className="min-w-0 flex-1">
                               <p className="font-semibold text-xs truncate">{reg.brand}</p>
@@ -861,7 +888,7 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
                             </div>
                           </div>
                           <div className="flex items-center justify-between mt-2">
-                            <span className="font-bold text-sm text-violet-600">{BANGLADESHI_CURRENCY_SYMBOL}{Math.round(companyPrice)}</span>
+                            <span className="font-bold text-sm text-primary">{BANGLADESHI_CURRENCY_SYMBOL}{Math.round(companyPrice)}</span>
                             <Badge variant="secondary" className="text-[9px] px-1.5">
                               <TrendingUp className="h-2.5 w-2.5 mr-0.5" />
                               {reg.quantity}
