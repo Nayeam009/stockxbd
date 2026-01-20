@@ -4,9 +4,6 @@ import { AppSidebar } from "@/components/dashboard/AppSidebar";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { GlobalCommandPalette } from "@/components/dashboard/GlobalCommandPalette";
 import { DashboardOverview } from "@/components/dashboard/modules/DashboardOverview";
-import { DailySalesModule } from "@/components/dashboard/modules/DailySalesModule";
-import { DailyExpensesModule } from "@/components/dashboard/modules/DailyExpensesModule";
-import { AnalysisModule } from "@/components/dashboard/modules/AnalysisModule";
 import { BusinessDiaryModule } from "@/components/dashboard/modules/BusinessDiaryModule";
 import { InventoryModule } from "@/components/dashboard/modules/InventoryModule";
 import { OnlineDeliveryModule } from "@/components/dashboard/modules/OnlineDeliveryModule";
@@ -131,8 +128,6 @@ const Dashboard = () => {
         return <POSModule userRole={userRole} userName={userName} />;
       case "pob":
         return <POBModule userRole={userRole} userName={userName} />;
-      case "daily-expenses":
-        return <DailyExpensesModule />;
       case "orders":
         return (
           <OnlineDeliveryModule
@@ -154,14 +149,12 @@ const Dashboard = () => {
         return <SettingsModule />;
       case "product-pricing":
         return <ProductPricingModule />;
-      case "analytics":
-        return <AnalysisModule />;
       case "business-diary":
-        return <BusinessDiaryModule />;
       case "daily-sales":
-        return <DailySalesModule />;
+      case "daily-expenses":
+      case "analytics":
       case "driver-sales":
-        return <DailySalesModule />;
+        return <BusinessDiaryModule />;
       case "community":
         return <CommunityModule />;
       case "staff-salary":
