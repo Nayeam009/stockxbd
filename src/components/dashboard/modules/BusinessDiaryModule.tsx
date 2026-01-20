@@ -22,13 +22,12 @@ import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
 import { useBusinessDiaryData } from "@/hooks/useBusinessDiaryData";
 import { SaleEntryCard } from "@/components/diary/SaleEntryCard";
 import { ExpenseEntryCard } from "@/components/diary/ExpenseEntryCard";
-import { DiaryAnalysisPanel } from "@/components/diary/DiaryAnalysisPanel";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 export const BusinessDiaryModule = () => {
   const { sales, expenses, loading, refetch, analytics } = useBusinessDiaryData();
   const isMobile = useIsMobile();
-  const [activeTab, setActiveTab] = useState<'sales' | 'expenses' | 'analysis'>('sales');
+  const [activeTab, setActiveTab] = useState<'sales' | 'expenses'>('sales');
   const [searchQuery, setSearchQuery] = useState("");
   const [dateFilter, setDateFilter] = useState(format(new Date(), 'yyyy-MM-dd'));
 
@@ -176,15 +175,14 @@ export const BusinessDiaryModule = () => {
 
       {/* Main Content - Dual Panel on Desktop, Tabs on Mobile */}
       {isMobile ? (
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
-          <TabsList className="grid w-full grid-cols-3 h-12">
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'sales' | 'expenses')}>
+          <TabsList className="grid w-full grid-cols-2 h-12">
             <TabsTrigger value="sales" className="text-xs gap-1 h-11 touch-manipulation">
               <ArrowUpRight className="h-3.5 w-3.5" /> Sales ({filteredSales.length})
             </TabsTrigger>
             <TabsTrigger value="expenses" className="text-xs gap-1 h-11 touch-manipulation">
               <ArrowDownRight className="h-3.5 w-3.5" /> Expense ({filteredExpenses.length})
             </TabsTrigger>
-            <TabsTrigger value="analysis" className="text-xs h-11 touch-manipulation">Analysis</TabsTrigger>
           </TabsList>
 
           <TabsContent value="sales" className="mt-3 space-y-3">
@@ -215,10 +213,6 @@ export const BusinessDiaryModule = () => {
                 <ExpenseEntryCard key={entry.id} entry={entry} onNavigateToSource={handleNavigateToSource} />
               ))
             )}
-          </TabsContent>
-
-          <TabsContent value="analysis" className="mt-3">
-            <DiaryAnalysisPanel sales={sales} expenses={expenses} analytics={analytics} />
           </TabsContent>
         </Tabs>
       ) : (
@@ -275,9 +269,6 @@ export const BusinessDiaryModule = () => {
               </CardContent>
             </Card>
           </div>
-
-          {/* Analysis Panel */}
-          <DiaryAnalysisPanel sales={sales} expenses={expenses} analytics={analytics} />
         </div>
       )}
     </div>
