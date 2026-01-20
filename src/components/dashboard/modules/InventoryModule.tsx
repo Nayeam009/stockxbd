@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { InventoryStatCard } from "@/components/inventory/InventoryStatCard";
+import { InventoryPOBDrawer } from "@/components/inventory/InventoryPOBDrawer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -32,7 +33,8 @@ import {
   Wrench,
   Flame,
   Gauge,
-  Edit
+  Edit,
+  ShoppingBag
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -100,6 +102,10 @@ export const InventoryModule = () => {
   const [activeTab, setActiveTab] = useState("lpg");
   const [loading, setLoading] = useState(true);
   
+  // POB Drawer State
+  const [isPOBOpen, setIsPOBOpen] = useState(false);
+  const [pobProductType, setPobProductType] = useState<'lpg' | 'stove' | 'regulator'>('lpg');
+  
   // LPG State
   const [sizeTab, setSizeTab] = useState<"22mm" | "20mm">("22mm");
   const [selectedWeight, setSelectedWeight] = useState("12kg");
@@ -141,6 +147,12 @@ export const InventoryModule = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const weightOptions = sizeTab === "22mm" ? WEIGHT_OPTIONS_22MM : WEIGHT_OPTIONS_20MM;
+  
+  // Open POB drawer for specific product type
+  const openPOB = (type: 'lpg' | 'stove' | 'regulator') => {
+    setPobProductType(type);
+    setIsPOBOpen(true);
+  };
 
   const getOwnerIdForWrite = useCallback(async () => {
     const { data: ownerId, error } = await supabase.rpc("get_owner_id");
@@ -902,6 +914,17 @@ export const InventoryModule = () => {
               </TabsList>
               
               <div className="flex items-center gap-2 flex-wrap">
+                {/* Buy Products Button */}
+                <Button 
+                  size="sm" 
+                  className="gap-2 text-xs sm:text-sm bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
+                  onClick={() => openPOB('lpg')}
+                >
+                  <ShoppingBag className="h-3 w-3 sm:h-4 sm:w-4" />
+                  <span className="hidden sm:inline">Buy Cylinders</span>
+                  <span className="sm:hidden">Buy</span>
+                </Button>
+                
                 {/* Send/Receive Dialogs */}
                 <Dialog open={isSendToPlantOpen} onOpenChange={setIsSendToPlantOpen}>
                   <DialogTrigger asChild>
@@ -1220,6 +1243,17 @@ export const InventoryModule = () => {
                 <Switch checked={showDamagedOnly} onCheckedChange={setShowDamagedOnly} id="damaged-filter" />
                 <Label htmlFor="damaged-filter" className="text-xs cursor-pointer">Damaged</Label>
               </div>
+              {/* Buy Stoves Button */}
+              <Button 
+                size="sm" 
+                className="gap-2 text-xs sm:text-sm bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
+                onClick={() => openPOB('stove')}
+              >
+                <ShoppingBag className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Buy Stoves</span>
+                <span className="sm:hidden">Buy</span>
+              </Button>
+              
               <Dialog open={isAddStoveDialogOpen} onOpenChange={setIsAddStoveDialogOpen}>
                 <DialogTrigger asChild>
                   <Button size="sm" className="gap-2 bg-gradient-to-r from-orange-500 to-red-500">
@@ -1362,6 +1396,17 @@ export const InventoryModule = () => {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input placeholder="Search regulators..." value={regulatorSearchQuery} onChange={(e) => setRegulatorSearchQuery(e.target.value)} className="pl-10" />
               </div>
+              {/* Buy Regulators Button */}
+              <Button 
+                size="sm" 
+                className="gap-2 text-xs sm:text-sm bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
+                onClick={() => openPOB('regulator')}
+              >
+                <ShoppingBag className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Buy Regulators</span>
+                <span className="sm:hidden">Buy</span>
+              </Button>
+              
               <Dialog open={isAddRegulatorDialogOpen} onOpenChange={setIsAddRegulatorDialogOpen}>
                 <DialogTrigger asChild>
                   <Button className="gap-2 whitespace-nowrap bg-gradient-to-r from-violet-500 to-purple-600">
@@ -1430,6 +1475,14 @@ export const InventoryModule = () => {
           </div>
         </TabsContent>
       </Tabs>
+      
+      {/* POB Drawer */}
+      <InventoryPOBDrawer
+        open={isPOBOpen}
+        onOpenChange={setIsPOBOpen}
+        productType={pobProductType}
+        onPurchaseComplete={fetchData}
+      />
     </div>
   );
 };
