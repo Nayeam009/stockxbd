@@ -484,6 +484,122 @@ export type Database = {
           },
         ]
       }
+      pob_transaction_items: {
+        Row: {
+          brand_id: string | null
+          created_at: string
+          created_by: string | null
+          cylinder_type: string | null
+          id: string
+          product_name: string
+          product_type: string
+          quantity: number
+          size: string | null
+          total_price: number
+          transaction_id: string
+          unit_price: number
+          weight: string | null
+        }
+        Insert: {
+          brand_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          cylinder_type?: string | null
+          id?: string
+          product_name: string
+          product_type: string
+          quantity?: number
+          size?: string | null
+          total_price?: number
+          transaction_id: string
+          unit_price?: number
+          weight?: string | null
+        }
+        Update: {
+          brand_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          cylinder_type?: string | null
+          id?: string
+          product_name?: string
+          product_type?: string
+          quantity?: number
+          size?: string | null
+          total_price?: number
+          transaction_id?: string
+          unit_price?: number
+          weight?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pob_transaction_items_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "pob_transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pob_transactions: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          discount: number
+          id: string
+          is_demo: boolean | null
+          is_voided: boolean | null
+          notes: string | null
+          owner_id: string | null
+          payment_method: string
+          payment_status: string
+          subtotal: number
+          supplier_name: string
+          total: number
+          transaction_number: string
+          void_reason: string | null
+          voided_at: string | null
+          voided_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          discount?: number
+          id?: string
+          is_demo?: boolean | null
+          is_voided?: boolean | null
+          notes?: string | null
+          owner_id?: string | null
+          payment_method?: string
+          payment_status?: string
+          subtotal?: number
+          supplier_name?: string
+          total?: number
+          transaction_number: string
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          discount?: number
+          id?: string
+          is_demo?: boolean | null
+          is_voided?: boolean | null
+          notes?: string | null
+          owner_id?: string | null
+          payment_method?: string
+          payment_status?: string
+          subtotal?: number
+          supplier_name?: string
+          total?: number
+          transaction_number?: string
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by?: string | null
+        }
+        Relationships: []
+      }
       pos_transaction_items: {
         Row: {
           created_at: string
@@ -1165,6 +1281,7 @@ export type Database = {
       count_demo_data: { Args: never; Returns: number }
       delete_demo_data: { Args: never; Returns: undefined }
       generate_order_number: { Args: never; Returns: string }
+      generate_pob_number: { Args: never; Returns: string }
       generate_transaction_number: { Args: never; Returns: string }
       get_owner_id: { Args: never; Returns: string }
       has_role: {

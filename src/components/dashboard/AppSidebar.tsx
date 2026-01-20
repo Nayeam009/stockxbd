@@ -2,7 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar, SidebarHeader, SidebarFooter } from "@/components/ui/sidebar";
-import { BarChart3, ChefHat, Users, Banknote, Truck, Search, Home, Receipt, Wallet, Wrench, RefreshCw, Tag, Settings, LogOut, Flame, ChevronRight, CircleDot } from "lucide-react";
+import { BarChart3, ChefHat, Users, Banknote, Truck, Search, Home, Receipt, Wallet, Wrench, RefreshCw, Tag, Settings, LogOut, Flame, ChevronRight, CircleDot, PackagePlus } from "lucide-react";
 import stockXLogo from "@/assets/stock-x-logo.png";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -41,6 +41,11 @@ export const AppSidebar = ({
     titleKey: 'overview',
     icon: Home,
     roles: ['owner', 'manager', 'driver']
+  }, {
+    id: 'pob',
+    titleKey: 'pob',
+    icon: PackagePlus,
+    roles: ['owner', 'manager']
   }, {
     id: 'pos',
     titleKey: 'pos',
