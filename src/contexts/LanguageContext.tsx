@@ -91,6 +91,7 @@ export const translations: Translations = {
   "product_pricing": { en: "Product Pricing", bn: "পণ্যের মূল্য" },
   "online_delivery": { en: "Online Delivery", bn: "অনলাইন ডেলিভারি" },
   "pos": { en: "Point of Sale", bn: "পয়েন্ট অফ সেল" },
+  "pob": { en: "Point of Buy", bn: "পয়েন্ট অফ বাই" },
   "customers": { en: "Customers", bn: "গ্রাহক" },
   "staff_salary": { en: "Staff Salary", bn: "কর্মী বেতন" },
   "vehicle_cost": { en: "Vehicle Cost", bn: "গাড়ির খরচ" },

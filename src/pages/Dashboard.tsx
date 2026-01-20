@@ -11,6 +11,7 @@ import { InventoryModule } from "@/components/dashboard/modules/InventoryModule"
 import { OnlineDeliveryModule } from "@/components/dashboard/modules/OnlineDeliveryModule";
 import { SearchModule } from "@/components/dashboard/modules/SearchModule";
 import { POSModule } from "@/components/dashboard/modules/POSModule";
+import { POBModule } from "@/components/dashboard/modules/POBModule";
 import { CommunityModule } from "@/components/dashboard/modules/CommunityModule";
 import { ProductPricingModule } from "@/components/dashboard/modules/ProductPricingModule";
 import { VehicleCostModule } from "@/components/dashboard/modules/VehicleCostModule";
@@ -24,7 +25,6 @@ import { useDashboardData } from "@/hooks/useDashboardData";
 import { getNextModule } from "@/hooks/useSwipeNavigation";
 import { supabase } from "@/integrations/supabase/client";
 import { useIsMobile } from "@/hooks/use-mobile";
-
 const Dashboard = () => {
   const [activeModule, setActiveModule] = useState("overview");
   const [searchQuery, setSearchQuery] = useState("");
@@ -128,6 +128,8 @@ const Dashboard = () => {
         );
       case "pos":
         return <POSModule userRole={userRole} userName={userName} />;
+      case "pob":
+        return <POBModule userRole={userRole} userName={userName} />;
       case "daily-expenses":
         return <DailyExpensesModule />;
       case "orders":
