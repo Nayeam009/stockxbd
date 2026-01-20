@@ -100,13 +100,6 @@ interface Customer {
   credit_limit?: number;
 }
 
-interface Driver {
-  id: string;
-  name: string;
-  phone: string;
-  status: 'active' | 'break' | 'offline';
-}
-
 interface SaleItem {
   id: string;
   type: 'lpg' | 'stove' | 'regulator' | 'custom';
@@ -148,8 +141,22 @@ const WEIGHT_OPTIONS_22MM = ["5.5kg", "12kg", "12.5kg", "25kg", "35kg", "45kg"];
 const WEIGHT_OPTIONS_20MM = ["5kg", "10kg", "12kg", "15kg", "21kg", "35kg"];
 const DEFAULT_CREDIT_LIMIT = 10000;
 
+// ============= POS MODULE PROPS =============
+interface POSModuleProps {
+  userRole?: 'owner' | 'manager' | 'driver';
+  userName?: string;
+}
+
+// Role display config
+const ROLE_CONFIG: Record<string, { label: string; color: string; bgColor: string }> = {
+  owner: { label: 'Owner', color: 'text-emerald-700', bgColor: 'bg-emerald-100 border-emerald-300' },
+  manager: { label: 'Manager', color: 'text-blue-700', bgColor: 'bg-blue-100 border-blue-300' },
+  driver: { label: 'Driver', color: 'text-amber-700', bgColor: 'bg-amber-100 border-amber-300' },
+  staff: { label: 'Staff', color: 'text-purple-700', bgColor: 'bg-purple-100 border-purple-300' },
+};
+
 // ============= MAIN POS MODULE =============
-export const POSModule = () => {
+export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModuleProps) => {
   const { t, language } = useLanguage();
   
   // ===== DATA STATE =====
@@ -160,7 +167,7 @@ export const POSModule = () => {
   const [regulators, setRegulators] = useState<Regulator[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [productPrices, setProductPrices] = useState<ProductPrice[]>([]);
-  const [drivers, setDrivers] = useState<Driver[]>([]);
+  // Drivers no longer needed for POS - seller role comes from userRole prop
   
   // ===== ACTIVE TABLE STATE (Sale or Return) =====
   const [activeTable, setActiveTable] = useState<'sale' | 'return'>('sale');
@@ -188,7 +195,7 @@ export const POSModule = () => {
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerAddress, setCustomerAddress] = useState("");
   const [discount, setDiscount] = useState("0");
-  const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null);
+  // Driver assignment removed - seller identified by userRole and created_by
   const [showAddCustomerDialog, setShowAddCustomerDialog] = useState(false);
   const [customerSearch, setCustomerSearch] = useState("");
   
@@ -203,13 +210,12 @@ export const POSModule = () => {
 
   // ============= DATA FETCHING =============
   const fetchData = useCallback(async () => {
-    const [brandsRes, stovesRes, regulatorsRes, customersRes, pricesRes, driversRes] = await Promise.all([
+    const [brandsRes, stovesRes, regulatorsRes, customersRes, pricesRes] = await Promise.all([
       supabase.from('lpg_brands').select('*').eq('is_active', true),
       supabase.from('stoves').select('*').eq('is_active', true),
       supabase.from('regulators').select('*').eq('is_active', true),
       supabase.from('customers').select('*').order('name'),
-      supabase.from('product_prices').select('*').eq('is_active', true),
-      supabase.from('user_roles').select('user_id').eq('role', 'driver')
+      supabase.from('product_prices').select('*').eq('is_active', true)
     ]);
 
     if (brandsRes.data) setLpgBrands(brandsRes.data);
@@ -217,23 +223,6 @@ export const POSModule = () => {
     if (regulatorsRes.data) setRegulators(regulatorsRes.data);
     if (customersRes.data) setCustomers(customersRes.data);
     if (pricesRes.data) setProductPrices(pricesRes.data);
-    
-    if (driversRes.data && driversRes.data.length > 0) {
-      const driverIds = driversRes.data.map(d => d.user_id);
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('user_id, full_name, phone')
-        .in('user_id', driverIds);
-      
-      if (profiles) {
-        setDrivers(profiles.map(p => ({
-          id: p.user_id,
-          name: p.full_name || 'Driver',
-          phone: p.phone || '',
-          status: 'active' as const
-        })));
-      }
-    }
 
     // Fetch recent transactions
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
@@ -745,7 +734,7 @@ export const POSModule = () => {
           total,
           payment_method: 'cash' as const,
           payment_status: paymentStatus,
-          driver_id: selectedDriverId || null,
+          driver_id: null, // Seller tracked via created_by and userRole
           created_by: user.id,
           owner_id: ownerId || user.id
         })
@@ -1400,23 +1389,15 @@ export const POSModule = () => {
                 />
               </div>
 
-              {/* Driver */}
+              {/* Seller Role Indicator */}
               <div className="space-y-1.5">
-                <Label className="text-xs">Driver (Optional)</Label>
-                <Select 
-                  value={selectedDriverId || "none"} 
-                  onValueChange={(val) => setSelectedDriverId(val === "none" ? null : val)}
-                >
-                  <SelectTrigger className="h-9">
-                    <SelectValue placeholder="Select driver" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No driver</SelectItem>
-                    {drivers.map(d => (
-                      <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label className="text-xs">Seller</Label>
+                <div className={`h-9 px-3 flex items-center gap-2 rounded-md border ${ROLE_CONFIG[userRole]?.bgColor || 'bg-muted border-border'}`}>
+                  <User className={`h-4 w-4 ${ROLE_CONFIG[userRole]?.color || 'text-foreground'}`} />
+                  <span className={`text-sm font-medium ${ROLE_CONFIG[userRole]?.color || 'text-foreground'}`}>
+                    {ROLE_CONFIG[userRole]?.label || 'User'}
+                  </span>
+                </div>
               </div>
 
               {/* Summary & Actions */}
