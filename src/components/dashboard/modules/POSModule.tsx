@@ -1403,12 +1403,15 @@ export const POSModule = () => {
               {/* Driver */}
               <div className="space-y-1.5">
                 <Label className="text-xs">Driver (Optional)</Label>
-                <Select value={selectedDriverId || ""} onValueChange={setSelectedDriverId}>
+                <Select 
+                  value={selectedDriverId || "none"} 
+                  onValueChange={(val) => setSelectedDriverId(val === "none" ? null : val)}
+                >
                   <SelectTrigger className="h-9">
                     <SelectValue placeholder="Select driver" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">No driver</SelectItem>
+                    <SelectItem value="none">No driver</SelectItem>
                     {drivers.map(d => (
                       <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
                     ))}

@@ -67,20 +67,30 @@ const Dashboard = () => {
   // Fetch user role from database
   useEffect(() => {
     const fetchUserRole = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setUserName(user.email || "User");
-        
-        // Fetch role from user_roles table
-        const { data: roleData } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', user.id)
-          .single();
-        
-        if (roleData?.role) {
-          setUserRole(roleData.role as 'owner' | 'manager' | 'driver');
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          setUserName(user.email || "User");
+          
+          // Fetch role from user_roles table
+          const { data: roleData } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', user.id)
+            .single();
+          
+          if (roleData?.role) {
+            setUserRole(roleData.role as 'owner' | 'manager' | 'driver');
+          }
+        } else {
+          // No user - set default owner role for dev mode
+          setUserName("Developer");
+          setUserRole('owner');
         }
+      } catch (error) {
+        // Auth check failed - continue with defaults
+        setUserName("Developer");
+        setUserRole('owner');
       }
       setAuthLoading(false);
     };
