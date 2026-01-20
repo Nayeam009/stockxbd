@@ -14,6 +14,7 @@ import {
   Minus, 
   Trash2, 
   ShoppingBag, 
+  ShoppingCart,
   Loader2,
   Cylinder,
   CheckCircle2,
@@ -134,8 +135,9 @@ export const InventoryPOBDrawer = ({
   const [stoves, setStoves] = useState<Stove[]>([]);
   const [regulators, setRegulators] = useState<Regulator[]>([]);
   
-  // Mobile step
+  // Mobile step and POB mode
   const [mobileStep, setMobileStep] = useState<'product' | 'cart' | 'checkout'>('product');
+  const [pobMode, setPobMode] = useState<'buy' | 'add'>('buy');
   
   // LPG Config
   const [lpgBrandName, setLpgBrandName] = useState("");
@@ -1397,65 +1399,263 @@ export const InventoryPOBDrawer = ({
     </div>
   );
 
+  // Quick Add to Stock (without cart/checkout flow)
+  const quickAddToStock = async () => {
+    setProcessing(true);
+    try {
+      if (productType === 'lpg') {
+        if (!lpgBrandName || lpgTotalQty <= 0) {
+          toast({ title: "Please select brand and enter quantity", variant: "destructive" });
+          return;
+        }
+
+        for (const valveSize of ['22mm', '20mm'] as const) {
+          const qty = valveSize === '22mm' ? lpgQty22mm : lpgQty20mm;
+          if (qty <= 0) continue;
+
+          const existingBrand = lpgBrands.find(b => 
+            b.name.toLowerCase() === lpgBrandName.toLowerCase() && 
+            b.size === valveSize && 
+            b.weight === lpgWeight
+          );
+
+          if (existingBrand) {
+            const stockField = lpgCylinderType === 'refill' ? 'refill_cylinder' : 'package_cylinder';
+            await supabase
+              .from('lpg_brands')
+              .update({ [stockField]: existingBrand[stockField] + qty })
+              .eq('id', existingBrand.id);
+          } else {
+            const brandColor = getLpgBrandColor(lpgBrandName);
+            await supabase
+              .from('lpg_brands')
+              .insert({
+                name: lpgBrandName,
+                size: valveSize,
+                weight: lpgWeight,
+                color: brandColor,
+                refill_cylinder: lpgCylinderType === 'refill' ? qty : 0,
+                package_cylinder: lpgCylinderType === 'package' ? qty : 0,
+                empty_cylinder: 0,
+                problem_cylinder: 0
+              });
+          }
+        }
+        toast({ title: "Stock Added!", description: `${lpgTotalQty} ${lpgBrandName} cylinders added` });
+      } else if (productType === 'stove') {
+        if (!stoveBrand || !stoveModel || stoveTotalQty <= 0) {
+          toast({ title: "Please fill brand, model and quantity", variant: "destructive" });
+          return;
+        }
+
+        const existingStove = stoves.find(s => 
+          s.brand.toLowerCase() === stoveBrand.toLowerCase() && 
+          s.model.toLowerCase() === stoveModel.toLowerCase()
+        );
+
+        if (existingStove) {
+          await supabase
+            .from('stoves')
+            .update({ quantity: existingStove.quantity + stoveTotalQty })
+            .eq('id', existingStove.id);
+        } else {
+          const burners = stoveQtySingle > 0 ? 1 : 2;
+          await supabase
+            .from('stoves')
+            .insert({
+              brand: stoveBrand,
+              model: stoveModel,
+              burners,
+              quantity: stoveTotalQty,
+              price: 0
+            });
+        }
+        toast({ title: "Stock Added!", description: `${stoveTotalQty} ${stoveBrand} stoves added` });
+      } else if (productType === 'regulator') {
+        if (!regulatorBrand || regTotalQty <= 0) {
+          toast({ title: "Please select brand and enter quantity", variant: "destructive" });
+          return;
+        }
+
+        for (const valveType of ['22mm', '20mm'] as const) {
+          const qty = valveType === '22mm' ? regQty22mm : regQty20mm;
+          if (qty <= 0) continue;
+
+          const existingReg = regulators.find(r => 
+            r.brand.toLowerCase() === regulatorBrand.toLowerCase() && 
+            r.type === valveType
+          );
+
+          if (existingReg) {
+            await supabase
+              .from('regulators')
+              .update({ quantity: existingReg.quantity + qty })
+              .eq('id', existingReg.id);
+          } else {
+            await supabase
+              .from('regulators')
+              .insert({
+                brand: regulatorBrand,
+                type: valveType,
+                quantity: qty
+              });
+          }
+        }
+        toast({ title: "Stock Added!", description: `${regTotalQty} ${regulatorBrand} regulators added` });
+      }
+
+      // Reset form and close
+      resetFormFields();
+      onPurchaseComplete();
+      onOpenChange(false);
+    } catch (error: any) {
+      console.error('Quick add error:', error);
+      toast({ title: "Error adding stock", description: error.message, variant: "destructive" });
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  // Reset form fields helper
+  const resetFormFields = () => {
+    setLpgBrandName("");
+    setLpgQty22mm(0);
+    setLpgQty20mm(0);
+    setLpgTotalDO(0);
+    setStoveBrand("");
+    setStoveModel("");
+    setStoveQtySingle(0);
+    setStoveQtyDouble(0);
+    setStoveTotalAmount(0);
+    setRegulatorBrand("");
+    setRegQty22mm(0);
+    setRegQty20mm(0);
+    setRegulatorTotalAmount(0);
+    setPurchaseItems([]);
+    setMobileStep('product');
+    setPobMode('buy');
+  };
+
   return (
     <>
       <Sheet open={open} onOpenChange={onOpenChange}>
         <SheetContent 
           side={isMobile ? "bottom" : "right"} 
           className={isMobile 
-            ? "h-[95vh] rounded-t-2xl flex flex-col overflow-hidden" 
-            : "w-full sm:max-w-xl flex flex-col"
+            ? "h-[95vh] rounded-t-2xl flex flex-col overflow-hidden p-0" 
+            : "w-full sm:max-w-xl flex flex-col p-0"
           }
         >
-          {/* Fixed Header */}
-          <SheetHeader className="pb-4 border-b flex-shrink-0">
-            <SheetTitle className="flex items-center gap-2">
-              {getIcon()}
-              {getTitle()}
-              {purchaseItemsCount > 0 && (
-                <Badge className="ml-2 bg-primary">{purchaseItemsCount}</Badge>
+          {/* Compact Fixed Header */}
+          <div className="flex-shrink-0 px-4 pt-4 pb-3 border-b bg-background">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <div className={`h-9 w-9 rounded-xl flex items-center justify-center ${
+                  productType === 'lpg' ? 'bg-primary/10 text-primary' :
+                  productType === 'stove' ? 'bg-orange-500/10 text-orange-500' :
+                  'bg-violet-500/10 text-violet-500'
+                }`}>
+                  {getIcon()}
+                </div>
+                <div>
+                  <h2 className="font-bold text-base leading-tight">{getTitle()}</h2>
+                  <p className="text-[11px] text-muted-foreground">Buy from company or add existing stock</p>
+                </div>
+              </div>
+              {purchaseItemsCount > 0 && pobMode === 'buy' && (
+                <Badge className="bg-primary text-primary-foreground">{purchaseItemsCount}</Badge>
               )}
-            </SheetTitle>
-            <SheetDescription>
-              Add products to cart and complete your purchase
-            </SheetDescription>
-          </SheetHeader>
+            </div>
+            
+            {/* Mode Toggle */}
+            <div className="flex bg-muted/50 rounded-lg p-1 mt-3">
+              <Button 
+                type="button"
+                variant={pobMode === 'buy' ? 'default' : 'ghost'} 
+                size="sm" 
+                className="flex-1 h-9 text-xs font-medium gap-1.5" 
+                onClick={() => setPobMode('buy')}
+              >
+                <ShoppingCart className="h-3.5 w-3.5" />
+                Buy from Company
+              </Button>
+              <Button 
+                type="button"
+                variant={pobMode === 'add' ? 'secondary' : 'ghost'} 
+                size="sm" 
+                className="flex-1 h-9 text-xs font-medium gap-1.5" 
+                onClick={() => setPobMode('add')}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Add Existing Stock
+              </Button>
+            </div>
+          </div>
 
           {loading ? (
             <div className="flex items-center justify-center h-64 flex-shrink-0">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
+          ) : pobMode === 'add' ? (
+            /* Quick Add Mode - Simplified Form */
+            <ScrollArea className="flex-1 min-h-0">
+              <div className="p-4 pb-8 space-y-4">
+                {renderProductForm()}
+                
+                {/* Quick Add Button */}
+                <Button 
+                  type="button" 
+                  size="lg" 
+                  className="w-full h-14 font-bold bg-gradient-to-r from-success to-emerald-600 hover:from-success/90 hover:to-emerald-600/90" 
+                  onClick={quickAddToStock}
+                  disabled={processing || (productType === 'lpg' && (!lpgBrandName || lpgTotalQty <= 0)) || 
+                    (productType === 'stove' && (!stoveBrand || !stoveModel || stoveTotalQty <= 0)) ||
+                    (productType === 'regulator' && (!regulatorBrand || regTotalQty <= 0))}
+                >
+                  {processing ? (
+                    <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                  ) : (
+                    <Plus className="h-5 w-5 mr-2" />
+                  )}
+                  Add to Inventory
+                </Button>
+              </div>
+            </ScrollArea>
           ) : (
+            /* Buy Mode - Full Cart/Checkout Flow */
             <>
-              {/* Mobile Step Navigation - Fixed */}
+              {/* Mobile Step Navigation - Compact */}
               {isMobile && (
-                <div className="flex items-center justify-between bg-muted/50 rounded-xl p-1 my-4 mx-1 flex-shrink-0">
+                <div className="flex items-center bg-muted/30 p-1 mx-3 mt-2 rounded-lg flex-shrink-0">
                   <Button 
+                    type="button"
                     variant={mobileStep === 'product' ? 'default' : 'ghost'} 
                     size="sm" 
-                    className="flex-1 h-11 font-medium" 
+                    className="flex-1 h-9 text-xs font-medium" 
                     onClick={() => setMobileStep('product')}
                   >
-                    Product
+                    1. Product
                   </Button>
                   <Button 
+                    type="button"
                     variant={mobileStep === 'cart' ? 'default' : 'ghost'} 
                     size="sm" 
-                    className="flex-1 h-11 relative font-medium" 
+                    className="flex-1 h-9 relative text-xs font-medium" 
                     onClick={() => setMobileStep('cart')}
                   >
-                    Cart
+                    2. Cart
                     {purchaseItemsCount > 0 && (
-                      <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-[10px]">{purchaseItemsCount}</Badge>
+                      <Badge className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center text-[9px]">{purchaseItemsCount}</Badge>
                     )}
                   </Button>
                   <Button 
+                    type="button"
                     variant={mobileStep === 'checkout' ? 'default' : 'ghost'} 
                     size="sm" 
-                    className="flex-1 h-11 font-medium" 
+                    className="flex-1 h-9 text-xs font-medium" 
                     onClick={() => setMobileStep('checkout')}
                   >
-                    Checkout
+                    3. Pay
                   </Button>
                 </div>
               )}
@@ -1463,15 +1663,15 @@ export const InventoryPOBDrawer = ({
               {/* Mobile: Scrollable Content Area */}
               {isMobile ? (
                 <ScrollArea className="flex-1 min-h-0">
-                  <div className="px-4 pb-8">
+                  <div className="px-4 pb-8 pt-3">
                     {mobileStep === 'product' && (
-                      <div className="space-y-5 py-2">
+                      <div className="space-y-4">
                         {renderProductForm()}
                       </div>
                     )}
                     {mobileStep === 'cart' && renderCartMobile()}
                     {mobileStep === 'checkout' && (
-                      <div className="py-2">
+                      <div>
                         {renderCheckout()}
                       </div>
                     )}

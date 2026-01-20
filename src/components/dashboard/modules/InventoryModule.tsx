@@ -640,96 +640,58 @@ export const InventoryModule = () => {
 
         {/* LPG Tab Content */}
         <TabsContent value="lpg" className="space-y-4 mt-4">
-          {/* Size Tabs */}
-          <Tabs value={sizeTab} onValueChange={(v) => setSizeTab(v as "22mm" | "20mm")} className="w-full">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-              <TabsList className="bg-muted/50 p-1">
-                <TabsTrigger value="22mm" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">22mm</TabsTrigger>
-                <TabsTrigger value="20mm" className="data-[state=active]:bg-cyan-500 data-[state=active]:text-white">20mm</TabsTrigger>
-              </TabsList>
-              
-              <div className="flex items-center gap-2 flex-wrap">
-                {/* Buy/Add Products Button */}
-                <Button 
-                  size="sm" 
-                  className="gap-2 text-xs sm:text-sm h-10 bg-gradient-to-r from-primary to-primary/80"
-                  onClick={() => openPOB('lpg')}
-                >
-                  <PackagePlus className="h-4 w-4" />
-                  <span className="hidden sm:inline">Buy/Add Cylinders</span>
-                  <span className="sm:hidden">Buy/Add</span>
-                </Button>
-              </div>
-            </div>
-          </Tabs>
-
-          {/* Weight Selector */}
-          <div className="flex flex-wrap gap-2">
-            {weightOptions.map(w => (
-              <Button
-                key={w.value}
-                variant={selectedWeight === w.value ? "default" : "outline"}
-                size="sm"
-                onClick={() => setSelectedWeight(w.value)}
-                className={`text-xs sm:text-sm ${selectedWeight === w.value ? "bg-primary text-primary-foreground" : ""}`}
-              >
-                {w.shortLabel} KG
-              </Button>
-            ))}
-          </div>
-
-          {/* LPG Summary Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          {/* LPG Summary Cards - Top Row */}
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-3">
             <Card className="bg-gradient-to-br from-green-500/10 to-green-500/5 border-green-500/20">
-              <CardContent className="p-3">
+              <CardContent className="p-2.5 sm:p-3">
                 <div className="flex items-center gap-2">
-                  <Package className="h-4 w-4 text-green-500" />
-                  <div>
-                    <p className="text-lg sm:text-2xl font-bold">{lpgTotals.package}</p>
+                  <Package className="h-4 w-4 text-green-500 flex-shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-lg sm:text-xl font-bold truncate">{lpgTotals.package}</p>
                     <p className="text-[10px] sm:text-xs text-muted-foreground">Package</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
             <Card className="bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/20">
-              <CardContent className="p-3">
+              <CardContent className="p-2.5 sm:p-3">
                 <div className="flex items-center gap-2">
-                  <Cylinder className="h-4 w-4 text-blue-500" />
-                  <div>
-                    <p className="text-lg sm:text-2xl font-bold">{lpgTotals.refill}</p>
+                  <Cylinder className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-lg sm:text-xl font-bold truncate">{lpgTotals.refill}</p>
                     <p className="text-[10px] sm:text-xs text-muted-foreground">Refill</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
             <Card className="bg-gradient-to-br from-gray-500/10 to-gray-500/5 border-gray-500/20">
-              <CardContent className="p-3">
+              <CardContent className="p-2.5 sm:p-3">
                 <div className="flex items-center gap-2">
-                  <Package className="h-4 w-4 text-gray-500" />
-                  <div>
-                    <p className="text-lg sm:text-2xl font-bold">{lpgTotals.empty}</p>
+                  <Package className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-lg sm:text-xl font-bold truncate">{lpgTotals.empty}</p>
                     <p className="text-[10px] sm:text-xs text-muted-foreground">Empty</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
             <Card className="bg-gradient-to-br from-red-500/10 to-red-500/5 border-red-500/20">
-              <CardContent className="p-3">
+              <CardContent className="p-2.5 sm:p-3">
                 <div className="flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 text-red-500" />
-                  <div>
-                    <p className="text-lg sm:text-2xl font-bold">{lpgTotals.problem}</p>
+                  <AlertTriangle className="h-4 w-4 text-red-500 flex-shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-lg sm:text-xl font-bold truncate">{lpgTotals.problem}</p>
                     <p className="text-[10px] sm:text-xs text-muted-foreground">Problem</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
             <Card className="bg-gradient-to-br from-yellow-500/10 to-yellow-500/5 border-yellow-500/20 col-span-2 sm:col-span-1">
-              <CardContent className="p-3">
+              <CardContent className="p-2.5 sm:p-3">
                 <div className="flex items-center gap-2">
-                  <Truck className="h-4 w-4 text-yellow-500" />
-                  <div>
-                    <p className="text-lg sm:text-2xl font-bold">{lpgTotals.inTransit}</p>
+                  <Truck className="h-4 w-4 text-yellow-500 flex-shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-lg sm:text-xl font-bold truncate">{lpgTotals.inTransit}</p>
                     <p className="text-[10px] sm:text-xs text-muted-foreground">In Transit</p>
                   </div>
                 </div>
@@ -737,11 +699,49 @@ export const InventoryModule = () => {
             </Card>
           </div>
 
-          {/* Search */}
-          <div className="relative max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Search brands..." value={lpgSearchQuery} onChange={(e) => setLpgSearchQuery(e.target.value)} className="pl-10" />
+          {/* Action Bar - Valve Size Toggle + Search + Buy Button */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
+            {/* Valve Size Toggle */}
+            <Tabs value={sizeTab} onValueChange={(v) => setSizeTab(v as "22mm" | "20mm")} className="w-full sm:w-auto">
+              <TabsList className="bg-muted/50 p-1 w-full sm:w-auto grid grid-cols-2 sm:inline-flex">
+                <TabsTrigger value="22mm" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs sm:text-sm">22mm</TabsTrigger>
+                <TabsTrigger value="20mm" className="data-[state=active]:bg-cyan-500 data-[state=active]:text-white text-xs sm:text-sm">20mm</TabsTrigger>
+              </TabsList>
+            </Tabs>
+            
+            {/* Search */}
+            <div className="relative flex-1 min-w-0">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input placeholder="Search brands..." value={lpgSearchQuery} onChange={(e) => setLpgSearchQuery(e.target.value)} className="pl-10 h-10" />
+            </div>
+            
+            {/* Buy/Add Button */}
+            <Button 
+              size="sm" 
+              className="gap-2 text-xs sm:text-sm h-10 bg-gradient-to-r from-primary to-primary/80 whitespace-nowrap"
+              onClick={() => openPOB('lpg')}
+            >
+              <PackagePlus className="h-4 w-4" />
+              <span className="hidden sm:inline">Buy/Add Cylinders</span>
+              <span className="sm:hidden">Buy/Add</span>
+            </Button>
           </div>
+
+          {/* Weight Selector Pills */}
+          <div className="flex flex-wrap gap-1.5 sm:gap-2">
+            {weightOptions.map(w => (
+              <Button
+                key={w.value}
+                variant={selectedWeight === w.value ? "default" : "outline"}
+                size="sm"
+                onClick={() => setSelectedWeight(w.value)}
+                className={`text-xs h-8 px-3 ${selectedWeight === w.value ? "bg-primary text-primary-foreground" : ""}`}
+              >
+                {w.shortLabel} KG
+              </Button>
+            ))}
+          </div>
+
 
           {/* LPG Brand Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -763,8 +763,8 @@ export const InventoryModule = () => {
 
         {/* Stoves Tab Content */}
         <TabsContent value="stoves" className="space-y-4 mt-4">
-          {/* Stove Summary Cards (tap to filter) */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {/* Stove Summary Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
             <InventoryStatCard
               icon={Package}
               label="Total Units"
@@ -811,29 +811,35 @@ export const InventoryModule = () => {
             />
           </div>
 
-          {/* Stove Filters */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-            <div className="relative flex-1 w-full sm:max-w-sm">
+          {/* Action Bar - Search + Filters + Buy Button */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
+            {/* Search */}
+            <div className="relative flex-1 min-w-0">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Search stoves..." value={stoveSearchQuery} onChange={(e) => setStoveSearchQuery(e.target.value)} className="pl-10" />
+              <Input placeholder="Search stoves..." value={stoveSearchQuery} onChange={(e) => setStoveSearchQuery(e.target.value)} className="pl-10 h-10" />
             </div>
-            <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
+            
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Burner Type Filter */}
               <Select value={filterBurner} onValueChange={setFilterBurner}>
-                <SelectTrigger className="w-full sm:w-36"><SelectValue placeholder="Filter by type" /></SelectTrigger>
+                <SelectTrigger className="w-32 h-10 text-xs"><SelectValue placeholder="Filter" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Types</SelectItem>
                   <SelectItem value="1">Single Burner</SelectItem>
                   <SelectItem value="2">Double Burner</SelectItem>
                 </SelectContent>
               </Select>
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/50 rounded-lg">
+              
+              {/* Damaged Toggle */}
+              <div className="flex items-center gap-2 px-3 py-1.5 h-10 bg-muted/50 rounded-lg">
                 <Switch checked={showDamagedOnly} onCheckedChange={setShowDamagedOnly} id="damaged-filter" />
-                <Label htmlFor="damaged-filter" className="text-xs cursor-pointer">Damaged</Label>
+                <Label htmlFor="damaged-filter" className="text-xs cursor-pointer whitespace-nowrap">Damaged</Label>
               </div>
-              {/* Buy/Add Stoves Button */}
+              
+              {/* Buy/Add Button */}
               <Button 
                 size="sm" 
-                className="gap-2 text-xs sm:text-sm h-10 bg-gradient-to-r from-orange-500 to-amber-500"
+                className="gap-2 text-xs sm:text-sm h-10 bg-gradient-to-r from-orange-500 to-amber-500 whitespace-nowrap"
                 onClick={() => openPOB('stove')}
               >
                 <PackagePlus className="h-4 w-4" />
@@ -863,14 +869,13 @@ export const InventoryModule = () => {
 
         {/* Regulators Tab Content */}
         <TabsContent value="regulators" className="space-y-4 mt-4">
-          {/* Regulator Summary Cards (tap to filter) */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {/* Regulator Summary Cards */}
+          <div className="grid grid-cols-3 gap-2 sm:gap-3">
             <InventoryStatCard
               icon={Package}
               label="Total Units"
               value={regulatorTotals.total}
               active={regulatorSizeFilter === "all"}
-              className="col-span-2 sm:col-span-1"
               onClick={() => setRegulatorSizeFilter("all")}
             />
             <InventoryStatCard
@@ -893,23 +898,24 @@ export const InventoryModule = () => {
             />
           </div>
 
-          {/* Regulator Filters */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+          {/* Action Bar - Size Toggle + Search + Buy Button */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
+            {/* Size Toggle */}
             <div className="flex w-full sm:w-auto rounded-lg bg-muted/50 p-1">
               <Button
                 type="button"
                 size="sm"
                 variant={regulatorSizeFilter === "all" ? "default" : "ghost"}
-                className="h-8 flex-1 sm:flex-none"
+                className="h-9 flex-1 sm:flex-none text-xs"
                 onClick={() => setRegulatorSizeFilter("all")}
               >
-                All Sizes
+                All
               </Button>
               <Button
                 type="button"
                 size="sm"
                 variant={regulatorSizeFilter === "22mm" ? "default" : "ghost"}
-                className="h-8 flex-1 sm:flex-none"
+                className="h-9 flex-1 sm:flex-none text-xs"
                 onClick={() => setRegulatorSizeFilter("22mm")}
               >
                 22mm
@@ -918,28 +924,29 @@ export const InventoryModule = () => {
                 type="button"
                 size="sm"
                 variant={regulatorSizeFilter === "20mm" ? "default" : "ghost"}
-                className="h-8 flex-1 sm:flex-none"
+                className="h-9 flex-1 sm:flex-none text-xs"
                 onClick={() => setRegulatorSizeFilter("20mm")}
               >
                 20mm
               </Button>
             </div>
-            <div className="flex flex-1 items-center gap-3 w-full sm:w-auto">
-              <div className="relative flex-1 sm:max-w-sm">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Search regulators..." value={regulatorSearchQuery} onChange={(e) => setRegulatorSearchQuery(e.target.value)} className="pl-10" />
-              </div>
-              {/* Buy/Add Regulators Button */}
-              <Button 
-                size="sm" 
-                className="gap-2 text-xs sm:text-sm h-10 bg-gradient-to-r from-violet-500 to-purple-600"
-                onClick={() => openPOB('regulator')}
-              >
-                <PackagePlus className="h-4 w-4" />
-                <span className="hidden sm:inline">Buy/Add Regulators</span>
-                <span className="sm:hidden">Buy/Add</span>
-              </Button>
+            
+            {/* Search */}
+            <div className="relative flex-1 min-w-0">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input placeholder="Search regulators..." value={regulatorSearchQuery} onChange={(e) => setRegulatorSearchQuery(e.target.value)} className="pl-10 h-10" />
             </div>
+            
+            {/* Buy/Add Button */}
+            <Button 
+              size="sm" 
+              className="gap-2 text-xs sm:text-sm h-10 bg-gradient-to-r from-violet-500 to-purple-600 whitespace-nowrap"
+              onClick={() => openPOB('regulator')}
+            >
+              <PackagePlus className="h-4 w-4" />
+              <span className="hidden sm:inline">Buy/Add Regulators</span>
+              <span className="sm:hidden">Buy/Add</span>
+            </Button>
           </div>
 
           {/* Regulator Cards */}
