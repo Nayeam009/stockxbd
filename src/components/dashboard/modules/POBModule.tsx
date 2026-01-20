@@ -516,25 +516,65 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
   ) => {
     try {
       if (type === 'lpg' && options.brandId) {
-        const fullProductName = `${productName} LP Gas ${options.weight} Cylinder (${options.valveSize}) ${options.cylinderType === 'refill' ? 'Refill' : 'Package'}`;
         const variant = options.cylinderType === 'refill' ? 'Refill' : 'Package';
+        const fullProductName = `${productName} LP Gas ${options.weight} Cylinder (${options.valveSize}) ${variant}`;
 
-        const { data: existingPrice } = await supabase
+        // First try to find by brand_id and variant
+        let existingPrice = null;
+        const { data: byBrandId } = await supabase
           .from('product_prices')
-          .select('id')
+          .select('id, company_price, package_price')
           .eq('brand_id', options.brandId)
           .eq('variant', variant)
           .eq('product_type', 'lpg')
+          .eq('is_active', true)
           .maybeSingle();
 
-        if (existingPrice) {
-          const updateField = options.cylinderType === 'package' ? 'package_price' : 'company_price';
-          await supabase
+        existingPrice = byBrandId;
+
+        // If not found, try to find by matching size and variant
+        if (!existingPrice) {
+          const { data: bySize } = await supabase
             .from('product_prices')
-            .update({ [updateField]: companyPrice, updated_at: new Date().toISOString() })
+            .select('id, company_price, package_price')
+            .eq('brand_id', options.brandId)
+            .eq('size', options.weight)
+            .eq('product_type', 'lpg')
+            .eq('is_active', true)
+            .maybeSingle();
+          
+          existingPrice = bySize;
+        }
+
+        if (existingPrice) {
+          // Update: For Refill type update company_price, for Package update package_price
+          const updateData: Record<string, unknown> = { 
+            updated_at: new Date().toISOString(),
+            product_name: fullProductName
+          };
+          
+          if (options.cylinderType === 'package') {
+            updateData.package_price = companyPrice;
+          } else {
+            updateData.company_price = companyPrice;
+          }
+          
+          const { error } = await supabase
+            .from('product_prices')
+            .update(updateData)
             .eq('id', existingPrice.id);
+            
+          if (error) {
+            console.error('Error updating LPG price:', error);
+          } else {
+            toast({
+              title: "Price Updated",
+              description: `${productName} ${variant} price set to ${BANGLADESHI_CURRENCY_SYMBOL}${companyPrice}`
+            });
+          }
         } else {
-          await supabase.from('product_prices').insert({
+          // Create new pricing entry
+          const { error } = await supabase.from('product_prices').insert({
             product_type: 'lpg',
             product_name: fullProductName,
             brand_id: options.brandId,
@@ -546,51 +586,96 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
             retail_price: 0,
             is_active: true
           });
+          
+          if (error) {
+            console.error('Error creating LPG price:', error);
+          } else {
+            toast({
+              title: "New Price Created",
+              description: `${productName} ${variant} added at ${BANGLADESHI_CURRENCY_SYMBOL}${companyPrice}`
+            });
+          }
         }
       } else if (type === 'stove') {
-        const fullProductName = `${productName} - ${options.burnerType === 'single' ? 'Single' : 'Double'} Burner`;
+        const burnerText = options.burnerType === 'single' ? 'Single' : 'Double';
+        const fullProductName = `${productName} - ${burnerText} Burner`;
         
+        // Try to find existing stove price - use ilike for case-insensitive match
         const { data: existingPrice } = await supabase
           .from('product_prices')
           .select('id')
-          .eq('product_name', fullProductName)
+          .ilike('product_name', `%${productName}%`)
           .eq('product_type', 'stove')
+          .eq('is_active', true)
           .maybeSingle();
 
         if (existingPrice) {
-          await supabase
+          const { error } = await supabase
             .from('product_prices')
-            .update({ company_price: companyPrice, updated_at: new Date().toISOString() })
+            .update({ 
+              company_price: companyPrice, 
+              product_name: fullProductName,
+              size: `${burnerText} Burner`,
+              updated_at: new Date().toISOString() 
+            })
             .eq('id', existingPrice.id);
+            
+          if (!error) {
+            toast({
+              title: "Stove Price Updated",
+              description: `${productName} price set to ${BANGLADESHI_CURRENCY_SYMBOL}${companyPrice}`
+            });
+          }
         } else {
-          await supabase.from('product_prices').insert({
+          const { error } = await supabase.from('product_prices').insert({
             product_type: 'stove',
             product_name: fullProductName,
-            size: options.burnerType === 'single' ? 'Single Burner' : 'Double Burner',
+            size: `${burnerText} Burner`,
             company_price: companyPrice,
             distributor_price: 0,
             retail_price: 0,
             package_price: 0,
             is_active: true
           });
+          
+          if (!error) {
+            toast({
+              title: "New Stove Price Created",
+              description: `${productName} added at ${BANGLADESHI_CURRENCY_SYMBOL}${companyPrice}`
+            });
+          }
         }
       } else if (type === 'regulator') {
         const fullProductName = `${productName} Regulator - ${options.regulatorType}`;
         
+        // Try to find existing regulator price
         const { data: existingPrice } = await supabase
           .from('product_prices')
           .select('id')
-          .eq('product_name', fullProductName)
+          .ilike('product_name', `%${productName}%`)
+          .eq('size', options.regulatorType)
           .eq('product_type', 'regulator')
+          .eq('is_active', true)
           .maybeSingle();
 
         if (existingPrice) {
-          await supabase
+          const { error } = await supabase
             .from('product_prices')
-            .update({ company_price: companyPrice, updated_at: new Date().toISOString() })
+            .update({ 
+              company_price: companyPrice, 
+              product_name: fullProductName,
+              updated_at: new Date().toISOString() 
+            })
             .eq('id', existingPrice.id);
+            
+          if (!error) {
+            toast({
+              title: "Regulator Price Updated",
+              description: `${productName} ${options.regulatorType} price set to ${BANGLADESHI_CURRENCY_SYMBOL}${companyPrice}`
+            });
+          }
         } else {
-          await supabase.from('product_prices').insert({
+          const { error } = await supabase.from('product_prices').insert({
             product_type: 'regulator',
             product_name: fullProductName,
             size: options.regulatorType,
@@ -600,12 +685,24 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
             package_price: 0,
             is_active: true
           });
+          
+          if (!error) {
+            toast({
+              title: "New Regulator Price Created",
+              description: `${productName} ${options.regulatorType} added at ${BANGLADESHI_CURRENCY_SYMBOL}${companyPrice}`
+            });
+          }
         }
       }
 
       console.log(`Product pricing updated for ${productName}: ${BANGLADESHI_CURRENCY_SYMBOL}${companyPrice}`);
     } catch (error) {
       console.error('Error updating product pricing:', error);
+      toast({ 
+        title: "Pricing Update Failed", 
+        description: "Could not update product pricing", 
+        variant: "destructive" 
+      });
     }
   };
 
