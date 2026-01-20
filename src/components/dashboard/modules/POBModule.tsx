@@ -1535,100 +1535,232 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
     </div>
   );
 
-  // ============= RENDER CART =============
-  const renderCart = () => (
-    <Card className="border-primary/20 shadow-sm h-full flex flex-col">
-      <CardHeader className="py-3 px-4 bg-primary/5 border-b border-primary/10 shrink-0">
-        <CardTitle className="flex items-center justify-between text-base">
-          <span className="flex items-center gap-2 font-semibold">
-            <ShoppingBag className="h-5 w-5 text-primary" />
-            Purchase Cart
-          </span>
-          <Badge className="bg-primary text-primary-foreground">
-            {purchaseItemsCount} items
-          </Badge>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="p-0 flex-1 flex flex-col min-h-0">
-        <ScrollArea className="flex-1">
-          {purchaseItems.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full py-12 text-muted-foreground">
-              <ShoppingBag className="h-12 w-12 opacity-20 mb-3" />
-              <p className="text-sm font-medium">Cart is empty</p>
-              <p className="text-xs">Add products to get started</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-border">
-              {purchaseItems.map(item => (
-                <div key={item.id} className="flex items-center gap-2 sm:gap-3 p-3 hover:bg-muted/30 transition-colors">
-                  <div 
-                    className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
-                    style={{ backgroundColor: item.brandColor ? `${item.brandColor}20` : 'hsl(var(--primary) / 0.1)' }}
-                  >
-                    {item.type === 'lpg' && <Cylinder className="h-5 w-5" style={{ color: item.brandColor || 'hsl(var(--primary))' }} />}
-                    {item.type === 'stove' && <ChefHat className="h-5 w-5 text-warning" />}
-                    {item.type === 'regulator' && <Gauge className="h-5 w-5 text-info" />}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold truncate">{item.name}</p>
-                    <p className="text-xs text-muted-foreground truncate">{item.details}</p>
-                    <p className="text-xs font-medium text-primary mt-0.5">
-                      {BANGLADESHI_CURRENCY_SYMBOL}{item.companyPrice.toLocaleString()}/pc
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => updateItemQuantity(item.id, -1)}
-                    >
-                      <Minus className="h-3 w-3" />
-                    </Button>
-                    <span className="w-6 text-center text-sm font-bold">{item.quantity}</span>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => updateItemQuantity(item.id, 1)}
-                    >
-                      <Plus className="h-3 w-3" />
-                    </Button>
-                  </div>
-                  <div className="text-right min-w-[60px]">
-                    <p className="text-sm font-bold">{BANGLADESHI_CURRENCY_SYMBOL}{(item.companyPrice * item.quantity).toLocaleString()}</p>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0"
-                    onClick={() => removeItem(item.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+  // ============= RENDER CART (Professional Memo-Style) =============
+  const renderCart = () => {
+    const totalQuantity = purchaseItems.reduce((sum, item) => sum + item.quantity, 0);
+    const totalDO = purchaseItems.reduce((sum, item) => sum + (item.companyPrice * item.quantity), 0);
+    const productCount = purchaseItems.length;
+    
+    return (
+      <Card className="border-primary/20 shadow-sm h-full flex flex-col">
+        <CardHeader className="py-3 px-4 bg-gradient-to-r from-primary/10 to-secondary/10 border-b border-primary/10 shrink-0">
+          <CardTitle className="flex items-center justify-between text-base">
+            <span className="flex items-center gap-2 font-bold">
+              <ShoppingBag className="h-5 w-5 text-primary" />
+              Purchase Cart
+            </span>
+            <Badge className="bg-primary text-primary-foreground text-sm px-3">
+              {productCount} {productCount === 1 ? 'product' : 'products'}
+            </Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0 flex-1 flex flex-col min-h-0">
+          <ScrollArea className="flex-1">
+            {purchaseItems.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full py-16 text-muted-foreground">
+                <div className="h-20 w-20 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+                  <ShoppingBag className="h-10 w-10 opacity-30" />
                 </div>
-              ))}
+                <p className="text-base font-semibold">Cart is empty</p>
+                <p className="text-sm">Add products to get started</p>
+              </div>
+            ) : (
+              <div className="p-3 space-y-3">
+                {purchaseItems.map((item, index) => (
+                  <Card 
+                    key={item.id} 
+                    className="overflow-hidden border shadow-sm hover:shadow-md transition-shadow"
+                    style={{ borderLeftWidth: '4px', borderLeftColor: item.brandColor || 'hsl(var(--primary))' }}
+                  >
+                    {/* Card Header with Brand & Delete */}
+                    <div 
+                      className="flex items-center justify-between px-4 py-2.5"
+                      style={{ backgroundColor: item.brandColor ? `${item.brandColor}10` : 'hsl(var(--primary) / 0.05)' }}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div 
+                          className="h-9 w-9 rounded-lg flex items-center justify-center"
+                          style={{ backgroundColor: item.brandColor ? `${item.brandColor}20` : 'hsl(var(--primary) / 0.15)' }}
+                        >
+                          {item.type === 'lpg' && <Cylinder className="h-5 w-5" style={{ color: item.brandColor || 'hsl(var(--primary))' }} />}
+                          {item.type === 'stove' && <ChefHat className="h-5 w-5 text-warning" />}
+                          {item.type === 'regulator' && <Gauge className="h-5 w-5 text-info" />}
+                        </div>
+                        <span className="font-bold text-sm">{item.name}</span>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-9 w-9 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => removeItem(item.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    
+                    {/* Card Body - Product Details */}
+                    <div className="px-4 py-3 space-y-3">
+                      {/* Attributes Grid */}
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                        {item.type === 'lpg' && (
+                          <>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-muted-foreground">Weight:</span>
+                              <span className="font-semibold">{item.weight}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-muted-foreground">Type:</span>
+                              <Badge variant={item.cylinderType === 'refill' ? 'success' : 'warning'} className="text-xs h-5">
+                                {item.cylinderType === 'refill' ? 'Refill' : 'Package'}
+                              </Badge>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-muted-foreground">Valve:</span>
+                              <span className="font-semibold">{item.valveSize}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-muted-foreground">Qty:</span>
+                              <span className="font-bold text-primary">{item.quantity.toLocaleString()} pcs</span>
+                            </div>
+                          </>
+                        )}
+                        {item.type === 'stove' && (
+                          <>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-muted-foreground">Model:</span>
+                              <span className="font-semibold">{item.model || 'N/A'}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-muted-foreground">Burner:</span>
+                              <Badge variant="warning" className="text-xs h-5">
+                                {item.burnerType === 'single' ? 'Single' : 'Double'}
+                              </Badge>
+                            </div>
+                            <div className="flex items-center gap-1.5 col-span-2">
+                              <span className="text-muted-foreground">Qty:</span>
+                              <span className="font-bold text-warning">{item.quantity.toLocaleString()} pcs</span>
+                            </div>
+                          </>
+                        )}
+                        {item.type === 'regulator' && (
+                          <>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-muted-foreground">Type:</span>
+                              <Badge variant="info" className="text-xs h-5">{item.regulatorType}</Badge>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-muted-foreground">Qty:</span>
+                              <span className="font-bold text-info">{item.quantity.toLocaleString()} pcs</span>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                      
+                      <Separator />
+                      
+                      {/* Price Row */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="text-center p-2 bg-muted/50 rounded-lg">
+                          <p className="text-xs text-muted-foreground mb-0.5">Unit Price</p>
+                          <p className="font-bold text-sm">{BANGLADESHI_CURRENCY_SYMBOL}{item.companyPrice.toLocaleString()}/pc</p>
+                        </div>
+                        <div className="text-center p-2 bg-primary/10 rounded-lg">
+                          <p className="text-xs text-muted-foreground mb-0.5">Total D.O.</p>
+                          <p className="font-bold text-base text-primary">{BANGLADESHI_CURRENCY_SYMBOL}{(item.companyPrice * item.quantity).toLocaleString()}</p>
+                        </div>
+                      </div>
+                      
+                      {/* Quantity Stepper */}
+                      <div className="flex items-center justify-center gap-2 pt-1">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-10 w-10"
+                          onClick={() => updateItemQuantity(item.id, -10)}
+                        >
+                          <span className="text-xs font-bold">-10</span>
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-10 w-10"
+                          onClick={() => updateItemQuantity(item.id, -1)}
+                        >
+                          <Minus className="h-4 w-4" />
+                        </Button>
+                        <div className="w-16 text-center">
+                          <span className="text-lg font-bold">{item.quantity.toLocaleString()}</span>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-10 w-10"
+                          onClick={() => updateItemQuantity(item.id, 1)}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-10 w-10"
+                          onClick={() => updateItemQuantity(item.id, 10)}
+                        >
+                          <span className="text-xs font-bold">+10</span>
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </ScrollArea>
+          
+          {/* Cart Summary - Separate Cards for Quantity and Total D.O. */}
+          {purchaseItems.length > 0 && (
+            <div className="p-3 bg-muted/30 border-t border-border shrink-0 space-y-3">
+              {/* Summary Cards Grid */}
+              <div className="grid grid-cols-2 gap-3">
+                {/* Total Quantity Card */}
+                <Card className="border-2 border-success/30 bg-success/5">
+                  <CardContent className="p-3 text-center">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Total Quantity</p>
+                    <p className="text-2xl font-bold text-success">{totalQuantity.toLocaleString()}</p>
+                    <p className="text-xs text-muted-foreground">({productCount} products)</p>
+                  </CardContent>
+                </Card>
+                
+                {/* Total D.O. Card */}
+                <Card className="border-2 border-primary/30 bg-primary/5">
+                  <CardContent className="p-3 text-center">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Total D.O.</p>
+                    <p className="text-2xl font-bold text-primary">{BANGLADESHI_CURRENCY_SYMBOL}{totalDO.toLocaleString()}</p>
+                  </CardContent>
+                </Card>
+              </div>
+              
+              {/* Mobile: Proceed to Checkout */}
+              {isMobile && (
+                <Button
+                  type="button"
+                  size="lg"
+                  className="w-full h-12 font-semibold"
+                  onClick={() => setMobileStep('checkout')}
+                >
+                  <CheckCircle2 className="h-5 w-5 mr-2" />
+                  Proceed to Checkout
+                </Button>
+              )}
             </div>
           )}
-        </ScrollArea>
-        
-        {/* Cart Total */}
-        {purchaseItems.length > 0 && (
-          <div className="p-4 bg-muted/30 border-t border-border shrink-0">
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-medium text-muted-foreground">Total D.O.</span>
-              <span className="text-2xl font-bold text-primary">
-                {BANGLADESHI_CURRENCY_SYMBOL}{total.toLocaleString()}
-              </span>
-            </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
+        </CardContent>
+      </Card>
+    );
+  };
 
   // ============= RENDER CHECKOUT =============
   const renderCheckout = () => (
