@@ -31,6 +31,9 @@ const EXPENSE_CATEGORIES = [
   { value: "Maintenance", label: "Maintenance", icon: "🔧", color: "#f97316" },
   { value: "Rent", label: "Rent", icon: "🏠", color: "#ec4899" },
   { value: "Marketing", label: "Marketing", icon: "📢", color: "#06b6d4" },
+  { value: "Vehicle", label: "Vehicle Cost", icon: "🚗", color: "#10b981" },
+  { value: "Loading", label: "Loading/Labor", icon: "👷", color: "#a855f7" },
+  { value: "Entertainment", label: "Entertainment", icon: "☕", color: "#f472b6" },
   { value: "Other", label: "Other", icon: "📦", color: "#6b7280" }
 ];
 
@@ -40,6 +43,8 @@ export const DailyExpensesModule = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [filterCategory, setFilterCategory] = useState("all");
   const [filterDate, setFilterDate] = useState("");
+  const [showCustomCategory, setShowCustomCategory] = useState(false);
+  const [customCategory, setCustomCategory] = useState("");
   const [newExpense, setNewExpense] = useState({
     expense_date: format(new Date(), 'yyyy-MM-dd'),
     category: '',
@@ -260,21 +265,77 @@ export const DailyExpensesModule = () => {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="category">Category</Label>
-                  <Select value={newExpense.category} onValueChange={(value) => setNewExpense({ ...newExpense, category: value })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {EXPENSE_CATEGORIES.map((cat) => (
-                        <SelectItem key={cat.value} value={cat.value}>
+                  {!showCustomCategory ? (
+                    <Select 
+                      value={newExpense.category} 
+                      onValueChange={(value) => {
+                        if (value === 'custom') {
+                          setShowCustomCategory(true);
+                        } else {
+                          setNewExpense({ ...newExpense, category: value });
+                        }
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {EXPENSE_CATEGORIES.map((cat) => (
+                          <SelectItem key={cat.value} value={cat.value}>
+                            <span className="flex items-center gap-2">
+                              <span>{cat.icon}</span>
+                              <span>{cat.label}</span>
+                            </span>
+                          </SelectItem>
+                        ))}
+                        <SelectItem value="custom">
                           <span className="flex items-center gap-2">
-                            <span>{cat.icon}</span>
-                            <span>{cat.label}</span>
+                            <Plus className="h-4 w-4" />
+                            <span>Custom Category</span>
                           </span>
                         </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <div className="flex gap-2">
+                      <Input
+                        value={customCategory}
+                        onChange={(e) => setCustomCategory(e.target.value)}
+                        placeholder="Enter custom category"
+                        className="flex-1"
+                        autoFocus
+                      />
+                      <Button 
+                        type="button" 
+                        size="sm"
+                        onClick={() => {
+                          if (customCategory.trim()) {
+                            setNewExpense({ ...newExpense, category: customCategory.trim() });
+                            setShowCustomCategory(false);
+                            setCustomCategory("");
+                          }
+                        }}
+                      >
+                        Add
+                      </Button>
+                      <Button 
+                        type="button" 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => {
+                          setShowCustomCategory(false);
+                          setCustomCategory("");
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  )}
+                  {newExpense.category && !EXPENSE_CATEGORIES.find(c => c.value === newExpense.category) && (
+                    <Badge variant="secondary" className="mt-1">
+                      Custom: {newExpense.category}
+                    </Badge>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="description">Description</Label>

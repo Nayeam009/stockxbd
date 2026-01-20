@@ -188,6 +188,21 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
   const [customReturnBrand, setCustomReturnBrand] = useState("");
   const [showCustomBrandInput, setShowCustomBrandInput] = useState(false);
   
+  // ===== CUSTOM SELLING BRAND STATE =====
+  const [showCustomSellingBrandInput, setShowCustomSellingBrandInput] = useState(false);
+  const [customSellingBrand, setCustomSellingBrand] = useState("");
+  const [customSellingPrice, setCustomSellingPrice] = useState("");
+  
+  // ===== CUSTOM STOVE/REGULATOR STATE =====
+  const [showCustomStoveInput, setShowCustomStoveInput] = useState(false);
+  const [customStove, setCustomStove] = useState({ brand: "", burners: 1, price: "" });
+  const [showCustomRegulatorInput, setShowCustomRegulatorInput] = useState(false);
+  const [customRegulator, setCustomRegulator] = useState({ brand: "", type: "22mm", price: "" });
+  
+  // ===== CUSTOM WEIGHT STATE =====
+  const [showCustomWeightInput, setShowCustomWeightInput] = useState(false);
+  const [customWeight, setCustomWeight] = useState("");
+  
   // ===== CUSTOMER STATE =====
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>("walkin");
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
@@ -537,7 +552,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
     ));
   };
 
-  // ============= CUSTOM BRAND HANDLER =============
+  // ============= CUSTOM BRAND HANDLER (RETURN) =============
   const handleAddCustomBrand = async () => {
     if (!customReturnBrand.trim()) {
       toast({ title: "Enter brand name", variant: "destructive" });
@@ -603,6 +618,238 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     }
+  };
+
+  // ============= CUSTOM SELLING BRAND HANDLER =============
+  const handleAddCustomSellingBrand = async () => {
+    if (!customSellingBrand.trim()) {
+      toast({ title: "Enter brand name", variant: "destructive" });
+      return;
+    }
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const { data: ownerId } = await supabase.rpc("get_owner_id");
+      const price = parsePositiveNumber(customSellingPrice, 10000000) || 0;
+
+      // Create new brand with stock
+      const { data: newBrand, error: brandError } = await supabase
+        .from('lpg_brands')
+        .insert({
+          name: sanitizeString(customSellingBrand),
+          size: mouthSize,
+          weight: weight,
+          color: '#6b7280',
+          package_cylinder: cylinderType === 'package' ? 10 : 0,
+          refill_cylinder: cylinderType === 'refill' ? 10 : 0,
+          empty_cylinder: 0,
+          problem_cylinder: 0,
+          created_by: user.id,
+          owner_id: ownerId || user.id
+        })
+        .select()
+        .single();
+
+      if (brandError) throw brandError;
+
+      // Create pricing entries
+      await supabase.from('product_prices').insert([
+        {
+          product_type: 'lpg',
+          product_name: `${customSellingBrand} ${weight}`,
+          brand_id: newBrand.id,
+          size: weight,
+          variant: 'Refill',
+          company_price: 0,
+          distributor_price: price * 0.95,
+          retail_price: price,
+          package_price: 0,
+          created_by: user.id,
+          owner_id: ownerId || user.id
+        },
+        {
+          product_type: 'lpg',
+          product_name: `${customSellingBrand} ${weight}`,
+          brand_id: newBrand.id,
+          size: weight,
+          variant: 'Package',
+          company_price: 0,
+          distributor_price: price * 0.95,
+          retail_price: price,
+          package_price: price + 1500,
+          created_by: user.id,
+          owner_id: ownerId || user.id
+        }
+      ]);
+
+      // Add to cart
+      const newItem: SaleItem = {
+        id: `lpg-${Date.now()}`,
+        type: 'lpg',
+        name: newBrand.name,
+        details: `${weight} • ${cylinderType === 'refill' ? 'Refill' : 'Package'} • ${saleType}`,
+        price: cylinderType === 'package' ? price + 1500 : price,
+        quantity: 1,
+        cylinderType,
+        brandId: newBrand.id,
+        weight,
+        mouthSize,
+        brandColor: newBrand.color
+      };
+      setSaleItems([...saleItems, newItem]);
+
+      toast({ title: "Custom brand created & added to cart" });
+      setShowCustomSellingBrandInput(false);
+      setCustomSellingBrand("");
+      setCustomSellingPrice("");
+      await fetchData();
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+  };
+
+  // ============= CUSTOM STOVE HANDLER =============
+  const handleAddCustomStove = async () => {
+    if (!customStove.brand.trim()) {
+      toast({ title: "Enter stove brand", variant: "destructive" });
+      return;
+    }
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const { data: ownerId } = await supabase.rpc("get_owner_id");
+      const price = parsePositiveNumber(customStove.price, 10000000) || 0;
+      const burnerLabel = customStove.burners === 1 ? "Single Burner" : "Double Burner";
+
+      // Create stove
+      const { data: newStove, error: stoveError } = await supabase
+        .from('stoves')
+        .insert({
+          brand: sanitizeString(customStove.brand),
+          model: burnerLabel,
+          burners: customStove.burners,
+          quantity: 5,
+          price: price,
+          created_by: user.id,
+          owner_id: ownerId || user.id
+        })
+        .select()
+        .single();
+
+      if (stoveError) throw stoveError;
+
+      // Create pricing entry
+      await supabase.from('product_prices').insert({
+        product_type: 'stove',
+        product_name: `${customStove.brand} ${burnerLabel}`,
+        company_price: 0,
+        distributor_price: price * 0.9,
+        retail_price: price,
+        package_price: price,
+        created_by: user.id,
+        owner_id: ownerId || user.id
+      });
+
+      // Add to cart
+      const newItem: SaleItem = {
+        id: `stove-${Date.now()}`,
+        type: 'stove',
+        name: `${newStove.brand} ${newStove.model}`,
+        details: `${newStove.burners} Burner`,
+        price,
+        quantity: 1,
+        stoveId: newStove.id
+      };
+      setSaleItems([...saleItems, newItem]);
+
+      toast({ title: "Custom stove created & added to cart" });
+      setShowCustomStoveInput(false);
+      setCustomStove({ brand: "", burners: 1, price: "" });
+      await fetchData();
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+  };
+
+  // ============= CUSTOM REGULATOR HANDLER =============
+  const handleAddCustomRegulator = async () => {
+    if (!customRegulator.brand.trim()) {
+      toast({ title: "Enter regulator brand", variant: "destructive" });
+      return;
+    }
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const { data: ownerId } = await supabase.rpc("get_owner_id");
+      const price = parsePositiveNumber(customRegulator.price, 10000000) || 0;
+
+      // Create regulator
+      const { data: newRegulator, error: regError } = await supabase
+        .from('regulators')
+        .insert({
+          brand: sanitizeString(customRegulator.brand),
+          type: customRegulator.type,
+          quantity: 5,
+          price: price,
+          created_by: user.id,
+          owner_id: ownerId || user.id
+        })
+        .select()
+        .single();
+
+      if (regError) throw regError;
+
+      // Create pricing entry
+      await supabase.from('product_prices').insert({
+        product_type: 'regulator',
+        product_name: `${customRegulator.brand} ${customRegulator.type}`,
+        company_price: 0,
+        distributor_price: price * 0.9,
+        retail_price: price,
+        package_price: price,
+        created_by: user.id,
+        owner_id: ownerId || user.id
+      });
+
+      // Add to cart
+      const newItem: SaleItem = {
+        id: `reg-${Date.now()}`,
+        type: 'regulator',
+        name: newRegulator.brand,
+        details: newRegulator.type,
+        price,
+        quantity: 1,
+        regulatorId: newRegulator.id
+      };
+      setSaleItems([...saleItems, newItem]);
+
+      toast({ title: "Custom regulator created & added to cart" });
+      setShowCustomRegulatorInput(false);
+      setCustomRegulator({ brand: "", type: "22mm", price: "" });
+      await fetchData();
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+  };
+
+  // ============= CUSTOM WEIGHT HANDLER =============
+  const handleAddCustomWeight = () => {
+    if (!customWeight.trim()) {
+      toast({ title: "Enter weight", variant: "destructive" });
+      return;
+    }
+    const weightVal = customWeight.trim().toLowerCase().replace(/\s/g, '');
+    const normalizedWeight = weightVal.includes('kg') ? weightVal : `${weightVal}kg`;
+    setWeight(normalizedWeight);
+    setShowCustomWeightInput(false);
+    setCustomWeight("");
+    toast({ title: `Weight set to ${normalizedWeight}` });
   };
 
   // ============= CUSTOMER ACTIONS =============
@@ -1173,6 +1420,14 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                 {w}
               </Button>
             ))}
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 text-xs px-2"
+              onClick={() => setShowCustomWeightInput(true)}
+            >
+              <Plus className="h-3 w-3 mr-1" />Other
+            </Button>
           </div>
         </div>
 
@@ -1276,6 +1531,20 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                         </div>
                       </button>
                     )}
+                    {/* Custom Brand for Sale */}
+                    {activeTable === 'sale' && (
+                      <button
+                        onClick={() => setShowCustomSellingBrandInput(true)}
+                        className="p-2.5 rounded-lg border-2 border-dashed border-muted-foreground/30 hover:border-emerald-500/50 bg-card text-left transition-all"
+                      >
+                        <div className="flex items-center justify-center h-full min-h-[60px]">
+                          <div className="text-center">
+                            <Plus className="h-5 w-5 mx-auto text-emerald-600 mb-1" />
+                            <p className="text-xs text-emerald-600">Add New</p>
+                          </div>
+                        </div>
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -1313,6 +1582,18 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                         </button>
                       );
                     })}
+                    {/* Custom Stove Button */}
+                    <button
+                      onClick={() => setShowCustomStoveInput(true)}
+                      className="p-2.5 rounded-lg border-2 border-dashed border-muted-foreground/30 hover:border-orange-500/50 bg-card text-left transition-all"
+                    >
+                      <div className="flex items-center justify-center h-full min-h-[60px]">
+                        <div className="text-center">
+                          <Plus className="h-5 w-5 mx-auto text-orange-500 mb-1" />
+                          <p className="text-xs text-orange-500">Add Stove</p>
+                        </div>
+                      </div>
+                    </button>
                   </div>
                 </div>
               )}
@@ -1350,6 +1631,18 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                         </button>
                       );
                     })}
+                    {/* Custom Regulator Button */}
+                    <button
+                      onClick={() => setShowCustomRegulatorInput(true)}
+                      className="p-2.5 rounded-lg border-2 border-dashed border-muted-foreground/30 hover:border-violet-500/50 bg-card text-left transition-all"
+                    >
+                      <div className="flex items-center justify-center h-full min-h-[60px]">
+                        <div className="text-center">
+                          <Plus className="h-5 w-5 mx-auto text-violet-500 mb-1" />
+                          <p className="text-xs text-violet-500">Add Regulator</p>
+                        </div>
+                      </div>
+                    </button>
                   </div>
                 </div>
               )}
@@ -1565,6 +1858,178 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowCustomBrandInput(false)}>Cancel</Button>
               <Button onClick={handleAddCustomBrand}>Add</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Custom Selling Brand Dialog */}
+        <Dialog open={showCustomSellingBrandInput} onOpenChange={setShowCustomSellingBrandInput}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Add Custom LPG Brand</DialogTitle>
+              <DialogDescription>Create a new brand and add to cart.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div>
+                <Label>Brand Name *</Label>
+                <Input
+                  value={customSellingBrand}
+                  onChange={(e) => setCustomSellingBrand(e.target.value)}
+                  placeholder="Enter brand name"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <Label>Retail Price ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
+                <Input
+                  type="number"
+                  value={customSellingPrice}
+                  onChange={(e) => setCustomSellingPrice(e.target.value)}
+                  placeholder="1450"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Weight: {weight} | Size: {mouthSize} | Type: {cylinderType}
+              </p>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowCustomSellingBrandInput(false)}>Cancel</Button>
+              <Button onClick={handleAddCustomSellingBrand}>Create & Add</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Custom Stove Dialog */}
+        <Dialog open={showCustomStoveInput} onOpenChange={setShowCustomStoveInput}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Add Custom Stove</DialogTitle>
+              <DialogDescription>Create a new stove and add to cart.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div>
+                <Label>Brand Name *</Label>
+                <Input
+                  value={customStove.brand}
+                  onChange={(e) => setCustomStove({ ...customStove, brand: e.target.value })}
+                  placeholder="RFL, Walton, etc."
+                  autoFocus
+                />
+              </div>
+              <div>
+                <Label>Burner Type</Label>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant={customStove.burners === 1 ? "default" : "outline"}
+                    className="flex-1"
+                    onClick={() => setCustomStove({ ...customStove, burners: 1 })}
+                  >
+                    Single
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={customStove.burners === 2 ? "default" : "outline"}
+                    className="flex-1"
+                    onClick={() => setCustomStove({ ...customStove, burners: 2 })}
+                  >
+                    Double
+                  </Button>
+                </div>
+              </div>
+              <div>
+                <Label>Price ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
+                <Input
+                  type="number"
+                  value={customStove.price}
+                  onChange={(e) => setCustomStove({ ...customStove, price: e.target.value })}
+                  placeholder="2500"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowCustomStoveInput(false)}>Cancel</Button>
+              <Button onClick={handleAddCustomStove}>Create & Add</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Custom Regulator Dialog */}
+        <Dialog open={showCustomRegulatorInput} onOpenChange={setShowCustomRegulatorInput}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Add Custom Regulator</DialogTitle>
+              <DialogDescription>Create a new regulator and add to cart.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div>
+                <Label>Brand Name *</Label>
+                <Input
+                  value={customRegulator.brand}
+                  onChange={(e) => setCustomRegulator({ ...customRegulator, brand: e.target.value })}
+                  placeholder="IGT, RFL, etc."
+                  autoFocus
+                />
+              </div>
+              <div>
+                <Label>Size Type</Label>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant={customRegulator.type === "22mm" ? "default" : "outline"}
+                    className="flex-1"
+                    onClick={() => setCustomRegulator({ ...customRegulator, type: "22mm" })}
+                  >
+                    22mm
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={customRegulator.type === "20mm" ? "default" : "outline"}
+                    className="flex-1"
+                    onClick={() => setCustomRegulator({ ...customRegulator, type: "20mm" })}
+                  >
+                    20mm
+                  </Button>
+                </div>
+              </div>
+              <div>
+                <Label>Price ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
+                <Input
+                  type="number"
+                  value={customRegulator.price}
+                  onChange={(e) => setCustomRegulator({ ...customRegulator, price: e.target.value })}
+                  placeholder="500"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowCustomRegulatorInput(false)}>Cancel</Button>
+              <Button onClick={handleAddCustomRegulator}>Create & Add</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Custom Weight Dialog */}
+        <Dialog open={showCustomWeightInput} onOpenChange={setShowCustomWeightInput}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Custom Weight</DialogTitle>
+              <DialogDescription>Enter a non-standard cylinder weight.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <Input
+                value={customWeight}
+                onChange={(e) => setCustomWeight(e.target.value)}
+                placeholder="e.g., 8kg, 18kg"
+                autoFocus
+              />
+              <p className="text-xs text-muted-foreground">
+                Enter weight with or without "kg" suffix
+              </p>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowCustomWeightInput(false)}>Cancel</Button>
+              <Button onClick={handleAddCustomWeight}>Set Weight</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
