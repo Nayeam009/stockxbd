@@ -1027,8 +1027,8 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
             />
           </div>
           
-          {/* Stepper Buttons - Two Rows for Better Touch */}
-          <div className="grid grid-cols-4 gap-2">
+          {/* Stepper Buttons */}
+          <div className="grid grid-cols-2 gap-2">
             <Button
               type="button"
               variant="outline"
@@ -1036,22 +1036,6 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
               onClick={() => onChange(Math.max(0, value - 10))}
             >
               -10
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              className={`h-12 w-full ${borderColor}`}
-              onClick={() => onChange(Math.max(0, value - 1))}
-            >
-              <Minus className="h-5 w-5" />
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              className={`h-12 w-full ${borderColor}`}
-              onClick={() => onChange(value + 1)}
-            >
-              <Plus className="h-5 w-5" />
             </Button>
             <Button
               type="button"
