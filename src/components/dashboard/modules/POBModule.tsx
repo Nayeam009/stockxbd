@@ -19,15 +19,13 @@ import {
   Cylinder,
   CheckCircle2,
   Building2,
-  PackagePlus,
   Undo2,
-  ArrowDownToLine,
   RotateCcw,
   Calculator,
   Sparkles,
   Save,
-  ArrowLeftRight,
-  Fuel
+  Fuel,
+  ArrowDown
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -136,13 +134,6 @@ interface POBModuleProps {
   userName?: string;
 }
 
-// Role display config
-const ROLE_CONFIG: Record<string, { label: string; color: string; bgColor: string }> = {
-  owner: { label: 'Owner', color: 'text-indigo-700 dark:text-indigo-300', bgColor: 'bg-indigo-100 dark:bg-indigo-900/40 border-indigo-300 dark:border-indigo-700' },
-  manager: { label: 'Manager', color: 'text-blue-700 dark:text-blue-300', bgColor: 'bg-blue-100 dark:bg-blue-900/40 border-blue-300 dark:border-blue-700' },
-  driver: { label: 'Driver', color: 'text-amber-700 dark:text-amber-300', bgColor: 'bg-amber-100 dark:bg-amber-900/40 border-amber-300 dark:border-amber-700' },
-};
-
 // ============= MAIN POB MODULE =============
 export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModuleProps) => {
   const { t, language } = useLanguage();
@@ -156,7 +147,7 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
   const [regulators, setRegulators] = useState<Regulator[]>([]);
   const [productPrices, setProductPrices] = useState<ProductPrice[]>([]);
   
-  // ===== ACTIVE TABLE (like POS) =====
+  // ===== ACTIVE TAB =====
   const [activeTab, setActiveTab] = useState<'lpg' | 'stove' | 'regulator'>('lpg');
   
   // ===== LPG CONFIGURATION STATE =====
@@ -328,7 +319,6 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
     if (existingBrand) {
       brandId = existingBrand.id;
     } else {
-      // Create new brand entry
       const { data: newBrand, error } = await supabase
         .from('lpg_brands')
         .insert({
@@ -381,7 +371,6 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
       description: `${lpgQuantity}x ${effectiveBrand} @ ${BANGLADESHI_CURRENCY_SYMBOL}${companyPrice}/pc` 
     });
 
-    // Reset form
     resetLPGForm();
   };
 
@@ -396,7 +385,6 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
     const companyPrice = stoveCompanyPrice;
     const burners = stoveBurnerType === 'single' ? 1 : 2;
 
-    // Find or create stove in inventory
     let stoveId = "";
     const existingStove = stoves.find(s => 
       s.brand.toLowerCase() === effectiveBrand.toLowerCase() && 
@@ -425,7 +413,6 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
       stoveId = newStove.id;
     }
 
-    // Update product pricing
     await updateProductPricing('stove', `${effectiveBrand} ${stoveModel}`, companyPrice, {
       burnerType: stoveBurnerType
     });
@@ -462,7 +449,6 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
 
     const companyPrice = regulatorCompanyPrice;
 
-    // Find or create regulator in inventory
     let regId = "";
     const existingReg = regulators.find(r => 
       r.brand.toLowerCase() === effectiveBrand.toLowerCase() && 
@@ -490,7 +476,6 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
       regId = newReg.id;
     }
 
-    // Update product pricing
     await updateProductPricing('regulator', `${effectiveBrand} ${effectiveType}`, companyPrice, {
       regulatorType: effectiveType
     });
@@ -865,198 +850,146 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
   // ============= LOADING STATE =============
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
-        <span className="ml-2 text-muted-foreground">Loading POB...</span>
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center space-y-3">
+          <Loader2 className="h-10 w-10 animate-spin text-primary mx-auto" />
+          <p className="text-sm text-muted-foreground">Loading POB...</p>
+        </div>
       </div>
     );
   }
 
   // ============= RENDER =============
   return (
-    <div className="space-y-3 pb-28 lg:pb-4">
+    <div className="min-h-screen pb-32 lg:pb-6">
       {/* ===== HEADER ===== */}
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-            <ArrowDownToLine className="h-4 w-4 text-white" />
+      <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm border-b border-border -mx-3 sm:-mx-4 px-3 sm:px-4 py-3 mb-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-lg">
+              <ArrowDown className="h-5 w-5 sm:h-6 sm:w-6 text-primary-foreground" />
+            </div>
+            <div>
+              <h1 className="text-lg sm:text-xl font-bold text-foreground">Point of Buy</h1>
+              <p className="text-xs text-muted-foreground hidden sm:block">Purchase inventory from suppliers</p>
+            </div>
           </div>
-          <h1 className="text-lg font-bold">Point of Buy</h1>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <Badge className="bg-indigo-600 text-white h-8 px-3 text-sm">
-            <ShoppingBag className="h-3.5 w-3.5 mr-1.5" />
-            Cart ({purchaseItemsCount})
-          </Badge>
-          {purchaseItems.length > 0 && (
-            <Button onClick={clearCart} variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive">
-              <RotateCcw className="h-4 w-4" />
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {purchaseItems.length > 0 && (
+              <Button onClick={clearCart} variant="ghost" size="icon" className="h-9 w-9 text-destructive hover:text-destructive hover:bg-destructive/10">
+                <RotateCcw className="h-4 w-4" />
+              </Button>
+            )}
+            <Badge className="h-9 px-3 bg-primary text-primary-foreground font-medium gap-1.5">
+              <ShoppingBag className="h-4 w-4" />
+              <span>{purchaseItemsCount}</span>
+            </Badge>
+          </div>
         </div>
       </div>
 
-      {/* ===== PURCHASE CART TABLE (Like POS Sale Table) ===== */}
-      <Card className="border-2 border-indigo-200 dark:border-indigo-900">
-        <CardHeader className="py-2 px-3 bg-indigo-50 dark:bg-indigo-950/30">
-          <CardTitle className="flex items-center justify-between text-sm">
-            <span className="flex items-center gap-2">
-              <ShoppingBag className="h-4 w-4 text-indigo-600" />
-              Purchase Cart
-            </span>
-            <div className="flex items-center gap-2">
-              <Badge className="bg-indigo-600">{purchaseItemsCount}</Badge>
-              {total > 0 && (
-                <span className="text-sm font-bold text-indigo-700 dark:text-indigo-300">
-                  {BANGLADESHI_CURRENCY_SYMBOL}{total.toLocaleString()}
-                </span>
-              )}
-            </div>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-2">
-          <ScrollArea className="h-[120px] sm:h-[140px]">
-            {purchaseItems.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-muted-foreground py-6">
-                <ShoppingBag className="h-8 w-8 opacity-30 mb-2" />
-                <p className="text-xs">Add products below to cart</p>
-              </div>
-            ) : (
-              <div className="space-y-1.5">
-                {purchaseItems.map(item => (
-                  <div key={item.id} className="flex items-center gap-2 p-2 rounded-lg bg-card border">
-                    <div 
-                      className="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0"
-                      style={{ backgroundColor: item.brandColor ? `${item.brandColor}20` : '#e0e7ff' }}
-                    >
-                      {item.type === 'lpg' && <Cylinder className="h-4 w-4" style={{ color: item.brandColor || '#6366f1' }} />}
-                      {item.type === 'stove' && <ChefHat className="h-4 w-4 text-amber-600" />}
-                      {item.type === 'regulator' && <Gauge className="h-4 w-4 text-blue-600" />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{item.name}</p>
-                      <p className="text-xs text-muted-foreground truncate">{item.details}</p>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 w-7 p-0"
-                        onClick={() => updateItemQuantity(item.id, -1)}
-                      >
-                        <Minus className="h-3 w-3" />
-                      </Button>
-                      <span className="w-6 text-center text-sm font-medium">{item.quantity}</span>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 w-7 p-0"
-                        onClick={() => updateItemQuantity(item.id, 1)}
-                      >
-                        <Plus className="h-3 w-3" />
-                      </Button>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-bold">{BANGLADESHI_CURRENCY_SYMBOL}{(item.companyPrice * item.quantity).toLocaleString()}</p>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 w-7 p-0 text-destructive"
-                      onClick={() => removeItem(item.id)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </ScrollArea>
-        </CardContent>
-      </Card>
-
-      {/* ===== PRODUCT TYPE TABS (Like POS) ===== */}
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 h-11">
-          <TabsTrigger value="lpg" className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white">
-            <Fuel className="h-4 w-4 mr-2" />
-            LPG Cylinder
-          </TabsTrigger>
-          <TabsTrigger value="stove" className="data-[state=active]:bg-amber-500 data-[state=active]:text-white">
-            <ChefHat className="h-4 w-4 mr-2" />
-            Gas Stove
-          </TabsTrigger>
-          <TabsTrigger value="regulator" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
-            <Gauge className="h-4 w-4 mr-2" />
-            Regulator
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
-
-      {/* ===== MAIN CONTENT: 2 COLUMN LAYOUT ===== */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+      {/* ===== MAIN LAYOUT ===== */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         
-        {/* LEFT: Product Configuration Form */}
-        <div className="lg:col-span-2">
+        {/* LEFT COLUMN: Product Selection */}
+        <div className="lg:col-span-5 space-y-4">
+          {/* Product Type Tabs */}
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'lpg' | 'stove' | 'regulator')} className="w-full">
+            <TabsList className="w-full h-12 p-1 bg-muted/50 grid grid-cols-3 gap-1">
+              <TabsTrigger 
+                value="lpg" 
+                className="h-full data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg gap-1.5 text-xs sm:text-sm font-medium"
+              >
+                <Cylinder className="h-4 w-4" />
+                <span className="hidden xs:inline">LPG</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="stove" 
+                className="h-full data-[state=active]:bg-warning data-[state=active]:text-warning-foreground rounded-lg gap-1.5 text-xs sm:text-sm font-medium"
+              >
+                <ChefHat className="h-4 w-4" />
+                <span className="hidden xs:inline">Stove</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="regulator" 
+                className="h-full data-[state=active]:bg-info data-[state=active]:text-info-foreground rounded-lg gap-1.5 text-xs sm:text-sm font-medium"
+              >
+                <Gauge className="h-4 w-4" />
+                <span className="hidden xs:inline">Regulator</span>
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+
           {/* LPG FORM */}
           {activeTab === 'lpg' && (
-            <Card className="border-2 border-indigo-200 dark:border-indigo-900">
-              <CardHeader className="py-2 px-3 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-950/30 dark:to-purple-950/30">
-                <CardTitle className="flex items-center gap-2 text-sm">
-                  <Fuel className="h-4 w-4 text-indigo-600" />
+            <Card className="border-primary/20 shadow-sm">
+              <CardHeader className="py-3 px-4 bg-primary/5 border-b border-primary/10">
+                <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                  <Fuel className="h-5 w-5 text-primary" />
                   LPG Cylinder Purchase
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-3 space-y-3">
+              <CardContent className="p-4 space-y-4">
                 {/* Valve Size */}
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    variant={lpgValveSize === "22mm" ? "default" : "outline"}
-                    className={`h-10 ${lpgValveSize === "22mm" ? "bg-indigo-600" : ""}`}
-                    onClick={() => { setLpgValveSize("22mm"); setLpgWeight("12kg"); }}
-                  >
-                    22mm Valve
-                  </Button>
-                  <Button
-                    variant={lpgValveSize === "20mm" ? "default" : "outline"}
-                    className={`h-10 ${lpgValveSize === "20mm" ? "bg-indigo-600" : ""}`}
-                    onClick={() => { setLpgValveSize("20mm"); setLpgWeight("12kg"); }}
-                  >
-                    20mm Valve
-                  </Button>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Valve Size</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      type="button"
+                      variant={lpgValveSize === "22mm" ? "default" : "outline"}
+                      className="h-11 font-medium"
+                      onClick={() => { setLpgValveSize("22mm"); setLpgWeight("12kg"); }}
+                    >
+                      22mm
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={lpgValveSize === "20mm" ? "default" : "outline"}
+                      className="h-11 font-medium"
+                      onClick={() => { setLpgValveSize("20mm"); setLpgWeight("12kg"); }}
+                    >
+                      20mm
+                    </Button>
+                  </div>
                 </div>
 
                 {/* Cylinder Type */}
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    variant={lpgCylinderType === "refill" ? "default" : "outline"}
-                    className={`h-10 ${lpgCylinderType === "refill" ? "bg-emerald-600" : ""}`}
-                    onClick={() => setLpgCylinderType("refill")}
-                  >
-                    <RotateCcw className="h-4 w-4 mr-2" />
-                    Refill
-                  </Button>
-                  <Button
-                    variant={lpgCylinderType === "package" ? "default" : "outline"}
-                    className={`h-10 ${lpgCylinderType === "package" ? "bg-amber-500" : ""}`}
-                    onClick={() => setLpgCylinderType("package")}
-                  >
-                    <Package className="h-4 w-4 mr-2" />
-                    Package (New)
-                  </Button>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Type</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      type="button"
+                      variant={lpgCylinderType === "refill" ? "success" : "outline"}
+                      className="h-11 font-medium gap-2"
+                      onClick={() => setLpgCylinderType("refill")}
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                      Refill
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={lpgCylinderType === "package" ? "warning" : "outline"}
+                      className="h-11 font-medium gap-2"
+                      onClick={() => setLpgCylinderType("package")}
+                    >
+                      <Package className="h-4 w-4" />
+                      Package
+                    </Button>
+                  </div>
                 </div>
 
-                {/* Brand Selection with Custom Option */}
-                <div className="space-y-1.5">
+                {/* Brand Selection */}
+                <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <Label className="text-sm font-medium">Brand Name</Label>
                     <Button
+                      type="button"
                       variant="ghost"
                       size="sm"
-                      className="h-6 px-2 text-xs text-indigo-600"
+                      className="h-7 px-2 text-xs text-primary hover:text-primary"
                       onClick={() => setShowCustomLpgBrand(!showCustomLpgBrand)}
                     >
-                      {showCustomLpgBrand ? "Select from list" : "+ Custom Brand"}
+                      {showCustomLpgBrand ? "← Select" : "+ Custom"}
                     </Button>
                   </div>
                   {showCustomLpgBrand ? (
@@ -1064,11 +997,11 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
                       placeholder="Enter custom brand name..."
                       value={customLpgBrand}
                       onChange={(e) => setCustomLpgBrand(e.target.value)}
-                      className="h-10"
+                      className="h-11"
                     />
                   ) : (
                     <Select value={lpgBrandName} onValueChange={setLpgBrandName}>
-                      <SelectTrigger className="h-10">
+                      <SelectTrigger className="h-11">
                         <SelectValue placeholder="Select brand..." />
                       </SelectTrigger>
                       <SelectContent>
@@ -1080,17 +1013,18 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
                   )}
                 </div>
 
-                {/* Weight Selection with Custom Option */}
-                <div className="space-y-1.5">
+                {/* Weight Selection */}
+                <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <Label className="text-sm font-medium">Weight</Label>
                     <Button
+                      type="button"
                       variant="ghost"
                       size="sm"
-                      className="h-6 px-2 text-xs text-indigo-600"
+                      className="h-7 px-2 text-xs text-primary hover:text-primary"
                       onClick={() => setShowCustomLpgWeight(!showCustomLpgWeight)}
                     >
-                      {showCustomLpgWeight ? "Select from list" : "+ Custom Weight"}
+                      {showCustomLpgWeight ? "← Select" : "+ Custom"}
                     </Button>
                   </div>
                   {showCustomLpgWeight ? (
@@ -1098,11 +1032,11 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
                       placeholder="e.g., 15kg"
                       value={customLpgWeight}
                       onChange={(e) => setCustomLpgWeight(e.target.value)}
-                      className="h-10"
+                      className="h-11"
                     />
                   ) : (
                     <Select value={lpgWeight} onValueChange={setLpgWeight}>
-                      <SelectTrigger className="h-10">
+                      <SelectTrigger className="h-11">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -1116,64 +1050,70 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
 
                 {/* Quantity & Total DO */}
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
+                  <div className="space-y-2">
                     <Label className="text-sm font-medium">Quantity</Label>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1">
                       <Button
+                        type="button"
                         variant="outline"
-                        size="sm"
-                        className="h-10 w-10 p-0"
+                        size="icon"
+                        className="h-11 w-11 shrink-0"
                         onClick={() => setLpgQuantity(Math.max(1, lpgQuantity - 1))}
                       >
                         <Minus className="h-4 w-4" />
                       </Button>
                       <Input
                         type="number"
+                        inputMode="numeric"
                         value={lpgQuantity}
                         onChange={(e) => setLpgQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                        className="h-10 text-center"
+                        className="h-11 text-center font-semibold"
                       />
                       <Button
+                        type="button"
                         variant="outline"
-                        size="sm"
-                        className="h-10 w-10 p-0"
+                        size="icon"
+                        className="h-11 w-11 shrink-0"
                         onClick={() => setLpgQuantity(lpgQuantity + 1)}
                       >
                         <Plus className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-sm font-medium">Total D.O. Amount ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Total D.O. ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
                     <Input
                       type="number"
-                      placeholder="Total amount paid..."
+                      inputMode="numeric"
+                      placeholder="Amount paid..."
                       value={lpgTotalDO || ""}
                       onChange={(e) => setLpgTotalDO(parseInt(e.target.value) || 0)}
-                      className="h-10"
+                      className="h-11"
                     />
                   </div>
                 </div>
 
                 {/* Auto-calculated Company Price */}
-                <div className="flex items-center justify-between p-3 bg-gradient-to-r from-indigo-100 to-purple-100 dark:from-indigo-900/50 dark:to-purple-900/50 rounded-lg">
+                <div className="flex items-center justify-between p-3.5 bg-primary/10 rounded-xl border border-primary/20">
                   <div className="flex items-center gap-2">
-                    <Calculator className="h-4 w-4 text-indigo-600" />
-                    <span className="text-sm font-medium">Company Price (per unit)</span>
+                    <Calculator className="h-4 w-4 text-primary" />
+                    <span className="text-sm font-medium text-foreground">Unit Price</span>
                   </div>
-                  <span className="text-lg font-bold text-indigo-700 dark:text-indigo-300">
+                  <span className="text-xl font-bold text-primary">
                     {BANGLADESHI_CURRENCY_SYMBOL}{lpgCompanyPrice.toLocaleString()}
                   </span>
                 </div>
 
                 {/* Add to Cart Button */}
                 <Button
-                  className="w-full h-12 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-medium"
+                  type="button"
+                  size="lg"
+                  className="w-full h-12 font-semibold"
                   onClick={addLPGToCart}
                   disabled={!getEffectiveLpgBrand() || lpgQuantity <= 0 || lpgTotalDO <= 0}
                 >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add LPG to Cart
+                  <Plus className="h-5 w-5 mr-2" />
+                  Add to Cart
                 </Button>
               </CardContent>
             </Card>
@@ -1181,25 +1121,26 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
 
           {/* STOVE FORM */}
           {activeTab === 'stove' && (
-            <Card className="border-2 border-amber-200 dark:border-amber-900">
-              <CardHeader className="py-2 px-3 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30">
-                <CardTitle className="flex items-center gap-2 text-sm">
-                  <ChefHat className="h-4 w-4 text-amber-600" />
+            <Card className="border-warning/20 shadow-sm">
+              <CardHeader className="py-3 px-4 bg-warning/5 border-b border-warning/10">
+                <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                  <ChefHat className="h-5 w-5 text-warning" />
                   Gas Stove Purchase
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-3 space-y-3">
-                {/* Brand Selection with Custom Option */}
-                <div className="space-y-1.5">
+              <CardContent className="p-4 space-y-4">
+                {/* Brand Selection */}
+                <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <Label className="text-sm font-medium">Brand Name</Label>
                     <Button
+                      type="button"
                       variant="ghost"
                       size="sm"
-                      className="h-6 px-2 text-xs text-amber-600"
+                      className="h-7 px-2 text-xs text-warning hover:text-warning"
                       onClick={() => setShowCustomStoveBrand(!showCustomStoveBrand)}
                     >
-                      {showCustomStoveBrand ? "Select from list" : "+ Custom Brand"}
+                      {showCustomStoveBrand ? "← Select" : "+ Custom"}
                     </Button>
                   </div>
                   {showCustomStoveBrand ? (
@@ -1207,11 +1148,11 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
                       placeholder="Enter custom brand name..."
                       value={customStoveBrand}
                       onChange={(e) => setCustomStoveBrand(e.target.value)}
-                      className="h-10"
+                      className="h-11"
                     />
                   ) : (
                     <Select value={stoveBrand} onValueChange={setStoveBrand}>
-                      <SelectTrigger className="h-10">
+                      <SelectTrigger className="h-11">
                         <SelectValue placeholder="Select brand..." />
                       </SelectTrigger>
                       <SelectContent>
@@ -1224,94 +1165,106 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
                 </div>
 
                 {/* Model Number */}
-                <div className="space-y-1.5">
+                <div className="space-y-2">
                   <Label className="text-sm font-medium">Model Number</Label>
                   <Input
                     placeholder="e.g., RFL-101, Walton GS-01..."
                     value={stoveModel}
                     onChange={(e) => setStoveModel(e.target.value)}
-                    className="h-10"
+                    className="h-11"
                   />
                 </div>
 
                 {/* Burner Type */}
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    variant={stoveBurnerType === "single" ? "default" : "outline"}
-                    className={`h-10 ${stoveBurnerType === "single" ? "bg-amber-500" : ""}`}
-                    onClick={() => setStoveBurnerType("single")}
-                  >
-                    Single Burner
-                  </Button>
-                  <Button
-                    variant={stoveBurnerType === "double" ? "default" : "outline"}
-                    className={`h-10 ${stoveBurnerType === "double" ? "bg-amber-500" : ""}`}
-                    onClick={() => setStoveBurnerType("double")}
-                  >
-                    Double Burner
-                  </Button>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Burner Type</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      type="button"
+                      variant={stoveBurnerType === "single" ? "warning" : "outline"}
+                      className="h-11 font-medium"
+                      onClick={() => setStoveBurnerType("single")}
+                    >
+                      Single Burner
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={stoveBurnerType === "double" ? "warning" : "outline"}
+                      className="h-11 font-medium"
+                      onClick={() => setStoveBurnerType("double")}
+                    >
+                      Double Burner
+                    </Button>
+                  </div>
                 </div>
 
                 {/* Quantity & Total Amount */}
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
+                  <div className="space-y-2">
                     <Label className="text-sm font-medium">Quantity</Label>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1">
                       <Button
+                        type="button"
                         variant="outline"
-                        size="sm"
-                        className="h-10 w-10 p-0"
+                        size="icon"
+                        className="h-11 w-11 shrink-0"
                         onClick={() => setStoveQuantity(Math.max(1, stoveQuantity - 1))}
                       >
                         <Minus className="h-4 w-4" />
                       </Button>
                       <Input
                         type="number"
+                        inputMode="numeric"
                         value={stoveQuantity}
                         onChange={(e) => setStoveQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                        className="h-10 text-center"
+                        className="h-11 text-center font-semibold"
                       />
                       <Button
+                        type="button"
                         variant="outline"
-                        size="sm"
-                        className="h-10 w-10 p-0"
+                        size="icon"
+                        className="h-11 w-11 shrink-0"
                         onClick={() => setStoveQuantity(stoveQuantity + 1)}
                       >
                         <Plus className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-sm font-medium">Total Amount ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Total ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
                     <Input
                       type="number"
-                      placeholder="Total amount paid..."
+                      inputMode="numeric"
+                      placeholder="Amount paid..."
                       value={stoveTotalAmount || ""}
                       onChange={(e) => setStoveTotalAmount(parseInt(e.target.value) || 0)}
-                      className="h-10"
+                      className="h-11"
                     />
                   </div>
                 </div>
 
                 {/* Auto-calculated Company Price */}
-                <div className="flex items-center justify-between p-3 bg-gradient-to-r from-amber-100 to-orange-100 dark:from-amber-900/50 dark:to-orange-900/50 rounded-lg">
+                <div className="flex items-center justify-between p-3.5 bg-warning/10 rounded-xl border border-warning/20">
                   <div className="flex items-center gap-2">
-                    <Calculator className="h-4 w-4 text-amber-600" />
-                    <span className="text-sm font-medium">Company Price (per unit)</span>
+                    <Calculator className="h-4 w-4 text-warning" />
+                    <span className="text-sm font-medium text-foreground">Unit Price</span>
                   </div>
-                  <span className="text-lg font-bold text-amber-700 dark:text-amber-300">
+                  <span className="text-xl font-bold text-warning">
                     {BANGLADESHI_CURRENCY_SYMBOL}{stoveCompanyPrice.toLocaleString()}
                   </span>
                 </div>
 
                 {/* Add to Cart Button */}
                 <Button
-                  className="w-full h-12 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-medium"
+                  type="button"
+                  size="lg"
+                  variant="warning"
+                  className="w-full h-12 font-semibold"
                   onClick={addStoveToCart}
                   disabled={!getEffectiveStoveBrand() || !stoveModel || stoveQuantity <= 0 || stoveTotalAmount <= 0}
                 >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Stove to Cart
+                  <Plus className="h-5 w-5 mr-2" />
+                  Add to Cart
                 </Button>
               </CardContent>
             </Card>
@@ -1319,25 +1272,26 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
 
           {/* REGULATOR FORM */}
           {activeTab === 'regulator' && (
-            <Card className="border-2 border-blue-200 dark:border-blue-900">
-              <CardHeader className="py-2 px-3 bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-950/30 dark:to-cyan-950/30">
-                <CardTitle className="flex items-center gap-2 text-sm">
-                  <Gauge className="h-4 w-4 text-blue-600" />
+            <Card className="border-info/20 shadow-sm">
+              <CardHeader className="py-3 px-4 bg-info/5 border-b border-info/10">
+                <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                  <Gauge className="h-5 w-5 text-info" />
                   Regulator Purchase
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-3 space-y-3">
-                {/* Brand Selection with Custom Option */}
-                <div className="space-y-1.5">
+              <CardContent className="p-4 space-y-4">
+                {/* Brand Selection */}
+                <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <Label className="text-sm font-medium">Brand Name</Label>
                     <Button
+                      type="button"
                       variant="ghost"
                       size="sm"
-                      className="h-6 px-2 text-xs text-blue-600"
+                      className="h-7 px-2 text-xs text-info hover:text-info"
                       onClick={() => setShowCustomRegulatorBrand(!showCustomRegulatorBrand)}
                     >
-                      {showCustomRegulatorBrand ? "Select from list" : "+ Custom Brand"}
+                      {showCustomRegulatorBrand ? "← Select" : "+ Custom"}
                     </Button>
                   </div>
                   {showCustomRegulatorBrand ? (
@@ -1345,11 +1299,11 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
                       placeholder="Enter custom brand name..."
                       value={customRegulatorBrand}
                       onChange={(e) => setCustomRegulatorBrand(e.target.value)}
-                      className="h-10"
+                      className="h-11"
                     />
                   ) : (
                     <Select value={regulatorBrand} onValueChange={setRegulatorBrand}>
-                      <SelectTrigger className="h-10">
+                      <SelectTrigger className="h-11">
                         <SelectValue placeholder="Select brand..." />
                       </SelectTrigger>
                       <SelectContent>
@@ -1361,17 +1315,18 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
                   )}
                 </div>
 
-                {/* Valve Size with Custom Option */}
-                <div className="space-y-1.5">
+                {/* Valve Size */}
+                <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <Label className="text-sm font-medium">Valve Size</Label>
                     <Button
+                      type="button"
                       variant="ghost"
                       size="sm"
-                      className="h-6 px-2 text-xs text-blue-600"
+                      className="h-7 px-2 text-xs text-info hover:text-info"
                       onClick={() => setShowCustomRegulatorType(!showCustomRegulatorType)}
                     >
-                      {showCustomRegulatorType ? "Select from list" : "+ Custom Size"}
+                      {showCustomRegulatorType ? "← Select" : "+ Custom"}
                     </Button>
                   </div>
                   {showCustomRegulatorType ? (
@@ -1379,23 +1334,25 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
                       placeholder="e.g., 25mm..."
                       value={customRegulatorType}
                       onChange={(e) => setCustomRegulatorType(e.target.value)}
-                      className="h-10"
+                      className="h-11"
                     />
                   ) : (
                     <div className="grid grid-cols-2 gap-2">
                       <Button
-                        variant={regulatorType === "22mm" ? "default" : "outline"}
-                        className={`h-10 ${regulatorType === "22mm" ? "bg-blue-600" : ""}`}
+                        type="button"
+                        variant={regulatorType === "22mm" ? "info" : "outline"}
+                        className="h-11 font-medium"
                         onClick={() => setRegulatorType("22mm")}
                       >
-                        22mm Valve
+                        22mm
                       </Button>
                       <Button
-                        variant={regulatorType === "20mm" ? "default" : "outline"}
-                        className={`h-10 ${regulatorType === "20mm" ? "bg-blue-600" : ""}`}
+                        type="button"
+                        variant={regulatorType === "20mm" ? "info" : "outline"}
+                        className="h-11 font-medium"
                         onClick={() => setRegulatorType("20mm")}
                       >
-                        20mm Valve
+                        20mm
                       </Button>
                     </div>
                   )}
@@ -1403,90 +1360,193 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
 
                 {/* Quantity & Total Amount */}
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
+                  <div className="space-y-2">
                     <Label className="text-sm font-medium">Quantity</Label>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1">
                       <Button
+                        type="button"
                         variant="outline"
-                        size="sm"
-                        className="h-10 w-10 p-0"
+                        size="icon"
+                        className="h-11 w-11 shrink-0"
                         onClick={() => setRegulatorQuantity(Math.max(1, regulatorQuantity - 1))}
                       >
                         <Minus className="h-4 w-4" />
                       </Button>
                       <Input
                         type="number"
+                        inputMode="numeric"
                         value={regulatorQuantity}
                         onChange={(e) => setRegulatorQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                        className="h-10 text-center"
+                        className="h-11 text-center font-semibold"
                       />
                       <Button
+                        type="button"
                         variant="outline"
-                        size="sm"
-                        className="h-10 w-10 p-0"
+                        size="icon"
+                        className="h-11 w-11 shrink-0"
                         onClick={() => setRegulatorQuantity(regulatorQuantity + 1)}
                       >
                         <Plus className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-sm font-medium">Total Amount ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Total ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
                     <Input
                       type="number"
-                      placeholder="Total amount paid..."
+                      inputMode="numeric"
+                      placeholder="Amount paid..."
                       value={regulatorTotalAmount || ""}
                       onChange={(e) => setRegulatorTotalAmount(parseInt(e.target.value) || 0)}
-                      className="h-10"
+                      className="h-11"
                     />
                   </div>
                 </div>
 
                 {/* Auto-calculated Company Price */}
-                <div className="flex items-center justify-between p-3 bg-gradient-to-r from-blue-100 to-cyan-100 dark:from-blue-900/50 dark:to-cyan-900/50 rounded-lg">
+                <div className="flex items-center justify-between p-3.5 bg-info/10 rounded-xl border border-info/20">
                   <div className="flex items-center gap-2">
-                    <Calculator className="h-4 w-4 text-blue-600" />
-                    <span className="text-sm font-medium">Company Price (per unit)</span>
+                    <Calculator className="h-4 w-4 text-info" />
+                    <span className="text-sm font-medium text-foreground">Unit Price</span>
                   </div>
-                  <span className="text-lg font-bold text-blue-700 dark:text-blue-300">
+                  <span className="text-xl font-bold text-info">
                     {BANGLADESHI_CURRENCY_SYMBOL}{regulatorCompanyPrice.toLocaleString()}
                   </span>
                 </div>
 
                 {/* Add to Cart Button */}
                 <Button
-                  className="w-full h-12 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white font-medium"
+                  type="button"
+                  size="lg"
+                  variant="info"
+                  className="w-full h-12 font-semibold"
                   onClick={addRegulatorToCart}
                   disabled={!getEffectiveRegulatorBrand() || regulatorQuantity <= 0 || regulatorTotalAmount <= 0}
                 >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Regulator to Cart
+                  <Plus className="h-5 w-5 mr-2" />
+                  Add to Cart
                 </Button>
               </CardContent>
             </Card>
           )}
         </div>
 
-        {/* RIGHT: Supplier & Checkout */}
-        <div className="space-y-3">
+        {/* MIDDLE COLUMN: Cart */}
+        <div className="lg:col-span-4 space-y-4">
+          <Card className="border-primary/20 shadow-sm">
+            <CardHeader className="py-3 px-4 bg-primary/5 border-b border-primary/10">
+              <CardTitle className="flex items-center justify-between text-base">
+                <span className="flex items-center gap-2 font-semibold">
+                  <ShoppingBag className="h-5 w-5 text-primary" />
+                  Purchase Cart
+                </span>
+                <Badge className="bg-primary text-primary-foreground">
+                  {purchaseItemsCount} items
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <ScrollArea className="h-[280px] sm:h-[340px]">
+                {purchaseItems.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full py-12 text-muted-foreground">
+                    <ShoppingBag className="h-12 w-12 opacity-20 mb-3" />
+                    <p className="text-sm font-medium">Cart is empty</p>
+                    <p className="text-xs">Add products from the left panel</p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-border">
+                    {purchaseItems.map(item => (
+                      <div key={item.id} className="flex items-center gap-3 p-3 hover:bg-muted/30 transition-colors">
+                        <div 
+                          className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
+                          style={{ backgroundColor: item.brandColor ? `${item.brandColor}20` : 'hsl(var(--primary) / 0.1)' }}
+                        >
+                          {item.type === 'lpg' && <Cylinder className="h-5 w-5" style={{ color: item.brandColor || 'hsl(var(--primary))' }} />}
+                          {item.type === 'stove' && <ChefHat className="h-5 w-5 text-warning" />}
+                          {item.type === 'regulator' && <Gauge className="h-5 w-5 text-info" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold truncate">{item.name}</p>
+                          <p className="text-xs text-muted-foreground truncate">{item.details}</p>
+                          <p className="text-xs font-medium text-primary mt-0.5">
+                            {BANGLADESHI_CURRENCY_SYMBOL}{item.companyPrice.toLocaleString()}/pc
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => updateItemQuantity(item.id, -1)}
+                          >
+                            <Minus className="h-3 w-3" />
+                          </Button>
+                          <span className="w-8 text-center text-sm font-bold">{item.quantity}</span>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => updateItemQuantity(item.id, 1)}
+                          >
+                            <Plus className="h-3 w-3" />
+                          </Button>
+                        </div>
+                        <div className="text-right min-w-[70px]">
+                          <p className="text-sm font-bold">{BANGLADESHI_CURRENCY_SYMBOL}{(item.companyPrice * item.quantity).toLocaleString()}</p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0"
+                          onClick={() => removeItem(item.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </ScrollArea>
+              
+              {/* Cart Total */}
+              {purchaseItems.length > 0 && (
+                <div className="p-4 bg-muted/30 border-t border-border">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-muted-foreground">Total D.O.</span>
+                    <span className="text-2xl font-bold text-primary">
+                      {BANGLADESHI_CURRENCY_SYMBOL}{total.toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* RIGHT COLUMN: Supplier & Checkout */}
+        <div className="lg:col-span-3 space-y-4">
           {/* Supplier Selection */}
-          <Card>
-            <CardHeader className="py-2 px-3">
-              <CardTitle className="flex items-center gap-2 text-sm">
-                <Building2 className="h-4 w-4 text-muted-foreground" />
+          <Card className="shadow-sm">
+            <CardHeader className="py-3 px-4 border-b">
+              <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                <Building2 className="h-5 w-5 text-muted-foreground" />
                 Supplier
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-3 space-y-3">
+            <CardContent className="p-4 space-y-3">
               <div className="flex items-center justify-between">
-                <Label className="text-sm">Select Supplier</Label>
+                <Label className="text-sm font-medium">Select Supplier</Label>
                 <Button
+                  type="button"
                   variant="ghost"
                   size="sm"
-                  className="h-6 px-2 text-xs text-indigo-600"
+                  className="h-7 px-2 text-xs text-primary hover:text-primary"
                   onClick={() => setShowCustomSupplierInput(!showCustomSupplierInput)}
                 >
-                  {showCustomSupplierInput ? "Select from list" : "+ Custom"}
+                  {showCustomSupplierInput ? "← Select" : "+ Custom"}
                 </Button>
               </div>
               {showCustomSupplierInput ? (
@@ -1494,11 +1554,11 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
                   placeholder="Enter supplier name..."
                   value={customSupplier}
                   onChange={(e) => setCustomSupplier(e.target.value)}
-                  className="h-10"
+                  className="h-11"
                 />
               ) : (
                 <Select value={supplierName} onValueChange={setSupplierName}>
-                  <SelectTrigger className="h-10">
+                  <SelectTrigger className="h-11">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1512,46 +1572,52 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
           </Card>
 
           {/* Order Summary & Checkout */}
-          <Card className="border-2 border-indigo-200 dark:border-indigo-900">
-            <CardHeader className="py-2 px-3 bg-indigo-50 dark:bg-indigo-950/30">
-              <CardTitle className="text-sm">Order Summary</CardTitle>
+          <Card className="border-primary/20 shadow-sm">
+            <CardHeader className="py-3 px-4 bg-primary/5 border-b border-primary/10">
+              <CardTitle className="text-base font-semibold">Order Summary</CardTitle>
             </CardHeader>
-            <CardContent className="p-3 space-y-3">
-              <div className="flex justify-between text-sm">
-                <span>Items</span>
-                <span className="font-medium">{purchaseItemsCount}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span>Subtotal</span>
-                <span className="font-medium">{BANGLADESHI_CURRENCY_SYMBOL}{subtotal.toLocaleString()}</span>
+            <CardContent className="p-4 space-y-4">
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Items</span>
+                  <span className="font-medium">{purchaseItemsCount}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Subtotal</span>
+                  <span className="font-medium">{BANGLADESHI_CURRENCY_SYMBOL}{subtotal.toLocaleString()}</span>
+                </div>
               </div>
               <Separator />
-              <div className="flex justify-between text-lg font-bold">
-                <span>Total D.O.</span>
-                <span className="text-indigo-600">{BANGLADESHI_CURRENCY_SYMBOL}{total.toLocaleString()}</span>
+              <div className="flex justify-between items-baseline">
+                <span className="text-base font-semibold">Total D.O.</span>
+                <span className="text-2xl font-bold text-primary">{BANGLADESHI_CURRENCY_SYMBOL}{total.toLocaleString()}</span>
               </div>
 
               {/* Action Buttons */}
-              <div className="grid grid-cols-1 gap-2 pt-2">
+              <div className="space-y-2 pt-2">
                 <Button
-                  className="h-12 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-medium"
+                  type="button"
+                  size="lg"
+                  className="w-full h-12 font-semibold"
                   onClick={() => handleCompletePurchase('completed')}
                   disabled={processing || purchaseItems.length === 0}
                 >
                   {processing ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    <Loader2 className="h-5 w-5 animate-spin mr-2" />
                   ) : (
-                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                    <CheckCircle2 className="h-5 w-5 mr-2" />
                   )}
-                  Complete Purchase (Paid)
+                  Complete (Paid)
                 </Button>
                 <Button
+                  type="button"
                   variant="outline"
-                  className="h-12 border-amber-500 text-amber-700 hover:bg-amber-50"
+                  size="lg"
+                  className="w-full h-12 font-semibold border-warning text-warning hover:bg-warning/10 hover:text-warning"
                   onClick={() => handleCompletePurchase('pending')}
                   disabled={processing || purchaseItems.length === 0}
                 >
-                  <Save className="h-4 w-4 mr-2" />
+                  <Save className="h-5 w-5 mr-2" />
                   Save as Credit
                 </Button>
               </div>
@@ -1560,32 +1626,33 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
 
           {/* Recent Purchases */}
           {recentPurchases.length > 0 && (
-            <Card>
-              <CardHeader className="py-2 px-3">
-                <CardTitle className="flex items-center gap-2 text-sm">
-                  <Sparkles className="h-4 w-4 text-amber-500" />
-                  Recent (5 min void window)
+            <Card className="shadow-sm">
+              <CardHeader className="py-3 px-4 border-b">
+                <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+                  <Sparkles className="h-4 w-4 text-warning" />
+                  Recent (5 min void)
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-2">
                 <ScrollArea className="h-[120px]">
-                  <div className="space-y-1.5">
+                  <div className="space-y-1">
                     {recentPurchases.map(purchase => (
-                      <div key={purchase.id} className="flex items-center justify-between p-2 rounded-lg bg-muted/50 text-xs">
+                      <div key={purchase.id} className="flex items-center justify-between p-2.5 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
                         <div>
-                          <p className="font-medium">{purchase.transactionNumber}</p>
-                          <p className="text-muted-foreground">{BANGLADESHI_CURRENCY_SYMBOL}{purchase.total.toLocaleString()}</p>
+                          <p className="text-xs font-semibold">{purchase.transactionNumber}</p>
+                          <p className="text-xs text-muted-foreground">{BANGLADESHI_CURRENCY_SYMBOL}{purchase.total.toLocaleString()}</p>
                         </div>
                         <Button
+                          type="button"
                           variant="ghost"
                           size="sm"
-                          className="h-7 px-2 text-destructive"
+                          className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
                           onClick={() => {
                             setPurchaseToVoid(purchase);
                             setShowVoidDialog(true);
                           }}
                         >
-                          <Undo2 className="h-3.5 w-3.5" />
+                          <Undo2 className="h-4 w-4" />
                         </Button>
                       </div>
                     ))}
@@ -1599,30 +1666,30 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
 
       {/* ===== VOID DIALOG ===== */}
       <Dialog open={showVoidDialog} onOpenChange={setShowVoidDialog}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-destructive">
               <Undo2 className="h-5 w-5" />
               Void Purchase
             </DialogTitle>
             <DialogDescription>
-              Are you sure you want to void this purchase? This will reverse all stock and expense entries.
+              This will reverse all stock and expense entries for this purchase.
             </DialogDescription>
           </DialogHeader>
           {purchaseToVoid && (
-            <div className="p-3 bg-muted rounded-lg">
-              <p className="font-medium">{purchaseToVoid.transactionNumber}</p>
+            <div className="p-4 bg-muted rounded-xl">
+              <p className="font-semibold">{purchaseToVoid.transactionNumber}</p>
               <p className="text-sm text-muted-foreground">{purchaseToVoid.supplierName}</p>
-              <p className="text-lg font-bold text-destructive mt-1">
+              <p className="text-xl font-bold text-destructive mt-2">
                 {BANGLADESHI_CURRENCY_SYMBOL}{purchaseToVoid.total.toLocaleString()}
               </p>
             </div>
           )}
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setShowVoidDialog(false)}>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="outline" onClick={() => setShowVoidDialog(false)}>
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handleVoidPurchase}>
+            <Button type="button" variant="destructive" onClick={handleVoidPurchase}>
               Confirm Void
             </Button>
           </DialogFooter>
