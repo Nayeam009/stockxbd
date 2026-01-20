@@ -233,17 +233,77 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
 
   // ============= PRICE HELPERS (Always use Company Price from Product Pricing) =============
   // Business Logic: Shop owner buys at Company Price (D.O Rate), sells at Distributor/Retail Price
-  const getLPGCompanyPrice = useCallback((brandId: string, weightVal: string): { price: number; found: boolean } => {
-    const priceEntry = productPrices.find(
-      p => p.product_type === 'LPG' && p.brand_id === brandId && p.size?.includes(weightVal)
-    );
-    // Also try matching by product_type 'lpg' (lowercase) for backward compatibility
-    const priceEntryAlt = productPrices.find(
-      p => p.product_type.toLowerCase() === 'lpg' && p.brand_id === brandId && p.size?.includes(weightVal)
-    );
-    const entry = priceEntry || priceEntryAlt;
-    return { price: entry?.company_price || 0, found: !!entry };
-  }, [productPrices]);
+  // Price lookup must match: brand_id + weight/size + variant (cylinder type) + valve size
+  
+  // Helper to normalize size strings (handle "12kg" vs "12 kg" variations)
+  const normalizeSize = useCallback((size: string): string => {
+    return size.toLowerCase().replace(/\s+/g, '').trim();
+  }, []);
+
+  // Helper to get variant string from cylinderType
+  const getVariantFromCylinderType = useCallback((cylType: 'refill' | 'package' | 'empty'): string => {
+    // For "empty" cylinders, we use the refill price as base (empty is just the shell)
+    if (cylType === 'refill' || cylType === 'empty') return 'Refill';
+    return 'Package';
+  }, []);
+
+  const getLPGCompanyPrice = useCallback((
+    brandId: string, 
+    weightVal: string, 
+    cylType: 'refill' | 'package' | 'empty',
+    valveSize: string
+  ): { price: number; found: boolean; priceType: string } => {
+    const normalizedWeight = normalizeSize(weightVal);
+    const targetVariant = getVariantFromCylinderType(cylType);
+    
+    // Find matching price entry with all criteria
+    const priceEntry = productPrices.find(p => {
+      const isLPG = p.product_type.toLowerCase() === 'lpg';
+      const matchesBrand = p.brand_id === brandId;
+      const matchesSize = p.size ? normalizeSize(p.size).includes(normalizedWeight.replace('kg', '')) : false;
+      const matchesVariant = p.variant?.toLowerCase() === targetVariant.toLowerCase();
+      // Check valve size in product_name (e.g., "(22mm)" or "(20mm)")
+      const matchesValve = p.product_name?.includes(`(${valveSize})`) || !p.product_name?.includes('mm)');
+      
+      return isLPG && matchesBrand && matchesSize && matchesVariant && matchesValve;
+    });
+
+    // Fallback: Try without valve size check (for legacy data)
+    const fallbackEntry = !priceEntry ? productPrices.find(p => {
+      const isLPG = p.product_type.toLowerCase() === 'lpg';
+      const matchesBrand = p.brand_id === brandId;
+      const matchesSize = p.size ? normalizeSize(p.size).includes(normalizedWeight.replace('kg', '')) : false;
+      const matchesVariant = p.variant?.toLowerCase() === targetVariant.toLowerCase();
+      
+      return isLPG && matchesBrand && matchesSize && matchesVariant;
+    }) : null;
+
+    // Second fallback: Just brand + size (for minimal data)
+    const minimalEntry = !priceEntry && !fallbackEntry ? productPrices.find(p => {
+      const isLPG = p.product_type.toLowerCase() === 'lpg';
+      const matchesBrand = p.brand_id === brandId;
+      const matchesSize = p.size ? normalizeSize(p.size).includes(normalizedWeight.replace('kg', '')) : false;
+      
+      return isLPG && matchesBrand && matchesSize;
+    }) : null;
+
+    const entry = priceEntry || fallbackEntry || minimalEntry;
+    
+    // For Package type, use package_price if available, otherwise company_price
+    let price = 0;
+    let priceType = 'Company';
+    if (entry) {
+      if (cylType === 'package' && entry.package_price > 0) {
+        price = entry.package_price;
+        priceType = 'Package';
+      } else {
+        price = entry.company_price;
+        priceType = 'Company';
+      }
+    }
+    
+    return { price, found: !!entry && price > 0, priceType };
+  }, [productPrices, normalizeSize, getVariantFromCylinderType]);
 
   const getStoveCompanyPrice = useCallback((brand: string, model: string): { price: number; found: boolean } => {
     const priceEntry = productPrices.find(
@@ -299,12 +359,12 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
 
   // ============= PRODUCT ACTIONS =============
   const addLPGToCart = (brand: LPGBrand) => {
-    const priceResult = getLPGCompanyPrice(brand.id, weight);
+    const priceResult = getLPGCompanyPrice(brand.id, weight, cylinderType, mouthSize);
     
     if (!priceResult.found) {
       toast({ 
         title: "Price not configured", 
-        description: `Please set Company Price for ${brand.name} (${weight}) in Product Pricing first.`,
+        description: `Please set ${priceResult.priceType} Price for ${brand.name} (${weight}, ${mouthSize}, ${cylinderType}) in Product Pricing first.`,
         variant: "destructive" 
       });
       return;
@@ -323,7 +383,7 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
         id: `lpg-${Date.now()}`,
         type: 'lpg',
         name: brand.name,
-        details: `${weight} • ${cylinderType === 'refill' ? 'Refill' : cylinderType === 'package' ? 'Package' : 'Empty'}`,
+        details: `${weight} • ${mouthSize} • ${cylinderType === 'refill' ? 'Refill' : cylinderType === 'package' ? 'Package' : 'Empty'}`,
         companyPrice: priceResult.price,
         quantity: 1,
         cylinderType,
@@ -334,7 +394,7 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
       };
       setPurchaseItems([...purchaseItems, newItem]);
     }
-    toast({ title: `${brand.name} added to purchase` });
+    toast({ title: `${brand.name} (${cylinderType}) added to purchase` });
   };
 
   const addStoveToCart = (stove: Stove) => {
@@ -778,9 +838,10 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
                   {activeTab === 'all' && <p className="text-xs font-medium text-muted-foreground mb-2">LPG Cylinders</p>}
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
                     {(activeTab === 'all' ? filteredBrands.slice(0, 5) : filteredBrands).map(brand => {
-                      const priceResult = getLPGCompanyPrice(brand.id, weight);
+                      const priceResult = getLPGCompanyPrice(brand.id, weight, cylinderType, mouthSize);
                       const companyPrice = priceResult.price;
                       const priceConfigured = priceResult.found;
+                      const priceType = priceResult.priceType;
                       const currentStock = cylinderType === 'refill' ? brand.refill_cylinder 
                         : cylinderType === 'package' ? brand.package_cylinder 
                         : brand.empty_cylinder;
@@ -790,7 +851,7 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
                           key={brand.id}
                           onClick={() => addLPGToCart(brand)}
                           className={`p-2.5 rounded-lg border-2 text-left transition-all hover:shadow-md relative bg-card ${
-                            priceConfigured ? 'border-transparent hover:border-blue-500/50' : 'border-destructive/30 opacity-75'
+                            priceConfigured ? 'border-transparent hover:border-primary/50' : 'border-destructive/30 opacity-75'
                           }`}
                         >
                           <div 
@@ -806,13 +867,20 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
                             </div>
                             <div className="min-w-0 flex-1">
                               <p className="font-semibold text-xs truncate">{brand.name}</p>
-                              <p className="text-[10px] text-muted-foreground">{weight}</p>
+                              <p className="text-[10px] text-muted-foreground">
+                                {weight} • {mouthSize} • {cylinderType === 'refill' ? 'Refill' : cylinderType === 'package' ? 'Package' : 'Empty'}
+                              </p>
                             </div>
                           </div>
                           <div className="flex items-center justify-between mt-2">
-                            <span className={`font-bold text-sm ${priceConfigured ? 'text-primary' : 'text-destructive'}`}>
-                              {priceConfigured ? `${BANGLADESHI_CURRENCY_SYMBOL}${companyPrice}` : 'No Price'}
-                            </span>
+                            <div className="flex flex-col">
+                              <span className={`font-bold text-sm ${priceConfigured ? 'text-primary' : 'text-destructive'}`}>
+                                {priceConfigured ? `${BANGLADESHI_CURRENCY_SYMBOL}${companyPrice.toLocaleString()}` : 'No Price'}
+                              </span>
+                              {priceConfigured && (
+                                <span className="text-[9px] text-muted-foreground">{priceType} Price</span>
+                              )}
+                            </div>
                             <Badge variant="secondary" className="text-[9px] px-1.5">
                               <TrendingUp className="h-2.5 w-2.5 mr-0.5" />
                               {currentStock}
