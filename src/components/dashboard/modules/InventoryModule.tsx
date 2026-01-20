@@ -6,13 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
@@ -26,22 +19,14 @@ import {
   Loader2,
   Cylinder,
   Truck,
-  ArrowUpFromLine,
-  ArrowDownToLine,
-  Save,
   ChefHat,
   Wrench,
   Flame,
   Gauge,
-  Edit,
-  ShoppingBag
+  PackagePlus
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { syncLpgBrandToPricing, syncStoveToPricing, syncRegulatorToPricing } from "@/hooks/useInventoryPricingSync";
-import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
-import { BrandSelect } from "@/components/shared/BrandSelect";
-import { getLpgBrandColor, type LpgBrandInfo } from "@/lib/brandConstants";
 
 // Interfaces
 interface LPGBrand {
@@ -111,38 +96,18 @@ export const InventoryModule = () => {
   const [selectedWeight, setSelectedWeight] = useState("12kg");
   const [lpgBrands, setLpgBrands] = useState<LPGBrand[]>([]);
   const [lpgSearchQuery, setLpgSearchQuery] = useState("");
-  const [isAddLpgDialogOpen, setIsAddLpgDialogOpen] = useState(false);
-  const [isSendToPlantOpen, setIsSendToPlantOpen] = useState(false);
-  const [isReceiveFromPlantOpen, setIsReceiveFromPlantOpen] = useState(false);
   const [editingCell, setEditingCell] = useState<{id: string, field: string, type: 'lpg' | 'stove' | 'regulator'} | null>(null);
-  
-  // Send/Receive plant state
-  const [sendToBrand, setSendToBrand] = useState("");
-  const [sendQuantity, setSendQuantity] = useState(0);
-  const [receiveFromBrand, setReceiveFromBrand] = useState("");
-  const [receiveQuantity, setReceiveQuantity] = useState(0);
-  const [receiveType, setReceiveType] = useState<'refill' | 'package'>('refill');
   
   // Stove State
   const [stoves, setStoves] = useState<Stove[]>([]);
   const [stoveSearchQuery, setStoveSearchQuery] = useState("");
   const [filterBurner, setFilterBurner] = useState<string>("all");
   const [showDamagedOnly, setShowDamagedOnly] = useState(false);
-  const [isAddStoveDialogOpen, setIsAddStoveDialogOpen] = useState(false);
   
   // Regulator State
   const [regulators, setRegulators] = useState<Regulator[]>([]);
   const [regulatorSearchQuery, setRegulatorSearchQuery] = useState("");
   const [regulatorSizeFilter, setRegulatorSizeFilter] = useState<string>("all");
-  const [isAddRegulatorDialogOpen, setIsAddRegulatorDialogOpen] = useState(false);
-  
-  // Form states
-  const [newLpgBrand, setNewLpgBrand] = useState({
-    name: "", color: "#22c55e", size: "22mm", weight: "12kg",
-    package_cylinder: 0, refill_cylinder: 0, empty_cylinder: 0, problem_cylinder: 0,
-  });
-  const [newStove, setNewStove] = useState({ brand: "", model: "", burners: 1, quantity: 0 });
-  const [newRegulator, setNewRegulator] = useState({ brand: "", type: "22mm", quantity: 0 });
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -164,12 +129,7 @@ export const InventoryModule = () => {
   useEffect(() => {
     const defaultWeight = sizeTab === "22mm" ? "12kg" : "12kg";
     setSelectedWeight(defaultWeight);
-    setNewLpgBrand((prev) => ({ ...prev, size: sizeTab, weight: defaultWeight }));
   }, [sizeTab]);
-
-  useEffect(() => {
-    setNewLpgBrand((prev) => ({ ...prev, weight: selectedWeight }));
-  }, [selectedWeight]);
 
   // Fetch all data
   const fetchData = useCallback(async () => {
@@ -260,172 +220,6 @@ export const InventoryModule = () => {
     return { label: "In Stock", bgClass: "bg-emerald-500/10 text-emerald-600" };
   };
 
-  // CRUD Operations
-  const handleAddLpgBrand = async () => {
-    if (!newLpgBrand.name.trim()) {
-      toast.error("Brand name is required");
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-      if (userError) throw userError;
-      if (!userData.user) throw new Error("You must be logged in");
-
-      const ownerId = (await getOwnerIdForWrite().catch(() => userData.user!.id)) || userData.user.id;
-
-      const { data: insertedBrand, error } = await supabase
-        .from("lpg_brands")
-        .insert({
-          ...newLpgBrand,
-          created_by: userData.user.id,
-          owner_id: ownerId,
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      if (insertedBrand) {
-        await syncLpgBrandToPricing(
-          newLpgBrand.name.trim(),
-          insertedBrand.id,
-          newLpgBrand.size,
-          newLpgBrand.weight
-        );
-      }
-
-      toast.success("Brand added successfully");
-      setIsAddLpgDialogOpen(false);
-      setNewLpgBrand({
-        name: "",
-        color: "#22c55e",
-        size: sizeTab,
-        weight: selectedWeight,
-        package_cylinder: 0,
-        refill_cylinder: 0,
-        empty_cylinder: 0,
-        problem_cylinder: 0,
-      });
-      await fetchData();
-    } catch (error: any) {
-      toast.error(error?.message || "Failed to add brand");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleAddStove = async () => {
-    if (!newStove.brand.trim()) {
-      toast.error("Please enter brand name");
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-      if (userError) throw userError;
-      if (!userData.user) throw new Error("You must be logged in");
-
-      const ownerId = (await getOwnerIdForWrite().catch(() => userData.user!.id)) || userData.user.id;
-      const burnerLabel = newStove.burners === 1 ? "Single Burner" : "Double Burner";
-
-      const existing = stoves.find(
-        (s) =>
-          s.brand.toLowerCase() === newStove.brand.trim().toLowerCase() &&
-          s.burners === newStove.burners
-      );
-
-      const modelName = newStove.model.trim() || burnerLabel;
-      
-      if (existing) {
-        const { error } = await supabase
-          .from("stoves")
-          .update({ quantity: existing.quantity + newStove.quantity })
-          .eq("id", existing.id);
-        if (error) throw error;
-
-        toast.success("Stove quantity updated");
-      } else {
-        const { error } = await supabase.from("stoves").insert({
-          brand: newStove.brand.trim(),
-          model: modelName,
-          burners: newStove.burners,
-          quantity: newStove.quantity,
-          price: 0,
-          created_by: userData.user.id,
-          owner_id: ownerId,
-        });
-        if (error) throw error;
-
-        await syncStoveToPricing(newStove.brand.trim(), modelName);
-        toast.success("Stove added successfully");
-      }
-
-      setNewStove({ brand: "", model: "", burners: 1, quantity: 0 });
-      setIsAddStoveDialogOpen(false);
-      await fetchData();
-    } catch (error: any) {
-      toast.error(error?.message || "Failed to add stove");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleAddRegulator = async () => {
-    if (!newRegulator.brand.trim()) {
-      toast.error("Please enter brand name");
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-      if (userError) throw userError;
-      if (!userData.user) throw new Error("You must be logged in");
-
-      const ownerId = (await getOwnerIdForWrite().catch(() => userData.user!.id)) || userData.user.id;
-
-      const existing = regulators.find(
-        (r) =>
-          r.brand.toLowerCase() === newRegulator.brand.trim().toLowerCase() &&
-          r.type === newRegulator.type
-      );
-
-      if (existing) {
-        const { error } = await supabase
-          .from("regulators")
-          .update({ quantity: existing.quantity + newRegulator.quantity })
-          .eq("id", existing.id);
-        if (error) throw error;
-
-        toast.success("Regulator quantity updated");
-      } else {
-        const { error } = await supabase.from("regulators").insert({
-          brand: newRegulator.brand.trim(),
-          type: newRegulator.type,
-          quantity: newRegulator.quantity,
-          price: 0,
-          created_by: userData.user.id,
-          owner_id: ownerId,
-        });
-        if (error) throw error;
-
-        await syncRegulatorToPricing(newRegulator.brand.trim(), newRegulator.type);
-        toast.success("Regulator added successfully");
-      }
-
-      setNewRegulator({ brand: "", type: "22mm", quantity: 0 });
-      setIsAddRegulatorDialogOpen(false);
-      await fetchData();
-    } catch (error: any) {
-      toast.error(error?.message || "Failed to add regulator");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   // Update operations
   const handleUpdateLpg = async (id: string, field: string, value: number) => {
     try {
@@ -504,65 +298,6 @@ export const InventoryModule = () => {
   };
 
   // Send to Plant
-  const handleSendToPlant = async () => {
-    if (!sendToBrand || sendQuantity <= 0) {
-      toast.error("Select brand and enter quantity");
-      return;
-    }
-    const brand = lpgBrands.find(b => b.id === sendToBrand);
-    if (!brand || brand.empty_cylinder < sendQuantity) {
-      toast.error("Not enough empty cylinders");
-      return;
-    }
-    setIsSubmitting(true);
-    try {
-      await supabase.from("lpg_brands").update({
-        empty_cylinder: brand.empty_cylinder - sendQuantity,
-        in_transit_cylinder: (brand.in_transit_cylinder || 0) + sendQuantity,
-      }).eq("id", sendToBrand);
-      toast.success(`${sendQuantity} cylinders sent to plant`);
-      setIsSendToPlantOpen(false);
-      setSendToBrand("");
-      setSendQuantity(0);
-      fetchData();
-    } catch (error: any) {
-      toast.error(error.message || "Failed to send");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // Receive from Plant
-  const handleReceiveFromPlant = async () => {
-    if (!receiveFromBrand || receiveQuantity <= 0) {
-      toast.error("Select brand and enter quantity");
-      return;
-    }
-    const brand = lpgBrands.find(b => b.id === receiveFromBrand);
-    if (!brand || (brand.in_transit_cylinder || 0) < receiveQuantity) {
-      toast.error("Quantity exceeds in-transit stock");
-      return;
-    }
-    setIsSubmitting(true);
-    try {
-      const updates: any = { in_transit_cylinder: (brand.in_transit_cylinder || 0) - receiveQuantity };
-      if (receiveType === 'refill') {
-        updates.refill_cylinder = brand.refill_cylinder + receiveQuantity;
-      } else {
-        updates.package_cylinder = brand.package_cylinder + receiveQuantity;
-      }
-      await supabase.from("lpg_brands").update(updates).eq("id", receiveFromBrand);
-      toast.success(`${receiveQuantity} cylinders received from plant`);
-      setIsReceiveFromPlantOpen(false);
-      setReceiveFromBrand("");
-      setReceiveQuantity(0);
-      fetchData();
-    } catch (error: any) {
-      toast.error(error.message || "Failed to receive");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   // Editable Stock Cell
   const EditableStockCell = ({ 
@@ -914,164 +649,16 @@ export const InventoryModule = () => {
               </TabsList>
               
               <div className="flex items-center gap-2 flex-wrap">
-                {/* Buy Products Button */}
+                {/* Buy/Add Products Button */}
                 <Button 
                   size="sm" 
-                  className="gap-2 text-xs sm:text-sm bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
+                  className="gap-2 text-xs sm:text-sm h-10 bg-gradient-to-r from-primary to-primary/80"
                   onClick={() => openPOB('lpg')}
                 >
-                  <ShoppingBag className="h-3 w-3 sm:h-4 sm:w-4" />
-                  <span className="hidden sm:inline">Buy Cylinders</span>
-                  <span className="sm:hidden">Buy</span>
+                  <PackagePlus className="h-4 w-4" />
+                  <span className="hidden sm:inline">Buy/Add Cylinders</span>
+                  <span className="sm:hidden">Buy/Add</span>
                 </Button>
-                
-                {/* Send/Receive Dialogs */}
-                <Dialog open={isSendToPlantOpen} onOpenChange={setIsSendToPlantOpen}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" size="sm" className="gap-2 text-xs sm:text-sm">
-                      <ArrowUpFromLine className="h-3 w-3 sm:h-4 sm:w-4" />
-                      <span className="hidden sm:inline">Send to Plant</span>
-                      <span className="sm:hidden">Send</span>
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-[95vw] sm:max-w-md">
-                    <DialogHeader><DialogTitle>Send Empties to Plant</DialogTitle></DialogHeader>
-                    <div className="space-y-4 py-4">
-                      <div className="space-y-2">
-                        <Label>Select Brand</Label>
-                        <Select value={sendToBrand} onValueChange={setSendToBrand}>
-                          <SelectTrigger><SelectValue placeholder="Select brand" /></SelectTrigger>
-                          <SelectContent>
-                            {lpgBrands.filter(b => b.empty_cylinder > 0).map(b => (
-                              <SelectItem key={b.id} value={b.id}>{b.name} ({b.empty_cylinder} empties)</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Quantity</Label>
-                        <Input type="number" min={0} value={sendQuantity} onChange={(e) => setSendQuantity(parseInt(e.target.value) || 0)} />
-                      </div>
-                      <Button onClick={handleSendToPlant} className="w-full" disabled={isSubmitting}>
-                        {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Send to Plant"}
-                      </Button>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-
-                <Dialog open={isReceiveFromPlantOpen} onOpenChange={setIsReceiveFromPlantOpen}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" size="sm" className="gap-2 text-xs sm:text-sm">
-                      <ArrowDownToLine className="h-3 w-3 sm:h-4 sm:w-4" />
-                      <span className="hidden sm:inline">Receive from Plant</span>
-                      <span className="sm:hidden">Receive</span>
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-[95vw] sm:max-w-md">
-                    <DialogHeader><DialogTitle>Receive from Plant</DialogTitle></DialogHeader>
-                    <div className="space-y-4 py-4">
-                      <div className="space-y-2">
-                        <Label>Select Brand</Label>
-                        <Select value={receiveFromBrand} onValueChange={setReceiveFromBrand}>
-                          <SelectTrigger><SelectValue placeholder="Select brand" /></SelectTrigger>
-                          <SelectContent>
-                            {lpgBrands.filter(b => (b.in_transit_cylinder || 0) > 0).map(b => (
-                              <SelectItem key={b.id} value={b.id}>{b.name} ({b.in_transit_cylinder} in transit)</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Receive As</Label>
-                        <Select value={receiveType} onValueChange={(v) => setReceiveType(v as 'refill' | 'package')}>
-                          <SelectTrigger><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="refill">Refill</SelectItem>
-                            <SelectItem value="package">Package (New)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Quantity</Label>
-                        <Input type="number" min={0} value={receiveQuantity} onChange={(e) => setReceiveQuantity(parseInt(e.target.value) || 0)} />
-                      </div>
-                      <Button onClick={handleReceiveFromPlant} className="w-full" disabled={isSubmitting}>
-                        {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Receive from Plant"}
-                      </Button>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-
-                <Dialog open={isAddLpgDialogOpen} onOpenChange={setIsAddLpgDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button size="sm" className="gap-2 bg-gradient-to-r from-primary to-primary/80 text-xs sm:text-sm">
-                      <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
-                      <span className="hidden sm:inline">Add Brand</span>
-                      <span className="sm:hidden">Add</span>
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-[95vw] sm:max-w-md">
-                    <DialogHeader><DialogTitle>Add New LPG Brand</DialogTitle></DialogHeader>
-                    <div className="space-y-4 py-4">
-                      <div className="space-y-2">
-                        <Label>Brand Name *</Label>
-                        <BrandSelect
-                          type="lpg"
-                          value={newLpgBrand.name}
-                          onChange={(value, brandInfo) => {
-                            const lpgInfo = brandInfo as LpgBrandInfo | undefined;
-                            setNewLpgBrand({
-                              ...newLpgBrand,
-                              name: value,
-                              color: lpgInfo?.color || getLpgBrandColor(value),
-                            });
-                          }}
-                          filterByMouthSize={sizeTab}
-                          placeholder="Select or type brand name..."
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label>Color</Label>
-                          <div className="flex gap-2">
-                            <Input type="color" value={newLpgBrand.color} onChange={(e) => setNewLpgBrand({ ...newLpgBrand, color: e.target.value })} className="h-10 flex-1" />
-                            <div className="h-10 w-10 rounded-lg border" style={{ backgroundColor: newLpgBrand.color }} />
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Weight</Label>
-                          <Select value={newLpgBrand.weight} onValueChange={(v) => setNewLpgBrand({ ...newLpgBrand, weight: v })}>
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              {weightOptions.map(w => <SelectItem key={w.value} value={w.value}>{w.label}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label>Package</Label>
-                          <Input type="number" min={0} value={newLpgBrand.package_cylinder} onChange={(e) => setNewLpgBrand({ ...newLpgBrand, package_cylinder: parseInt(e.target.value) || 0 })} />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Refill</Label>
-                          <Input type="number" min={0} value={newLpgBrand.refill_cylinder} onChange={(e) => setNewLpgBrand({ ...newLpgBrand, refill_cylinder: parseInt(e.target.value) || 0 })} />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Empty</Label>
-                          <Input type="number" min={0} value={newLpgBrand.empty_cylinder} onChange={(e) => setNewLpgBrand({ ...newLpgBrand, empty_cylinder: parseInt(e.target.value) || 0 })} />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Problem</Label>
-                          <Input type="number" min={0} value={newLpgBrand.problem_cylinder} onChange={(e) => setNewLpgBrand({ ...newLpgBrand, problem_cylinder: parseInt(e.target.value) || 0 })} />
-                        </div>
-                      </div>
-                      <Button onClick={handleAddLpgBrand} className="w-full h-11" disabled={isSubmitting}>
-                        {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Add Brand"}
-                      </Button>
-                    </div>
-                  </DialogContent>
-                </Dialog>
               </div>
             </div>
           </Tabs>
@@ -1163,8 +750,8 @@ export const InventoryModule = () => {
                 <CardContent className="flex flex-col items-center justify-center py-12">
                   <Flame className="h-12 w-12 text-muted-foreground/50 mb-4" />
                   <p className="text-muted-foreground text-center">No brands found for {sizeTab} / {selectedWeight}</p>
-                  <Button variant="outline" className="mt-4" onClick={() => setIsAddLpgDialogOpen(true)}>
-                    <Plus className="h-4 w-4 mr-2" />Add Brand
+                  <Button variant="outline" className="mt-4" onClick={() => openPOB('lpg')}>
+                    <PackagePlus className="h-4 w-4 mr-2" />Buy/Add Cylinders
                   </Button>
                 </CardContent>
               </Card>
@@ -1243,70 +830,16 @@ export const InventoryModule = () => {
                 <Switch checked={showDamagedOnly} onCheckedChange={setShowDamagedOnly} id="damaged-filter" />
                 <Label htmlFor="damaged-filter" className="text-xs cursor-pointer">Damaged</Label>
               </div>
-              {/* Buy Stoves Button */}
+              {/* Buy/Add Stoves Button */}
               <Button 
                 size="sm" 
-                className="gap-2 text-xs sm:text-sm bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
+                className="gap-2 text-xs sm:text-sm h-10 bg-gradient-to-r from-orange-500 to-amber-500"
                 onClick={() => openPOB('stove')}
               >
-                <ShoppingBag className="h-3 w-3 sm:h-4 sm:w-4" />
-                <span className="hidden sm:inline">Buy Stoves</span>
-                <span className="sm:hidden">Buy</span>
+                <PackagePlus className="h-4 w-4" />
+                <span className="hidden sm:inline">Buy/Add Stoves</span>
+                <span className="sm:hidden">Buy/Add</span>
               </Button>
-              
-              <Dialog open={isAddStoveDialogOpen} onOpenChange={setIsAddStoveDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button size="sm" className="gap-2 bg-gradient-to-r from-orange-500 to-red-500">
-                    <Plus className="h-4 w-4" />
-                    <span className="hidden sm:inline">Add Stove</span>
-                    <span className="sm:hidden">Add</span>
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-[95vw] sm:max-w-md">
-                  <DialogHeader><DialogTitle>Add New Stove</DialogTitle></DialogHeader>
-                  <div className="space-y-4 py-4">
-                    <div className="space-y-2">
-                      <Label>Brand Name *</Label>
-                      <BrandSelect
-                        type="stove"
-                        value={newStove.brand}
-                        onChange={(value) => setNewStove({ ...newStove, brand: value })}
-                        placeholder="Select or type brand name..."
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Model Number</Label>
-                      <Input 
-                        value={newStove.model} 
-                        onChange={(e) => setNewStove({ ...newStove, model: e.target.value })}
-                        placeholder="e.g., GS-102, WGS-LX3, etc."
-                        className="h-10"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Burner Type *</Label>
-                      <div className="grid grid-cols-2 gap-3">
-                        {[1, 2].map((burner) => (
-                          <button key={burner} onClick={() => setNewStove({ ...newStove, burners: burner })}
-                            className={`p-3 sm:p-4 rounded-xl border-2 transition-all ${newStove.burners === burner ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/50'}`}>
-                            <div className="flex flex-col items-center gap-2">
-                              <Flame className={`h-5 w-5 ${newStove.burners === burner ? 'text-primary' : 'text-muted-foreground'}`} />
-                              <span className="text-xs sm:text-sm font-medium">{burner === 1 ? "Single Burner" : "Double Burner"}</span>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Quantity</Label>
-                      <Input type="number" min={0} value={newStove.quantity} onChange={(e) => setNewStove({ ...newStove, quantity: parseInt(e.target.value) || 0 })} className="h-10" />
-                    </div>
-                    <Button onClick={handleAddStove} className="w-full h-11 bg-gradient-to-r from-orange-500 to-red-500" disabled={isSubmitting}>
-                      {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Add Stove"}
-                    </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
             </div>
           </div>
 
@@ -1317,8 +850,8 @@ export const InventoryModule = () => {
                 <CardContent className="flex flex-col items-center justify-center py-12">
                   <ChefHat className="h-12 w-12 text-muted-foreground/50 mb-4" />
                   <p className="text-muted-foreground text-center">No stoves found</p>
-                  <Button variant="outline" className="mt-4" onClick={() => setIsAddStoveDialogOpen(true)}>
-                    <Plus className="h-4 w-4 mr-2" />Add Stove
+                  <Button variant="outline" className="mt-4" onClick={() => openPOB('stove')}>
+                    <PackagePlus className="h-4 w-4 mr-2" />Buy/Add Stoves
                   </Button>
                 </CardContent>
               </Card>
@@ -1396,64 +929,16 @@ export const InventoryModule = () => {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input placeholder="Search regulators..." value={regulatorSearchQuery} onChange={(e) => setRegulatorSearchQuery(e.target.value)} className="pl-10" />
               </div>
-              {/* Buy Regulators Button */}
+              {/* Buy/Add Regulators Button */}
               <Button 
                 size="sm" 
-                className="gap-2 text-xs sm:text-sm bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
+                className="gap-2 text-xs sm:text-sm h-10 bg-gradient-to-r from-violet-500 to-purple-600"
                 onClick={() => openPOB('regulator')}
               >
-                <ShoppingBag className="h-3 w-3 sm:h-4 sm:w-4" />
-                <span className="hidden sm:inline">Buy Regulators</span>
-                <span className="sm:hidden">Buy</span>
+                <PackagePlus className="h-4 w-4" />
+                <span className="hidden sm:inline">Buy/Add Regulators</span>
+                <span className="sm:hidden">Buy/Add</span>
               </Button>
-              
-              <Dialog open={isAddRegulatorDialogOpen} onOpenChange={setIsAddRegulatorDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button className="gap-2 whitespace-nowrap bg-gradient-to-r from-violet-500 to-purple-600">
-                    <Plus className="h-4 w-4" />
-                    <span className="hidden sm:inline">Add Regulator</span>
-                    <span className="sm:hidden">Add</span>
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-[95vw] sm:max-w-md">
-                  <DialogHeader><DialogTitle>Add New Regulator</DialogTitle></DialogHeader>
-                  <div className="space-y-4 py-4">
-                    <div className="space-y-2">
-                      <Label>Brand Name *</Label>
-                      <BrandSelect
-                        type="regulator"
-                        value={newRegulator.brand}
-                        onChange={(value) => setNewRegulator({ ...newRegulator, brand: value })}
-                        placeholder="Select or type brand name..."
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Size *</Label>
-                      <div className="grid grid-cols-2 gap-3">
-                        {["22mm", "20mm"].map((size) => (
-                          <button key={size} onClick={() => setNewRegulator({ ...newRegulator, type: size })}
-                            className={`p-4 rounded-xl border-2 transition-all ${newRegulator.type === size ? (size === "22mm" ? 'border-violet-500 bg-violet-500/10' : 'border-cyan-500 bg-cyan-500/10') : 'border-border hover:border-primary/50'}`}>
-                            <div className="flex flex-col items-center gap-2">
-                              <Gauge className={`h-6 w-6 ${newRegulator.type === size ? (size === "22mm" ? 'text-violet-500' : 'text-cyan-500') : 'text-muted-foreground'}`} />
-                              <span className="text-sm font-medium">{size}</span>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Initial Quantity</Label>
-                      <Input type="number" min={0} value={newRegulator.quantity} onChange={(e) => setNewRegulator({ ...newRegulator, quantity: parseInt(e.target.value) || 0 })} />
-                    </div>
-                    <p className="text-xs text-muted-foreground bg-muted/50 p-3 rounded-lg">
-                      💡 Prices are set in the Product Pricing module
-                    </p>
-                    <Button onClick={handleAddRegulator} className="w-full bg-gradient-to-r from-violet-500 to-purple-600" disabled={isSubmitting}>
-                      {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Add Regulator"}
-                    </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
             </div>
           </div>
 
@@ -1464,8 +949,8 @@ export const InventoryModule = () => {
                 <CardContent className="flex flex-col items-center justify-center py-12">
                   <Wrench className="h-12 w-12 text-muted-foreground/50 mb-4" />
                   <p className="text-muted-foreground text-center">No regulators found</p>
-                  <Button variant="outline" className="mt-4" onClick={() => setIsAddRegulatorDialogOpen(true)}>
-                    <Plus className="h-4 w-4 mr-2" />Add Regulator
+                  <Button variant="outline" className="mt-4" onClick={() => openPOB('regulator')}>
+                    <PackagePlus className="h-4 w-4 mr-2" />Buy/Add Regulators
                   </Button>
                 </CardContent>
               </Card>
