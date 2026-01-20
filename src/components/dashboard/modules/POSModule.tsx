@@ -1363,73 +1363,94 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
         </div>
 
         {/* ===== MIDDLE SECTION: TYPE TOGGLES & FILTERS ===== */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Cylinder Type */}
-          <div className="flex bg-muted rounded-lg p-0.5">
-            <Button
-              size="sm"
-              variant={cylinderType === 'refill' ? 'default' : 'ghost'}
-              onClick={() => setCylinderType('refill')}
-              className="h-7 text-xs px-2.5"
-            >
-              Refill
-            </Button>
-            <Button
-              size="sm"
-              variant={cylinderType === 'package' ? 'default' : 'ghost'}
-              onClick={() => setCylinderType('package')}
-              className={`h-7 text-xs px-2.5 ${cylinderType === 'package' ? 'bg-emerald-600 hover:bg-emerald-700' : ''}`}
-            >
-              Package
-            </Button>
-          </div>
-          {/* Sale Type */}
-          <div className="flex bg-muted rounded-lg p-0.5">
-            <Button
-              size="sm"
-              variant={saleType === 'retail' ? 'default' : 'ghost'}
-              onClick={() => setSaleType('retail')}
-              className="h-7 text-xs px-2.5"
-            >
-              Retail
-            </Button>
-            <Button
-              size="sm"
-              variant={saleType === 'wholesale' ? 'default' : 'ghost'}
-              onClick={() => setSaleType('wholesale')}
-              className={`h-7 text-xs px-2.5 ${saleType === 'wholesale' ? 'bg-violet-600 hover:bg-violet-700' : ''}`}
-            >
-              Wholesale
-            </Button>
-          </div>
-          {/* Mouth Size */}
-          <div className="flex bg-muted rounded-lg p-0.5">
-            <Button size="sm" variant={mouthSize === "22mm" ? "default" : "ghost"} className="h-7 text-xs px-2" onClick={() => { setMouthSize("22mm"); setWeight("12kg"); }}>22mm</Button>
-            <Button size="sm" variant={mouthSize === "20mm" ? "default" : "ghost"} className="h-7 text-xs px-2" onClick={() => { setMouthSize("20mm"); setWeight("12kg"); }}>20mm</Button>
-          </div>
-          {/* Weight */}
-          <div className="flex flex-wrap gap-1">
-            {(mouthSize === "22mm" ? WEIGHT_OPTIONS_22MM : WEIGHT_OPTIONS_20MM).slice(0, 5).map(w => (
+        <Card className="border-border/50 bg-card/50">
+          <CardContent className="p-3 space-y-2.5">
+            {/* Row 1: Cylinder Type + Sale Type */}
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Cylinder Type */}
+              <div className="flex bg-muted/80 rounded-lg p-0.5 border border-border/50">
+                <Button
+                  size="sm"
+                  variant={cylinderType === 'refill' ? 'default' : 'ghost'}
+                  onClick={() => setCylinderType('refill')}
+                  className={`h-8 text-xs px-3 font-medium ${cylinderType === 'refill' ? 'bg-primary shadow-sm' : ''}`}
+                >
+                  Refill
+                </Button>
+                <Button
+                  size="sm"
+                  variant={cylinderType === 'package' ? 'default' : 'ghost'}
+                  onClick={() => setCylinderType('package')}
+                  className={`h-8 text-xs px-3 font-medium ${cylinderType === 'package' ? 'bg-emerald-600 hover:bg-emerald-700 shadow-sm' : ''}`}
+                >
+                  Package
+                </Button>
+              </div>
+              {/* Sale Type */}
+              <div className="flex bg-muted/80 rounded-lg p-0.5 border border-border/50">
+                <Button
+                  size="sm"
+                  variant={saleType === 'retail' ? 'default' : 'ghost'}
+                  onClick={() => setSaleType('retail')}
+                  className={`h-8 text-xs px-3 font-medium ${saleType === 'retail' ? 'bg-primary shadow-sm' : ''}`}
+                >
+                  Retail
+                </Button>
+                <Button
+                  size="sm"
+                  variant={saleType === 'wholesale' ? 'default' : 'ghost'}
+                  onClick={() => setSaleType('wholesale')}
+                  className={`h-8 text-xs px-3 font-medium ${saleType === 'wholesale' ? 'bg-violet-600 hover:bg-violet-700 shadow-sm' : ''}`}
+                >
+                  Wholesale
+                </Button>
+              </div>
+              {/* Mouth Size */}
+              <div className="flex bg-muted/80 rounded-lg p-0.5 border border-border/50">
+                <Button 
+                  size="sm" 
+                  variant={mouthSize === "22mm" ? "default" : "ghost"} 
+                  className={`h-8 text-xs px-3 font-medium ${mouthSize === "22mm" ? 'bg-primary shadow-sm' : ''}`}
+                  onClick={() => { setMouthSize("22mm"); setWeight("12kg"); }}
+                >
+                  22mm
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant={mouthSize === "20mm" ? "default" : "ghost"} 
+                  className={`h-8 text-xs px-3 font-medium ${mouthSize === "20mm" ? 'bg-cyan-600 hover:bg-cyan-700 shadow-sm' : ''}`}
+                  onClick={() => { setMouthSize("20mm"); setWeight("12kg"); }}
+                >
+                  20mm
+                </Button>
+              </div>
+            </div>
+            
+            {/* Row 2: Weight Pills */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              {(mouthSize === "22mm" ? WEIGHT_OPTIONS_22MM : WEIGHT_OPTIONS_20MM).map(w => (
+                <Button
+                  key={w}
+                  size="sm"
+                  variant={weight === w ? "default" : "outline"}
+                  className={`h-8 text-xs px-3 font-medium ${weight === w ? 'bg-primary shadow-sm' : 'hover:bg-muted'}`}
+                  onClick={() => setWeight(w)}
+                >
+                  {w}
+                </Button>
+              ))}
               <Button
-                key={w}
                 size="sm"
-                variant={weight === w ? "default" : "outline"}
-                className="h-7 text-xs px-2"
-                onClick={() => setWeight(w)}
+                variant="outline"
+                className="h-8 text-xs px-3 font-medium border-dashed"
+                onClick={() => setShowCustomWeightInput(true)}
               >
-                {w}
+                <Plus className="h-3.5 w-3.5 mr-1" />
+                Other
               </Button>
-            ))}
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-7 text-xs px-2"
-              onClick={() => setShowCustomWeightInput(true)}
-            >
-              <Plus className="h-3 w-3 mr-1" />Other
-            </Button>
-          </div>
-        </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* ===== PRODUCT CARDS SECTION ===== */}
         <Card>

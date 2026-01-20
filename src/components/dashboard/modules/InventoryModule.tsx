@@ -641,7 +641,7 @@ export const InventoryModule = () => {
         {/* LPG Tab Content */}
         <TabsContent value="lpg" className="space-y-4 mt-4">
           {/* LPG Summary Cards - Top Row */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
             <Card className="bg-gradient-to-br from-green-500/10 to-green-500/5 border-green-500/20">
               <CardContent className="p-2.5 sm:p-3">
                 <div className="flex items-center gap-2">
@@ -682,17 +682,6 @@ export const InventoryModule = () => {
                   <div className="min-w-0">
                     <p className="text-lg sm:text-xl font-bold truncate">{lpgTotals.problem}</p>
                     <p className="text-[10px] sm:text-xs text-muted-foreground">Problem</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="bg-gradient-to-br from-yellow-500/10 to-yellow-500/5 border-yellow-500/20 col-span-2 sm:col-span-1">
-              <CardContent className="p-2.5 sm:p-3">
-                <div className="flex items-center gap-2">
-                  <Truck className="h-4 w-4 text-yellow-500 flex-shrink-0" />
-                  <div className="min-w-0">
-                    <p className="text-lg sm:text-xl font-bold truncate">{lpgTotals.inTransit}</p>
-                    <p className="text-[10px] sm:text-xs text-muted-foreground">In Transit</p>
                   </div>
                 </div>
               </CardContent>
