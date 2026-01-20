@@ -28,9 +28,9 @@ import { useIsMobile } from "@/hooks/use-mobile";
 const Dashboard = () => {
   const [activeModule, setActiveModule] = useState("overview");
   const [searchQuery, setSearchQuery] = useState("");
-  const [userRole, setUserRole] = useState<'owner' | 'manager' | 'driver'>('owner');
-  const [userName, setUserName] = useState("");
-  const [authLoading, setAuthLoading] = useState(true);
+  // Development mode - hardcoded owner role (auth disabled)
+  const userRole = 'owner' as const;
+  const userName = "Shop Owner";
   const isMobile = useIsMobile();
 
   // Swipe gesture state
@@ -64,39 +64,7 @@ const Dashboard = () => {
     }
   }, [touchStart, touchEnd, activeModule, userRole]);
 
-  // Fetch user role from database
-  useEffect(() => {
-    const fetchUserRole = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          setUserName(user.email || "User");
-          
-          // Fetch role from user_roles table
-          const { data: roleData } = await supabase
-            .from('user_roles')
-            .select('role')
-            .eq('user_id', user.id)
-            .single();
-          
-          if (roleData?.role) {
-            setUserRole(roleData.role as 'owner' | 'manager' | 'driver');
-          }
-        } else {
-          // No user - set default owner role for dev mode
-          setUserName("Developer");
-          setUserRole('owner');
-        }
-      } catch (error) {
-        // Auth check failed - continue with defaults
-        setUserName("Developer");
-        setUserRole('owner');
-      }
-      setAuthLoading(false);
-    };
-
-    fetchUserRole();
-  }, []);
+  // Auth disabled for development - skipping role fetch
 
   // Listen for module navigation events from other components
   useEffect(() => {
@@ -131,7 +99,7 @@ const Dashboard = () => {
     setOrders,
   } = useDashboardData();
 
-  if (loading || authLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center space-y-4 animate-fade-in">
