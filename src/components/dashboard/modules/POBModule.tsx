@@ -24,9 +24,9 @@ import {
   Calculator,
   Sparkles,
   Save,
-  Fuel,
   ArrowDown,
-  CircleDot
+  CircleDot,
+  CircleDashed
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -154,12 +154,13 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
   // ===== MOBILE STEP (for step-based mobile navigation) =====
   const [mobileStep, setMobileStep] = useState<'product' | 'cart' | 'checkout'>('product');
   
-  // ===== LPG CONFIGURATION STATE =====
+  // ===== LPG CONFIGURATION STATE (DUAL VALVE SIZE) =====
   const [lpgBrandName, setLpgBrandName] = useState("");
   const [lpgCylinderType, setLpgCylinderType] = useState<'refill' | 'package'>("refill");
   const [lpgWeight, setLpgWeight] = useState("12kg");
-  const [lpgValveSize, setLpgValveSize] = useState("22mm");
-  const [lpgQuantity, setLpgQuantity] = useState(1);
+  // NEW: Dual valve size quantities
+  const [lpgQty22mm, setLpgQty22mm] = useState(0);
+  const [lpgQty20mm, setLpgQty20mm] = useState(0);
   const [lpgTotalDO, setLpgTotalDO] = useState(0);
   const [customLpgBrand, setCustomLpgBrand] = useState("");
   const [showCustomLpgBrand, setShowCustomLpgBrand] = useState(false);
@@ -175,15 +176,14 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
   const [customStoveBrand, setCustomStoveBrand] = useState("");
   const [showCustomStoveBrand, setShowCustomStoveBrand] = useState(false);
   
-  // ===== REGULATOR CONFIGURATION STATE =====
+  // ===== REGULATOR CONFIGURATION STATE (DUAL VALVE SIZE) =====
   const [regulatorBrand, setRegulatorBrand] = useState("");
-  const [regulatorType, setRegulatorType] = useState("22mm");
-  const [regulatorQuantity, setRegulatorQuantity] = useState(1);
+  // NEW: Dual valve size quantities for regulators
+  const [regQty22mm, setRegQty22mm] = useState(0);
+  const [regQty20mm, setRegQty20mm] = useState(0);
   const [regulatorTotalAmount, setRegulatorTotalAmount] = useState(0);
   const [customRegulatorBrand, setCustomRegulatorBrand] = useState("");
   const [showCustomRegulatorBrand, setShowCustomRegulatorBrand] = useState(false);
-  const [customRegulatorType, setCustomRegulatorType] = useState("");
-  const [showCustomRegulatorType, setShowCustomRegulatorType] = useState(false);
   
   // ===== CART STATE =====
   const [purchaseItems, setPurchaseItems] = useState<PurchaseItem[]>([]);
@@ -197,6 +197,10 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
   const [recentPurchases, setRecentPurchases] = useState<RecentPurchase[]>([]);
   const [showVoidDialog, setShowVoidDialog] = useState(false);
   const [purchaseToVoid, setPurchaseToVoid] = useState<RecentPurchase | null>(null);
+
+  // ============= COMPUTED TOTALS =============
+  const lpgTotalQty = lpgQty22mm + lpgQty20mm;
+  const regTotalQty = regQty22mm + regQty20mm;
 
   // ============= DATA FETCHING =============
   const fetchData = useCallback(async () => {
@@ -285,11 +289,18 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
     return { "22mm": stats22mm, "20mm": stats20mm };
   }, [lpgBrands]);
 
+  // ============= REGULATOR STOCK COUNTS BY VALVE =============
+  const regulatorValveStats = useMemo(() => {
+    const stats22mm = regulators.filter(r => r.type === "22mm").reduce((sum, r) => sum + r.quantity, 0);
+    const stats20mm = regulators.filter(r => r.type === "20mm").reduce((sum, r) => sum + r.quantity, 0);
+    return { "22mm": stats22mm, "20mm": stats20mm };
+  }, [regulators]);
+
   // ============= CALCULATED PRICES =============
   const lpgCompanyPrice = useMemo(() => {
-    if (lpgQuantity <= 0 || lpgTotalDO <= 0) return 0;
-    return Math.round(lpgTotalDO / lpgQuantity);
-  }, [lpgQuantity, lpgTotalDO]);
+    if (lpgTotalQty <= 0 || lpgTotalDO <= 0) return 0;
+    return Math.round(lpgTotalDO / lpgTotalQty);
+  }, [lpgTotalQty, lpgTotalDO]);
 
   const stoveCompanyPrice = useMemo(() => {
     if (stoveQuantity <= 0 || stoveTotalAmount <= 0) return 0;
@@ -297,9 +308,9 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
   }, [stoveQuantity, stoveTotalAmount]);
 
   const regulatorCompanyPrice = useMemo(() => {
-    if (regulatorQuantity <= 0 || regulatorTotalAmount <= 0) return 0;
-    return Math.round(regulatorTotalAmount / regulatorQuantity);
-  }, [regulatorQuantity, regulatorTotalAmount]);
+    if (regTotalQty <= 0 || regulatorTotalAmount <= 0) return 0;
+    return Math.round(regulatorTotalAmount / regTotalQty);
+  }, [regTotalQty, regulatorTotalAmount]);
 
   // ============= CART CALCULATIONS =============
   const purchaseItemsCount = useMemo(() => {
@@ -319,15 +330,14 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
   const getEffectiveLpgWeight = () => showCustomLpgWeight ? customLpgWeight : lpgWeight;
   const getEffectiveStoveBrand = () => showCustomStoveBrand ? customStoveBrand : stoveBrand;
   const getEffectiveRegulatorBrand = () => showCustomRegulatorBrand ? customRegulatorBrand : regulatorBrand;
-  const getEffectiveRegulatorType = () => showCustomRegulatorType ? customRegulatorType : regulatorType;
   const getEffectiveSupplier = () => showCustomSupplierInput ? customSupplier : supplierName;
 
-  // ============= ADD PRODUCT TO CART & UPDATE PRICING =============
+  // ============= ADD LPG TO CART (DUAL VALVE SIZE) =============
   const addLPGToCart = async () => {
     const effectiveBrand = getEffectiveLpgBrand();
     const effectiveWeight = getEffectiveLpgWeight();
     
-    if (!effectiveBrand || lpgQuantity <= 0 || lpgTotalDO <= 0) {
+    if (!effectiveBrand || lpgTotalQty <= 0 || lpgTotalDO <= 0) {
       toast({ title: "Please fill all required fields", variant: "destructive" });
       return;
     }
@@ -335,67 +345,79 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
     const companyPrice = lpgCompanyPrice;
     const brandColor = getBrandColor(effectiveBrand);
 
-    // Find or create brand in inventory
-    let brandId = "";
-    const existingBrand = lpgBrands.find(b => 
-      b.name.toLowerCase() === effectiveBrand.toLowerCase() && 
-      b.size === lpgValveSize && 
-      b.weight === effectiveWeight
-    );
+    // Add items for each valve size that has quantity
+    const itemsToAdd: PurchaseItem[] = [];
 
-    if (existingBrand) {
-      brandId = existingBrand.id;
-    } else {
-      const { data: newBrand, error } = await supabase
-        .from('lpg_brands')
-        .insert({
-          name: effectiveBrand,
-          size: lpgValveSize,
-          weight: effectiveWeight,
-          color: brandColor,
-          refill_cylinder: 0,
-          package_cylinder: 0,
-          empty_cylinder: 0,
-          problem_cylinder: 0
-        })
-        .select()
-        .single();
+    for (const valveSize of ['22mm', '20mm'] as const) {
+      const qty = valveSize === '22mm' ? lpgQty22mm : lpgQty20mm;
+      if (qty <= 0) continue;
 
-      if (error) {
-        toast({ title: "Error creating brand", variant: "destructive" });
-        return;
+      // Find or create brand in inventory for this valve size
+      let brandId = "";
+      const existingBrand = lpgBrands.find(b => 
+        b.name.toLowerCase() === effectiveBrand.toLowerCase() && 
+        b.size === valveSize && 
+        b.weight === effectiveWeight
+      );
+
+      if (existingBrand) {
+        brandId = existingBrand.id;
+      } else {
+        const { data: newBrand, error } = await supabase
+          .from('lpg_brands')
+          .insert({
+            name: effectiveBrand,
+            size: valveSize,
+            weight: effectiveWeight,
+            color: brandColor,
+            refill_cylinder: 0,
+            package_cylinder: 0,
+            empty_cylinder: 0,
+            problem_cylinder: 0
+          })
+          .select()
+          .single();
+
+        if (error) {
+          toast({ title: `Error creating brand for ${valveSize}`, variant: "destructive" });
+          continue;
+        }
+        brandId = newBrand.id;
       }
-      brandId = newBrand.id;
+
+      // Update product pricing
+      await updateProductPricing('lpg', effectiveBrand, companyPrice, {
+        brandId,
+        weight: effectiveWeight,
+        valveSize,
+        cylinderType: lpgCylinderType
+      });
+
+      const itemId = `lpg-${valveSize}-${Date.now()}`;
+      itemsToAdd.push({
+        id: itemId,
+        type: 'lpg',
+        name: effectiveBrand,
+        details: `${effectiveWeight} • ${valveSize} • ${lpgCylinderType === 'refill' ? 'Refill' : 'Package'}`,
+        companyPrice,
+        quantity: qty,
+        cylinderType: lpgCylinderType,
+        brandId,
+        weight: effectiveWeight,
+        valveSize,
+        brandColor
+      });
     }
 
-    // Update product pricing
-    await updateProductPricing('lpg', effectiveBrand, companyPrice, {
-      brandId,
-      weight: effectiveWeight,
-      valveSize: lpgValveSize,
-      cylinderType: lpgCylinderType
-    });
+    if (itemsToAdd.length === 0) {
+      toast({ title: "No items to add", variant: "destructive" });
+      return;
+    }
 
-    // Add to cart
-    const itemId = `lpg-${Date.now()}`;
-    const newItem: PurchaseItem = {
-      id: itemId,
-      type: 'lpg',
-      name: effectiveBrand,
-      details: `${effectiveWeight} • ${lpgValveSize} • ${lpgCylinderType === 'refill' ? 'Refill' : 'Package'}`,
-      companyPrice,
-      quantity: lpgQuantity,
-      cylinderType: lpgCylinderType,
-      brandId,
-      weight: effectiveWeight,
-      valveSize: lpgValveSize,
-      brandColor
-    };
-
-    setPurchaseItems([...purchaseItems, newItem]);
+    setPurchaseItems([...purchaseItems, ...itemsToAdd]);
     toast({ 
       title: "Added to cart!", 
-      description: `${lpgQuantity}x ${effectiveBrand} @ ${BANGLADESHI_CURRENCY_SYMBOL}${companyPrice}/pc` 
+      description: `${lpgTotalQty}x ${effectiveBrand} @ ${BANGLADESHI_CURRENCY_SYMBOL}${companyPrice.toLocaleString()}/pc` 
     });
 
     // On mobile, show cart after adding
@@ -461,70 +483,81 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
     setPurchaseItems([...purchaseItems, newItem]);
     toast({ 
       title: "Added to cart!", 
-      description: `${stoveQuantity}x ${effectiveBrand} ${stoveModel} @ ${BANGLADESHI_CURRENCY_SYMBOL}${companyPrice}/pc` 
+      description: `${stoveQuantity}x ${effectiveBrand} ${stoveModel} @ ${BANGLADESHI_CURRENCY_SYMBOL}${companyPrice.toLocaleString()}/pc` 
     });
 
     if (isMobile) setMobileStep('cart');
     resetStoveForm();
   };
 
+  // ============= ADD REGULATOR TO CART (DUAL VALVE SIZE) =============
   const addRegulatorToCart = async () => {
     const effectiveBrand = getEffectiveRegulatorBrand();
-    const effectiveType = getEffectiveRegulatorType();
     
-    if (!effectiveBrand || regulatorQuantity <= 0 || regulatorTotalAmount <= 0) {
+    if (!effectiveBrand || regTotalQty <= 0 || regulatorTotalAmount <= 0) {
       toast({ title: "Please fill all required fields", variant: "destructive" });
       return;
     }
 
     const companyPrice = regulatorCompanyPrice;
+    const itemsToAdd: PurchaseItem[] = [];
 
-    let regId = "";
-    const existingReg = regulators.find(r => 
-      r.brand.toLowerCase() === effectiveBrand.toLowerCase() && 
-      r.type === effectiveType
-    );
+    for (const valveType of ['22mm', '20mm'] as const) {
+      const qty = valveType === '22mm' ? regQty22mm : regQty20mm;
+      if (qty <= 0) continue;
 
-    if (existingReg) {
-      regId = existingReg.id;
-    } else {
-      const { data: newReg, error } = await supabase
-        .from('regulators')
-        .insert({
-          brand: effectiveBrand,
-          type: effectiveType,
-          quantity: 0,
-          price: 0
-        })
-        .select()
-        .single();
+      let regId = "";
+      const existingReg = regulators.find(r => 
+        r.brand.toLowerCase() === effectiveBrand.toLowerCase() && 
+        r.type === valveType
+      );
 
-      if (error) {
-        toast({ title: "Error creating regulator", variant: "destructive" });
-        return;
+      if (existingReg) {
+        regId = existingReg.id;
+      } else {
+        const { data: newReg, error } = await supabase
+          .from('regulators')
+          .insert({
+            brand: effectiveBrand,
+            type: valveType,
+            quantity: 0,
+            price: 0
+          })
+          .select()
+          .single();
+
+        if (error) {
+          toast({ title: `Error creating regulator for ${valveType}`, variant: "destructive" });
+          continue;
+        }
+        regId = newReg.id;
       }
-      regId = newReg.id;
+
+      await updateProductPricing('regulator', `${effectiveBrand} ${valveType}`, companyPrice, {
+        regulatorType: valveType
+      });
+
+      itemsToAdd.push({
+        id: `regulator-${valveType}-${Date.now()}`,
+        type: 'regulator',
+        name: `${effectiveBrand} Regulator`,
+        details: `${valveType} Valve`,
+        companyPrice,
+        quantity: qty,
+        regulatorId: regId,
+        regulatorType: valveType
+      });
     }
 
-    await updateProductPricing('regulator', `${effectiveBrand} ${effectiveType}`, companyPrice, {
-      regulatorType: effectiveType
-    });
+    if (itemsToAdd.length === 0) {
+      toast({ title: "No items to add", variant: "destructive" });
+      return;
+    }
 
-    const newItem: PurchaseItem = {
-      id: `regulator-${Date.now()}`,
-      type: 'regulator',
-      name: `${effectiveBrand} Regulator`,
-      details: `${effectiveType} Valve`,
-      companyPrice,
-      quantity: regulatorQuantity,
-      regulatorId: regId,
-      regulatorType: effectiveType
-    };
-
-    setPurchaseItems([...purchaseItems, newItem]);
+    setPurchaseItems([...purchaseItems, ...itemsToAdd]);
     toast({ 
       title: "Added to cart!", 
-      description: `${regulatorQuantity}x ${effectiveBrand} @ ${BANGLADESHI_CURRENCY_SYMBOL}${companyPrice}/pc` 
+      description: `${regTotalQty}x ${effectiveBrand} @ ${BANGLADESHI_CURRENCY_SYMBOL}${companyPrice.toLocaleString()}/pc` 
     });
 
     if (isMobile) setMobileStep('cart');
@@ -597,11 +630,6 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
             
           if (error) {
             console.error('Error updating LPG price:', error);
-          } else {
-            toast({
-              title: "Price Updated",
-              description: `${productName} ${variant} price set to ${BANGLADESHI_CURRENCY_SYMBOL}${companyPrice}`
-            });
           }
         } else {
           // Create new pricing entry
@@ -620,11 +648,6 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
           
           if (error) {
             console.error('Error creating LPG price:', error);
-          } else {
-            toast({
-              title: "New Price Created",
-              description: `${productName} ${variant} added at ${BANGLADESHI_CURRENCY_SYMBOL}${companyPrice}`
-            });
           }
         }
       } else if (type === 'stove') {
@@ -641,7 +664,7 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
           .maybeSingle();
 
         if (existingPrice) {
-          const { error } = await supabase
+          await supabase
             .from('product_prices')
             .update({ 
               company_price: companyPrice, 
@@ -650,15 +673,8 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
               updated_at: new Date().toISOString() 
             })
             .eq('id', existingPrice.id);
-            
-          if (!error) {
-            toast({
-              title: "Stove Price Updated",
-              description: `${productName} price set to ${BANGLADESHI_CURRENCY_SYMBOL}${companyPrice}`
-            });
-          }
         } else {
-          const { error } = await supabase.from('product_prices').insert({
+          await supabase.from('product_prices').insert({
             product_type: 'stove',
             product_name: fullProductName,
             size: `${burnerText} Burner`,
@@ -668,13 +684,6 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
             package_price: 0,
             is_active: true
           });
-          
-          if (!error) {
-            toast({
-              title: "New Stove Price Created",
-              description: `${productName} added at ${BANGLADESHI_CURRENCY_SYMBOL}${companyPrice}`
-            });
-          }
         }
       } else if (type === 'regulator') {
         const fullProductName = `${productName} Regulator - ${options.regulatorType}`;
@@ -690,7 +699,7 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
           .maybeSingle();
 
         if (existingPrice) {
-          const { error } = await supabase
+          await supabase
             .from('product_prices')
             .update({ 
               company_price: companyPrice, 
@@ -698,15 +707,8 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
               updated_at: new Date().toISOString() 
             })
             .eq('id', existingPrice.id);
-            
-          if (!error) {
-            toast({
-              title: "Regulator Price Updated",
-              description: `${productName} ${options.regulatorType} price set to ${BANGLADESHI_CURRENCY_SYMBOL}${companyPrice}`
-            });
-          }
         } else {
-          const { error } = await supabase.from('product_prices').insert({
+          await supabase.from('product_prices').insert({
             product_type: 'regulator',
             product_name: fullProductName,
             size: options.regulatorType,
@@ -716,24 +718,12 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
             package_price: 0,
             is_active: true
           });
-          
-          if (!error) {
-            toast({
-              title: "New Regulator Price Created",
-              description: `${productName} ${options.regulatorType} added at ${BANGLADESHI_CURRENCY_SYMBOL}${companyPrice}`
-            });
-          }
         }
       }
 
       console.log(`Product pricing updated for ${productName}: ${BANGLADESHI_CURRENCY_SYMBOL}${companyPrice}`);
     } catch (error) {
       console.error('Error updating product pricing:', error);
-      toast({ 
-        title: "Pricing Update Failed", 
-        description: "Could not update product pricing", 
-        variant: "destructive" 
-      });
     }
   };
 
@@ -742,7 +732,8 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
     setLpgBrandName("");
     setLpgCylinderType("refill");
     setLpgWeight("12kg");
-    setLpgQuantity(1);
+    setLpgQty22mm(0);
+    setLpgQty20mm(0);
     setLpgTotalDO(0);
     setCustomLpgBrand("");
     setShowCustomLpgBrand(false);
@@ -762,13 +753,11 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
 
   const resetRegulatorForm = () => {
     setRegulatorBrand("");
-    setRegulatorType("22mm");
-    setRegulatorQuantity(1);
+    setRegQty22mm(0);
+    setRegQty20mm(0);
     setRegulatorTotalAmount(0);
     setCustomRegulatorBrand("");
     setShowCustomRegulatorBrand(false);
-    setCustomRegulatorType("");
-    setShowCustomRegulatorType(false);
   };
 
   // ============= CART ACTIONS =============
@@ -836,7 +825,7 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
         total_price: item.companyPrice * item.quantity,
         cylinder_type: item.cylinderType || null,
         weight: item.weight || null,
-        size: item.valveSize || null
+        size: item.valveSize || item.regulatorType || null
       }));
 
       await supabase.from('pob_transaction_items').insert(items);
@@ -969,11 +958,11 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
 
   // ============= GET AVAILABLE BRANDS =============
   const lpgBrandOptions = useMemo(() => {
-    const brands = getLpgBrandsByMouthSize(lpgValveSize as "22mm" | "20mm");
-    return brands.map(b => b.name);
-  }, [lpgValveSize]);
-
-  const weightOptions = lpgValveSize === "22mm" ? WEIGHT_OPTIONS_22MM : WEIGHT_OPTIONS_20MM;
+    // Get all unique brands from both valve sizes
+    const allBrands = new Set<string>();
+    LPG_BRANDS.forEach(b => allBrands.add(b.name));
+    return Array.from(allBrands);
+  }, []);
 
   // ============= LOADING STATE =============
   if (loading) {
@@ -987,7 +976,74 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
     );
   }
 
-  // ============= RENDER PRODUCT SELECTION (Shared component) =============
+  // ============= QUANTITY STEPPER COMPONENT =============
+  const QuantityStepper = ({ 
+    value, 
+    onChange, 
+    label, 
+    stockLabel,
+    colorClass = "text-primary"
+  }: { 
+    value: number; 
+    onChange: (v: number) => void;
+    label: string;
+    stockLabel?: string;
+    colorClass?: string;
+  }) => (
+    <div className="flex flex-col items-center p-3 bg-muted/30 rounded-xl border border-border">
+      <span className="text-sm font-semibold mb-1">{label}</span>
+      {stockLabel && (
+        <span className="text-xs text-muted-foreground mb-2">{stockLabel}</span>
+      )}
+      <div className="flex items-center gap-1">
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className="h-10 w-10"
+          onClick={() => onChange(Math.max(0, value - 10))}
+        >
+          <span className="text-xs font-bold">-10</span>
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className="h-10 w-10"
+          onClick={() => onChange(Math.max(0, value - 1))}
+        >
+          <Minus className="h-4 w-4" />
+        </Button>
+        <Input
+          type="number"
+          inputMode="numeric"
+          value={value}
+          onChange={(e) => onChange(Math.max(0, parseInt(e.target.value) || 0))}
+          className="w-16 h-10 text-center font-bold text-lg"
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className="h-10 w-10"
+          onClick={() => onChange(value + 1)}
+        >
+          <Plus className="h-4 w-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className="h-10 w-10"
+          onClick={() => onChange(value + 10)}
+        >
+          <span className="text-xs font-bold">+10</span>
+        </Button>
+      </div>
+    </div>
+  );
+
+  // ============= RENDER PRODUCT SELECTION =============
   const renderProductSelection = () => (
     <div className="space-y-4">
       {/* Product Type Tabs */}
@@ -1017,71 +1073,81 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
         </TabsList>
       </Tabs>
 
-      {/* LPG FORM */}
+      {/* LPG FORM - Redesigned with Dual Valve Quantity */}
       {activeTab === 'lpg' && (
-        <Card className="border-primary/20 shadow-sm">
-          <CardHeader className="py-3 px-4 bg-primary/5 border-b border-primary/10">
-            <CardTitle className="flex items-center gap-2 text-base font-semibold">
-              <Fuel className="h-5 w-5 text-primary" />
+        <Card className="border-primary/20 shadow-sm overflow-hidden">
+          <CardHeader className="py-3 px-4 bg-gradient-to-r from-primary/10 to-secondary/5 border-b border-primary/10">
+            <CardTitle className="flex items-center gap-2 text-base font-bold">
+              <Cylinder className="h-5 w-5 text-primary" />
               LPG Cylinder Purchase
             </CardTitle>
+            <p className="text-xs text-muted-foreground">Configure your cylinder requirements</p>
           </CardHeader>
-          <CardContent className="p-4 space-y-4">
-            {/* Valve Size with Stock Count */}
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Valve Size (Current Stock)</Label>
-              <div className="grid grid-cols-2 gap-2">
-                <Button
-                  type="button"
-                  variant={lpgValveSize === "22mm" ? "default" : "outline"}
-                  className="h-14 flex-col font-medium relative"
-                  onClick={() => { setLpgValveSize("22mm"); setLpgWeight("12kg"); }}
-                >
-                  <span className="text-base font-bold">22mm</span>
-                  <span className="text-[10px] opacity-80">
-                    {valveSizeStats["22mm"].refill}R + {valveSizeStats["22mm"].package}P
-                  </span>
-                </Button>
-                <Button
-                  type="button"
-                  variant={lpgValveSize === "20mm" ? "default" : "outline"}
-                  className="h-14 flex-col font-medium relative"
-                  onClick={() => { setLpgValveSize("20mm"); setLpgWeight("12kg"); }}
-                >
-                  <span className="text-base font-bold">20mm</span>
-                  <span className="text-[10px] opacity-80">
-                    {valveSizeStats["20mm"].refill}R + {valveSizeStats["20mm"].package}P
-                  </span>
-                </Button>
+          <CardContent className="p-4 space-y-5">
+            {/* Row 1: Cylinder Type & Weight (Side by Side) */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Cylinder Type</Label>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <Button
+                    type="button"
+                    variant={lpgCylinderType === "refill" ? "default" : "outline"}
+                    size="sm"
+                    className="h-11 font-medium text-xs"
+                    onClick={() => setLpgCylinderType("refill")}
+                  >
+                    Refill
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={lpgCylinderType === "package" ? "secondary" : "outline"}
+                    size="sm"
+                    className="h-11 font-medium text-xs"
+                    onClick={() => setLpgCylinderType("package")}
+                  >
+                    Package
+                  </Button>
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-medium">Weight</Label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-[10px] text-primary"
+                    onClick={() => setShowCustomLpgWeight(!showCustomLpgWeight)}
+                  >
+                    {showCustomLpgWeight ? "← Select" : "+ Custom"}
+                  </Button>
+                </div>
+                {showCustomLpgWeight ? (
+                  <Input
+                    placeholder="e.g., 14kg"
+                    value={customLpgWeight}
+                    onChange={(e) => setCustomLpgWeight(e.target.value)}
+                    className="h-11"
+                  />
+                ) : (
+                  <Select value={lpgWeight} onValueChange={setLpgWeight}>
+                    <SelectTrigger className="h-11">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[...new Set([...WEIGHT_OPTIONS_22MM, ...WEIGHT_OPTIONS_20MM])].sort((a, b) => 
+                        parseFloat(a) - parseFloat(b)
+                      ).map(w => (
+                        <SelectItem key={w} value={w}>{w}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
             </div>
 
-            {/* Cylinder Type */}
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Type</Label>
-              <div className="grid grid-cols-2 gap-2">
-                <Button
-                  type="button"
-                  variant={lpgCylinderType === "refill" ? "success" : "outline"}
-                  className="h-12 font-medium gap-2"
-                  onClick={() => setLpgCylinderType("refill")}
-                >
-                  <RotateCcw className="h-4 w-4" />
-                  Refill
-                </Button>
-                <Button
-                  type="button"
-                  variant={lpgCylinderType === "package" ? "warning" : "outline"}
-                  className="h-12 font-medium gap-2"
-                  onClick={() => setLpgCylinderType("package")}
-                >
-                  <Package className="h-4 w-4" />
-                  Package
-                </Button>
-              </div>
-            </div>
-
-            {/* Brand Selection */}
+            {/* Row 2: Brand Name (Full Width) */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label className="text-sm font-medium">Brand Name</Label>
@@ -1089,7 +1155,7 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="h-7 px-2 text-xs text-primary hover:text-primary"
+                  className="h-6 px-2 text-[10px] text-primary"
                   onClick={() => setShowCustomLpgBrand(!showCustomLpgBrand)}
                 >
                   {showCustomLpgBrand ? "← Select" : "+ Custom"}
@@ -1116,93 +1182,59 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
               )}
             </div>
 
-            {/* Weight Selection */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label className="text-sm font-medium">Weight</Label>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 px-2 text-xs text-primary hover:text-primary"
-                  onClick={() => setShowCustomLpgWeight(!showCustomLpgWeight)}
-                >
-                  {showCustomLpgWeight ? "← Select" : "+ Custom"}
-                </Button>
-              </div>
-              {showCustomLpgWeight ? (
-                <Input
-                  placeholder="e.g., 15kg"
-                  value={customLpgWeight}
-                  onChange={(e) => setCustomLpgWeight(e.target.value)}
-                  className="h-12"
+            {/* Row 3: QUANTITY BY VALVE SIZE (The Key Feature) */}
+            <div className="space-y-3">
+              <Label className="text-sm font-semibold flex items-center gap-2">
+                <CircleDashed className="h-4 w-4" />
+                Quantity (By Valve Size)
+              </Label>
+              <div className="grid grid-cols-2 gap-3">
+                <QuantityStepper
+                  value={lpgQty22mm}
+                  onChange={setLpgQty22mm}
+                  label="22mm"
+                  stockLabel={`Stock: ${valveSizeStats["22mm"].refill}R + ${valveSizeStats["22mm"].package}P`}
+                  colorClass="text-primary"
                 />
-              ) : (
-                <Select value={lpgWeight} onValueChange={setLpgWeight}>
-                  <SelectTrigger className="h-12">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {weightOptions.map(w => (
-                      <SelectItem key={w} value={w}>{w}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <QuantityStepper
+                  value={lpgQty20mm}
+                  onChange={setLpgQty20mm}
+                  label="20mm"
+                  stockLabel={`Stock: ${valveSizeStats["20mm"].refill}R + ${valveSizeStats["20mm"].package}P`}
+                  colorClass="text-secondary"
+                />
+              </div>
+              {lpgTotalQty > 0 && (
+                <div className="text-center py-2 bg-primary/5 rounded-lg border border-primary/20">
+                  <span className="text-sm text-muted-foreground">Total: </span>
+                  <span className="text-lg font-bold text-primary">{lpgTotalQty.toLocaleString()}</span>
+                  <span className="text-sm text-muted-foreground"> cylinders</span>
+                </div>
               )}
             </div>
 
-            {/* Quantity & Total DO */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Quantity</Label>
-                <div className="flex items-center gap-1">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="h-12 w-12 shrink-0"
-                    onClick={() => setLpgQuantity(Math.max(1, lpgQuantity - 1))}
-                  >
-                    <Minus className="h-4 w-4" />
-                  </Button>
-                  <Input
-                    type="number"
-                    inputMode="numeric"
-                    value={lpgQuantity}
-                    onChange={(e) => setLpgQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                    className="h-12 text-center font-semibold"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="h-12 w-12 shrink-0"
-                    onClick={() => setLpgQuantity(lpgQuantity + 1)}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Total D.O. ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
-                <Input
-                  type="number"
-                  inputMode="numeric"
-                  placeholder="Amount paid..."
-                  value={lpgTotalDO || ""}
-                  onChange={(e) => setLpgTotalDO(parseInt(e.target.value) || 0)}
-                  className="h-12"
-                />
-              </div>
+            <Separator />
+
+            {/* Row 4: Total D.O. Amount */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Total D.O. Amount ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
+              <Input
+                type="number"
+                inputMode="numeric"
+                placeholder="Enter total amount paid..."
+                value={lpgTotalDO || ""}
+                onChange={(e) => setLpgTotalDO(parseInt(e.target.value) || 0)}
+                className="h-14 text-lg font-semibold"
+              />
             </div>
 
-            {/* Auto-calculated Company Price */}
-            <div className="flex items-center justify-between p-4 bg-primary/10 rounded-xl border border-primary/20">
+            {/* Auto-calculated Unit Price */}
+            <div className="flex items-center justify-between p-4 bg-gradient-to-r from-primary/10 to-secondary/5 rounded-xl border border-primary/20">
               <div className="flex items-center gap-2">
                 <Calculator className="h-5 w-5 text-primary" />
-                <span className="text-sm font-medium text-foreground">Unit Price</span>
+                <span className="text-sm font-medium">Unit Price</span>
               </div>
-              <span className="text-2xl font-bold text-primary">
+              <span className="text-3xl font-extrabold text-primary">
                 {BANGLADESHI_CURRENCY_SYMBOL}{lpgCompanyPrice.toLocaleString()}
               </span>
             </div>
@@ -1213,7 +1245,7 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
               size="lg"
               className="w-full h-14 font-semibold text-base"
               onClick={addLPGToCart}
-              disabled={!getEffectiveLpgBrand() || lpgQuantity <= 0 || lpgTotalDO <= 0}
+              disabled={!getEffectiveLpgBrand() || lpgTotalQty <= 0 || lpgTotalDO <= 0}
             >
               <Plus className="h-5 w-5 mr-2" />
               Add to Cart
@@ -1373,16 +1405,16 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
         </Card>
       )}
 
-      {/* REGULATOR FORM */}
+      {/* REGULATOR FORM - Redesigned with Dual Valve Quantity */}
       {activeTab === 'regulator' && (
-        <Card className="border-info/20 shadow-sm">
+        <Card className="border-info/20 shadow-sm overflow-hidden">
           <CardHeader className="py-3 px-4 bg-info/5 border-b border-info/10">
             <CardTitle className="flex items-center gap-2 text-base font-semibold">
               <Gauge className="h-5 w-5 text-info" />
               Regulator Purchase
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-4 space-y-4">
+          <CardContent className="p-4 space-y-5">
             {/* Brand Selection */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
@@ -1418,92 +1450,50 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
               )}
             </div>
 
-            {/* Valve Type */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label className="text-sm font-medium">Valve Type</Label>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 px-2 text-xs text-info hover:text-info"
-                  onClick={() => setShowCustomRegulatorType(!showCustomRegulatorType)}
-                >
-                  {showCustomRegulatorType ? "← Select" : "+ Custom"}
-                </Button>
-              </div>
-              {showCustomRegulatorType ? (
-                <Input
-                  placeholder="e.g., 21mm, 25mm..."
-                  value={customRegulatorType}
-                  onChange={(e) => setCustomRegulatorType(e.target.value)}
-                  className="h-12"
+            {/* QUANTITY BY VALVE TYPE (The Key Feature for Regulators) */}
+            <div className="space-y-3">
+              <Label className="text-sm font-semibold flex items-center gap-2">
+                <CircleDashed className="h-4 w-4" />
+                Quantity (By Valve Type)
+              </Label>
+              <div className="grid grid-cols-2 gap-3">
+                <QuantityStepper
+                  value={regQty22mm}
+                  onChange={setRegQty22mm}
+                  label="22mm"
+                  stockLabel={`Stock: ${regulatorValveStats["22mm"]}`}
+                  colorClass="text-info"
                 />
-              ) : (
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    type="button"
-                    variant={regulatorType === "22mm" ? "info" : "outline"}
-                    className="h-12 font-medium"
-                    onClick={() => setRegulatorType("22mm")}
-                  >
-                    22mm
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={regulatorType === "20mm" ? "info" : "outline"}
-                    className="h-12 font-medium"
-                    onClick={() => setRegulatorType("20mm")}
-                  >
-                    20mm
-                  </Button>
+                <QuantityStepper
+                  value={regQty20mm}
+                  onChange={setRegQty20mm}
+                  label="20mm"
+                  stockLabel={`Stock: ${regulatorValveStats["20mm"]}`}
+                  colorClass="text-info"
+                />
+              </div>
+              {regTotalQty > 0 && (
+                <div className="text-center py-2 bg-info/5 rounded-lg border border-info/20">
+                  <span className="text-sm text-muted-foreground">Total: </span>
+                  <span className="text-lg font-bold text-info">{regTotalQty.toLocaleString()}</span>
+                  <span className="text-sm text-muted-foreground"> regulators</span>
                 </div>
               )}
             </div>
 
-            {/* Quantity & Total Amount */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Quantity</Label>
-                <div className="flex items-center gap-1">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="h-12 w-12 shrink-0"
-                    onClick={() => setRegulatorQuantity(Math.max(1, regulatorQuantity - 1))}
-                  >
-                    <Minus className="h-4 w-4" />
-                  </Button>
-                  <Input
-                    type="number"
-                    inputMode="numeric"
-                    value={regulatorQuantity}
-                    onChange={(e) => setRegulatorQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                    className="h-12 text-center font-semibold"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="h-12 w-12 shrink-0"
-                    onClick={() => setRegulatorQuantity(regulatorQuantity + 1)}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Total ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
-                <Input
-                  type="number"
-                  inputMode="numeric"
-                  placeholder="Amount paid..."
-                  value={regulatorTotalAmount || ""}
-                  onChange={(e) => setRegulatorTotalAmount(parseInt(e.target.value) || 0)}
-                  className="h-12"
-                />
-              </div>
+            <Separator />
+
+            {/* Total Amount */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Total Amount ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
+              <Input
+                type="number"
+                inputMode="numeric"
+                placeholder="Enter total amount paid..."
+                value={regulatorTotalAmount || ""}
+                onChange={(e) => setRegulatorTotalAmount(parseInt(e.target.value) || 0)}
+                className="h-14 text-lg font-semibold"
+              />
             </div>
 
             {/* Auto-calculated Company Price */}
@@ -1512,7 +1502,7 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
                 <Calculator className="h-5 w-5 text-info" />
                 <span className="text-sm font-medium text-foreground">Unit Price</span>
               </div>
-              <span className="text-2xl font-bold text-info">
+              <span className="text-3xl font-extrabold text-info">
                 {BANGLADESHI_CURRENCY_SYMBOL}{regulatorCompanyPrice.toLocaleString()}
               </span>
             </div>
@@ -1524,7 +1514,7 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
               variant="info"
               className="w-full h-14 font-semibold text-base"
               onClick={addRegulatorToCart}
-              disabled={!getEffectiveRegulatorBrand() || regulatorQuantity <= 0 || regulatorTotalAmount <= 0}
+              disabled={!getEffectiveRegulatorBrand() || regTotalQty <= 0 || regulatorTotalAmount <= 0}
             >
               <Plus className="h-5 w-5 mr-2" />
               Add to Cart
@@ -1566,7 +1556,7 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
               </div>
             ) : (
               <div className="p-3 space-y-3">
-                {purchaseItems.map((item, index) => (
+                {purchaseItems.map((item) => (
                   <Card 
                     key={item.id} 
                     className="overflow-hidden border shadow-sm hover:shadow-md transition-shadow"
@@ -1720,25 +1710,25 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
             )}
           </ScrollArea>
           
-          {/* Cart Summary - Separate Cards for Quantity and Total D.O. */}
+          {/* Cart Summary - Large Prominent Cards */}
           {purchaseItems.length > 0 && (
-            <div className="p-3 bg-muted/30 border-t border-border shrink-0 space-y-3">
-              {/* Summary Cards Grid */}
-              <div className="grid grid-cols-2 gap-3">
+            <div className="p-4 bg-gradient-to-t from-muted/50 to-transparent border-t border-border shrink-0 space-y-4">
+              {/* Summary Cards Grid - Made Larger */}
+              <div className="grid grid-cols-2 gap-4">
                 {/* Total Quantity Card */}
-                <Card className="border-2 border-success/30 bg-success/5">
-                  <CardContent className="p-3 text-center">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Total Quantity</p>
-                    <p className="text-2xl font-bold text-success">{totalQuantity.toLocaleString()}</p>
-                    <p className="text-xs text-muted-foreground">({productCount} products)</p>
+                <Card className="border-2 border-success/40 bg-gradient-to-br from-success/10 to-success/5 shadow-sm">
+                  <CardContent className="p-4 text-center">
+                    <p className="text-xs font-semibold text-success uppercase tracking-wider mb-1">Total Quantity</p>
+                    <p className="text-4xl font-extrabold text-success">{totalQuantity.toLocaleString()}</p>
+                    <p className="text-xs text-muted-foreground mt-1">({productCount} products)</p>
                   </CardContent>
                 </Card>
                 
                 {/* Total D.O. Card */}
-                <Card className="border-2 border-primary/30 bg-primary/5">
-                  <CardContent className="p-3 text-center">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Total D.O.</p>
-                    <p className="text-2xl font-bold text-primary">{BANGLADESHI_CURRENCY_SYMBOL}{totalDO.toLocaleString()}</p>
+                <Card className="border-2 border-primary/40 bg-gradient-to-br from-primary/10 to-primary/5 shadow-sm">
+                  <CardContent className="p-4 text-center">
+                    <p className="text-xs font-semibold text-primary uppercase tracking-wider mb-1">Total D.O.</p>
+                    <p className="text-3xl font-extrabold text-primary">{BANGLADESHI_CURRENCY_SYMBOL}{totalDO.toLocaleString()}</p>
                   </CardContent>
                 </Card>
               </div>
@@ -1748,7 +1738,7 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
                 <Button
                   type="button"
                   size="lg"
-                  className="w-full h-12 font-semibold"
+                  className="w-full h-14 font-semibold text-base"
                   onClick={() => setMobileStep('checkout')}
                 >
                   <CheckCircle2 className="h-5 w-5 mr-2" />
@@ -1817,7 +1807,7 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Items</span>
-              <span className="font-medium">{purchaseItemsCount}</span>
+              <span className="font-medium">{purchaseItemsCount.toLocaleString()}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Subtotal</span>
@@ -1827,7 +1817,7 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
           <Separator />
           <div className="flex justify-between items-baseline">
             <span className="text-base font-semibold">Total D.O.</span>
-            <span className="text-2xl font-bold text-primary">{BANGLADESHI_CURRENCY_SYMBOL}{total.toLocaleString()}</span>
+            <span className="text-3xl font-extrabold text-primary">{BANGLADESHI_CURRENCY_SYMBOL}{total.toLocaleString()}</span>
           </div>
 
           {/* Action Buttons */}
@@ -1924,7 +1914,7 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
             )}
             <Badge className="h-10 px-4 bg-primary text-primary-foreground font-medium gap-2 text-sm">
               <ShoppingBag className="h-4 w-4" />
-              <span>{purchaseItemsCount}</span>
+              <span>{purchaseItemsCount.toLocaleString()}</span>
             </Badge>
           </div>
         </div>
@@ -1988,44 +1978,29 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
         </div>
       </div>
 
-      {/* ===== MOBILE LAYOUT (step-based) ===== */}
+      {/* ===== MOBILE LAYOUT (Step-based) ===== */}
       <div className="lg:hidden">
         {mobileStep === 'product' && renderProductSelection()}
-        {mobileStep === 'cart' && (
-          <div className="h-[calc(100vh-220px)]">
-            {renderCart()}
-          </div>
-        )}
+        {mobileStep === 'cart' && renderCart()}
         {mobileStep === 'checkout' && renderCheckout()}
       </div>
 
       {/* ===== VOID DIALOG ===== */}
       <Dialog open={showVoidDialog} onOpenChange={setShowVoidDialog}>
-        <DialogContent className="sm:max-w-md mx-4">
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-destructive">
-              <Undo2 className="h-5 w-5" />
-              Void Purchase
-            </DialogTitle>
+            <DialogTitle>Void Purchase?</DialogTitle>
             <DialogDescription>
-              This will reverse all stock and expense entries for this purchase.
+              This will reverse the stock changes and remove the expense entry for {purchaseToVoid?.transactionNumber}.
             </DialogDescription>
           </DialogHeader>
-          {purchaseToVoid && (
-            <div className="p-4 bg-muted rounded-xl">
-              <p className="font-semibold">{purchaseToVoid.transactionNumber}</p>
-              <p className="text-sm text-muted-foreground">{purchaseToVoid.supplierName}</p>
-              <p className="text-xl font-bold text-destructive mt-2">
-                {BANGLADESHI_CURRENCY_SYMBOL}{purchaseToVoid.total.toLocaleString()}
-              </p>
-            </div>
-          )}
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button type="button" variant="outline" className="h-12" onClick={() => setShowVoidDialog(false)}>
+            <Button variant="outline" onClick={() => setShowVoidDialog(false)}>
               Cancel
             </Button>
-            <Button type="button" variant="destructive" className="h-12" onClick={handleVoidPurchase}>
-              Confirm Void
+            <Button variant="destructive" onClick={handleVoidPurchase}>
+              <Undo2 className="h-4 w-4 mr-2" />
+              Void Purchase
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2033,3 +2008,5 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
     </div>
   );
 };
+
+export default POBModule;
