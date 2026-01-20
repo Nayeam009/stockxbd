@@ -53,6 +53,11 @@ export const AppSidebar = ({
     roles: ['owner', 'manager', 'driver']
   }];
   const salesItems = [{
+    id: 'business-diary',
+    titleKey: 'business_diary',
+    icon: BarChart3,
+    roles: ['owner', 'manager']
+  }, {
     id: 'daily-sales',
     titleKey: 'daily_sales',
     icon: BarChart3,
