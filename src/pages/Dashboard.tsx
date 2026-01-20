@@ -7,7 +7,7 @@ import { DashboardOverview } from "@/components/dashboard/modules/DashboardOverv
 import { BusinessDiaryModule } from "@/components/dashboard/modules/BusinessDiaryModule";
 import { InventoryModule } from "@/components/dashboard/modules/InventoryModule";
 import { OnlineDeliveryModule } from "@/components/dashboard/modules/OnlineDeliveryModule";
-import { SearchModule } from "@/components/dashboard/modules/SearchModule";
+import { AnalysisSearchReportModule } from "@/components/dashboard/modules/AnalysisSearchReportModule";
 import { POSModule } from "@/components/dashboard/modules/POSModule";
 
 import { CommunityModule } from "@/components/dashboard/modules/CommunityModule";
@@ -172,8 +172,9 @@ const Dashboard = () => {
           />
         );
       case "search":
+      case "analysis-search":
         return (
-          <SearchModule
+          <AnalysisSearchReportModule
             salesData={salesData}
             customers={customers}
             stockData={stockData}

@@ -99,8 +99,8 @@ export const AppSidebar = ({
     icon: Users,
     roles: ['owner', 'manager', 'driver']
   }, {
-    id: 'search',
-    titleKey: 'search',
+    id: 'analysis-search',
+    titleKey: 'analysis_search',
     icon: Search,
     roles: ['owner', 'manager']
   }, {
