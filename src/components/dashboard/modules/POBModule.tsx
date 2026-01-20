@@ -26,7 +26,8 @@ import {
   Save,
   ArrowDown,
   CircleDot,
-  CircleDashed
+  CircleDashed,
+  Flame
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -95,7 +96,7 @@ interface PurchaseItem {
   weight?: string;
   valveSize?: string;
   brandColor?: string;
-  burnerType?: string;
+  burnerType?: 'single' | 'double';
   model?: string;
   regulatorType?: string;
 }
@@ -158,7 +159,7 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
   const [lpgBrandName, setLpgBrandName] = useState("");
   const [lpgCylinderType, setLpgCylinderType] = useState<'refill' | 'package'>("refill");
   const [lpgWeight, setLpgWeight] = useState("12kg");
-  // NEW: Dual valve size quantities
+  // Dual valve size quantities
   const [lpgQty22mm, setLpgQty22mm] = useState(0);
   const [lpgQty20mm, setLpgQty20mm] = useState(0);
   const [lpgTotalDO, setLpgTotalDO] = useState(0);
@@ -167,18 +168,19 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
   const [customLpgWeight, setCustomLpgWeight] = useState("");
   const [showCustomLpgWeight, setShowCustomLpgWeight] = useState(false);
   
-  // ===== STOVE CONFIGURATION STATE =====
+  // ===== STOVE CONFIGURATION STATE (DUAL BURNER TYPE) =====
   const [stoveBrand, setStoveBrand] = useState("");
   const [stoveModel, setStoveModel] = useState("");
-  const [stoveBurnerType, setStoveBurnerType] = useState<'single' | 'double'>("single");
-  const [stoveQuantity, setStoveQuantity] = useState(1);
+  // NEW: Dual burner type quantities
+  const [stoveQtySingle, setStoveQtySingle] = useState(0);
+  const [stoveQtyDouble, setStoveQtyDouble] = useState(0);
   const [stoveTotalAmount, setStoveTotalAmount] = useState(0);
   const [customStoveBrand, setCustomStoveBrand] = useState("");
   const [showCustomStoveBrand, setShowCustomStoveBrand] = useState(false);
   
   // ===== REGULATOR CONFIGURATION STATE (DUAL VALVE SIZE) =====
   const [regulatorBrand, setRegulatorBrand] = useState("");
-  // NEW: Dual valve size quantities for regulators
+  // Dual valve size quantities for regulators
   const [regQty22mm, setRegQty22mm] = useState(0);
   const [regQty20mm, setRegQty20mm] = useState(0);
   const [regulatorTotalAmount, setRegulatorTotalAmount] = useState(0);
@@ -200,6 +202,7 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
 
   // ============= COMPUTED TOTALS =============
   const lpgTotalQty = lpgQty22mm + lpgQty20mm;
+  const stoveTotalQty = stoveQtySingle + stoveQtyDouble;
   const regTotalQty = regQty22mm + regQty20mm;
 
   // ============= DATA FETCHING =============
@@ -266,7 +269,7 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
     return () => channels.forEach(ch => supabase.removeChannel(ch));
   }, [fetchData]);
 
-  // ============= VALVE SIZE STOCK COUNTS =============
+  // ============= VALVE SIZE STOCK COUNTS (LPG) =============
   const valveSizeStats = useMemo(() => {
     const stats22mm = lpgBrands
       .filter(b => b.size === "22mm")
@@ -296,6 +299,13 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
     return { "22mm": stats22mm, "20mm": stats20mm };
   }, [regulators]);
 
+  // ============= STOVE STOCK COUNTS BY BURNER TYPE =============
+  const stoveBurnerStats = useMemo(() => {
+    const singleBurner = stoves.filter(s => s.burners === 1).reduce((sum, s) => sum + s.quantity, 0);
+    const doubleBurner = stoves.filter(s => s.burners === 2).reduce((sum, s) => sum + s.quantity, 0);
+    return { single: singleBurner, double: doubleBurner };
+  }, [stoves]);
+
   // ============= CALCULATED PRICES =============
   const lpgCompanyPrice = useMemo(() => {
     if (lpgTotalQty <= 0 || lpgTotalDO <= 0) return 0;
@@ -303,9 +313,9 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
   }, [lpgTotalQty, lpgTotalDO]);
 
   const stoveCompanyPrice = useMemo(() => {
-    if (stoveQuantity <= 0 || stoveTotalAmount <= 0) return 0;
-    return Math.round(stoveTotalAmount / stoveQuantity);
-  }, [stoveQuantity, stoveTotalAmount]);
+    if (stoveTotalQty <= 0 || stoveTotalAmount <= 0) return 0;
+    return Math.round(stoveTotalAmount / stoveTotalQty);
+  }, [stoveTotalQty, stoveTotalAmount]);
 
   const regulatorCompanyPrice = useMemo(() => {
     if (regTotalQty <= 0 || regulatorTotalAmount <= 0) return 0;
@@ -425,65 +435,80 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
     resetLPGForm();
   };
 
+  // ============= ADD STOVE TO CART (DUAL BURNER TYPE) =============
   const addStoveToCart = async () => {
     const effectiveBrand = getEffectiveStoveBrand();
     
-    if (!effectiveBrand || !stoveModel || stoveQuantity <= 0 || stoveTotalAmount <= 0) {
+    if (!effectiveBrand || !stoveModel || stoveTotalQty <= 0 || stoveTotalAmount <= 0) {
       toast({ title: "Please fill all required fields", variant: "destructive" });
       return;
     }
 
     const companyPrice = stoveCompanyPrice;
-    const burners = stoveBurnerType === 'single' ? 1 : 2;
+    const itemsToAdd: PurchaseItem[] = [];
 
-    let stoveId = "";
-    const existingStove = stoves.find(s => 
-      s.brand.toLowerCase() === effectiveBrand.toLowerCase() && 
-      s.model.toLowerCase() === stoveModel.toLowerCase()
-    );
+    // Add items for each burner type that has quantity
+    for (const burnerType of ['single', 'double'] as const) {
+      const qty = burnerType === 'single' ? stoveQtySingle : stoveQtyDouble;
+      if (qty <= 0) continue;
 
-    if (existingStove) {
-      stoveId = existingStove.id;
-    } else {
-      const { data: newStove, error } = await supabase
-        .from('stoves')
-        .insert({
-          brand: effectiveBrand,
-          model: stoveModel,
-          burners,
-          price: 0,
-          quantity: 0
-        })
-        .select()
-        .single();
+      const burners = burnerType === 'single' ? 1 : 2;
+      let stoveId = "";
+      
+      const existingStove = stoves.find(s => 
+        s.brand.toLowerCase() === effectiveBrand.toLowerCase() && 
+        s.model.toLowerCase() === stoveModel.toLowerCase() &&
+        s.burners === burners
+      );
 
-      if (error) {
-        toast({ title: "Error creating stove", variant: "destructive" });
-        return;
+      if (existingStove) {
+        stoveId = existingStove.id;
+      } else {
+        const { data: newStove, error } = await supabase
+          .from('stoves')
+          .insert({
+            brand: effectiveBrand,
+            model: stoveModel,
+            burners,
+            price: 0,
+            quantity: 0
+          })
+          .select()
+          .single();
+
+        if (error) {
+          toast({ title: `Error creating stove for ${burnerType} burner`, variant: "destructive" });
+          continue;
+        }
+        stoveId = newStove.id;
       }
-      stoveId = newStove.id;
+
+      await updateProductPricing('stove', `${effectiveBrand} ${stoveModel}`, companyPrice, {
+        burnerType
+      });
+
+      itemsToAdd.push({
+        id: `stove-${burnerType}-${Date.now()}`,
+        type: 'stove',
+        name: `${effectiveBrand} ${stoveModel}`,
+        details: `${burnerType === 'single' ? 'Single' : 'Double'} Burner`,
+        companyPrice,
+        quantity: qty,
+        stoveId,
+        burnerType,
+        model: stoveModel
+      });
     }
 
-    await updateProductPricing('stove', `${effectiveBrand} ${stoveModel}`, companyPrice, {
-      burnerType: stoveBurnerType
-    });
+    if (itemsToAdd.length === 0) {
+      toast({ title: "No items to add", variant: "destructive" });
+      return;
+    }
 
-    const newItem: PurchaseItem = {
-      id: `stove-${Date.now()}`,
-      type: 'stove',
-      name: `${effectiveBrand} ${stoveModel}`,
-      details: `${stoveBurnerType === 'single' ? 'Single' : 'Double'} Burner`,
-      companyPrice,
-      quantity: stoveQuantity,
-      stoveId,
-      burnerType: stoveBurnerType,
-      model: stoveModel
-    };
-
-    setPurchaseItems([...purchaseItems, newItem]);
+    setPurchaseItems([...purchaseItems, ...itemsToAdd]);
     toast({ 
       title: "Added to cart!", 
-      description: `${stoveQuantity}x ${effectiveBrand} ${stoveModel} @ ${BANGLADESHI_CURRENCY_SYMBOL}${companyPrice.toLocaleString()}/pc` 
+      description: `${stoveTotalQty}x ${effectiveBrand} ${stoveModel} @ ${BANGLADESHI_CURRENCY_SYMBOL}${companyPrice.toLocaleString()}/pc` 
     });
 
     if (isMobile) setMobileStep('cart');
@@ -744,8 +769,8 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
   const resetStoveForm = () => {
     setStoveBrand("");
     setStoveModel("");
-    setStoveBurnerType("single");
-    setStoveQuantity(1);
+    setStoveQtySingle(0);
+    setStoveQtyDouble(0);
     setStoveTotalAmount(0);
     setCustomStoveBrand("");
     setShowCustomStoveBrand(false);
@@ -825,7 +850,7 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
         total_price: item.companyPrice * item.quantity,
         cylinder_type: item.cylinderType || null,
         weight: item.weight || null,
-        size: item.valveSize || item.regulatorType || null
+        size: item.valveSize || item.regulatorType || (item.burnerType ? `${item.burnerType === 'single' ? 'Single' : 'Double'} Burner` : null)
       }));
 
       await supabase.from('pob_transaction_items').insert(items);
@@ -1001,20 +1026,20 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
     return (
       <Card className={`overflow-hidden border-2 ${borderColor} shadow-sm`}>
         {/* Valve Size Header Badge */}
-        <div className={`bg-gradient-to-br ${bgGradient} p-4 text-center border-b ${borderColor}`}>
-          <div className={`inline-flex items-center justify-center ${badgeBg} text-white px-4 py-2 rounded-full shadow-md`}>
-            <CircleDot className="h-4 w-4 mr-2" />
-            <span className="text-base font-bold">{valveSize}</span>
+        <div className={`bg-gradient-to-br ${bgGradient} p-3 sm:p-4 text-center border-b ${borderColor}`}>
+          <div className={`inline-flex items-center justify-center ${badgeBg} text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-full shadow-md`}>
+            <CircleDot className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
+            <span className="text-sm sm:text-base font-bold">{valveSize}</span>
           </div>
           {stockLabel && (
-            <p className="text-xs font-medium text-muted-foreground mt-2">
+            <p className="text-[10px] sm:text-xs font-medium text-muted-foreground mt-1.5 sm:mt-2">
               Current Stock: <span className={`font-bold ${textColor}`}>{stockLabel}</span>
             </p>
           )}
         </div>
         
         {/* Quantity Input Section */}
-        <CardContent className="p-4 space-y-3">
+        <CardContent className="p-3 sm:p-4 space-y-2 sm:space-y-3">
           {/* Large Quantity Display */}
           <div className="relative">
             <Input
@@ -1022,7 +1047,7 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
               inputMode="numeric"
               value={value}
               onChange={(e) => onChange(Math.max(0, parseInt(e.target.value) || 0))}
-              className={`w-full h-16 text-center text-3xl font-extrabold border-2 ${borderColor} ${textColor}`}
+              className={`w-full h-14 sm:h-16 text-center text-2xl sm:text-3xl font-extrabold border-2 ${borderColor} ${textColor}`}
               placeholder="0"
             />
           </div>
@@ -1032,7 +1057,7 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
             <Button
               type="button"
               variant="outline"
-              className={`h-12 w-full text-sm font-bold ${borderColor} hover:${textColor}`}
+              className={`h-11 sm:h-12 w-full text-sm font-bold ${borderColor}`}
               onClick={() => onChange(Math.max(0, value - 10))}
             >
               -10
@@ -1040,7 +1065,7 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
             <Button
               type="button"
               variant="outline"
-              className={`h-12 w-full text-sm font-bold ${borderColor} hover:${textColor}`}
+              className={`h-11 sm:h-12 w-full text-sm font-bold ${borderColor}`}
               onClick={() => onChange(value + 10)}
             >
               +10
@@ -1051,72 +1076,79 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
     );
   };
 
-  // ============= LEGACY QUANTITY STEPPER (for stoves) =============
-  const QuantityStepper = ({ 
+  // ============= BURNER TYPE QUANTITY CARD COMPONENT (For Stoves) =============
+  const BurnerTypeQuantityCard = ({ 
     value, 
     onChange, 
-    label, 
-    stockLabel,
-    colorClass = "text-primary"
+    burnerType, 
+    stockLabel
   }: { 
     value: number; 
     onChange: (v: number) => void;
-    label: string;
+    burnerType: 'single' | 'double';
     stockLabel?: string;
-    colorClass?: string;
-  }) => (
-    <div className="flex flex-col items-center p-3 bg-muted/30 rounded-xl border border-border">
-      <span className="text-sm font-semibold mb-1">{label}</span>
-      {stockLabel && (
-        <span className="text-xs text-muted-foreground mb-2">{stockLabel}</span>
-      )}
-      <div className="flex items-center gap-1">
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          className="h-10 w-10"
-          onClick={() => onChange(Math.max(0, value - 10))}
-        >
-          <span className="text-xs font-bold">-10</span>
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          className="h-10 w-10"
-          onClick={() => onChange(Math.max(0, value - 1))}
-        >
-          <Minus className="h-4 w-4" />
-        </Button>
-        <Input
-          type="number"
-          inputMode="numeric"
-          value={value}
-          onChange={(e) => onChange(Math.max(0, parseInt(e.target.value) || 0))}
-          className="w-16 h-10 text-center font-bold text-lg"
-        />
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          className="h-10 w-10"
-          onClick={() => onChange(value + 1)}
-        >
-          <Plus className="h-4 w-4" />
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          className="h-10 w-10"
-          onClick={() => onChange(value + 10)}
-        >
-          <span className="text-xs font-bold">+10</span>
-        </Button>
-      </div>
-    </div>
-  );
+  }) => {
+    const isSingle = burnerType === 'single';
+    const bgGradient = isSingle 
+      ? 'from-warning/15 via-warning/10 to-warning/5' 
+      : 'from-orange-500/15 via-orange-500/10 to-orange-500/5';
+    const borderColor = isSingle ? 'border-warning/40' : 'border-orange-500/40';
+    const badgeBg = isSingle ? 'bg-warning' : 'bg-orange-500';
+    const textColor = isSingle ? 'text-warning' : 'text-orange-500';
+    const label = isSingle ? 'Single Burner' : 'Double Burner';
+    
+    return (
+      <Card className={`overflow-hidden border-2 ${borderColor} shadow-sm`}>
+        {/* Burner Type Header Badge */}
+        <div className={`bg-gradient-to-br ${bgGradient} p-3 sm:p-4 text-center border-b ${borderColor}`}>
+          <div className={`inline-flex items-center justify-center ${badgeBg} text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-full shadow-md`}>
+            <Flame className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
+            <span className="text-xs sm:text-sm font-bold">{label}</span>
+          </div>
+          {stockLabel && (
+            <p className="text-[10px] sm:text-xs font-medium text-muted-foreground mt-1.5 sm:mt-2">
+              Current Stock: <span className={`font-bold ${textColor}`}>{stockLabel}</span>
+            </p>
+          )}
+        </div>
+        
+        {/* Quantity Input Section */}
+        <CardContent className="p-3 sm:p-4 space-y-2 sm:space-y-3">
+          {/* Large Quantity Display */}
+          <div className="relative">
+            <Input
+              type="number"
+              inputMode="numeric"
+              value={value}
+              onChange={(e) => onChange(Math.max(0, parseInt(e.target.value) || 0))}
+              className={`w-full h-14 sm:h-16 text-center text-2xl sm:text-3xl font-extrabold border-2 ${borderColor} ${textColor}`}
+              placeholder="0"
+            />
+          </div>
+          
+          {/* Stepper Buttons */}
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className={`h-11 sm:h-12 w-full text-sm font-bold ${borderColor}`}
+              onClick={() => onChange(Math.max(0, value - 10))}
+            >
+              -10
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className={`h-11 sm:h-12 w-full text-sm font-bold ${borderColor}`}
+              onClick={() => onChange(value + 10)}
+            >
+              +10
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
 
   // ============= RENDER PRODUCT SELECTION =============
   const renderProductSelection = () => (
@@ -1264,7 +1296,7 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
                 <Label className="text-base font-bold">Quantity (By Valve Size)</Label>
               </div>
               
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4">
                 <ValveSizeQuantityCard
                   value={lpgQty22mm}
                   onChange={setLpgQty22mm}
@@ -1284,25 +1316,25 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
               {/* Total Summary Bar - Enhanced */}
               {lpgTotalQty > 0 && (
                 <Card className="border-2 border-primary/30 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent overflow-hidden">
-                  <CardContent className="p-4">
+                  <CardContent className="p-3 sm:p-4">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="h-12 w-12 rounded-xl bg-primary/20 flex items-center justify-center">
-                          <Cylinder className="h-6 w-6 text-primary" />
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-primary/20 flex items-center justify-center">
+                          <Cylinder className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
                         </div>
                         <div>
-                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Cylinders</p>
-                          <p className="text-3xl font-black text-primary">{lpgTotalQty.toLocaleString()}</p>
+                          <p className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Cylinders</p>
+                          <p className="text-2xl sm:text-3xl font-black text-primary">{lpgTotalQty.toLocaleString()}</p>
                         </div>
                       </div>
-                      <div className="text-right text-sm">
-                        <div className="flex items-center gap-2 justify-end">
-                          <Badge variant="outline" className="border-primary/50 text-primary font-semibold">
+                      <div className="text-right text-xs sm:text-sm">
+                        <div className="flex items-center gap-1 sm:gap-2 justify-end">
+                          <Badge variant="outline" className="border-primary/50 text-primary font-semibold text-[10px] sm:text-xs h-5 sm:h-6">
                             22mm: {lpgQty22mm}
                           </Badge>
                         </div>
-                        <div className="flex items-center gap-2 justify-end mt-1">
-                          <Badge variant="outline" className="border-warning/50 text-warning font-semibold">
+                        <div className="flex items-center gap-1 sm:gap-2 justify-end mt-1">
+                          <Badge variant="outline" className="border-warning/50 text-warning font-semibold text-[10px] sm:text-xs h-5 sm:h-6">
                             20mm: {lpgQty20mm}
                           </Badge>
                         </div>
@@ -1334,7 +1366,7 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
                 <Calculator className="h-5 w-5 text-primary" />
                 <span className="text-sm font-medium">Unit Price</span>
               </div>
-              <span className="text-3xl font-extrabold text-primary">
+              <span className="text-2xl sm:text-3xl font-extrabold text-primary">
                 {BANGLADESHI_CURRENCY_SYMBOL}{lpgCompanyPrice.toLocaleString()}
               </span>
             </div>
@@ -1354,16 +1386,17 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
         </Card>
       )}
 
-      {/* STOVE FORM */}
+      {/* STOVE FORM - Redesigned with Dual Burner Type Quantity */}
       {activeTab === 'stove' && (
-        <Card className="border-warning/20 shadow-sm">
-          <CardHeader className="py-3 px-4 bg-warning/5 border-b border-warning/10">
-            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+        <Card className="border-warning/20 shadow-sm overflow-hidden">
+          <CardHeader className="py-3 px-4 bg-gradient-to-r from-warning/10 to-orange-500/5 border-b border-warning/10">
+            <CardTitle className="flex items-center gap-2 text-base font-bold">
               <ChefHat className="h-5 w-5 text-warning" />
               Gas Stove Purchase
             </CardTitle>
+            <p className="text-xs text-muted-foreground">Configure your stove requirements</p>
           </CardHeader>
-          <CardContent className="p-4 space-y-4">
+          <CardContent className="p-4 space-y-5">
             {/* Brand Selection */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
@@ -1372,7 +1405,7 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="h-7 px-2 text-xs text-warning hover:text-warning"
+                  className="h-6 px-2 text-[10px] text-warning hover:text-warning"
                   onClick={() => setShowCustomStoveBrand(!showCustomStoveBrand)}
                 >
                   {showCustomStoveBrand ? "← Select" : "+ Custom"}
@@ -1410,81 +1443,82 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
               />
             </div>
 
-            {/* Burner Type */}
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Burner Type</Label>
-              <div className="grid grid-cols-2 gap-2">
-                <Button
-                  type="button"
-                  variant={stoveBurnerType === "single" ? "warning" : "outline"}
-                  className="h-12 font-medium"
-                  onClick={() => setStoveBurnerType("single")}
-                >
-                  Single Burner
-                </Button>
-                <Button
-                  type="button"
-                  variant={stoveBurnerType === "double" ? "warning" : "outline"}
-                  className="h-12 font-medium"
-                  onClick={() => setStoveBurnerType("double")}
-                >
-                  Double Burner
-                </Button>
+            {/* QUANTITY BY BURNER TYPE (The Key Feature for Stoves) - Enhanced Cards */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 pb-1 border-b border-warning/30">
+                <Flame className="h-5 w-5 text-warning" />
+                <Label className="text-base font-bold">Quantity (By Burner Type)</Label>
               </div>
-            </div>
-
-            {/* Quantity & Total Amount */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Quantity</Label>
-                <div className="flex items-center gap-1">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="h-12 w-12 shrink-0"
-                    onClick={() => setStoveQuantity(Math.max(1, stoveQuantity - 1))}
-                  >
-                    <Minus className="h-4 w-4" />
-                  </Button>
-                  <Input
-                    type="number"
-                    inputMode="numeric"
-                    value={stoveQuantity}
-                    onChange={(e) => setStoveQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                    className="h-12 text-center font-semibold"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="h-12 w-12 shrink-0"
-                    onClick={() => setStoveQuantity(stoveQuantity + 1)}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Total ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
-                <Input
-                  type="number"
-                  inputMode="numeric"
-                  placeholder="Amount paid..."
-                  value={stoveTotalAmount || ""}
-                  onChange={(e) => setStoveTotalAmount(parseInt(e.target.value) || 0)}
-                  className="h-12"
+              
+              <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                <BurnerTypeQuantityCard
+                  value={stoveQtySingle}
+                  onChange={setStoveQtySingle}
+                  burnerType="single"
+                  stockLabel={`${stoveBurnerStats.single} pcs`}
+                />
+                <BurnerTypeQuantityCard
+                  value={stoveQtyDouble}
+                  onChange={setStoveQtyDouble}
+                  burnerType="double"
+                  stockLabel={`${stoveBurnerStats.double} pcs`}
                 />
               </div>
+              
+              {/* Total Summary Bar - Enhanced for Stoves */}
+              {stoveTotalQty > 0 && (
+                <Card className="border-2 border-warning/30 bg-gradient-to-r from-warning/10 via-warning/5 to-transparent overflow-hidden">
+                  <CardContent className="p-3 sm:p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-warning/20 flex items-center justify-center">
+                          <ChefHat className="h-5 w-5 sm:h-6 sm:w-6 text-warning" />
+                        </div>
+                        <div>
+                          <p className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Stoves</p>
+                          <p className="text-2xl sm:text-3xl font-black text-warning">{stoveTotalQty.toLocaleString()}</p>
+                        </div>
+                      </div>
+                      <div className="text-right text-xs sm:text-sm">
+                        <div className="flex items-center gap-1 sm:gap-2 justify-end">
+                          <Badge variant="outline" className="border-warning/50 text-warning font-semibold text-[10px] sm:text-xs h-5 sm:h-6">
+                            Single: {stoveQtySingle}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-1 sm:gap-2 justify-end mt-1">
+                          <Badge variant="outline" className="border-orange-500/50 text-orange-500 font-semibold text-[10px] sm:text-xs h-5 sm:h-6">
+                            Double: {stoveQtyDouble}
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+
+            <Separator />
+
+            {/* Total Amount */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Total D.O. Amount ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
+              <Input
+                type="number"
+                inputMode="numeric"
+                placeholder="Enter total amount paid..."
+                value={stoveTotalAmount || ""}
+                onChange={(e) => setStoveTotalAmount(parseInt(e.target.value) || 0)}
+                className="h-14 text-lg font-semibold"
+              />
             </div>
 
             {/* Auto-calculated Company Price */}
-            <div className="flex items-center justify-between p-4 bg-warning/10 rounded-xl border border-warning/20">
+            <div className="flex items-center justify-between p-4 bg-gradient-to-r from-warning/10 to-orange-500/5 rounded-xl border border-warning/20">
               <div className="flex items-center gap-2">
                 <Calculator className="h-5 w-5 text-warning" />
                 <span className="text-sm font-medium text-foreground">Unit Price</span>
               </div>
-              <span className="text-2xl font-bold text-warning">
+              <span className="text-2xl sm:text-3xl font-extrabold text-warning">
                 {BANGLADESHI_CURRENCY_SYMBOL}{stoveCompanyPrice.toLocaleString()}
               </span>
             </div>
@@ -1496,7 +1530,7 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
               variant="warning"
               className="w-full h-14 font-semibold text-base"
               onClick={addStoveToCart}
-              disabled={!getEffectiveStoveBrand() || !stoveModel || stoveQuantity <= 0 || stoveTotalAmount <= 0}
+              disabled={!getEffectiveStoveBrand() || !stoveModel || stoveTotalQty <= 0 || stoveTotalAmount <= 0}
             >
               <Plus className="h-5 w-5 mr-2" />
               Add to Cart
@@ -1508,11 +1542,12 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
       {/* REGULATOR FORM - Redesigned with Dual Valve Quantity */}
       {activeTab === 'regulator' && (
         <Card className="border-info/20 shadow-sm overflow-hidden">
-          <CardHeader className="py-3 px-4 bg-info/5 border-b border-info/10">
-            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+          <CardHeader className="py-3 px-4 bg-gradient-to-r from-info/10 to-cyan-500/5 border-b border-info/10">
+            <CardTitle className="flex items-center gap-2 text-base font-bold">
               <Gauge className="h-5 w-5 text-info" />
               Regulator Purchase
             </CardTitle>
+            <p className="text-xs text-muted-foreground">Configure your regulator requirements</p>
           </CardHeader>
           <CardContent className="p-4 space-y-5">
             {/* Brand Selection */}
@@ -1523,7 +1558,7 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="h-7 px-2 text-xs text-info hover:text-info"
+                  className="h-6 px-2 text-[10px] text-info hover:text-info"
                   onClick={() => setShowCustomRegulatorBrand(!showCustomRegulatorBrand)}
                 >
                   {showCustomRegulatorBrand ? "← Select" : "+ Custom"}
@@ -1557,7 +1592,7 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
                 <Label className="text-base font-bold">Quantity (By Valve Type)</Label>
               </div>
               
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4">
                 <ValveSizeQuantityCard
                   value={regQty22mm}
                   onChange={setRegQty22mm}
@@ -1577,25 +1612,25 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
               {/* Total Summary Bar - Enhanced for Regulators */}
               {regTotalQty > 0 && (
                 <Card className="border-2 border-info/30 bg-gradient-to-r from-info/10 via-info/5 to-transparent overflow-hidden">
-                  <CardContent className="p-4">
+                  <CardContent className="p-3 sm:p-4">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="h-12 w-12 rounded-xl bg-info/20 flex items-center justify-center">
-                          <Gauge className="h-6 w-6 text-info" />
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-info/20 flex items-center justify-center">
+                          <Gauge className="h-5 w-5 sm:h-6 sm:w-6 text-info" />
                         </div>
                         <div>
-                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Regulators</p>
-                          <p className="text-3xl font-black text-info">{regTotalQty.toLocaleString()}</p>
+                          <p className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Regulators</p>
+                          <p className="text-2xl sm:text-3xl font-black text-info">{regTotalQty.toLocaleString()}</p>
                         </div>
                       </div>
-                      <div className="text-right text-sm">
-                        <div className="flex items-center gap-2 justify-end">
-                          <Badge variant="outline" className="border-primary/50 text-primary font-semibold">
+                      <div className="text-right text-xs sm:text-sm">
+                        <div className="flex items-center gap-1 sm:gap-2 justify-end">
+                          <Badge variant="outline" className="border-primary/50 text-primary font-semibold text-[10px] sm:text-xs h-5 sm:h-6">
                             22mm: {regQty22mm}
                           </Badge>
                         </div>
-                        <div className="flex items-center gap-2 justify-end mt-1">
-                          <Badge variant="outline" className="border-warning/50 text-warning font-semibold">
+                        <div className="flex items-center gap-1 sm:gap-2 justify-end mt-1">
+                          <Badge variant="outline" className="border-warning/50 text-warning font-semibold text-[10px] sm:text-xs h-5 sm:h-6">
                             20mm: {regQty20mm}
                           </Badge>
                         </div>
@@ -1610,7 +1645,7 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
 
             {/* Total Amount */}
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Total Amount ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
+              <Label className="text-sm font-medium">Total D.O. Amount ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
               <Input
                 type="number"
                 inputMode="numeric"
@@ -1622,12 +1657,12 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
             </div>
 
             {/* Auto-calculated Company Price */}
-            <div className="flex items-center justify-between p-4 bg-info/10 rounded-xl border border-info/20">
+            <div className="flex items-center justify-between p-4 bg-gradient-to-r from-info/10 to-cyan-500/5 rounded-xl border border-info/20">
               <div className="flex items-center gap-2">
                 <Calculator className="h-5 w-5 text-info" />
                 <span className="text-sm font-medium text-foreground">Unit Price</span>
               </div>
-              <span className="text-3xl font-extrabold text-info">
+              <span className="text-2xl sm:text-3xl font-extrabold text-info">
                 {BANGLADESHI_CURRENCY_SYMBOL}{regulatorCompanyPrice.toLocaleString()}
               </span>
             </div>
@@ -1685,17 +1720,17 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
                   <Card 
                     key={item.id} 
                     className="overflow-hidden border shadow-sm hover:shadow-md transition-shadow"
-                    style={{ borderLeftWidth: '4px', borderLeftColor: item.brandColor || 'hsl(var(--primary))' }}
+                    style={{ borderLeftWidth: '4px', borderLeftColor: item.brandColor || (item.type === 'stove' ? 'hsl(var(--warning))' : item.type === 'regulator' ? 'hsl(var(--info))' : 'hsl(var(--primary))') }}
                   >
                     {/* Card Header with Brand & Delete */}
                     <div 
                       className="flex items-center justify-between px-4 py-2.5"
-                      style={{ backgroundColor: item.brandColor ? `${item.brandColor}10` : 'hsl(var(--primary) / 0.05)' }}
+                      style={{ backgroundColor: item.brandColor ? `${item.brandColor}10` : (item.type === 'stove' ? 'hsl(var(--warning) / 0.05)' : item.type === 'regulator' ? 'hsl(var(--info) / 0.05)' : 'hsl(var(--primary) / 0.05)') }}
                     >
                       <div className="flex items-center gap-2.5">
                         <div 
                           className="h-9 w-9 rounded-lg flex items-center justify-center"
-                          style={{ backgroundColor: item.brandColor ? `${item.brandColor}20` : 'hsl(var(--primary) / 0.15)' }}
+                          style={{ backgroundColor: item.brandColor ? `${item.brandColor}20` : (item.type === 'stove' ? 'hsl(var(--warning) / 0.15)' : item.type === 'regulator' ? 'hsl(var(--info) / 0.15)' : 'hsl(var(--primary) / 0.15)') }}
                         >
                           {item.type === 'lpg' && <Cylinder className="h-5 w-5" style={{ color: item.brandColor || 'hsl(var(--primary))' }} />}
                           {item.type === 'stove' && <ChefHat className="h-5 w-5 text-warning" />}
@@ -1837,33 +1872,33 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
           
           {/* Cart Summary - Extra Large Prominent Cards with Better Spacing */}
           {purchaseItems.length > 0 && (
-            <div className="p-5 bg-gradient-to-t from-muted/60 to-transparent border-t-2 border-border shrink-0 space-y-5">
+            <div className="p-4 sm:p-5 bg-gradient-to-t from-muted/60 to-transparent border-t-2 border-border shrink-0 space-y-4 sm:space-y-5">
               {/* Summary Cards Grid - Extra Large with Better Visual Hierarchy */}
-              <div className="grid grid-cols-2 gap-5">
+              <div className="grid grid-cols-2 gap-3 sm:gap-5">
                 {/* Total Quantity Card - Green Theme */}
-                <Card className="border-3 border-success/50 bg-gradient-to-br from-success/15 via-success/10 to-success/5 shadow-lg overflow-hidden">
-                  <CardContent className="p-5 text-center relative">
+                <Card className="border-2 sm:border-3 border-success/50 bg-gradient-to-br from-success/15 via-success/10 to-success/5 shadow-lg overflow-hidden">
+                  <CardContent className="p-3 sm:p-5 text-center relative">
                     {/* Decorative corner */}
-                    <div className="absolute top-0 right-0 w-16 h-16 bg-success/10 rounded-bl-full" />
-                    <p className="text-xs font-bold text-success uppercase tracking-widest mb-2">Total Quantity</p>
-                    <p className="text-5xl font-black text-success leading-none">{totalQuantity.toLocaleString()}</p>
-                    <p className="text-sm text-success/70 font-medium mt-2">
-                      {productCount} {productCount === 1 ? 'product' : 'products'} added
+                    <div className="absolute top-0 right-0 w-10 h-10 sm:w-16 sm:h-16 bg-success/10 rounded-bl-full" />
+                    <p className="text-[10px] sm:text-xs font-bold text-success uppercase tracking-widest mb-1 sm:mb-2">Total Quantity</p>
+                    <p className="text-3xl sm:text-5xl font-black text-success leading-none">{totalQuantity.toLocaleString()}</p>
+                    <p className="text-xs sm:text-sm text-success/70 font-medium mt-1 sm:mt-2">
+                      {productCount} {productCount === 1 ? 'product' : 'products'}
                     </p>
                   </CardContent>
                 </Card>
                 
                 {/* Total D.O. Card - Indigo/Primary Theme */}
-                <Card className="border-3 border-primary/50 bg-gradient-to-br from-primary/15 via-primary/10 to-primary/5 shadow-lg overflow-hidden">
-                  <CardContent className="p-5 text-center relative">
+                <Card className="border-2 sm:border-3 border-primary/50 bg-gradient-to-br from-primary/15 via-primary/10 to-primary/5 shadow-lg overflow-hidden">
+                  <CardContent className="p-3 sm:p-5 text-center relative">
                     {/* Decorative corner */}
-                    <div className="absolute top-0 right-0 w-16 h-16 bg-primary/10 rounded-bl-full" />
-                    <p className="text-xs font-bold text-primary uppercase tracking-widest mb-2">Total D.O.</p>
-                    <p className="text-4xl font-black text-primary leading-none">
+                    <div className="absolute top-0 right-0 w-10 h-10 sm:w-16 sm:h-16 bg-primary/10 rounded-bl-full" />
+                    <p className="text-[10px] sm:text-xs font-bold text-primary uppercase tracking-widest mb-1 sm:mb-2">Total D.O.</p>
+                    <p className="text-2xl sm:text-4xl font-black text-primary leading-none">
                       {BANGLADESHI_CURRENCY_SYMBOL}{totalDO.toLocaleString()}
                     </p>
                     {totalQuantity > 0 && (
-                      <p className="text-sm text-primary/70 font-medium mt-2">
+                      <p className="text-xs sm:text-sm text-primary/70 font-medium mt-1 sm:mt-2">
                         Avg: {BANGLADESHI_CURRENCY_SYMBOL}{Math.round(totalDO / totalQuantity).toLocaleString()}/pc
                       </p>
                     )}
@@ -1955,7 +1990,7 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
           <Separator />
           <div className="flex justify-between items-baseline">
             <span className="text-base font-semibold">Total D.O.</span>
-            <span className="text-3xl font-extrabold text-primary">{BANGLADESHI_CURRENCY_SYMBOL}{total.toLocaleString()}</span>
+            <span className="text-2xl sm:text-3xl font-extrabold text-primary">{BANGLADESHI_CURRENCY_SYMBOL}{total.toLocaleString()}</span>
           </div>
 
           {/* Action Buttons */}
