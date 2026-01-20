@@ -585,211 +585,346 @@ export const CustomerManagementModule = () => {
   // Due Customers View
   if (viewMode === 'due') {
     return (
-      <div className="space-y-6">
-        <div>
-          <Button 
-            variant="ghost" 
-            onClick={() => setViewMode('main')}
-            className="mb-4 text-muted-foreground hover:text-foreground"
-          >
-            ← Back to Customer Management
-          </Button>
-          <h2 className="text-3xl font-bold text-foreground">Due Customers</h2>
-          <p className="text-muted-foreground">Manage customers with pending or overdue payments or unreturned cylinders.</p>
+      <div className="space-y-4 sm:space-y-6 pb-4">
+        {/* Premium Header */}
+        <div className="relative">
+          <div className="absolute inset-0 bg-gradient-to-r from-rose-500/5 via-transparent to-rose-500/5 rounded-xl -z-10" />
+          <div className="p-4 sm:p-0">
+            <Button 
+              variant="ghost" 
+              onClick={() => setViewMode('main')}
+              className="mb-3 -ml-2 text-muted-foreground hover:text-foreground h-9 px-3 text-sm touch-manipulation"
+            >
+              ← Back to Customer Management
+            </Button>
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-gradient-to-br from-rose-500 to-rose-600 flex items-center justify-center shadow-lg shrink-0">
+                <UserX className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+              </div>
+              <div>
+                <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground tracking-tight">
+                  Due Customers
+                </h2>
+                <p className="text-xs sm:text-sm text-muted-foreground">
+                  Manage pending payments & unreturned cylinders
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Summary Cards */}
-        <div className="grid md:grid-cols-3 gap-4">
-          <Card className="bg-card border-border">
-            <CardContent className="p-6">
-              <div className="flex justify-between items-start">
+        {/* Premium Summary Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+          {/* Due Accounts */}
+          <Card className="relative overflow-hidden border-0 shadow-lg">
+            <div className="absolute inset-0 bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-transparent" />
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-rose-500 to-rose-400" />
+            <CardContent className="relative p-4 sm:p-5">
+              <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Due Accounts</p>
-                  <h3 className="text-3xl font-bold text-foreground mt-1">{dueCustomers.length}</h3>
-                  <p className="text-xs text-muted-foreground mt-1">Total customers with outstanding balance.</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground font-medium">Due Accounts</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-rose-600 dark:text-rose-400 mt-1 tabular-nums">{dueCustomers.length}</p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">Total customers with outstanding balance</p>
                 </div>
-                <Users className="h-5 w-5 text-muted-foreground" />
+                <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-rose-500/20 flex items-center justify-center shrink-0">
+                  <Users className="h-5 w-5 sm:h-6 sm:w-6 text-rose-500" />
+                </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-card border-border">
-            <CardContent className="p-6">
-              <div className="flex justify-between items-start">
+          {/* Total Amount Due */}
+          <Card className="relative overflow-hidden border-0 shadow-lg">
+            <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent" />
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 to-amber-400" />
+            <CardContent className="relative p-4 sm:p-5">
+              <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Total Amount Due</p>
-                  <h3 className="text-3xl font-bold text-foreground mt-1">৳{totalAmountDue.toLocaleString()}</h3>
-                  <p className="text-xs text-muted-foreground mt-1">Sum of all pending and overdue payments.</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground font-medium">Total Amount Due</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-amber-600 dark:text-amber-400 mt-1 tabular-nums">
+                    {BANGLADESHI_CURRENCY_SYMBOL}{totalAmountDue.toLocaleString()}
+                  </p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">Sum of all pending payments</p>
                 </div>
-                <Banknote className="h-5 w-5 text-muted-foreground" />
+                <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-amber-500/20 flex items-center justify-center shrink-0">
+                  <Banknote className="h-5 w-5 sm:h-6 sm:w-6 text-amber-500" />
+                </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-card border-border">
-            <CardContent className="p-6">
-              <div className="flex justify-between items-start">
+          {/* Total Cylinders Due */}
+          <Card className="relative overflow-hidden border-0 shadow-lg">
+            <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 via-purple-500/5 to-transparent" />
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 to-purple-400" />
+            <CardContent className="relative p-4 sm:p-5">
+              <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Total Cylinders Due</p>
-                  <h3 className="text-3xl font-bold text-foreground mt-1">{totalCylindersDue}</h3>
-                  <p className="text-xs text-muted-foreground mt-1">Total number of unreturned cylinders.</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground font-medium">Cylinders Due</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-purple-600 dark:text-purple-400 mt-1 tabular-nums">{totalCylindersDue}</p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">Total unreturned cylinders</p>
                 </div>
-                <Package className="h-5 w-5 text-muted-foreground" />
+                <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-purple-500/20 flex items-center justify-center shrink-0">
+                  <Package className="h-5 w-5 sm:h-6 sm:w-6 text-purple-500" />
+                </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Customer Table */}
-        <Card className="bg-card border-border">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <UserX className="h-5 w-5 text-destructive" />
-                <CardTitle className="text-foreground">Due Customer Accounts ({filteredDueCustomers.length})</CardTitle>
+        {/* Search Bar */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search due customers by name or email..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10 h-11 bg-card border-border shadow-sm"
+          />
+        </div>
+
+        {/* Customer List - Mobile Cards / Desktop Table */}
+        <Card className="relative overflow-hidden border-0 shadow-lg">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-rose-500 to-rose-400" />
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded-lg bg-rose-500/20 flex items-center justify-center">
+                <UserX className="h-4 w-4 text-rose-500" />
               </div>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search due customers by name or email..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 w-80 bg-background"
-                />
+              <div>
+                <CardTitle className="text-base sm:text-lg text-foreground">
+                  Due Accounts ({filteredDueCustomers.length})
+                </CardTitle>
+                <p className="text-xs text-muted-foreground">Customers with outstanding balance</p>
               </div>
             </div>
           </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow className="border-border">
-                  <TableHead className="text-muted-foreground">Customer</TableHead>
-                  <TableHead className="text-muted-foreground">Billing Status</TableHead>
-                  <TableHead className="text-muted-foreground text-right">Amount Due</TableHead>
-                  <TableHead className="text-muted-foreground text-right">Cylinders Due</TableHead>
-                  <TableHead className="text-muted-foreground text-center">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredDueCustomers.map((customer) => (
-                  <TableRow key={customer.id} className="border-border">
-                    <TableCell>
+          <CardContent className="pt-0">
+            {/* Mobile Card View */}
+            <div className="sm:hidden space-y-3">
+              {filteredDueCustomers.map((customer) => (
+                <Card key={customer.id} className="border border-border/50 shadow-sm">
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-3">
-                        <Avatar className="h-10 w-10 bg-muted">
-                          <AvatarFallback className="bg-muted text-muted-foreground">
+                        <Avatar className="h-10 w-10 bg-rose-500/10 shrink-0">
+                          <AvatarFallback className="bg-rose-500/10 text-rose-600 font-semibold">
                             {getInitials(customer.name)}
                           </AvatarFallback>
                         </Avatar>
-                        <div>
-                          <p className="font-medium text-foreground">{customer.name}</p>
-                          <p className="text-sm text-muted-foreground">{customer.email || customer.phone || 'No contact'}</p>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-foreground truncate">{customer.name}</p>
+                          <p className="text-xs text-muted-foreground truncate">{customer.email || customer.phone || 'No contact'}</p>
                         </div>
                       </div>
-                    </TableCell>
-                    <TableCell>
                       {getBillingBadge(customer.billing_status, customer.total_due)}
-                    </TableCell>
-                    <TableCell className="text-right font-medium text-destructive">
-                      ৳{Number(customer.total_due).toLocaleString()}
-                    </TableCell>
-                    <TableCell className="text-right font-medium text-destructive">
-                      {customer.cylinders_due}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center justify-center gap-2">
-                        <Button
-                          size="sm"
-                          className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
-                          onClick={() => {
-                            setSelectedCustomer(customer);
-                            setPaymentAmount(customer.total_due.toString());
-                            setCylindersToCollect(customer.cylinders_due.toString());
-                            setSettleDialogOpen(true);
-                          }}
-                        >
-                          Settle Account
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="text-muted-foreground hover:text-foreground"
-                          onClick={() => {
-                            setSelectedCustomer(customer);
-                            fetchCustomerSalesHistory(customer.id);
-                            setHistoryDialogOpen(true);
-                          }}
-                        >
-                          <History className="h-4 w-4 mr-1" />
-                          History
-                        </Button>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-3 mb-4">
+                      <div className="bg-rose-500/5 rounded-lg p-2.5">
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Amount Due</p>
+                        <p className="text-base font-bold text-rose-600 dark:text-rose-400 tabular-nums">
+                          {BANGLADESHI_CURRENCY_SYMBOL}{Number(customer.total_due).toLocaleString()}
+                        </p>
                       </div>
-                    </TableCell>
+                      <div className="bg-purple-500/5 rounded-lg p-2.5">
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Cylinders</p>
+                        <p className="text-base font-bold text-purple-600 dark:text-purple-400 tabular-nums">
+                          {customer.cylinders_due} pcs
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        className="flex-1 h-10 bg-rose-500 hover:bg-rose-600 text-white font-medium touch-manipulation"
+                        onClick={() => {
+                          setSelectedCustomer(customer);
+                          setPaymentAmount(customer.total_due.toString());
+                          setCylindersToCollect(customer.cylinders_due.toString());
+                          setSettleDialogOpen(true);
+                        }}
+                      >
+                        Settle Account
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-10 px-3 border-border touch-manipulation"
+                        onClick={() => {
+                          setSelectedCustomer(customer);
+                          fetchCustomerSalesHistory(customer.id);
+                          setHistoryDialogOpen(true);
+                        }}
+                      >
+                        <History className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+              {filteredDueCustomers.length === 0 && (
+                <div className="text-center py-12">
+                  <div className="h-16 w-16 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-4">
+                    <UserCheck className="h-8 w-8 text-muted-foreground" />
+                  </div>
+                  <p className="text-muted-foreground font-medium">No due customers found</p>
+                  <p className="text-xs text-muted-foreground mt-1">All accounts are settled!</p>
+                </div>
+              )}
+            </div>
+
+            {/* Desktop Table View */}
+            <div className="hidden sm:block">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-border hover:bg-transparent">
+                    <TableHead className="text-muted-foreground font-semibold">Customer</TableHead>
+                    <TableHead className="text-muted-foreground font-semibold">Status</TableHead>
+                    <TableHead className="text-muted-foreground font-semibold text-right">Amount Due</TableHead>
+                    <TableHead className="text-muted-foreground font-semibold text-right">Cylinders</TableHead>
+                    <TableHead className="text-muted-foreground font-semibold text-center">Actions</TableHead>
                   </TableRow>
-                ))}
-                {filteredDueCustomers.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                      No due customers found
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filteredDueCustomers.map((customer) => (
+                    <TableRow key={customer.id} className="border-border hover:bg-muted/30 transition-colors">
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-10 w-10 bg-rose-500/10">
+                            <AvatarFallback className="bg-rose-500/10 text-rose-600 font-semibold">
+                              {getInitials(customer.name)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-medium text-foreground">{customer.name}</p>
+                            <p className="text-sm text-muted-foreground">{customer.email || customer.phone || 'No contact'}</p>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {getBillingBadge(customer.billing_status, customer.total_due)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <span className="font-bold text-rose-600 dark:text-rose-400 tabular-nums">
+                          {BANGLADESHI_CURRENCY_SYMBOL}{Number(customer.total_due).toLocaleString()}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <span className="font-bold text-purple-600 dark:text-purple-400 tabular-nums">
+                          {customer.cylinders_due}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center justify-center gap-2">
+                          <Button
+                            size="sm"
+                            className="h-9 bg-rose-500 hover:bg-rose-600 text-white font-medium"
+                            onClick={() => {
+                              setSelectedCustomer(customer);
+                              setPaymentAmount(customer.total_due.toString());
+                              setCylindersToCollect(customer.cylinders_due.toString());
+                              setSettleDialogOpen(true);
+                            }}
+                          >
+                            Settle Account
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-9 text-muted-foreground hover:text-foreground"
+                            onClick={() => {
+                              setSelectedCustomer(customer);
+                              fetchCustomerSalesHistory(customer.id);
+                              setHistoryDialogOpen(true);
+                            }}
+                          >
+                            <History className="h-4 w-4 mr-1" />
+                            History
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {filteredDueCustomers.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-12">
+                        <div className="h-16 w-16 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-4">
+                          <UserCheck className="h-8 w-8 text-muted-foreground" />
+                        </div>
+                        <p className="text-muted-foreground font-medium">No due customers found</p>
+                        <p className="text-xs text-muted-foreground mt-1">All accounts are settled!</p>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           </CardContent>
         </Card>
 
         {/* Settle Account Dialog */}
         <Dialog open={settleDialogOpen} onOpenChange={setSettleDialogOpen}>
-          <DialogContent className="bg-card border-border">
+          <DialogContent className="bg-card border-border max-w-md">
             <DialogHeader>
-              <DialogTitle>Settle Account for {selectedCustomer?.name}</DialogTitle>
-              <p className="text-sm text-muted-foreground">Record a payment and/or collect returned cylinders.</p>
+              <div className="flex items-center gap-3 mb-2">
+                <div className="h-10 w-10 rounded-xl bg-rose-500/20 flex items-center justify-center">
+                  <Banknote className="h-5 w-5 text-rose-500" />
+                </div>
+                <div>
+                  <DialogTitle className="text-lg">Settle Account</DialogTitle>
+                  <p className="text-sm text-muted-foreground">{selectedCustomer?.name}</p>
+                </div>
+              </div>
             </DialogHeader>
-            <div className="space-y-6 py-4">
-              <div>
-                <h4 className="font-medium text-foreground mb-3">Payment Details</h4>
-                <div className="bg-background rounded-lg p-4 space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Remaining Due:</span>
-                    <span className="font-medium text-foreground">৳{Number(selectedCustomer?.total_due || 0).toLocaleString()}</span>
-                  </div>
-                  <div>
-                    <label className="text-sm text-muted-foreground">Payment Amount</label>
-                    <Input
-                      type="number"
-                      value={paymentAmount}
-                      onChange={(e) => setPaymentAmount(e.target.value)}
-                      placeholder="0"
-                      className="mt-1"
-                    />
-                  </div>
+            <div className="space-y-4 py-2">
+              {/* Payment Section */}
+              <div className="bg-muted/30 rounded-xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-foreground">Payment Details</span>
+                  <Badge variant="outline" className="bg-rose-500/10 text-rose-600 border-rose-500/30">
+                    Due: {BANGLADESHI_CURRENCY_SYMBOL}{Number(selectedCustomer?.total_due || 0).toLocaleString()}
+                  </Badge>
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground font-medium">Payment Amount</label>
+                  <Input
+                    type="number"
+                    value={paymentAmount}
+                    onChange={(e) => setPaymentAmount(e.target.value)}
+                    placeholder="0"
+                    className="mt-1.5 h-11 text-lg font-semibold"
+                  />
                 </div>
               </div>
 
-              <div>
-                <h4 className="font-medium text-foreground mb-3">Cylinder Collection</h4>
-                <div className="bg-background rounded-lg p-4 space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Cylinders Due:</span>
-                    <span className="font-medium text-foreground">{selectedCustomer?.cylinders_due || 0}</span>
-                  </div>
-                  <div>
-                    <label className="text-sm text-muted-foreground">Cylinders to Collect</label>
-                    <Input
-                      type="number"
-                      value={cylindersToCollect}
-                      onChange={(e) => setCylindersToCollect(e.target.value)}
-                      placeholder="0"
-                      className="mt-1"
-                    />
-                  </div>
+              {/* Cylinder Section */}
+              <div className="bg-muted/30 rounded-xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-foreground">Cylinder Collection</span>
+                  <Badge variant="outline" className="bg-purple-500/10 text-purple-600 border-purple-500/30">
+                    Due: {selectedCustomer?.cylinders_due || 0} pcs
+                  </Badge>
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground font-medium">Cylinders to Collect</label>
+                  <Input
+                    type="number"
+                    value={cylindersToCollect}
+                    onChange={(e) => setCylindersToCollect(e.target.value)}
+                    placeholder="0"
+                    className="mt-1.5 h-11 text-lg font-semibold"
+                  />
                 </div>
               </div>
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setSettleDialogOpen(false)}>Cancel</Button>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button variant="outline" onClick={() => setSettleDialogOpen(false)} className="h-11">
+                Cancel
+              </Button>
               <Button 
-                className="bg-destructive hover:bg-destructive/90"
+                className="h-11 bg-rose-500 hover:bg-rose-600 text-white font-medium"
                 onClick={handleSettleAccount}
               >
                 Confirm & Settle
@@ -802,15 +937,23 @@ export const CustomerManagementModule = () => {
         <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
           <DialogContent className="bg-card border-border max-w-2xl">
             <DialogHeader>
-              <DialogTitle>Payment History - {selectedCustomer?.name}</DialogTitle>
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                  <History className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <DialogTitle className="text-lg">Payment History</DialogTitle>
+                  <p className="text-sm text-muted-foreground">{selectedCustomer?.name}</p>
+                </div>
+              </div>
             </DialogHeader>
-            <div className="py-4">
+            <div className="py-2">
               <Table>
                 <TableHeader>
                   <TableRow className="border-border">
-                    <TableHead className="text-muted-foreground">Date</TableHead>
-                    <TableHead className="text-muted-foreground text-right">Amount Paid</TableHead>
-                    <TableHead className="text-muted-foreground text-right">Cylinders Collected</TableHead>
+                    <TableHead className="text-muted-foreground font-semibold">Date</TableHead>
+                    <TableHead className="text-muted-foreground font-semibold text-right">Amount Paid</TableHead>
+                    <TableHead className="text-muted-foreground font-semibold text-right">Cylinders</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -819,18 +962,23 @@ export const CustomerManagementModule = () => {
                       <TableCell className="text-foreground">
                         {format(new Date(payment.payment_date), 'MMM dd, yyyy HH:mm')}
                       </TableCell>
-                      <TableCell className="text-right text-green-500">
-                        ৳{Number(payment.amount).toLocaleString()}
+                      <TableCell className="text-right">
+                        <span className="font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                          {BANGLADESHI_CURRENCY_SYMBOL}{Number(payment.amount).toLocaleString()}
+                        </span>
                       </TableCell>
-                      <TableCell className="text-right text-foreground">
+                      <TableCell className="text-right font-medium text-foreground tabular-nums">
                         {payment.cylinders_collected}
                       </TableCell>
                     </TableRow>
                   ))}
                   {selectedCustomer && getCustomerPayments(selectedCustomer.id).length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
-                        No payment history found
+                      <TableCell colSpan={3} className="text-center py-8">
+                        <div className="h-12 w-12 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-3">
+                          <Receipt className="h-6 w-6 text-muted-foreground" />
+                        </div>
+                        <p className="text-muted-foreground">No payment history found</p>
                       </TableCell>
                     </TableRow>
                   )}
@@ -845,75 +993,164 @@ export const CustomerManagementModule = () => {
 
   // Paid Customers View
   return (
-    <div className="space-y-6">
-      <div>
-        <Button 
-          variant="ghost" 
-          onClick={() => setViewMode('main')}
-          className="mb-4 text-muted-foreground hover:text-foreground"
-        >
-          ← Back to Customer Management
-        </Button>
-        <h2 className="text-3xl font-bold text-foreground">Paid Customers</h2>
-        <p className="text-muted-foreground">A list of customers with no outstanding balance.</p>
+    <div className="space-y-4 sm:space-y-6 pb-4">
+      {/* Premium Header */}
+      <div className="relative">
+        <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 via-transparent to-emerald-500/5 rounded-xl -z-10" />
+        <div className="p-4 sm:p-0">
+          <Button 
+            variant="ghost" 
+            onClick={() => setViewMode('main')}
+            className="mb-3 -ml-2 text-muted-foreground hover:text-foreground h-9 px-3 text-sm touch-manipulation"
+          >
+            ← Back to Customer Management
+          </Button>
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-lg shrink-0">
+              <UserCheck className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+            </div>
+            <div>
+              <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground tracking-tight">
+                Paid Customers
+              </h2>
+              <p className="text-xs sm:text-sm text-muted-foreground">
+                Accounts with no outstanding balance
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Search */}
+      {/* Search Bar */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
           placeholder="Search paid customers by name or email..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-10 bg-card border-border"
+          className="pl-10 h-11 bg-card border-border shadow-sm"
         />
       </div>
 
-      {/* Customer Table */}
-      <Card className="bg-card border-border">
-        <CardHeader>
+      {/* Customer List - Mobile Cards / Desktop Table */}
+      <Card className="relative overflow-hidden border-0 shadow-lg">
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-emerald-400" />
+        <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
-            <UserCheck className="h-5 w-5 text-green-500" />
+            <div className="h-8 w-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+              <UserCheck className="h-4 w-4 text-emerald-500" />
+            </div>
             <div>
-              <CardTitle className="text-foreground">Paid Customers ({filteredPaidCustomers.length})</CardTitle>
-              <p className="text-sm text-muted-foreground mt-1">These customers have settled all their dues.</p>
+              <CardTitle className="text-base sm:text-lg text-foreground">
+                Paid Customers ({filteredPaidCustomers.length})
+              </CardTitle>
+              <p className="text-xs text-muted-foreground">All dues have been settled</p>
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow className="border-border">
-                <TableHead className="text-muted-foreground">Customer ID</TableHead>
-                <TableHead className="text-muted-foreground">Name</TableHead>
-                <TableHead className="text-muted-foreground">Email</TableHead>
-                <TableHead className="text-muted-foreground">Last Order</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredPaidCustomers.map((customer, index) => (
-                <TableRow key={customer.id} className="border-border">
-                  <TableCell className="font-medium text-foreground">
-                    CUST-{String(index + 1).padStart(3, '0')}
-                  </TableCell>
-                  <TableCell className="text-foreground">{customer.name}</TableCell>
-                  <TableCell className="text-muted-foreground">{customer.email || 'N/A'}</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {customer.last_order_date 
-                      ? format(new Date(customer.last_order_date), 'yyyy-MM-dd')
-                      : 'N/A'}
-                  </TableCell>
+        <CardContent className="pt-0">
+          {/* Mobile Card View */}
+          <div className="sm:hidden space-y-3">
+            {filteredPaidCustomers.map((customer, index) => (
+              <Card key={customer.id} className="border border-border/50 shadow-sm">
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    <Avatar className="h-10 w-10 bg-emerald-500/10 shrink-0">
+                      <AvatarFallback className="bg-emerald-500/10 text-emerald-600 font-semibold">
+                        {getInitials(customer.name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="font-semibold text-foreground truncate">{customer.name}</p>
+                        <Badge className="bg-emerald-500/20 text-emerald-600 border-emerald-500/30 shrink-0">
+                          Clear
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {customer.email || customer.phone || 'No contact'}
+                      </p>
+                      <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                        <span className="font-medium">ID: CUST-{String(index + 1).padStart(3, '0')}</span>
+                        <span>
+                          {customer.last_order_date 
+                            ? `Last: ${format(new Date(customer.last_order_date), 'MMM dd, yyyy')}`
+                            : 'No orders yet'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+            {filteredPaidCustomers.length === 0 && (
+              <div className="text-center py-12">
+                <div className="h-16 w-16 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-4">
+                  <Users className="h-8 w-8 text-muted-foreground" />
+                </div>
+                <p className="text-muted-foreground font-medium">No paid customers found</p>
+                <p className="text-xs text-muted-foreground mt-1">Try adjusting your search</p>
+              </div>
+            )}
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="hidden sm:block">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-border hover:bg-transparent">
+                  <TableHead className="text-muted-foreground font-semibold">Customer ID</TableHead>
+                  <TableHead className="text-muted-foreground font-semibold">Customer</TableHead>
+                  <TableHead className="text-muted-foreground font-semibold">Contact</TableHead>
+                  <TableHead className="text-muted-foreground font-semibold">Last Order</TableHead>
+                  <TableHead className="text-muted-foreground font-semibold text-center">Status</TableHead>
                 </TableRow>
-              ))}
-              {filteredPaidCustomers.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-                    No paid customers found
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {filteredPaidCustomers.map((customer, index) => (
+                  <TableRow key={customer.id} className="border-border hover:bg-muted/30 transition-colors">
+                    <TableCell className="font-mono text-sm text-muted-foreground">
+                      CUST-{String(index + 1).padStart(3, '0')}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-9 w-9 bg-emerald-500/10">
+                          <AvatarFallback className="bg-emerald-500/10 text-emerald-600 font-semibold text-sm">
+                            {getInitials(customer.name)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="font-medium text-foreground">{customer.name}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {customer.email || customer.phone || 'N/A'}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {customer.last_order_date 
+                        ? format(new Date(customer.last_order_date), 'MMM dd, yyyy')
+                        : 'N/A'}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Badge className="bg-emerald-500/20 text-emerald-600 border-emerald-500/30">
+                        Clear
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {filteredPaidCustomers.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-12">
+                      <div className="h-16 w-16 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-4">
+                        <Users className="h-8 w-8 text-muted-foreground" />
+                      </div>
+                      <p className="text-muted-foreground font-medium">No paid customers found</p>
+                      <p className="text-xs text-muted-foreground mt-1">Try adjusting your search</p>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     </div>
