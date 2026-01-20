@@ -845,662 +845,792 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
     );
   }
 
+  // ============= MOBILE STEP NAVIGATION =============
+  const goToStep = (step: 1 | 2 | 3) => {
+    setCurrentStep(step);
+  };
+
+  const goBack = () => {
+    if (currentStep === 3) {
+      setCurrentStep(2);
+    } else if (currentStep === 2) {
+      setCurrentStep(1);
+      setProductType(null);
+    }
+  };
+
   // ============= RENDER =============
   return (
-    <div className="space-y-3 pb-24 lg:pb-4">
+    <div className="space-y-3 pb-28 lg:pb-4">
       {/* ===== HEADER ===== */}
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex items-center justify-between gap-2 sticky top-0 z-10 bg-background/95 backdrop-blur py-2 -mt-2 -mx-1 px-1">
         <div className="flex items-center gap-2">
-          <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-            <ArrowDownToLine className="h-4 w-4 text-white" />
+          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg">
+            <ArrowDownToLine className="h-5 w-5 text-white" />
           </div>
           <div>
             <h1 className="text-lg font-bold">Point of Buy</h1>
-            <p className="text-xs text-muted-foreground">Purchase from company</p>
+            <p className="text-xs text-muted-foreground hidden sm:block">Purchase from company</p>
           </div>
         </div>
-        <div className="flex items-center gap-1.5">
-          <Badge className="bg-indigo-600 text-white">
-            <ShoppingBag className="h-3 w-3 mr-1" />
-            Cart ({purchaseItemsCount})
+        <div className="flex items-center gap-2">
+          <Badge className="bg-indigo-600 text-white h-8 px-3">
+            <ShoppingBag className="h-3.5 w-3.5 mr-1.5" />
+            {purchaseItemsCount}
           </Badge>
-          <Badge className={`${ROLE_CONFIG[userRole]?.bgColor} ${ROLE_CONFIG[userRole]?.color} border text-xs`}>
-            <User className="h-3 w-3 mr-1" />
-            {userName}
-          </Badge>
+          {isMobile && purchaseItems.length > 0 && currentStep !== 3 && (
+            <Button 
+              size="sm" 
+              className="h-8 bg-indigo-600"
+              onClick={() => setCurrentStep(3)}
+            >
+              Checkout
+            </Button>
+          )}
         </div>
       </div>
 
-      {/* ===== 3-PART LAYOUT ===== */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+      {/* ===== MOBILE STEP INDICATOR ===== */}
+      {isMobile && (
+        <div className="flex items-center justify-between bg-muted/50 rounded-lg p-2">
+          <div className="flex items-center gap-2">
+            {currentStep > 1 && (
+              <Button variant="ghost" size="sm" className="h-8 px-2" onClick={goBack}>
+                <ArrowRight className="h-4 w-4 rotate-180" />
+              </Button>
+            )}
+            <div className="flex items-center gap-1.5">
+              {[1, 2, 3].map((step) => (
+                <button
+                  key={step}
+                  onClick={() => {
+                    if (step === 1) goToStep(1);
+                    else if (step === 2 && productType) goToStep(2);
+                    else if (step === 3 && purchaseItems.length > 0) goToStep(3);
+                  }}
+                  className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                    currentStep === step 
+                      ? 'bg-indigo-600 text-white scale-110' 
+                      : step < currentStep || (step === 3 && purchaseItems.length > 0)
+                        ? 'bg-indigo-200 dark:bg-indigo-800 text-indigo-700 dark:text-indigo-300'
+                        : 'bg-muted text-muted-foreground'
+                  }`}
+                >
+                  {step}
+                </button>
+              ))}
+            </div>
+          </div>
+          <span className="text-xs font-medium">
+            {currentStep === 1 ? 'Select Type' : currentStep === 2 ? 'Configure' : 'Summary'}
+          </span>
+        </div>
+      )}
+
+      {/* ===== DESKTOP 3-COLUMN / MOBILE SINGLE VIEW ===== */}
+      <div className={isMobile ? 'space-y-3' : 'grid grid-cols-3 gap-3'}>
         
         {/* ===== PART 1: SELECT PRODUCT TYPE ===== */}
-        <Card className={`border-2 ${currentStep === 1 ? 'border-indigo-500 shadow-lg' : 'border-muted'}`}>
-          <CardHeader className="py-2 px-3 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-950/30 dark:to-purple-950/30">
-            <CardTitle className="flex items-center gap-2 text-sm">
-              <div className="w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-bold">1</div>
-              Select Product Type
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3">
-            <div className="grid grid-cols-1 gap-2">
-              <Button
-                variant={productType === 'lpg' ? 'default' : 'outline'}
-                className={`h-16 justify-start gap-3 ${productType === 'lpg' ? 'bg-indigo-600 hover:bg-indigo-700' : ''}`}
-                onClick={() => { setProductType('lpg'); setCurrentStep(2); }}
-              >
-                <div className="w-10 h-10 rounded-lg bg-indigo-500/20 flex items-center justify-center">
-                  <Cylinder className="h-5 w-5 text-indigo-600" />
-                </div>
-                <div className="text-left">
-                  <p className="font-semibold">LPG Cylinder</p>
-                  <p className="text-xs opacity-70">Refill / Package</p>
-                </div>
-              </Button>
+        {(!isMobile || currentStep === 1) && (
+          <Card className={`border-2 transition-all ${currentStep === 1 ? 'border-indigo-500 shadow-lg' : 'border-muted'}`}>
+            <CardHeader className="py-3 px-4 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-950/30 dark:to-purple-950/30">
+              <CardTitle className="flex items-center gap-2 text-sm">
+                <div className="w-7 h-7 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-bold">1</div>
+                Select Product Type
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-3">
+              <div className="grid grid-cols-1 gap-3">
+                <button
+                  className={`flex items-center gap-4 p-4 rounded-xl border-2 transition-all min-h-[72px] ${
+                    productType === 'lpg' 
+                      ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/30 shadow-md' 
+                      : 'border-muted hover:border-indigo-300 hover:bg-muted/50'
+                  }`}
+                  onClick={() => { setProductType('lpg'); setCurrentStep(2); }}
+                >
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                    productType === 'lpg' ? 'bg-indigo-600' : 'bg-indigo-100 dark:bg-indigo-900/50'
+                  }`}>
+                    <Cylinder className={`h-6 w-6 ${productType === 'lpg' ? 'text-white' : 'text-indigo-600'}`} />
+                  </div>
+                  <div className="text-left flex-1">
+                    <p className="font-semibold">LPG Cylinder</p>
+                    <p className="text-xs text-muted-foreground">Refill / Package</p>
+                  </div>
+                  {productType === 'lpg' && <CheckCircle2 className="h-5 w-5 text-indigo-600" />}
+                </button>
 
-              <Button
-                variant={productType === 'stove' ? 'default' : 'outline'}
-                className={`h-16 justify-start gap-3 ${productType === 'stove' ? 'bg-orange-500 hover:bg-orange-600' : ''}`}
-                onClick={() => { setProductType('stove'); setCurrentStep(2); }}
-              >
-                <div className="w-10 h-10 rounded-lg bg-orange-500/20 flex items-center justify-center">
-                  <ChefHat className="h-5 w-5 text-orange-600" />
-                </div>
-                <div className="text-left">
-                  <p className="font-semibold">Gas Stove</p>
-                  <p className="text-xs opacity-70">Single / Double Burner</p>
-                </div>
-              </Button>
+                <button
+                  className={`flex items-center gap-4 p-4 rounded-xl border-2 transition-all min-h-[72px] ${
+                    productType === 'stove' 
+                      ? 'border-orange-500 bg-orange-50 dark:bg-orange-950/30 shadow-md' 
+                      : 'border-muted hover:border-orange-300 hover:bg-muted/50'
+                  }`}
+                  onClick={() => { setProductType('stove'); setCurrentStep(2); }}
+                >
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                    productType === 'stove' ? 'bg-orange-500' : 'bg-orange-100 dark:bg-orange-900/50'
+                  }`}>
+                    <ChefHat className={`h-6 w-6 ${productType === 'stove' ? 'text-white' : 'text-orange-600'}`} />
+                  </div>
+                  <div className="text-left flex-1">
+                    <p className="font-semibold">Gas Stove</p>
+                    <p className="text-xs text-muted-foreground">Single / Double Burner</p>
+                  </div>
+                  {productType === 'stove' && <CheckCircle2 className="h-5 w-5 text-orange-500" />}
+                </button>
 
-              <Button
-                variant={productType === 'regulator' ? 'default' : 'outline'}
-                className={`h-16 justify-start gap-3 ${productType === 'regulator' ? 'bg-purple-500 hover:bg-purple-600' : ''}`}
-                onClick={() => { setProductType('regulator'); setCurrentStep(2); }}
-              >
-                <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center">
-                  <Gauge className="h-5 w-5 text-purple-600" />
-                </div>
-                <div className="text-left">
-                  <p className="font-semibold">Regulator</p>
-                  <p className="text-xs opacity-70">22mm / 20mm</p>
-                </div>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+                <button
+                  className={`flex items-center gap-4 p-4 rounded-xl border-2 transition-all min-h-[72px] ${
+                    productType === 'regulator' 
+                      ? 'border-purple-500 bg-purple-50 dark:bg-purple-950/30 shadow-md' 
+                      : 'border-muted hover:border-purple-300 hover:bg-muted/50'
+                  }`}
+                  onClick={() => { setProductType('regulator'); setCurrentStep(2); }}
+                >
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                    productType === 'regulator' ? 'bg-purple-500' : 'bg-purple-100 dark:bg-purple-900/50'
+                  }`}>
+                    <Gauge className={`h-6 w-6 ${productType === 'regulator' ? 'text-white' : 'text-purple-600'}`} />
+                  </div>
+                  <div className="text-left flex-1">
+                    <p className="font-semibold">Regulator</p>
+                    <p className="text-xs text-muted-foreground">22mm / 20mm</p>
+                  </div>
+                  {productType === 'regulator' && <CheckCircle2 className="h-5 w-5 text-purple-500" />}
+                </button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* ===== PART 2: CONFIGURE PRODUCT ===== */}
-        <Card className={`border-2 ${currentStep === 2 ? 'border-indigo-500 shadow-lg' : 'border-muted'}`}>
-          <CardHeader className="py-2 px-3 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-950/30 dark:to-purple-950/30">
-            <CardTitle className="flex items-center gap-2 text-sm">
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${currentStep >= 2 ? 'bg-indigo-600 text-white' : 'bg-muted text-muted-foreground'}`}>2</div>
-              Configure Purchase
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3">
-            {!productType ? (
-              <div className="flex flex-col items-center justify-center h-[300px] text-muted-foreground">
-                <Package className="h-12 w-12 opacity-30 mb-2" />
-                <p className="text-sm">Select a product type first</p>
-              </div>
-            ) : productType === 'lpg' ? (
-              <ScrollArea className="h-[340px] pr-2">
-                <div className="space-y-3">
-                  {/* Brand Name */}
-                  <div>
-                    <Label className="text-xs font-medium">Brand Name</Label>
-                    <Select value={lpgBrandName} onValueChange={setLpgBrandName}>
-                      <SelectTrigger className="h-10 mt-1">
-                        <SelectValue placeholder="Select brand..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {lpgBrandOptions.map(brand => (
-                          <SelectItem key={brand} value={brand}>{brand}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Cylinder Type */}
-                  <div>
-                    <Label className="text-xs font-medium">Cylinder Type</Label>
-                    <div className="flex gap-2 mt-1">
-                      <Button
-                        type="button"
-                        variant={lpgCylinderType === 'refill' ? 'default' : 'outline'}
-                        className={`flex-1 h-9 ${lpgCylinderType === 'refill' ? 'bg-indigo-600' : ''}`}
-                        onClick={() => setLpgCylinderType('refill')}
-                      >
-                        Refill
-                      </Button>
-                      <Button
-                        type="button"
-                        variant={lpgCylinderType === 'package' ? 'default' : 'outline'}
-                        className={`flex-1 h-9 ${lpgCylinderType === 'package' ? 'bg-indigo-600' : ''}`}
-                        onClick={() => setLpgCylinderType('package')}
-                      >
-                        Package
-                      </Button>
+        {(!isMobile || currentStep === 2) && (
+          <Card className={`border-2 transition-all ${currentStep === 2 ? 'border-indigo-500 shadow-lg' : 'border-muted'}`}>
+            <CardHeader className="py-3 px-4 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-950/30 dark:to-purple-950/30">
+              <CardTitle className="flex items-center gap-2 text-sm">
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${currentStep >= 2 ? 'bg-indigo-600 text-white' : 'bg-muted text-muted-foreground'}`}>2</div>
+                Configure Purchase
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-3">
+              {!productType ? (
+                <div className="flex flex-col items-center justify-center h-[300px] text-muted-foreground">
+                  <Package className="h-16 w-16 opacity-20 mb-3" />
+                  <p className="text-sm font-medium">Select a product type first</p>
+                  <p className="text-xs mt-1">Choose from LPG, Stove, or Regulator</p>
+                </div>
+              ) : productType === 'lpg' ? (
+                <ScrollArea className={isMobile ? "h-[calc(100vh-320px)]" : "h-[400px]"}>
+                  <div className="space-y-4 pr-2">
+                    {/* Brand Name */}
+                    <div>
+                      <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Brand Name</Label>
+                      <Select value={lpgBrandName} onValueChange={setLpgBrandName}>
+                        <SelectTrigger className="h-12 mt-1.5 text-base">
+                          <SelectValue placeholder="Select brand..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {lpgBrandOptions.map(brand => (
+                            <SelectItem key={brand} value={brand} className="h-11">{brand}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
-                  </div>
 
-                  {/* Valve Size */}
-                  <div>
-                    <Label className="text-xs font-medium">Valve Size</Label>
-                    <div className="flex gap-2 mt-1">
-                      <Button
-                        type="button"
-                        variant={lpgValveSize === '22mm' ? 'default' : 'outline'}
-                        className={`flex-1 h-9 ${lpgValveSize === '22mm' ? 'bg-indigo-600' : ''}`}
-                        onClick={() => { setLpgValveSize('22mm'); setLpgBrandName(''); }}
-                      >
-                        22mm
-                      </Button>
-                      <Button
-                        type="button"
-                        variant={lpgValveSize === '20mm' ? 'default' : 'outline'}
-                        className={`flex-1 h-9 ${lpgValveSize === '20mm' ? 'bg-indigo-600' : ''}`}
-                        onClick={() => { setLpgValveSize('20mm'); setLpgBrandName(''); }}
-                      >
-                        20mm
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Weight */}
-                  <div>
-                    <Label className="text-xs font-medium">Weight</Label>
-                    <div className="flex flex-wrap gap-1.5 mt-1">
-                      {(lpgValveSize === '22mm' ? WEIGHT_OPTIONS_22MM : WEIGHT_OPTIONS_20MM).map(w => (
-                        <Button
-                          key={w}
+                    {/* Cylinder Type */}
+                    <div>
+                      <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Cylinder Type</Label>
+                      <div className="grid grid-cols-2 gap-2 mt-1.5">
+                        <button
                           type="button"
-                          size="sm"
-                          variant={lpgWeight === w ? 'default' : 'outline'}
-                          className={`h-8 px-3 ${lpgWeight === w ? 'bg-indigo-600' : ''}`}
-                          onClick={() => setLpgWeight(w)}
+                          className={`h-12 rounded-lg border-2 font-medium transition-all ${
+                            lpgCylinderType === 'refill' 
+                              ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300' 
+                              : 'border-muted hover:border-indigo-300'
+                          }`}
+                          onClick={() => setLpgCylinderType('refill')}
                         >
-                          {w}
+                          Refill
+                        </button>
+                        <button
+                          type="button"
+                          className={`h-12 rounded-lg border-2 font-medium transition-all ${
+                            lpgCylinderType === 'package' 
+                              ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300' 
+                              : 'border-muted hover:border-indigo-300'
+                          }`}
+                          onClick={() => setLpgCylinderType('package')}
+                        >
+                          Package
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Valve Size */}
+                    <div>
+                      <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Valve Size</Label>
+                      <div className="grid grid-cols-2 gap-2 mt-1.5">
+                        <button
+                          type="button"
+                          className={`h-12 rounded-lg border-2 font-medium transition-all ${
+                            lpgValveSize === '22mm' 
+                              ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300' 
+                              : 'border-muted hover:border-indigo-300'
+                          }`}
+                          onClick={() => { setLpgValveSize('22mm'); setLpgBrandName(''); }}
+                        >
+                          22mm
+                        </button>
+                        <button
+                          type="button"
+                          className={`h-12 rounded-lg border-2 font-medium transition-all ${
+                            lpgValveSize === '20mm' 
+                              ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300' 
+                              : 'border-muted hover:border-indigo-300'
+                          }`}
+                          onClick={() => { setLpgValveSize('20mm'); setLpgBrandName(''); }}
+                        >
+                          20mm
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Weight */}
+                    <div>
+                      <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Weight</Label>
+                      <div className="grid grid-cols-3 gap-2 mt-1.5">
+                        {(lpgValveSize === '22mm' ? WEIGHT_OPTIONS_22MM : WEIGHT_OPTIONS_20MM).map(w => (
+                          <button
+                            key={w}
+                            type="button"
+                            className={`h-11 rounded-lg border-2 text-sm font-medium transition-all ${
+                              lpgWeight === w 
+                                ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300' 
+                                : 'border-muted hover:border-indigo-300'
+                            }`}
+                            onClick={() => setLpgWeight(w)}
+                          >
+                            {w}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Number of Cylinders */}
+                    <div>
+                      <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Number of Cylinders</Label>
+                      <div className="flex items-center gap-3 mt-1.5">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-12 w-12 rounded-xl"
+                          onClick={() => setLpgQuantity(Math.max(1, lpgQuantity - 1))}
+                        >
+                          <Minus className="h-5 w-5" />
                         </Button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Number of Cylinders */}
-                  <div>
-                    <Label className="text-xs font-medium">Number of Cylinders</Label>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        className="h-10 w-10"
-                        onClick={() => setLpgQuantity(Math.max(1, lpgQuantity - 1))}
-                      >
-                        <Minus className="h-4 w-4" />
-                      </Button>
-                      <Input
-                        type="number"
-                        value={lpgQuantity}
-                        onChange={(e) => setLpgQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                        className="h-10 text-center font-bold text-lg"
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        className="h-10 w-10"
-                        onClick={() => setLpgQuantity(lpgQuantity + 1)}
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Total D.O. Amount */}
-                  <div>
-                    <Label className="text-xs font-medium">Total D.O. Amount ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
-                    <Input
-                      type="number"
-                      placeholder="Enter total amount paid..."
-                      value={lpgTotalDO || ''}
-                      onChange={(e) => setLpgTotalDO(parseFloat(e.target.value) || 0)}
-                      className="h-10 mt-1 text-lg font-semibold"
-                    />
-                  </div>
-
-                  {/* Calculated Company Price */}
-                  {lpgTotalDO > 0 && lpgQuantity > 0 && (
-                    <div className="p-3 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-950/30 dark:to-purple-950/30 rounded-lg border border-indigo-200 dark:border-indigo-800">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Calculator className="h-4 w-4 text-indigo-600" />
-                        <span className="text-xs font-medium text-indigo-700 dark:text-indigo-300">Auto-calculated Company Price</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm">Per Cylinder:</span>
-                        <span className="text-xl font-bold text-indigo-600">{BANGLADESHI_CURRENCY_SYMBOL}{lpgCompanyPrice.toLocaleString()}</span>
-                      </div>
-                      <p className="text-[10px] text-muted-foreground mt-1">
-                        <Sparkles className="h-3 w-3 inline mr-1" />
-                        This price will update Product Pricing automatically
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Add to Cart Button */}
-                  <Button
-                    className="w-full h-11 bg-indigo-600 hover:bg-indigo-700"
-                    disabled={!lpgBrandName || lpgQuantity <= 0 || lpgTotalDO <= 0}
-                    onClick={addLPGToCart}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add to Cart
-                  </Button>
-                </div>
-              </ScrollArea>
-            ) : productType === 'stove' ? (
-              <ScrollArea className="h-[340px] pr-2">
-                <div className="space-y-3">
-                  {/* Brand Name */}
-                  <div>
-                    <Label className="text-xs font-medium">Brand Name</Label>
-                    <Select value={stoveBrand} onValueChange={setStoveBrand}>
-                      <SelectTrigger className="h-10 mt-1">
-                        <SelectValue placeholder="Select brand..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {STOVE_BRANDS.map(brand => (
-                          <SelectItem key={brand.name} value={brand.name}>{brand.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Model Number */}
-                  <div>
-                    <Label className="text-xs font-medium">Model Number</Label>
-                    <Input
-                      placeholder="e.g., RFL-101, GS-2000..."
-                      value={stoveModel}
-                      onChange={(e) => setStoveModel(e.target.value)}
-                      className="h-10 mt-1"
-                    />
-                  </div>
-
-                  {/* Burner Type */}
-                  <div>
-                    <Label className="text-xs font-medium">Burner Type</Label>
-                    <div className="flex gap-2 mt-1">
-                      <Button
-                        type="button"
-                        variant={stoveBurnerType === 'single' ? 'default' : 'outline'}
-                        className={`flex-1 h-9 ${stoveBurnerType === 'single' ? 'bg-orange-500' : ''}`}
-                        onClick={() => setStoveBurnerType('single')}
-                      >
-                        Single Burner
-                      </Button>
-                      <Button
-                        type="button"
-                        variant={stoveBurnerType === 'double' ? 'default' : 'outline'}
-                        className={`flex-1 h-9 ${stoveBurnerType === 'double' ? 'bg-orange-500' : ''}`}
-                        onClick={() => setStoveBurnerType('double')}
-                      >
-                        Double Burner
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Quantity */}
-                  <div>
-                    <Label className="text-xs font-medium">Number of Stoves</Label>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        className="h-10 w-10"
-                        onClick={() => setStoveQuantity(Math.max(1, stoveQuantity - 1))}
-                      >
-                        <Minus className="h-4 w-4" />
-                      </Button>
-                      <Input
-                        type="number"
-                        value={stoveQuantity}
-                        onChange={(e) => setStoveQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                        className="h-10 text-center font-bold text-lg"
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        className="h-10 w-10"
-                        onClick={() => setStoveQuantity(stoveQuantity + 1)}
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Total Amount */}
-                  <div>
-                    <Label className="text-xs font-medium">Total Amount Paid ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
-                    <Input
-                      type="number"
-                      placeholder="Enter total amount..."
-                      value={stoveTotalAmount || ''}
-                      onChange={(e) => setStoveTotalAmount(parseFloat(e.target.value) || 0)}
-                      className="h-10 mt-1 text-lg font-semibold"
-                    />
-                  </div>
-
-                  {/* Calculated Price */}
-                  {stoveTotalAmount > 0 && stoveQuantity > 0 && (
-                    <div className="p-3 bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-950/30 dark:to-amber-950/30 rounded-lg border border-orange-200 dark:border-orange-800">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Calculator className="h-4 w-4 text-orange-600" />
-                        <span className="text-xs font-medium text-orange-700 dark:text-orange-300">Auto-calculated Company Price</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm">Per Stove:</span>
-                        <span className="text-xl font-bold text-orange-600">{BANGLADESHI_CURRENCY_SYMBOL}{stoveCompanyPrice.toLocaleString()}</span>
-                      </div>
-                      <p className="text-[10px] text-muted-foreground mt-1">
-                        <Sparkles className="h-3 w-3 inline mr-1" />
-                        This price will update Product Pricing automatically
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Add Button */}
-                  <Button
-                    className="w-full h-11 bg-orange-500 hover:bg-orange-600"
-                    disabled={!stoveBrand || !stoveModel || stoveQuantity <= 0 || stoveTotalAmount <= 0}
-                    onClick={addStoveToCart}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add to Cart
-                  </Button>
-                </div>
-              </ScrollArea>
-            ) : productType === 'regulator' ? (
-              <ScrollArea className="h-[340px] pr-2">
-                <div className="space-y-3">
-                  {/* Brand Name */}
-                  <div>
-                    <Label className="text-xs font-medium">Brand Name</Label>
-                    <Select value={regulatorBrand} onValueChange={setRegulatorBrand}>
-                      <SelectTrigger className="h-10 mt-1">
-                        <SelectValue placeholder="Select brand..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {REGULATOR_BRANDS.map(brand => (
-                          <SelectItem key={brand.name} value={brand.name}>{brand.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Valve Type */}
-                  <div>
-                    <Label className="text-xs font-medium">Valve Type</Label>
-                    <div className="flex gap-2 mt-1">
-                      <Button
-                        type="button"
-                        variant={regulatorType === '22mm' ? 'default' : 'outline'}
-                        className={`flex-1 h-9 ${regulatorType === '22mm' ? 'bg-purple-500' : ''}`}
-                        onClick={() => setRegulatorType('22mm')}
-                      >
-                        22mm
-                      </Button>
-                      <Button
-                        type="button"
-                        variant={regulatorType === '20mm' ? 'default' : 'outline'}
-                        className={`flex-1 h-9 ${regulatorType === '20mm' ? 'bg-purple-500' : ''}`}
-                        onClick={() => setRegulatorType('20mm')}
-                      >
-                        20mm
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Quantity */}
-                  <div>
-                    <Label className="text-xs font-medium">Number of Regulators</Label>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        className="h-10 w-10"
-                        onClick={() => setRegulatorQuantity(Math.max(1, regulatorQuantity - 1))}
-                      >
-                        <Minus className="h-4 w-4" />
-                      </Button>
-                      <Input
-                        type="number"
-                        value={regulatorQuantity}
-                        onChange={(e) => setRegulatorQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                        className="h-10 text-center font-bold text-lg"
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        className="h-10 w-10"
-                        onClick={() => setRegulatorQuantity(regulatorQuantity + 1)}
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Total Amount */}
-                  <div>
-                    <Label className="text-xs font-medium">Total Amount Paid ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
-                    <Input
-                      type="number"
-                      placeholder="Enter total amount..."
-                      value={regulatorTotalAmount || ''}
-                      onChange={(e) => setRegulatorTotalAmount(parseFloat(e.target.value) || 0)}
-                      className="h-10 mt-1 text-lg font-semibold"
-                    />
-                  </div>
-
-                  {/* Calculated Price */}
-                  {regulatorTotalAmount > 0 && regulatorQuantity > 0 && (
-                    <div className="p-3 bg-gradient-to-r from-purple-50 to-violet-50 dark:from-purple-950/30 dark:to-violet-950/30 rounded-lg border border-purple-200 dark:border-purple-800">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Calculator className="h-4 w-4 text-purple-600" />
-                        <span className="text-xs font-medium text-purple-700 dark:text-purple-300">Auto-calculated Company Price</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm">Per Regulator:</span>
-                        <span className="text-xl font-bold text-purple-600">{BANGLADESHI_CURRENCY_SYMBOL}{regulatorCompanyPrice.toLocaleString()}</span>
-                      </div>
-                      <p className="text-[10px] text-muted-foreground mt-1">
-                        <Sparkles className="h-3 w-3 inline mr-1" />
-                        This price will update Product Pricing automatically
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Add Button */}
-                  <Button
-                    className="w-full h-11 bg-purple-500 hover:bg-purple-600"
-                    disabled={!regulatorBrand || regulatorQuantity <= 0 || regulatorTotalAmount <= 0}
-                    onClick={addRegulatorToCart}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add to Cart
-                  </Button>
-                </div>
-              </ScrollArea>
-            ) : null}
-          </CardContent>
-        </Card>
-
-        {/* ===== PART 3: PURCHASE SUMMARY ===== */}
-        <Card className={`border-2 ${currentStep === 3 || purchaseItems.length > 0 ? 'border-indigo-500 shadow-lg' : 'border-muted'}`}>
-          <CardHeader className="py-2 px-3 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-950/30 dark:to-purple-950/30">
-            <CardTitle className="flex items-center justify-between text-sm">
-              <span className="flex items-center gap-2">
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${purchaseItems.length > 0 ? 'bg-indigo-600 text-white' : 'bg-muted text-muted-foreground'}`}>3</div>
-                Purchase Summary
-              </span>
-              {purchaseItems.length > 0 && (
-                <Button variant="ghost" size="sm" className="h-7 text-destructive" onClick={clearCart}>
-                  <RotateCcw className="h-3.5 w-3.5 mr-1" />
-                  Clear
-                </Button>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3">
-            {purchaseItems.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-[300px] text-muted-foreground">
-                <ShoppingBag className="h-12 w-12 opacity-30 mb-2" />
-                <p className="text-sm">Your cart is empty</p>
-                <p className="text-xs mt-1">Add products to see summary</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {/* Cart Items */}
-                <ScrollArea className="h-[180px]">
-                  <div className="space-y-2">
-                    {purchaseItems.map(item => (
-                      <div key={item.id} className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 border">
-                        <div 
-                          className="w-8 h-8 rounded flex items-center justify-center flex-shrink-0"
-                          style={{ backgroundColor: item.brandColor || (item.type === 'stove' ? '#f97316' : item.type === 'regulator' ? '#8b5cf6' : '#6366f1') }}
+                        <Input
+                          type="number"
+                          value={lpgQuantity}
+                          onChange={(e) => setLpgQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                          className="h-12 text-center font-bold text-xl flex-1"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-12 w-12 rounded-xl"
+                          onClick={() => setLpgQuantity(lpgQuantity + 1)}
                         >
-                          {item.type === 'lpg' && <Cylinder className="h-4 w-4 text-white" />}
-                          {item.type === 'stove' && <ChefHat className="h-4 w-4 text-white" />}
-                          {item.type === 'regulator' && <Gauge className="h-4 w-4 text-white" />}
+                          <Plus className="h-5 w-5" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Total D.O. Amount */}
+                    <div>
+                      <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Total D.O. Amount ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
+                      <Input
+                        type="number"
+                        inputMode="numeric"
+                        placeholder="Enter total amount paid..."
+                        value={lpgTotalDO || ''}
+                        onChange={(e) => setLpgTotalDO(parseFloat(e.target.value) || 0)}
+                        className="h-14 mt-1.5 text-xl font-semibold"
+                      />
+                    </div>
+
+                    {/* Calculated Company Price */}
+                    {lpgTotalDO > 0 && lpgQuantity > 0 && (
+                      <div className="p-4 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-950/30 dark:to-purple-950/30 rounded-xl border-2 border-indigo-200 dark:border-indigo-800">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Calculator className="h-5 w-5 text-indigo-600" />
+                          <span className="text-sm font-semibold text-indigo-700 dark:text-indigo-300">Auto-calculated</span>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-xs truncate">{item.name}</p>
-                          <p className="text-[10px] text-muted-foreground">{item.details}</p>
+                        <div className="flex justify-between items-baseline">
+                          <span className="text-sm text-muted-foreground">Per Cylinder:</span>
+                          <span className="text-2xl font-bold text-indigo-600">{BANGLADESHI_CURRENCY_SYMBOL}{lpgCompanyPrice.toLocaleString()}</span>
                         </div>
-                        <div className="flex items-center gap-1">
-                          <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => updateItemQuantity(item.id, -1)}>
-                            <Minus className="h-3 w-3" />
-                          </Button>
-                          <span className="w-5 text-center text-xs font-bold">{item.quantity}</span>
-                          <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => updateItemQuantity(item.id, 1)}>
-                            <Plus className="h-3 w-3" />
-                          </Button>
-                        </div>
-                        <p className="font-bold text-xs text-indigo-600 w-16 text-right">
-                          {BANGLADESHI_CURRENCY_SYMBOL}{(item.companyPrice * item.quantity).toLocaleString()}
+                        <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+                          <Sparkles className="h-3.5 w-3.5" />
+                          Updates Product Pricing automatically
                         </p>
-                        <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive" onClick={() => removeItem(item.id)}>
-                          <X className="h-3 w-3" />
-                        </Button>
                       </div>
-                    ))}
+                    )}
+
+                    {/* Add to Cart Button */}
+                    <Button
+                      className="w-full h-14 text-base bg-indigo-600 hover:bg-indigo-700 rounded-xl"
+                      disabled={!lpgBrandName || lpgQuantity <= 0 || lpgTotalDO <= 0}
+                      onClick={addLPGToCart}
+                    >
+                      <Plus className="h-5 w-5 mr-2" />
+                      Add to Cart
+                    </Button>
                   </div>
                 </ScrollArea>
-
-                <Separator />
-
-                {/* Supplier Selection */}
-                <div>
-                  <Label className="text-xs font-medium">Supplier</Label>
-                  {!showCustomSupplierInput ? (
-                    <Select value={supplierName} onValueChange={(val) => {
-                      if (val === 'custom') {
-                        setShowCustomSupplierInput(true);
-                      } else {
-                        setSupplierName(val);
-                      }
-                    }}>
-                      <SelectTrigger className="h-9 mt-1">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {SUPPLIERS.map(s => (
-                          <SelectItem key={s} value={s}>{s}</SelectItem>
-                        ))}
-                        <SelectItem value="custom">+ Add Custom Supplier</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <div className="flex gap-2 mt-1">
-                      <Input
-                        placeholder="Custom supplier name..."
-                        value={customSupplier}
-                        onChange={(e) => setCustomSupplier(e.target.value)}
-                        className="h-9"
-                      />
-                      <Button variant="ghost" size="sm" className="h-9" onClick={() => setShowCustomSupplierInput(false)}>
-                        <X className="h-4 w-4" />
-                      </Button>
+              ) : productType === 'stove' ? (
+                <ScrollArea className={isMobile ? "h-[calc(100vh-320px)]" : "h-[400px]"}>
+                  <div className="space-y-4 pr-2">
+                    {/* Brand Name */}
+                    <div>
+                      <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Brand Name</Label>
+                      <Select value={stoveBrand} onValueChange={setStoveBrand}>
+                        <SelectTrigger className="h-12 mt-1.5 text-base">
+                          <SelectValue placeholder="Select brand..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {STOVE_BRANDS.map(brand => (
+                            <SelectItem key={brand.name} value={brand.name} className="h-11">{brand.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
+
+                    {/* Model Number */}
+                    <div>
+                      <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Model Number</Label>
+                      <Input
+                        placeholder="e.g., RFL-101, GS-2000..."
+                        value={stoveModel}
+                        onChange={(e) => setStoveModel(e.target.value)}
+                        className="h-12 mt-1.5 text-base"
+                      />
+                    </div>
+
+                    {/* Burner Type */}
+                    <div>
+                      <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Burner Type</Label>
+                      <div className="grid grid-cols-2 gap-2 mt-1.5">
+                        <button
+                          type="button"
+                          className={`h-12 rounded-lg border-2 font-medium transition-all ${
+                            stoveBurnerType === 'single' 
+                              ? 'border-orange-500 bg-orange-50 dark:bg-orange-950/50 text-orange-700 dark:text-orange-300' 
+                              : 'border-muted hover:border-orange-300'
+                          }`}
+                          onClick={() => setStoveBurnerType('single')}
+                        >
+                          Single
+                        </button>
+                        <button
+                          type="button"
+                          className={`h-12 rounded-lg border-2 font-medium transition-all ${
+                            stoveBurnerType === 'double' 
+                              ? 'border-orange-500 bg-orange-50 dark:bg-orange-950/50 text-orange-700 dark:text-orange-300' 
+                              : 'border-muted hover:border-orange-300'
+                          }`}
+                          onClick={() => setStoveBurnerType('double')}
+                        >
+                          Double
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Quantity */}
+                    <div>
+                      <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Number of Stoves</Label>
+                      <div className="flex items-center gap-3 mt-1.5">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-12 w-12 rounded-xl"
+                          onClick={() => setStoveQuantity(Math.max(1, stoveQuantity - 1))}
+                        >
+                          <Minus className="h-5 w-5" />
+                        </Button>
+                        <Input
+                          type="number"
+                          value={stoveQuantity}
+                          onChange={(e) => setStoveQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                          className="h-12 text-center font-bold text-xl flex-1"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-12 w-12 rounded-xl"
+                          onClick={() => setStoveQuantity(stoveQuantity + 1)}
+                        >
+                          <Plus className="h-5 w-5" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Total Amount */}
+                    <div>
+                      <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Total Amount ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
+                      <Input
+                        type="number"
+                        inputMode="numeric"
+                        placeholder="Enter total amount..."
+                        value={stoveTotalAmount || ''}
+                        onChange={(e) => setStoveTotalAmount(parseFloat(e.target.value) || 0)}
+                        className="h-14 mt-1.5 text-xl font-semibold"
+                      />
+                    </div>
+
+                    {/* Calculated Price */}
+                    {stoveTotalAmount > 0 && stoveQuantity > 0 && (
+                      <div className="p-4 bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-950/30 dark:to-amber-950/30 rounded-xl border-2 border-orange-200 dark:border-orange-800">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Calculator className="h-5 w-5 text-orange-600" />
+                          <span className="text-sm font-semibold text-orange-700 dark:text-orange-300">Auto-calculated</span>
+                        </div>
+                        <div className="flex justify-between items-baseline">
+                          <span className="text-sm text-muted-foreground">Per Stove:</span>
+                          <span className="text-2xl font-bold text-orange-600">{BANGLADESHI_CURRENCY_SYMBOL}{stoveCompanyPrice.toLocaleString()}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+                          <Sparkles className="h-3.5 w-3.5" />
+                          Updates Product Pricing automatically
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Add Button */}
+                    <Button
+                      className="w-full h-14 text-base bg-orange-500 hover:bg-orange-600 rounded-xl"
+                      disabled={!stoveBrand || !stoveModel || stoveQuantity <= 0 || stoveTotalAmount <= 0}
+                      onClick={addStoveToCart}
+                    >
+                      <Plus className="h-5 w-5 mr-2" />
+                      Add to Cart
+                    </Button>
+                  </div>
+                </ScrollArea>
+              ) : productType === 'regulator' ? (
+                <ScrollArea className={isMobile ? "h-[calc(100vh-320px)]" : "h-[400px]"}>
+                  <div className="space-y-4 pr-2">
+                    {/* Brand Name */}
+                    <div>
+                      <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Brand Name</Label>
+                      <Select value={regulatorBrand} onValueChange={setRegulatorBrand}>
+                        <SelectTrigger className="h-12 mt-1.5 text-base">
+                          <SelectValue placeholder="Select brand..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {REGULATOR_BRANDS.map(brand => (
+                            <SelectItem key={brand.name} value={brand.name} className="h-11">{brand.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Valve Type */}
+                    <div>
+                      <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Valve Type</Label>
+                      <div className="grid grid-cols-2 gap-2 mt-1.5">
+                        <button
+                          type="button"
+                          className={`h-12 rounded-lg border-2 font-medium transition-all ${
+                            regulatorType === '22mm' 
+                              ? 'border-purple-500 bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300' 
+                              : 'border-muted hover:border-purple-300'
+                          }`}
+                          onClick={() => setRegulatorType('22mm')}
+                        >
+                          22mm
+                        </button>
+                        <button
+                          type="button"
+                          className={`h-12 rounded-lg border-2 font-medium transition-all ${
+                            regulatorType === '20mm' 
+                              ? 'border-purple-500 bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300' 
+                              : 'border-muted hover:border-purple-300'
+                          }`}
+                          onClick={() => setRegulatorType('20mm')}
+                        >
+                          20mm
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Quantity */}
+                    <div>
+                      <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Number of Regulators</Label>
+                      <div className="flex items-center gap-3 mt-1.5">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-12 w-12 rounded-xl"
+                          onClick={() => setRegulatorQuantity(Math.max(1, regulatorQuantity - 1))}
+                        >
+                          <Minus className="h-5 w-5" />
+                        </Button>
+                        <Input
+                          type="number"
+                          value={regulatorQuantity}
+                          onChange={(e) => setRegulatorQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                          className="h-12 text-center font-bold text-xl flex-1"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-12 w-12 rounded-xl"
+                          onClick={() => setRegulatorQuantity(regulatorQuantity + 1)}
+                        >
+                          <Plus className="h-5 w-5" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Total Amount */}
+                    <div>
+                      <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Total Amount ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
+                      <Input
+                        type="number"
+                        inputMode="numeric"
+                        placeholder="Enter total amount..."
+                        value={regulatorTotalAmount || ''}
+                        onChange={(e) => setRegulatorTotalAmount(parseFloat(e.target.value) || 0)}
+                        className="h-14 mt-1.5 text-xl font-semibold"
+                      />
+                    </div>
+
+                    {/* Calculated Price */}
+                    {regulatorTotalAmount > 0 && regulatorQuantity > 0 && (
+                      <div className="p-4 bg-gradient-to-r from-purple-50 to-violet-50 dark:from-purple-950/30 dark:to-violet-950/30 rounded-xl border-2 border-purple-200 dark:border-purple-800">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Calculator className="h-5 w-5 text-purple-600" />
+                          <span className="text-sm font-semibold text-purple-700 dark:text-purple-300">Auto-calculated</span>
+                        </div>
+                        <div className="flex justify-between items-baseline">
+                          <span className="text-sm text-muted-foreground">Per Regulator:</span>
+                          <span className="text-2xl font-bold text-purple-600">{BANGLADESHI_CURRENCY_SYMBOL}{regulatorCompanyPrice.toLocaleString()}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+                          <Sparkles className="h-3.5 w-3.5" />
+                          Updates Product Pricing automatically
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Add Button */}
+                    <Button
+                      className="w-full h-14 text-base bg-purple-500 hover:bg-purple-600 rounded-xl"
+                      disabled={!regulatorBrand || regulatorQuantity <= 0 || regulatorTotalAmount <= 0}
+                      onClick={addRegulatorToCart}
+                    >
+                      <Plus className="h-5 w-5 mr-2" />
+                      Add to Cart
+                    </Button>
+                  </div>
+                </ScrollArea>
+              ) : null}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* ===== PART 3: PURCHASE SUMMARY ===== */}
+        {(!isMobile || currentStep === 3) && (
+          <Card className={`border-2 transition-all ${currentStep === 3 || purchaseItems.length > 0 ? 'border-indigo-500 shadow-lg' : 'border-muted'}`}>
+            <CardHeader className="py-3 px-4 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-950/30 dark:to-purple-950/30">
+              <CardTitle className="flex items-center justify-between text-sm">
+                <span className="flex items-center gap-2">
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${purchaseItems.length > 0 ? 'bg-indigo-600 text-white' : 'bg-muted text-muted-foreground'}`}>3</div>
+                  Purchase Summary
+                </span>
+                {purchaseItems.length > 0 && (
+                  <Button variant="ghost" size="sm" className="h-8 text-destructive hover:bg-destructive/10" onClick={clearCart}>
+                    <RotateCcw className="h-4 w-4 mr-1" />
+                    Clear
+                  </Button>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-3">
+              {purchaseItems.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-[300px] text-muted-foreground">
+                  <ShoppingBag className="h-16 w-16 opacity-20 mb-3" />
+                  <p className="text-sm font-medium">Your cart is empty</p>
+                  <p className="text-xs mt-1">Add products to see summary</p>
+                  {isMobile && (
+                    <Button variant="outline" className="mt-4" onClick={() => setCurrentStep(1)}>
+                      Start Shopping
+                    </Button>
                   )}
                 </div>
+              ) : (
+                <div className="space-y-3">
+                  {/* Cart Items */}
+                  <ScrollArea className={isMobile ? "h-[calc(100vh-480px)] min-h-[150px]" : "h-[200px]"}>
+                    <div className="space-y-2">
+                      {purchaseItems.map(item => (
+                        <div key={item.id} className="flex items-center gap-2 p-3 rounded-xl bg-muted/50 border">
+                          <div 
+                            className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+                            style={{ backgroundColor: item.brandColor || (item.type === 'stove' ? '#f97316' : item.type === 'regulator' ? '#8b5cf6' : '#6366f1') }}
+                          >
+                            {item.type === 'lpg' && <Cylinder className="h-5 w-5 text-white" />}
+                            {item.type === 'stove' && <ChefHat className="h-5 w-5 text-white" />}
+                            {item.type === 'regulator' && <Gauge className="h-5 w-5 text-white" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm truncate">{item.name}</p>
+                            <p className="text-xs text-muted-foreground">{item.details}</p>
+                          </div>
+                          <div className="flex items-center gap-1 bg-background rounded-lg p-1">
+                            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => updateItemQuantity(item.id, -1)}>
+                              <Minus className="h-4 w-4" />
+                            </Button>
+                            <span className="w-8 text-center text-sm font-bold">{item.quantity}</span>
+                            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => updateItemQuantity(item.id, 1)}>
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <div className="text-right min-w-[70px]">
+                            <p className="font-bold text-sm text-indigo-600">
+                              {BANGLADESHI_CURRENCY_SYMBOL}{(item.companyPrice * item.quantity).toLocaleString()}
+                            </p>
+                          </div>
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => removeItem(item.id)}>
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
 
-                {/* Total */}
-                <div className="p-3 bg-gradient-to-r from-indigo-100 to-purple-100 dark:from-indigo-900/50 dark:to-purple-900/50 rounded-lg">
-                  <div className="flex justify-between items-center">
-                    <span className="font-medium">Total Purchase</span>
-                    <span className="text-2xl font-bold text-indigo-600">{BANGLADESHI_CURRENCY_SYMBOL}{total.toLocaleString()}</span>
+                  <Separator />
+
+                  {/* Supplier Selection */}
+                  <div>
+                    <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Supplier</Label>
+                    {!showCustomSupplierInput ? (
+                      <Select value={supplierName} onValueChange={(val) => {
+                        if (val === 'custom') {
+                          setShowCustomSupplierInput(true);
+                        } else {
+                          setSupplierName(val);
+                        }
+                      }}>
+                        <SelectTrigger className="h-11 mt-1.5">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {SUPPLIERS.map(s => (
+                            <SelectItem key={s} value={s} className="h-10">{s}</SelectItem>
+                          ))}
+                          <SelectItem value="custom" className="h-10">+ Add Custom Supplier</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <div className="flex gap-2 mt-1.5">
+                        <Input
+                          placeholder="Custom supplier name..."
+                          value={customSupplier}
+                          onChange={(e) => setCustomSupplier(e.target.value)}
+                          className="h-11"
+                        />
+                        <Button variant="ghost" size="icon" className="h-11 w-11" onClick={() => setShowCustomSupplierInput(false)}>
+                          <X className="h-5 w-5" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
-                </div>
 
-                {/* Action Buttons */}
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    variant="outline"
-                    className="h-11"
-                    onClick={() => handleCompletePurchase('pending')}
-                    disabled={processing}
-                  >
-                    {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-                    Save as Credit
-                  </Button>
-                  <Button
-                    className="h-11 bg-indigo-600 hover:bg-indigo-700"
-                    onClick={() => handleCompletePurchase('completed')}
-                    disabled={processing}
-                  >
-                    {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
-                    Complete
-                  </Button>
+                  {/* Total */}
+                  <div className="p-4 bg-gradient-to-r from-indigo-100 to-purple-100 dark:from-indigo-900/50 dark:to-purple-900/50 rounded-xl">
+                    <div className="flex justify-between items-center">
+                      <span className="font-semibold">Total Purchase</span>
+                      <span className="text-3xl font-bold text-indigo-600">{BANGLADESHI_CURRENCY_SYMBOL}{total.toLocaleString()}</span>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      variant="outline"
+                      className="h-14 text-base rounded-xl"
+                      onClick={() => handleCompletePurchase('pending')}
+                      disabled={processing}
+                    >
+                      {processing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5 mr-2" />}
+                      Credit
+                    </Button>
+                    <Button
+                      className="h-14 text-base bg-indigo-600 hover:bg-indigo-700 rounded-xl"
+                      onClick={() => handleCompletePurchase('completed')}
+                      disabled={processing}
+                    >
+                      {processing ? <Loader2 className="h-5 w-5 animate-spin" /> : <CheckCircle2 className="h-5 w-5 mr-2" />}
+                      Complete
+                    </Button>
+                  </div>
+
+                  {/* Add More Button on Mobile */}
+                  {isMobile && (
+                    <Button
+                      variant="outline"
+                      className="w-full h-12 rounded-xl"
+                      onClick={() => setCurrentStep(1)}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add More Products
+                    </Button>
+                  )}
                 </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* ===== RECENT PURCHASES (Void within 5 mins) ===== */}
-      {recentPurchases.length > 0 && (
+      {recentPurchases.length > 0 && (!isMobile || currentStep === 1) && (
         <Card>
-          <CardHeader className="py-2 px-3">
+          <CardHeader className="py-3 px-4">
             <CardTitle className="text-sm flex items-center gap-2">
               <Building2 className="h-4 w-4 text-muted-foreground" />
-              Recent Purchases (5 min void window)
+              Recent Purchases
+              <Badge variant="secondary" className="ml-auto text-xs">5 min void</Badge>
             </CardTitle>
           </CardHeader>
           <CardContent className="p-2">
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               {recentPurchases.map(purchase => (
-                <div key={purchase.id} className="flex items-center justify-between p-2 rounded-lg bg-muted/50 border">
-                  <div className="flex-1">
-                    <p className="font-medium text-xs">{purchase.transactionNumber}</p>
-                    <p className="text-[10px] text-muted-foreground">
-                      {purchase.supplierName} • {purchase.items.map(i => `${i.quantity}x ${i.name}`).join(', ')}
+                <div key={purchase.id} className="flex items-center justify-between p-3 rounded-xl bg-muted/50 border">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm">{purchase.transactionNumber}</p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {purchase.supplierName}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-sm text-indigo-600">{BANGLADESHI_CURRENCY_SYMBOL}{purchase.total.toLocaleString()}</span>
+                  <div className="flex items-center gap-3">
+                    <span className="font-bold text-indigo-600">{BANGLADESHI_CURRENCY_SYMBOL}{purchase.total.toLocaleString()}</span>
                     <Button
-                      size="sm"
+                      size="icon"
                       variant="ghost"
-                      className="h-7 text-destructive hover:bg-destructive/10"
+                      className="h-9 w-9 text-destructive hover:bg-destructive/10"
                       onClick={() => { setPurchaseToVoid(purchase); setShowVoidDialog(true); }}
                     >
-                      <Undo2 className="h-3.5 w-3.5" />
+                      <Undo2 className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
@@ -1512,16 +1642,16 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
 
       {/* ===== VOID DIALOG ===== */}
       <Dialog open={showVoidDialog} onOpenChange={setShowVoidDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Void Purchase?</DialogTitle>
             <DialogDescription>
-              This will reverse the inventory changes and remove the expense entry for {purchaseToVoid?.transactionNumber}.
+              This will reverse inventory changes and remove the expense entry for {purchaseToVoid?.transactionNumber}.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowVoidDialog(false)}>Cancel</Button>
-            <Button variant="destructive" onClick={handleVoidPurchase}>Void Purchase</Button>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" className="h-11" onClick={() => setShowVoidDialog(false)}>Cancel</Button>
+            <Button variant="destructive" className="h-11" onClick={handleVoidPurchase}>Void Purchase</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
