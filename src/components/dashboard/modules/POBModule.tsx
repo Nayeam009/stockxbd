@@ -976,7 +976,98 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
     );
   }
 
-  // ============= QUANTITY STEPPER COMPONENT =============
+  // ============= ENHANCED VALVE SIZE QUANTITY CARD COMPONENT =============
+  const ValveSizeQuantityCard = ({ 
+    value, 
+    onChange, 
+    valveSize, 
+    stockLabel,
+    variant = 'primary'
+  }: { 
+    value: number; 
+    onChange: (v: number) => void;
+    valveSize: '22mm' | '20mm';
+    stockLabel?: string;
+    variant?: 'primary' | 'secondary' | 'info';
+  }) => {
+    const is22mm = valveSize === '22mm';
+    const bgGradient = is22mm 
+      ? 'from-primary/15 via-primary/10 to-primary/5' 
+      : 'from-warning/15 via-warning/10 to-warning/5';
+    const borderColor = is22mm ? 'border-primary/30' : 'border-warning/30';
+    const badgeBg = is22mm ? 'bg-primary' : 'bg-warning';
+    const textColor = is22mm ? 'text-primary' : 'text-warning';
+    
+    return (
+      <Card className={`overflow-hidden border-2 ${borderColor} shadow-sm`}>
+        {/* Valve Size Header Badge */}
+        <div className={`bg-gradient-to-br ${bgGradient} p-4 text-center border-b ${borderColor}`}>
+          <div className={`inline-flex items-center justify-center ${badgeBg} text-white px-4 py-2 rounded-full shadow-md`}>
+            <CircleDot className="h-4 w-4 mr-2" />
+            <span className="text-base font-bold">{valveSize}</span>
+          </div>
+          {stockLabel && (
+            <p className="text-xs font-medium text-muted-foreground mt-2">
+              Current Stock: <span className={`font-bold ${textColor}`}>{stockLabel}</span>
+            </p>
+          )}
+        </div>
+        
+        {/* Quantity Input Section */}
+        <CardContent className="p-4 space-y-3">
+          {/* Large Quantity Display */}
+          <div className="relative">
+            <Input
+              type="number"
+              inputMode="numeric"
+              value={value}
+              onChange={(e) => onChange(Math.max(0, parseInt(e.target.value) || 0))}
+              className={`w-full h-16 text-center text-3xl font-extrabold border-2 ${borderColor} ${textColor}`}
+              placeholder="0"
+            />
+          </div>
+          
+          {/* Stepper Buttons - Two Rows for Better Touch */}
+          <div className="grid grid-cols-4 gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className={`h-12 w-full text-sm font-bold ${borderColor} hover:${textColor}`}
+              onClick={() => onChange(Math.max(0, value - 10))}
+            >
+              -10
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className={`h-12 w-full ${borderColor}`}
+              onClick={() => onChange(Math.max(0, value - 1))}
+            >
+              <Minus className="h-5 w-5" />
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className={`h-12 w-full ${borderColor}`}
+              onClick={() => onChange(value + 1)}
+            >
+              <Plus className="h-5 w-5" />
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className={`h-12 w-full text-sm font-bold ${borderColor} hover:${textColor}`}
+              onClick={() => onChange(value + 10)}
+            >
+              +10
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  // ============= LEGACY QUANTITY STEPPER (for stoves) =============
   const QuantityStepper = ({ 
     value, 
     onChange, 
@@ -1182,34 +1273,59 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
               )}
             </div>
 
-            {/* Row 3: QUANTITY BY VALVE SIZE (The Key Feature) */}
-            <div className="space-y-3">
-              <Label className="text-sm font-semibold flex items-center gap-2">
-                <CircleDashed className="h-4 w-4" />
-                Quantity (By Valve Size)
-              </Label>
-              <div className="grid grid-cols-2 gap-3">
-                <QuantityStepper
+            {/* Row 3: QUANTITY BY VALVE SIZE (The Key Feature) - Enhanced Cards */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 pb-1 border-b border-border">
+                <CircleDashed className="h-5 w-5 text-primary" />
+                <Label className="text-base font-bold">Quantity (By Valve Size)</Label>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <ValveSizeQuantityCard
                   value={lpgQty22mm}
                   onChange={setLpgQty22mm}
-                  label="22mm"
-                  stockLabel={`Stock: ${valveSizeStats["22mm"].refill}R + ${valveSizeStats["22mm"].package}P`}
-                  colorClass="text-primary"
+                  valveSize="22mm"
+                  stockLabel={`${valveSizeStats["22mm"].refill}R + ${valveSizeStats["22mm"].package}P`}
+                  variant="primary"
                 />
-                <QuantityStepper
+                <ValveSizeQuantityCard
                   value={lpgQty20mm}
                   onChange={setLpgQty20mm}
-                  label="20mm"
-                  stockLabel={`Stock: ${valveSizeStats["20mm"].refill}R + ${valveSizeStats["20mm"].package}P`}
-                  colorClass="text-secondary"
+                  valveSize="20mm"
+                  stockLabel={`${valveSizeStats["20mm"].refill}R + ${valveSizeStats["20mm"].package}P`}
+                  variant="secondary"
                 />
               </div>
+              
+              {/* Total Summary Bar - Enhanced */}
               {lpgTotalQty > 0 && (
-                <div className="text-center py-2 bg-primary/5 rounded-lg border border-primary/20">
-                  <span className="text-sm text-muted-foreground">Total: </span>
-                  <span className="text-lg font-bold text-primary">{lpgTotalQty.toLocaleString()}</span>
-                  <span className="text-sm text-muted-foreground"> cylinders</span>
-                </div>
+                <Card className="border-2 border-primary/30 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent overflow-hidden">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="h-12 w-12 rounded-xl bg-primary/20 flex items-center justify-center">
+                          <Cylinder className="h-6 w-6 text-primary" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Cylinders</p>
+                          <p className="text-3xl font-black text-primary">{lpgTotalQty.toLocaleString()}</p>
+                        </div>
+                      </div>
+                      <div className="text-right text-sm">
+                        <div className="flex items-center gap-2 justify-end">
+                          <Badge variant="outline" className="border-primary/50 text-primary font-semibold">
+                            22mm: {lpgQty22mm}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-2 justify-end mt-1">
+                          <Badge variant="outline" className="border-warning/50 text-warning font-semibold">
+                            20mm: {lpgQty20mm}
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               )}
             </div>
 
@@ -1450,34 +1566,59 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
               )}
             </div>
 
-            {/* QUANTITY BY VALVE TYPE (The Key Feature for Regulators) */}
-            <div className="space-y-3">
-              <Label className="text-sm font-semibold flex items-center gap-2">
-                <CircleDashed className="h-4 w-4" />
-                Quantity (By Valve Type)
-              </Label>
-              <div className="grid grid-cols-2 gap-3">
-                <QuantityStepper
+            {/* QUANTITY BY VALVE TYPE (The Key Feature for Regulators) - Enhanced Cards */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 pb-1 border-b border-info/30">
+                <CircleDashed className="h-5 w-5 text-info" />
+                <Label className="text-base font-bold">Quantity (By Valve Type)</Label>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <ValveSizeQuantityCard
                   value={regQty22mm}
                   onChange={setRegQty22mm}
-                  label="22mm"
-                  stockLabel={`Stock: ${regulatorValveStats["22mm"]}`}
-                  colorClass="text-info"
+                  valveSize="22mm"
+                  stockLabel={`${regulatorValveStats["22mm"]} pcs`}
+                  variant="primary"
                 />
-                <QuantityStepper
+                <ValveSizeQuantityCard
                   value={regQty20mm}
                   onChange={setRegQty20mm}
-                  label="20mm"
-                  stockLabel={`Stock: ${regulatorValveStats["20mm"]}`}
-                  colorClass="text-info"
+                  valveSize="20mm"
+                  stockLabel={`${regulatorValveStats["20mm"]} pcs`}
+                  variant="secondary"
                 />
               </div>
+              
+              {/* Total Summary Bar - Enhanced for Regulators */}
               {regTotalQty > 0 && (
-                <div className="text-center py-2 bg-info/5 rounded-lg border border-info/20">
-                  <span className="text-sm text-muted-foreground">Total: </span>
-                  <span className="text-lg font-bold text-info">{regTotalQty.toLocaleString()}</span>
-                  <span className="text-sm text-muted-foreground"> regulators</span>
-                </div>
+                <Card className="border-2 border-info/30 bg-gradient-to-r from-info/10 via-info/5 to-transparent overflow-hidden">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="h-12 w-12 rounded-xl bg-info/20 flex items-center justify-center">
+                          <Gauge className="h-6 w-6 text-info" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Regulators</p>
+                          <p className="text-3xl font-black text-info">{regTotalQty.toLocaleString()}</p>
+                        </div>
+                      </div>
+                      <div className="text-right text-sm">
+                        <div className="flex items-center gap-2 justify-end">
+                          <Badge variant="outline" className="border-primary/50 text-primary font-semibold">
+                            22mm: {regQty22mm}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-2 justify-end mt-1">
+                          <Badge variant="outline" className="border-warning/50 text-warning font-semibold">
+                            20mm: {regQty20mm}
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               )}
             </div>
 
@@ -1710,25 +1851,38 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
             )}
           </ScrollArea>
           
-          {/* Cart Summary - Large Prominent Cards */}
+          {/* Cart Summary - Extra Large Prominent Cards with Better Spacing */}
           {purchaseItems.length > 0 && (
-            <div className="p-4 bg-gradient-to-t from-muted/50 to-transparent border-t border-border shrink-0 space-y-4">
-              {/* Summary Cards Grid - Made Larger */}
-              <div className="grid grid-cols-2 gap-4">
-                {/* Total Quantity Card */}
-                <Card className="border-2 border-success/40 bg-gradient-to-br from-success/10 to-success/5 shadow-sm">
-                  <CardContent className="p-4 text-center">
-                    <p className="text-xs font-semibold text-success uppercase tracking-wider mb-1">Total Quantity</p>
-                    <p className="text-4xl font-extrabold text-success">{totalQuantity.toLocaleString()}</p>
-                    <p className="text-xs text-muted-foreground mt-1">({productCount} products)</p>
+            <div className="p-5 bg-gradient-to-t from-muted/60 to-transparent border-t-2 border-border shrink-0 space-y-5">
+              {/* Summary Cards Grid - Extra Large with Better Visual Hierarchy */}
+              <div className="grid grid-cols-2 gap-5">
+                {/* Total Quantity Card - Green Theme */}
+                <Card className="border-3 border-success/50 bg-gradient-to-br from-success/15 via-success/10 to-success/5 shadow-lg overflow-hidden">
+                  <CardContent className="p-5 text-center relative">
+                    {/* Decorative corner */}
+                    <div className="absolute top-0 right-0 w-16 h-16 bg-success/10 rounded-bl-full" />
+                    <p className="text-xs font-bold text-success uppercase tracking-widest mb-2">Total Quantity</p>
+                    <p className="text-5xl font-black text-success leading-none">{totalQuantity.toLocaleString()}</p>
+                    <p className="text-sm text-success/70 font-medium mt-2">
+                      {productCount} {productCount === 1 ? 'product' : 'products'} added
+                    </p>
                   </CardContent>
                 </Card>
                 
-                {/* Total D.O. Card */}
-                <Card className="border-2 border-primary/40 bg-gradient-to-br from-primary/10 to-primary/5 shadow-sm">
-                  <CardContent className="p-4 text-center">
-                    <p className="text-xs font-semibold text-primary uppercase tracking-wider mb-1">Total D.O.</p>
-                    <p className="text-3xl font-extrabold text-primary">{BANGLADESHI_CURRENCY_SYMBOL}{totalDO.toLocaleString()}</p>
+                {/* Total D.O. Card - Indigo/Primary Theme */}
+                <Card className="border-3 border-primary/50 bg-gradient-to-br from-primary/15 via-primary/10 to-primary/5 shadow-lg overflow-hidden">
+                  <CardContent className="p-5 text-center relative">
+                    {/* Decorative corner */}
+                    <div className="absolute top-0 right-0 w-16 h-16 bg-primary/10 rounded-bl-full" />
+                    <p className="text-xs font-bold text-primary uppercase tracking-widest mb-2">Total D.O.</p>
+                    <p className="text-4xl font-black text-primary leading-none">
+                      {BANGLADESHI_CURRENCY_SYMBOL}{totalDO.toLocaleString()}
+                    </p>
+                    {totalQuantity > 0 && (
+                      <p className="text-sm text-primary/70 font-medium mt-2">
+                        Avg: {BANGLADESHI_CURRENCY_SYMBOL}{Math.round(totalDO / totalQuantity).toLocaleString()}/pc
+                      </p>
+                    )}
                   </CardContent>
                 </Card>
               </div>
@@ -1738,7 +1892,7 @@ export const POBModule = ({ userRole = 'owner', userName = 'User' }: POBModulePr
                 <Button
                   type="button"
                   size="lg"
-                  className="w-full h-14 font-semibold text-base"
+                  className="w-full h-14 font-bold text-base shadow-lg"
                   onClick={() => setMobileStep('checkout')}
                 >
                   <CheckCircle2 className="h-5 w-5 mr-2" />
