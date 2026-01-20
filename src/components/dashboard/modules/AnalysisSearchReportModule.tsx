@@ -1361,7 +1361,8 @@ export const AnalysisSearchReportModule = ({ salesData, customers, stockData, dr
 
       {/* Command Palette Dialog */}
       <Dialog open={commandOpen} onOpenChange={setCommandOpen}>
-        <DialogContent className="p-0 gap-0 max-w-[95vw] md:max-w-2xl overflow-hidden">
+        <DialogContent className="p-0 gap-0 max-w-[95vw] md:max-w-2xl overflow-hidden" aria-describedby={undefined}>
+          <DialogTitle className="sr-only">Quick Command Palette</DialogTitle>
           <Command className="rounded-lg border-0" shouldFilter={true}>
             <CommandInput 
               placeholder="Search pages, actions, customers, sales, stock..." 
