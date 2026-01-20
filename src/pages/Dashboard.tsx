@@ -159,7 +159,7 @@ const Dashboard = () => {
           />
         );
       case "pos":
-        return <POSModule />;
+        return <POSModule userRole={userRole} userName={userName} />;
       case "daily-expenses":
         return <DailyExpensesModule />;
       case "orders":
