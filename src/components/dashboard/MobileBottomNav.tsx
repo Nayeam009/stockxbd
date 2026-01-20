@@ -36,10 +36,6 @@ const moreItems = [{
   labelKey: 'business_diary',
   roles: ['owner', 'manager']
 }, {
-  id: 'pob',
-  labelKey: 'pob',
-  roles: ['owner', 'manager']
-}, {
   id: 'orders',
   labelKey: 'online_delivery',
   roles: ['owner', 'manager', 'driver']

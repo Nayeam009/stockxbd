@@ -9,7 +9,7 @@ import { InventoryModule } from "@/components/dashboard/modules/InventoryModule"
 import { OnlineDeliveryModule } from "@/components/dashboard/modules/OnlineDeliveryModule";
 import { SearchModule } from "@/components/dashboard/modules/SearchModule";
 import { POSModule } from "@/components/dashboard/modules/POSModule";
-import { POBModule } from "@/components/dashboard/modules/POBModule";
+
 import { CommunityModule } from "@/components/dashboard/modules/CommunityModule";
 import { ProductPricingModule } from "@/components/dashboard/modules/ProductPricingModule";
 import { VehicleCostModule } from "@/components/dashboard/modules/VehicleCostModule";
@@ -127,7 +127,7 @@ const Dashboard = () => {
       case "pos":
         return <POSModule userRole={userRole} userName={userName} />;
       case "pob":
-        return <POBModule userRole={userRole} userName={userName} />;
+        return <InventoryModule />;
       case "orders":
         return (
           <OnlineDeliveryModule

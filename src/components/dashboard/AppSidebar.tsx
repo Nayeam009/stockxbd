@@ -42,11 +42,6 @@ export const AppSidebar = ({
     icon: Home,
     roles: ['owner', 'manager', 'driver']
   }, {
-    id: 'pob',
-    titleKey: 'pob',
-    icon: PackagePlus,
-    roles: ['owner', 'manager']
-  }, {
     id: 'pos',
     titleKey: 'pos',
     icon: Receipt,
