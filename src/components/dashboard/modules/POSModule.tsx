@@ -351,12 +351,24 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
       .reduce((sum, i) => sum + i.quantity, 0);
   }, [saleItems]);
 
+  const packageCylindersCount = useMemo(() => {
+    return saleItems
+      .filter(i => i.type === 'lpg' && i.cylinderType === 'package')
+      .reduce((sum, i) => sum + i.quantity, 0);
+  }, [saleItems]);
+
   const returnCylindersCount = useMemo(() => {
     return returnItems.reduce((sum, i) => sum + i.quantity, 0);
   }, [returnItems]);
 
+  const saleItemsCount = useMemo(() => {
+    return saleItems.reduce((s, i) => s + i.quantity, 0);
+  }, [saleItems]);
+
   const isReturnCountMatched = refillCylindersCount === 0 || refillCylindersCount === returnCylindersCount;
   const hasRefillInCart = refillCylindersCount > 0;
+  // Wholesale condition: more than 1 product in cart allows "Due" payment (cylinder credit)
+  const isWholesaleEligible = saleItemsCount > 1;
 
   const subtotal = saleItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const discountAmount = parsePositiveNumber(discount, 10000000);
@@ -804,13 +816,20 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
         }
       }
 
-      // Update customer dues
+      // Update customer dues (track both money and cylinders)
       if (paymentStatus === 'pending' && customerId) {
         const customer = customers.find(c => c.id === customerId);
         if (customer) {
+          // Count package cylinders sold on due (these are cylinder assets owed by customer)
+          const packageCylindersSold = saleItems
+            .filter(i => i.type === 'lpg' && i.cylinderType === 'package')
+            .reduce((sum, i) => sum + i.quantity, 0);
+          
           await supabase.from('customers')
             .update({ 
               total_due: (customer.total_due || 0) + total,
+              cylinders_due: (customer.cylinders_due || 0) + packageCylindersSold,
+              billing_status: 'pending',
               last_order_date: new Date().toISOString()
             })
             .eq('id', customerId);
@@ -902,7 +921,6 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
     );
   }
 
-  const saleItemsCount = saleItems.reduce((s, i) => s + i.quantity, 0);
 
   return (
     <TooltipProvider>
@@ -1001,9 +1019,14 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                             <Plus className="h-3 w-3" />
                           </Button>
                         </div>
-                        <p className="font-bold text-xs text-emerald-600 w-16 text-right">{BANGLADESHI_CURRENCY_SYMBOL}{(item.price * item.quantity).toLocaleString()}</p>
-                        <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive" onClick={() => removeItem(item.id)}>
-                          <X className="h-3 w-3" />
+                        <p className="font-bold text-xs text-emerald-600 w-14 sm:w-16 text-right flex-shrink-0">{BANGLADESHI_CURRENCY_SYMBOL}{(item.price * item.quantity).toLocaleString()}</p>
+                        <Button 
+                          size="icon" 
+                          variant="ghost" 
+                          className="h-7 w-7 min-w-[28px] text-destructive hover:bg-destructive/10 flex-shrink-0" 
+                          onClick={() => removeItem(item.id)}
+                        >
+                          <X className="h-4 w-4" />
                         </Button>
                       </div>
                     ))}
@@ -1075,8 +1098,13 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                             <Plus className="h-3 w-3" />
                           </Button>
                         </div>
-                        <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive" onClick={() => removeReturnItem(item.id)}>
-                          <X className="h-3 w-3" />
+                        <Button 
+                          size="icon" 
+                          variant="ghost" 
+                          className="h-7 w-7 min-w-[28px] text-destructive hover:bg-destructive/10 flex-shrink-0" 
+                          onClick={() => removeReturnItem(item.id)}
+                        >
+                          <X className="h-4 w-4" />
                         </Button>
                       </div>
                     ))}
@@ -1414,14 +1442,25 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                   >
                     {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Wallet className="h-4 w-4 mr-1" /> Cash</>}
                   </Button>
-                  <Button
-                    onClick={() => handleCompleteSale('pending')}
-                    disabled={processing || saleItems.length === 0 || selectedCustomerId === "walkin"}
-                    variant="outline"
-                    className="h-9 border-amber-500 text-amber-600 hover:bg-amber-50"
-                  >
-                    <CreditCard className="h-4 w-4 mr-1" /> Due
-                  </Button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="w-full">
+                        <Button
+                          onClick={() => handleCompleteSale('pending')}
+                          disabled={processing || saleItems.length === 0 || selectedCustomerId === "walkin" || !isWholesaleEligible}
+                          variant="outline"
+                          className="h-9 w-full border-amber-500 text-amber-600 hover:bg-amber-50 disabled:opacity-50"
+                        >
+                          <CreditCard className="h-4 w-4 mr-1" /> Due
+                        </Button>
+                      </span>
+                    </TooltipTrigger>
+                    {!isWholesaleEligible && saleItems.length > 0 && (
+                      <TooltipContent>
+                        <p className="text-xs">Due requires 2+ items (wholesale)</p>
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
                 </div>
               </div>
             </div>
