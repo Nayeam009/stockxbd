@@ -84,15 +84,7 @@ interface PurchaseItem {
   regulatorType?: string;
 }
 
-interface RecentPurchase {
-  id: string;
-  transactionNumber: string;
-  supplierName: string;
-  total: number;
-  status: string;
-  createdAt: Date;
-  items: { name: string; quantity: number }[];
-}
+// RecentPurchase interface removed - void system disabled
 
 interface InventoryPOBDrawerProps {
   open: boolean;
@@ -166,10 +158,7 @@ export const InventoryPOBDrawer = ({
   // Supplier
   const [supplierName, setSupplierName] = useState("Bashundhara LP Gas Ltd.");
   
-  // Recent purchases for void
-  const [recentPurchases, setRecentPurchases] = useState<RecentPurchase[]>([]);
-  const [showVoidDialog, setShowVoidDialog] = useState(false);
-  const [purchaseToVoid, setPurchaseToVoid] = useState<RecentPurchase | null>(null);
+  // Void system removed - purchases are permanent
 
   // Computed totals
   const lpgTotalQty = lpgQty22mm + lpgQty20mm;
@@ -188,25 +177,7 @@ export const InventoryPOBDrawer = ({
     if (stovesRes.data) setStoves(stovesRes.data);
     if (regulatorsRes.data) setRegulators(regulatorsRes.data);
 
-    // Fetch recent POB transactions for void (no time limit - fetch last 20)
-    const { data: recentTxns } = await supabase
-      .from('pob_transactions')
-      .select(`id, transaction_number, supplier_name, total, payment_status, created_at, pob_transaction_items (product_name, quantity)`)
-      .eq('is_voided', false)
-      .order('created_at', { ascending: false })
-      .limit(20);
-
-    if (recentTxns) {
-      setRecentPurchases(recentTxns.map(t => ({
-        id: t.id,
-        transactionNumber: t.transaction_number,
-        supplierName: t.supplier_name,
-        total: Number(t.total),
-        status: t.payment_status,
-        createdAt: new Date(t.created_at),
-        items: t.pob_transaction_items?.map((i: any) => ({ name: i.product_name, quantity: i.quantity })) || []
-      })));
-    }
+    // Void system removed - no recent transactions tracking needed
   }, []);
 
   useEffect(() => {
@@ -768,71 +739,7 @@ export const InventoryPOBDrawer = ({
     }
   };
 
-  // Void purchase
-  const handleVoidPurchase = async () => {
-    if (!purchaseToVoid) return;
-
-    try {
-      await supabase
-        .from('pob_transactions')
-        .update({ is_voided: true, voided_at: new Date().toISOString() })
-        .eq('id', purchaseToVoid.id);
-
-      const { data: items } = await supabase
-        .from('pob_transaction_items')
-        .select('*')
-        .eq('transaction_id', purchaseToVoid.id);
-
-      if (items) {
-        for (const item of items) {
-          if (item.product_type === 'lpg' && item.brand_id) {
-            const stockField = item.cylinder_type === 'refill' ? 'refill_cylinder' : 'package_cylinder';
-            const { data: brand } = await supabase
-              .from('lpg_brands')
-              .select(stockField)
-              .eq('id', item.brand_id)
-              .single();
-            
-            if (brand) {
-              await supabase
-                .from('lpg_brands')
-                .update({ [stockField]: (brand[stockField] as number) - item.quantity })
-                .eq('id', item.brand_id);
-            }
-          } else if (item.product_type === 'stove') {
-            const stove = stoves.find(s => `${s.brand} ${s.model}` === item.product_name);
-            if (stove) {
-              await supabase
-                .from('stoves')
-                .update({ quantity: stove.quantity - item.quantity })
-                .eq('id', stove.id);
-            }
-          } else if (item.product_type === 'regulator') {
-            const reg = regulators.find(r => `${r.brand} ${r.type}` === item.product_name);
-            if (reg) {
-              await supabase
-                .from('regulators')
-                .update({ quantity: reg.quantity - item.quantity })
-                .eq('id', reg.id);
-            }
-          }
-        }
-      }
-
-      await supabase
-        .from('daily_expenses')
-        .delete()
-        .ilike('description', `${purchaseToVoid.transactionNumber}%`);
-
-      toast({ title: "Purchase voided", description: purchaseToVoid.transactionNumber });
-      setShowVoidDialog(false);
-      setPurchaseToVoid(null);
-      await fetchData();
-      onPurchaseComplete();
-    } catch (error: any) {
-      toast({ title: "Error voiding purchase", variant: "destructive" });
-    }
-  };
+  // Void system removed - purchases are permanent
 
   // Valve Size Quantity Card - Compact for mobile
   const ValveSizeQuantityCard = ({ 
@@ -1294,39 +1201,7 @@ export const InventoryPOBDrawer = ({
         </CardContent>
       </Card>
 
-      {/* Recent Purchases */}
-      {recentPurchases.length > 0 && (
-        <Card>
-          <CardHeader className="py-3 px-4 border-b">
-            <CardTitle className="flex items-center gap-2 text-sm">
-              <Sparkles className="h-4 w-4 text-warning" />Recent Purchases
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-2">
-            <div className="max-h-[140px] overflow-y-auto">
-              <div className="space-y-1">
-                {recentPurchases.map(purchase => (
-                  <div key={purchase.id} className="flex items-center justify-between p-2.5 rounded-lg bg-muted/50">
-                    <div>
-                      <p className="text-xs font-semibold">{purchase.transactionNumber}</p>
-                      <p className="text-xs text-muted-foreground">{BANGLADESHI_CURRENCY_SYMBOL}{purchase.total.toLocaleString()}</p>
-                    </div>
-                    <Button 
-                      type="button" 
-                      variant="ghost" 
-                      size="sm" 
-                      className="h-10 w-10 p-0 text-destructive" 
-                      onClick={() => { setPurchaseToVoid(purchase); setShowVoidDialog(true); }}
-                    >
-                      <Undo2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* Recent Purchases section removed - void system disabled */}
     </div>
   );
 
@@ -1707,23 +1582,7 @@ export const InventoryPOBDrawer = ({
         </SheetContent>
       </Sheet>
 
-      {/* Void Dialog */}
-      <Dialog open={showVoidDialog} onOpenChange={setShowVoidDialog}>
-        <DialogContent className="max-w-[95vw] sm:max-w-md rounded-xl">
-          <DialogHeader>
-            <DialogTitle>Void Purchase?</DialogTitle>
-            <DialogDescription>
-              This will reverse the stock changes and remove the expense entry for {purchaseToVoid?.transactionNumber}.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" className="h-11" onClick={() => setShowVoidDialog(false)}>Cancel</Button>
-            <Button variant="destructive" className="h-11" onClick={handleVoidPurchase}>
-              <Undo2 className="h-4 w-4 mr-2" />Void Purchase
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Void Dialog removed - void system disabled */}
     </>
   );
 };
