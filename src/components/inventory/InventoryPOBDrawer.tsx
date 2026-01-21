@@ -188,15 +188,13 @@ export const InventoryPOBDrawer = ({
     if (stovesRes.data) setStoves(stovesRes.data);
     if (regulatorsRes.data) setRegulators(regulatorsRes.data);
 
-    // Fetch recent POB transactions for void
-    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    // Fetch recent POB transactions for void (no time limit - fetch last 20)
     const { data: recentTxns } = await supabase
       .from('pob_transactions')
       .select(`id, transaction_number, supplier_name, total, payment_status, created_at, pob_transaction_items (product_name, quantity)`)
-      .gte('created_at', fiveMinutesAgo)
       .eq('is_voided', false)
       .order('created_at', { ascending: false })
-      .limit(5);
+      .limit(20);
 
     if (recentTxns) {
       setRecentPurchases(recentTxns.map(t => ({
@@ -1301,7 +1299,7 @@ export const InventoryPOBDrawer = ({
         <Card>
           <CardHeader className="py-3 px-4 border-b">
             <CardTitle className="flex items-center gap-2 text-sm">
-              <Sparkles className="h-4 w-4 text-warning" />Recent (5 min void window)
+              <Sparkles className="h-4 w-4 text-warning" />Recent Purchases
             </CardTitle>
           </CardHeader>
           <CardContent className="p-2">

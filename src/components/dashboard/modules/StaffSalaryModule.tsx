@@ -63,6 +63,22 @@ export const StaffSalaryModule = () => {
     fetchData();
   }, []);
 
+  // Real-time staff sync
+  useEffect(() => {
+    const channels = [
+      supabase.channel('staff-realtime').on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'staff' }, 
+        () => fetchData()
+      ).subscribe(),
+      supabase.channel('staff-payments-realtime').on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'staff_payments' }, 
+        () => fetchData()
+      ).subscribe(),
+    ];
+    
+    return () => channels.forEach(ch => supabase.removeChannel(ch));
+  }, []);
+
   const fetchData = async () => {
     setLoading(true);
     const currentMonth = startOfMonth(new Date());

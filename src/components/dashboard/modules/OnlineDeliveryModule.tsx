@@ -80,6 +80,46 @@ export const OnlineDeliveryModule = ({ orders, setOrders, drivers, userRole }: O
     fetchFormData();
   }, []);
 
+  // Real-time orders sync
+  useEffect(() => {
+    const channel = supabase
+      .channel('orders-delivery-realtime')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'orders' }, 
+        async () => {
+          const { data } = await supabase
+            .from('orders')
+            .select('*, order_items(*)')
+            .order('created_at', { ascending: false });
+          if (data) {
+            setOrders(data.map(order => ({
+              id: order.id,
+              orderNumber: order.order_number,
+              customerId: order.customer_id,
+              customerName: order.customer_name,
+              deliveryAddress: order.delivery_address,
+              totalAmount: Number(order.total_amount),
+              status: order.status as 'pending' | 'confirmed' | 'dispatched' | 'delivered' | 'cancelled',
+              paymentStatus: order.payment_status as 'pending' | 'paid' | 'partial',
+              driverId: order.driver_id,
+              orderDate: order.order_date,
+              deliveryDate: order.delivery_date,
+              notes: order.notes,
+              items: order.order_items?.map((item: any) => ({
+                productId: item.product_id || item.id,
+                productName: item.product_name,
+                quantity: item.quantity,
+                price: Number(item.price)
+              })) || []
+            })));
+          }
+        }
+      )
+      .subscribe();
+    
+    return () => { supabase.removeChannel(channel); };
+  }, [setOrders]);
+
   // Filter orders
   const filteredOrders = useMemo(() => {
     return orders.filter(order => {

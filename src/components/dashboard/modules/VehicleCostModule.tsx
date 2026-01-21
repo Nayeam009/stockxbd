@@ -64,6 +64,22 @@ export const VehicleCostModule = () => {
     fetchData();
   }, []);
 
+  // Real-time vehicle sync
+  useEffect(() => {
+    const channels = [
+      supabase.channel('vehicles-realtime').on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'vehicles' }, 
+        () => fetchData()
+      ).subscribe(),
+      supabase.channel('vehicle-costs-realtime').on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'vehicle_costs' }, 
+        () => fetchData()
+      ).subscribe(),
+    ];
+    
+    return () => channels.forEach(ch => supabase.removeChannel(ch));
+  }, []);
+
   const fetchData = async () => {
     setLoading(true);
     const [vehiclesRes, costsRes] = await Promise.all([
