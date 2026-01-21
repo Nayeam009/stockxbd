@@ -836,7 +836,7 @@ export const InventoryPOBDrawer = ({
     }
   };
 
-  // Valve Size Quantity Card
+  // Valve Size Quantity Card - Compact for mobile
   const ValveSizeQuantityCard = ({ 
     value, 
     onChange, 
@@ -855,31 +855,31 @@ export const InventoryPOBDrawer = ({
     
     return (
       <Card className={`overflow-hidden border-2 ${borderColor}`}>
-        <div className={`p-3 text-center border-b ${borderColor} bg-gradient-to-br ${is22mm ? 'from-primary/10 to-primary/5' : 'from-warning/10 to-warning/5'}`}>
-          <div className={`inline-flex items-center justify-center ${badgeBg} text-white px-3 py-1.5 rounded-full`}>
-            <CircleDot className="h-3.5 w-3.5 mr-1.5" />
-            <span className="text-sm font-bold">{valveSize}</span>
+        <div className={`p-2 text-center border-b ${borderColor} bg-gradient-to-br ${is22mm ? 'from-primary/10 to-primary/5' : 'from-warning/10 to-warning/5'}`}>
+          <div className={`inline-flex items-center justify-center ${badgeBg} text-white px-2.5 py-1 rounded-full`}>
+            <CircleDot className="h-3 w-3 mr-1" />
+            <span className="text-xs font-bold">{valveSize}</span>
           </div>
           {stockLabel && (
-            <p className="text-[10px] font-medium text-muted-foreground mt-1.5">
+            <p className="text-[10px] font-medium text-muted-foreground mt-1">
               Stock: <span className={`font-bold ${textColor}`}>{stockLabel}</span>
             </p>
           )}
         </div>
-        <CardContent className="p-3 space-y-2">
+        <CardContent className="p-2 space-y-1.5">
           <Input
             type="number"
             inputMode="numeric"
             value={value}
             onChange={(e) => onChange(Math.max(0, parseInt(e.target.value) || 0))}
-            className={`w-full h-14 text-center text-2xl font-extrabold border-2 ${borderColor} ${textColor}`}
+            className={`w-full h-12 text-center text-xl font-extrabold border-2 ${borderColor} ${textColor}`}
             placeholder="0"
           />
-          <div className="grid grid-cols-2 gap-2">
-            <Button type="button" variant="outline" className="h-11 font-bold" onClick={() => onChange(Math.max(0, value - 10))}>
+          <div className="grid grid-cols-2 gap-1.5">
+            <Button type="button" variant="outline" className="h-9 font-bold text-xs" onClick={() => onChange(Math.max(0, value - 10))}>
               -10
             </Button>
-            <Button type="button" variant="outline" className="h-11 font-bold" onClick={() => onChange(value + 10)}>
+            <Button type="button" variant="outline" className="h-9 font-bold text-xs" onClick={() => onChange(value + 10)}>
               +10
             </Button>
           </div>
@@ -888,7 +888,7 @@ export const InventoryPOBDrawer = ({
     );
   };
 
-  // Burner Type Quantity Card
+  // Burner Type Quantity Card - Compact for mobile
   const BurnerTypeQuantityCard = ({ 
     value, 
     onChange, 
@@ -904,35 +904,35 @@ export const InventoryPOBDrawer = ({
     const borderColor = isSingle ? 'border-warning/40' : 'border-orange-500/40';
     const badgeBg = isSingle ? 'bg-warning' : 'bg-orange-500';
     const textColor = isSingle ? 'text-warning' : 'text-orange-500';
-    const label = isSingle ? 'Single Burner' : 'Double Burner';
+    const label = isSingle ? 'Single' : 'Double';
     
     return (
       <Card className={`overflow-hidden border-2 ${borderColor}`}>
-        <div className={`p-3 text-center border-b ${borderColor} bg-gradient-to-br ${isSingle ? 'from-warning/10 to-warning/5' : 'from-orange-500/10 to-orange-500/5'}`}>
-          <div className={`inline-flex items-center justify-center ${badgeBg} text-white px-3 py-1.5 rounded-full`}>
-            <Flame className="h-3.5 w-3.5 mr-1.5" />
+        <div className={`p-2 text-center border-b ${borderColor} bg-gradient-to-br ${isSingle ? 'from-warning/10 to-warning/5' : 'from-orange-500/10 to-orange-500/5'}`}>
+          <div className={`inline-flex items-center justify-center ${badgeBg} text-white px-2.5 py-1 rounded-full`}>
+            <Flame className="h-3 w-3 mr-1" />
             <span className="text-xs font-bold">{label}</span>
           </div>
           {stockLabel && (
-            <p className="text-[10px] font-medium text-muted-foreground mt-1.5">
+            <p className="text-[10px] font-medium text-muted-foreground mt-1">
               Stock: <span className={`font-bold ${textColor}`}>{stockLabel}</span>
             </p>
           )}
         </div>
-        <CardContent className="p-3 space-y-2">
+        <CardContent className="p-2 space-y-1.5">
           <Input
             type="number"
             inputMode="numeric"
             value={value}
             onChange={(e) => onChange(Math.max(0, parseInt(e.target.value) || 0))}
-            className={`w-full h-14 text-center text-2xl font-extrabold border-2 ${borderColor} ${textColor}`}
+            className={`w-full h-12 text-center text-xl font-extrabold border-2 ${borderColor} ${textColor}`}
             placeholder="0"
           />
-          <div className="grid grid-cols-2 gap-2">
-            <Button type="button" variant="outline" className="h-11 font-bold" onClick={() => onChange(Math.max(0, value - 10))}>
+          <div className="grid grid-cols-2 gap-1.5">
+            <Button type="button" variant="outline" className="h-9 font-bold text-xs" onClick={() => onChange(Math.max(0, value - 10))}>
               -10
             </Button>
-            <Button type="button" variant="outline" className="h-11 font-bold" onClick={() => onChange(value + 10)}>
+            <Button type="button" variant="outline" className="h-9 font-bold text-xs" onClick={() => onChange(value + 10)}>
               +10
             </Button>
           </div>
@@ -945,38 +945,51 @@ export const InventoryPOBDrawer = ({
   const renderProductForm = () => {
     if (productType === 'lpg') {
       return (
-        <div className="space-y-4">
-          {/* Cylinder Type & Weight */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Cylinder Type</Label>
-              <div className="grid grid-cols-2 gap-1.5">
-                <Button type="button" variant={lpgCylinderType === "refill" ? "default" : "outline"} size="sm" className="h-11" onClick={() => setLpgCylinderType("refill")}>
-                  Refill
-                </Button>
-                <Button type="button" variant={lpgCylinderType === "package" ? "secondary" : "outline"} size="sm" className="h-11" onClick={() => setLpgCylinderType("package")}>
-                  Package
-                </Button>
-              </div>
+        <div className="space-y-3">
+          {/* Unified Row: Cylinder Type + Weight */}
+          <div className="flex items-center gap-2">
+            {/* Cylinder Type + Separator */}
+            <div className="flex bg-muted/60 rounded-full p-1 border border-border/50 flex-1">
+              <button
+                type="button"
+                onClick={() => setLpgCylinderType("refill")}
+                className={`flex-1 h-9 px-2 rounded-full font-semibold text-xs transition-all ${
+                  lpgCylinderType === 'refill' 
+                    ? 'bg-primary text-primary-foreground shadow-md' 
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Refill
+              </button>
+              <button
+                type="button"
+                onClick={() => setLpgCylinderType("package")}
+                className={`flex-1 h-9 px-2 rounded-full font-semibold text-xs transition-all ${
+                  lpgCylinderType === 'package' 
+                    ? 'bg-secondary text-secondary-foreground shadow-md' 
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Package
+              </button>
             </div>
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Weight</Label>
-              <Select value={lpgWeight} onValueChange={setLpgWeight}>
-                <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {[...new Set([...WEIGHT_OPTIONS_22MM, ...WEIGHT_OPTIONS_20MM])].sort((a, b) => parseFloat(a) - parseFloat(b)).map(w => (
-                    <SelectItem key={w} value={w}>{w}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            
+            {/* Weight Dropdown */}
+            <Select value={lpgWeight} onValueChange={setLpgWeight}>
+              <SelectTrigger className="h-9 w-24 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {[...new Set([...WEIGHT_OPTIONS_22MM, ...WEIGHT_OPTIONS_20MM])].sort((a, b) => parseFloat(a) - parseFloat(b)).map(w => (
+                  <SelectItem key={w} value={w}>{w}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Brand */}
-          <div className="space-y-2">
-            <Label className="text-sm font-medium">Brand Name</Label>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium">Brand Name</Label>
             <Select value={lpgBrandName} onValueChange={setLpgBrandName}>
-              <SelectTrigger className="h-12"><SelectValue placeholder="Select brand..." /></SelectTrigger>
+              <SelectTrigger className="h-10"><SelectValue placeholder="Select brand..." /></SelectTrigger>
               <SelectContent>
                 {lpgBrandOptions.map(brand => (
                   <SelectItem key={brand} value={brand}>{brand}</SelectItem>
@@ -986,21 +999,21 @@ export const InventoryPOBDrawer = ({
           </div>
 
           {/* Quantity by Valve Size */}
-          <div className="space-y-3">
+          <div className="space-y-2">
             <div className="flex items-center gap-2 pb-1 border-b">
-              <CircleDashed className="h-5 w-5 text-primary" />
-              <Label className="text-base font-bold">Quantity (By Valve Size)</Label>
+              <CircleDashed className="h-4 w-4 text-primary" />
+              <Label className="text-sm font-bold">Quantity (By Valve Size)</Label>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-2">
               <ValveSizeQuantityCard value={lpgQty22mm} onChange={setLpgQty22mm} valveSize="22mm" stockLabel={`${valveSizeStats["22mm"].refill}R + ${valveSizeStats["22mm"].package}P`} />
               <ValveSizeQuantityCard value={lpgQty20mm} onChange={setLpgQty20mm} valveSize="20mm" stockLabel={`${valveSizeStats["20mm"].refill}R + ${valveSizeStats["20mm"].package}P`} />
             </div>
             {lpgTotalQty > 0 && (
-              <div className="flex items-center justify-between p-3 bg-primary/10 rounded-lg border border-primary/20">
-                <span className="font-medium">Total: {lpgTotalQty} cylinders</span>
+              <div className="flex items-center justify-between p-2 bg-primary/10 rounded-lg border border-primary/20">
+                <span className="font-medium text-sm">Total: {lpgTotalQty} cylinders</span>
                 <div className="flex gap-1">
-                  <Badge variant="outline" className="text-xs">22mm: {lpgQty22mm}</Badge>
-                  <Badge variant="outline" className="text-xs">20mm: {lpgQty20mm}</Badge>
+                  <Badge variant="outline" className="text-[10px]">22mm: {lpgQty22mm}</Badge>
+                  <Badge variant="outline" className="text-[10px]">20mm: {lpgQty20mm}</Badge>
                 </div>
               </div>
             )}
@@ -1009,22 +1022,22 @@ export const InventoryPOBDrawer = ({
           <Separator />
 
           {/* Total D.O. */}
-          <div className="space-y-2">
-            <Label className="text-sm font-medium">Total D.O. Amount ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
-            <Input type="number" inputMode="numeric" placeholder="Enter total amount..." value={lpgTotalDO || ""} onChange={(e) => setLpgTotalDO(parseInt(e.target.value) || 0)} className="h-14 text-lg font-semibold" />
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium">Total D.O. Amount ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
+            <Input type="number" inputMode="numeric" placeholder="Enter total amount..." value={lpgTotalDO || ""} onChange={(e) => setLpgTotalDO(parseInt(e.target.value) || 0)} className="h-12 text-lg font-semibold" />
           </div>
 
           {/* Unit Price */}
-          <div className="flex items-center justify-between p-4 bg-primary/10 rounded-xl border border-primary/20">
+          <div className="flex items-center justify-between p-3 bg-primary/10 rounded-xl border border-primary/20">
             <div className="flex items-center gap-2">
-              <Calculator className="h-5 w-5 text-primary" />
-              <span className="font-medium">Unit Price</span>
+              <Calculator className="h-4 w-4 text-primary" />
+              <span className="font-medium text-sm">Unit Price</span>
             </div>
-            <span className="text-2xl font-extrabold text-primary">{BANGLADESHI_CURRENCY_SYMBOL}{lpgCompanyPrice.toLocaleString()}</span>
+            <span className="text-xl font-extrabold text-primary">{BANGLADESHI_CURRENCY_SYMBOL}{lpgCompanyPrice.toLocaleString()}</span>
           </div>
 
           {/* Add to Cart */}
-          <Button type="button" size="lg" className="w-full h-14 font-semibold" onClick={addLPGToCart} disabled={!lpgBrandName || lpgTotalQty <= 0 || lpgTotalDO <= 0}>
+          <Button type="button" size="lg" className="w-full h-12 font-semibold" onClick={addLPGToCart} disabled={!lpgBrandName || lpgTotalQty <= 0 || lpgTotalDO <= 0}>
             <Plus className="h-5 w-5 mr-2" />Add to Cart
           </Button>
         </div>

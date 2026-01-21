@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -120,15 +120,15 @@ export const ProductPricingModule = () => {
     fetchData();
   }, [fetchData]);
 
-  // Filter brands by size and weight for LPG
-  const getFilteredBrands = useCallback(() => {
+  // Filter brands by size and weight for LPG with useMemo
+  const getFilteredBrands = useMemo(() => {
     return lpgBrands.filter(brand => 
       brand.size === sizeTab && 
       brand.weight === selectedWeight
     );
   }, [lpgBrands, sizeTab, selectedWeight]);
 
-  // Get products for a specific brand and variant
+  // Get products for a specific brand and variant with useCallback
   const getProductsForBrand = useCallback((brandId: string) => {
     return products.filter(p => 
       p.product_type === "lpg" && 
@@ -137,12 +137,16 @@ export const ProductPricingModule = () => {
     );
   }, [products, searchQuery]);
 
-  // Get non-LPG products
-  const getFilteredProducts = useCallback((type: string) => {
-    return products
-      .filter(p => p.product_type === type)
-      .filter(p => p.product_name.toLowerCase().includes(searchQuery.toLowerCase()));
-  }, [products, searchQuery]);
+  // Get non-LPG products with useMemo
+  const filteredStoveProducts = useMemo(() => 
+    products.filter(p => p.product_type === "stove" && p.product_name.toLowerCase().includes(searchQuery.toLowerCase())),
+    [products, searchQuery]
+  );
+
+  const filteredRegulatorProducts = useMemo(() => 
+    products.filter(p => p.product_type === "regulator" && p.product_name.toLowerCase().includes(searchQuery.toLowerCase())),
+    [products, searchQuery]
+  );
 
   const handlePriceChange = (productId: string, field: keyof ProductPrice, value: number) => {
     setEditedPrices(prev => ({
@@ -862,68 +866,66 @@ export const ProductPricingModule = () => {
 
         {/* LPG Tab Content */}
         <TabsContent value="lpg" className="space-y-4 mt-4">
-          {/* Size Tabs - Matching Inventory Module Style */}
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-              {/* Size Toggle Buttons - Matching Inventory */}
-              <div className="flex w-full sm:w-auto rounded-lg bg-muted/50 p-1">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={sizeTab === "22mm" ? "default" : "ghost"}
-                  className="h-8 flex-1 sm:flex-none data-[active=true]:bg-primary data-[active=true]:text-primary-foreground"
-                  data-active={sizeTab === "22mm"}
+          {/* Unified Filter Row: Valve Size + Weight Dropdown + Search */}
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
+              {/* Unified Valve Size Toggle */}
+              <div className="flex bg-muted/60 rounded-full p-1 border border-border/50 flex-shrink-0">
+                <button
                   onClick={() => setSizeTab("22mm")}
+                  className={`h-9 px-3 sm:px-4 rounded-full font-semibold text-xs sm:text-sm transition-all ${
+                    sizeTab === '22mm' 
+                      ? 'bg-primary text-primary-foreground shadow-md' 
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
                 >
                   22mm
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={sizeTab === "20mm" ? "default" : "ghost"}
-                  className={`h-8 flex-1 sm:flex-none ${sizeTab === "20mm" ? "bg-cyan-500 text-white hover:bg-cyan-600" : ""}`}
+                </button>
+                <button
                   onClick={() => setSizeTab("20mm")}
+                  className={`h-9 px-3 sm:px-4 rounded-full font-semibold text-xs sm:text-sm transition-all ${
+                    sizeTab === '20mm' 
+                      ? 'bg-cyan-500 text-white shadow-md' 
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
                 >
                   20mm
-                </Button>
+                </button>
+              </div>
+              
+              {/* Weight Dropdown (Compact) */}
+              <Select value={selectedWeight} onValueChange={setSelectedWeight}>
+                <SelectTrigger className="h-9 w-24 sm:w-28 text-xs sm:text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {weightOptions.map(option => (
+                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            
+              {/* Search */}
+              <div className="relative flex-1 min-w-0">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input 
+                  placeholder="Search brands..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="pl-10 h-9 bg-muted/50"
+                />
               </div>
             </div>
-            
-            {/* Weight Selector - Matching Inventory Style */}
-            <div className="flex flex-wrap gap-2">
-              {weightOptions.map(option => (
-                <Button
-                  key={option.value}
-                  variant={selectedWeight === option.value ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setSelectedWeight(option.value)}
-                  className={`text-xs sm:text-sm ${selectedWeight === option.value ? "bg-primary text-primary-foreground" : ""}`}
-                >
-                  {option.shortLabel} KG
-                </Button>
-              ))}
-            </div>
-          </div>
-
-          {/* Search */}
-          <div className="relative w-full sm:w-80">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input 
-              placeholder="Search brands..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="pl-10 h-9 bg-muted/50"
-            />
           </div>
 
           {/* Brand Cards Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
-            {getFilteredBrands().map(brand => (
+            {getFilteredBrands.map(brand => (
               <BrandPriceCard key={brand.id} brand={brand} />
             ))}
           </div>
 
-          {getFilteredBrands().length === 0 && (
+          {getFilteredBrands.length === 0 && (
             <Card className="border-dashed">
               <CardContent className="flex flex-col items-center justify-center py-8 sm:py-12 text-center">
                 <Package className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground/50 mb-3" />
@@ -951,12 +953,12 @@ export const ProductPricingModule = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
-            {getFilteredProducts("stove").map(product => (
+            {filteredStoveProducts.map(product => (
               <AccessoryPriceCard key={product.id} product={product} />
             ))}
           </div>
 
-          {getFilteredProducts("stove").length === 0 && (
+          {filteredStoveProducts.length === 0 && (
             <Card className="border-dashed">
               <CardContent className="flex flex-col items-center justify-center py-8 sm:py-12 text-center">
                 <ChefHat className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground/50 mb-3" />
@@ -982,12 +984,12 @@ export const ProductPricingModule = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
-            {getFilteredProducts("regulator").map(product => (
+            {filteredRegulatorProducts.map(product => (
               <AccessoryPriceCard key={product.id} product={product} />
             ))}
           </div>
 
-          {getFilteredProducts("regulator").length === 0 && (
+          {filteredRegulatorProducts.length === 0 && (
             <Card className="border-dashed">
               <CardContent className="flex flex-col items-center justify-center py-8 sm:py-12 text-center">
                 <Wrench className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground/50 mb-3" />

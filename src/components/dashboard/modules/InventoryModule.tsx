@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { InventoryStatCard } from "@/components/inventory/InventoryStatCard";
 import { InventoryPOBDrawer } from "@/components/inventory/InventoryPOBDrawer";
@@ -166,45 +166,57 @@ export const InventoryModule = () => {
     fetchData();
   }, [fetchData]);
 
-  // Filtered data
-  const filteredLpgBrands = lpgBrands.filter(b => b.name.toLowerCase().includes(lpgSearchQuery.toLowerCase()));
+  // Filtered data with useMemo for performance
+  const filteredLpgBrands = useMemo(() => 
+    lpgBrands.filter(b => b.name.toLowerCase().includes(lpgSearchQuery.toLowerCase())),
+    [lpgBrands, lpgSearchQuery]
+  );
   
-  const filteredStoves = stoves.filter(s => {
-    const matchesSearch = s.brand.toLowerCase().includes(stoveSearchQuery.toLowerCase());
-    const matchesBurner = filterBurner === "all" || s.burners.toString() === filterBurner;
-    const matchesDamaged = !showDamagedOnly || s.is_damaged === true;
-    return matchesSearch && matchesBurner && matchesDamaged;
-  });
+  const filteredStoves = useMemo(() => 
+    stoves.filter(s => {
+      const matchesSearch = s.brand.toLowerCase().includes(stoveSearchQuery.toLowerCase());
+      const matchesBurner = filterBurner === "all" || s.burners.toString() === filterBurner;
+      const matchesDamaged = !showDamagedOnly || s.is_damaged === true;
+      return matchesSearch && matchesBurner && matchesDamaged;
+    }),
+    [stoves, stoveSearchQuery, filterBurner, showDamagedOnly]
+  );
   
-  const filteredRegulators = regulators.filter(r => {
-    const matchesSearch = r.brand.toLowerCase().includes(regulatorSearchQuery.toLowerCase());
-    const matchesSize = regulatorSizeFilter === "all" || r.type === regulatorSizeFilter;
-    return matchesSearch && matchesSize;
-  });
+  const filteredRegulators = useMemo(() => 
+    regulators.filter(r => {
+      const matchesSearch = r.brand.toLowerCase().includes(regulatorSearchQuery.toLowerCase());
+      const matchesSize = regulatorSizeFilter === "all" || r.type === regulatorSizeFilter;
+      return matchesSearch && matchesSize;
+    }),
+    [regulators, regulatorSearchQuery, regulatorSizeFilter]
+  );
 
-  // LPG Totals
-  const lpgTotals = filteredLpgBrands.reduce((acc, b) => ({
-    package: acc.package + b.package_cylinder,
-    refill: acc.refill + b.refill_cylinder,
-    empty: acc.empty + b.empty_cylinder,
-    problem: acc.problem + b.problem_cylinder,
-    inTransit: acc.inTransit + (b.in_transit_cylinder || 0),
-  }), { package: 0, refill: 0, empty: 0, problem: 0, inTransit: 0 });
+  // LPG Totals with useMemo
+  const lpgTotals = useMemo(() => 
+    filteredLpgBrands.reduce((acc, b) => ({
+      package: acc.package + b.package_cylinder,
+      refill: acc.refill + b.refill_cylinder,
+      empty: acc.empty + b.empty_cylinder,
+      problem: acc.problem + b.problem_cylinder,
+      inTransit: acc.inTransit + (b.in_transit_cylinder || 0),
+    }), { package: 0, refill: 0, empty: 0, problem: 0, inTransit: 0 }),
+    [filteredLpgBrands]
+  );
 
-  // Stove Totals
-  const stoveTotals = {
+  // Stove Totals with useMemo
+  const stoveTotals = useMemo(() => ({
     total: stoves.reduce((sum, s) => sum + s.quantity, 0),
     singleBurner: stoves.filter(s => s.burners === 1).reduce((sum, s) => sum + s.quantity, 0),
     doubleBurner: stoves.filter(s => s.burners === 2).reduce((sum, s) => sum + s.quantity, 0),
     damaged: stoves.filter(s => s.is_damaged).reduce((sum, s) => sum + s.quantity, 0),
-  };
+  }), [stoves]);
 
-  // Regulator Totals
-  const regulatorTotals = {
+  // Regulator Totals with useMemo
+  const regulatorTotals = useMemo(() => ({
     total: regulators.reduce((sum, r) => sum + r.quantity, 0),
     size22mm: regulators.filter(r => r.type === "22mm").reduce((sum, r) => sum + r.quantity, 0),
     size20mm: regulators.filter(r => r.type === "20mm").reduce((sum, r) => sum + r.quantity, 0),
-  };
+  }), [regulators]);
 
   // Status helpers
   const getLpgStatus = (brand: LPGBrand) => {
@@ -688,47 +700,62 @@ export const InventoryModule = () => {
             </Card>
           </div>
 
-          {/* Action Bar - Valve Size Toggle + Search + Buy Button */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
-            {/* Valve Size Toggle */}
-            <Tabs value={sizeTab} onValueChange={(v) => setSizeTab(v as "22mm" | "20mm")} className="w-full sm:w-auto">
-              <TabsList className="bg-muted/50 p-1 w-full sm:w-auto grid grid-cols-2 sm:inline-flex">
-                <TabsTrigger value="22mm" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs sm:text-sm">22mm</TabsTrigger>
-                <TabsTrigger value="20mm" className="data-[state=active]:bg-cyan-500 data-[state=active]:text-white text-xs sm:text-sm">20mm</TabsTrigger>
-              </TabsList>
-            </Tabs>
-            
-            {/* Search */}
-            <div className="relative flex-1 min-w-0">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Search brands..." value={lpgSearchQuery} onChange={(e) => setLpgSearchQuery(e.target.value)} className="pl-10 h-10" />
-            </div>
-            
-            {/* Buy/Add Button */}
-            <Button 
-              size="sm" 
-              className="gap-2 text-xs sm:text-sm h-10 bg-gradient-to-r from-primary to-primary/80 whitespace-nowrap"
-              onClick={() => openPOB('lpg')}
-            >
-              <PackagePlus className="h-4 w-4" />
-              <span className="hidden sm:inline">Buy/Add Cylinders</span>
-              <span className="sm:hidden">Buy/Add</span>
-            </Button>
-          </div>
-
-          {/* Weight Selector Pills */}
-          <div className="flex flex-wrap gap-1.5 sm:gap-2">
-            {weightOptions.map(w => (
-              <Button
-                key={w.value}
-                variant={selectedWeight === w.value ? "default" : "outline"}
-                size="sm"
-                onClick={() => setSelectedWeight(w.value)}
-                className={`text-xs h-8 px-3 ${selectedWeight === w.value ? "bg-primary text-primary-foreground" : ""}`}
+          {/* Action Bar - Unified Row: Valve Size + Weight + Search + Buy Button */}
+          <div className="flex flex-col gap-2 sm:gap-3">
+            {/* Row 1: Unified Valve Size Toggle (Single Row like POS) */}
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="flex bg-muted/60 rounded-full p-1 border border-border/50 flex-shrink-0">
+                <button
+                  onClick={() => setSizeTab("22mm")}
+                  className={`h-9 px-3 sm:px-4 rounded-full font-semibold text-xs sm:text-sm transition-all ${
+                    sizeTab === '22mm' 
+                      ? 'bg-primary text-primary-foreground shadow-md' 
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  22mm
+                </button>
+                <button
+                  onClick={() => setSizeTab("20mm")}
+                  className={`h-9 px-3 sm:px-4 rounded-full font-semibold text-xs sm:text-sm transition-all ${
+                    sizeTab === '20mm' 
+                      ? 'bg-cyan-500 text-white shadow-md' 
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  20mm
+                </button>
+              </div>
+              
+              {/* Weight Dropdown (Compact) */}
+              <Select value={selectedWeight} onValueChange={setSelectedWeight}>
+                <SelectTrigger className="h-9 w-24 sm:w-28 text-xs sm:text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {weightOptions.map(w => (
+                    <SelectItem key={w.value} value={w.value}>{w.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              {/* Search */}
+              <div className="relative flex-1 min-w-0">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input placeholder="Search brands..." value={lpgSearchQuery} onChange={(e) => setLpgSearchQuery(e.target.value)} className="pl-10 h-9" />
+              </div>
+              
+              {/* Buy/Add Button */}
+              <Button 
+                size="sm" 
+                className="gap-1.5 text-xs sm:text-sm h-9 bg-gradient-to-r from-primary to-primary/80 whitespace-nowrap flex-shrink-0"
+                onClick={() => openPOB('lpg')}
               >
-                {w.shortLabel} KG
+                <PackagePlus className="h-4 w-4" />
+                <span className="hidden sm:inline">Buy/Add</span>
+                <span className="sm:hidden">+</span>
               </Button>
-            ))}
+            </div>
           </div>
 
 
