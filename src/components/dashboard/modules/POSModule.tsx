@@ -1797,11 +1797,11 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
           </CardContent>
         </Card>
 
-        {/* ===== PHONE-FIRST CUSTOMER BAR ===== */}
+        {/* ===== CUSTOMER SECTION (Always Visible Fields) ===== */}
         <Card className="border-border/50">
-          <CardContent className="p-3">
-            {/* Walk-in Toggle */}
-            <div className="flex items-center gap-3 mb-3">
+          <CardContent className="p-3 space-y-3">
+            {/* Row 1: Walk-in / By Phone Toggle */}
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => {
                   setIsWalkin(true);
@@ -1810,11 +1810,13 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                   setFoundCustomer(null);
                   setSelectedCustomerId("walkin");
                   setSelectedCustomer(null);
+                  setNewCustomerName("");
+                  setNewCustomerAddress("");
                 }}
-                className={`flex items-center gap-2 h-9 px-4 rounded-full text-sm font-medium transition-all ${
+                className={`flex items-center gap-2 h-10 px-4 rounded-lg text-sm font-medium transition-all ${
                   isWalkin 
-                    ? 'bg-muted text-foreground' 
-                    : 'text-muted-foreground hover:bg-muted/50'
+                    ? 'bg-muted text-foreground border border-border' 
+                    : 'text-muted-foreground hover:bg-muted/50 border border-transparent'
                 }`}
               >
                 <User className="h-4 w-4" />
@@ -1822,10 +1824,10 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
               </button>
               <button
                 onClick={() => setIsWalkin(false)}
-                className={`flex items-center gap-2 h-9 px-4 rounded-full text-sm font-medium transition-all ${
+                className={`flex items-center gap-2 h-10 px-4 rounded-lg text-sm font-medium transition-all ${
                   !isWalkin 
                     ? 'bg-primary text-primary-foreground' 
-                    : 'text-muted-foreground hover:bg-muted/50'
+                    : 'text-muted-foreground hover:bg-muted/50 border border-transparent'
                 }`}
               >
                 <Phone className="h-4 w-4" />
@@ -1833,109 +1835,121 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
               </button>
             </div>
 
-            {/* Phone Input (Only when not Walk-in) */}
-            {!isWalkin && (
-              <div className="space-y-2">
+            {/* Row 2: Customer Details Form - Always Visible */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Phone Field */}
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1.5 block">Phone</Label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     type="tel"
                     value={phoneQuery}
                     onChange={(e) => setPhoneQuery(e.target.value.replace(/\D/g, '').slice(0, 11))}
-                    placeholder="Enter 11-digit phone number..."
+                    placeholder={isWalkin ? "Walk-in customer" : "01XXXXXXXXX"}
                     className="h-11 pl-10 text-base font-medium"
                     maxLength={11}
+                    disabled={isWalkin}
                   />
                   {customerStatus === 'searching' && (
                     <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
                   )}
+                  {customerStatus === 'found' && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 rounded-full bg-sky-500 flex items-center justify-center">
+                      <UserCircle className="h-3.5 w-3.5 text-white" />
+                    </div>
+                  )}
+                  {customerStatus === 'new' && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 rounded-full bg-emerald-500 flex items-center justify-center">
+                      <Sparkles className="h-3 w-3 text-white" />
+                    </div>
+                  )}
                 </div>
+              </div>
 
-                {/* Customer Status Feedback - Found Customer */}
-                {customerStatus === 'found' && foundCustomer && (
-                  <div className="space-y-2 p-3 rounded-lg bg-sky-50 dark:bg-sky-950/30 border border-sky-200 dark:border-sky-900">
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-sky-500 flex items-center justify-center shrink-0">
-                        <UserCircle className="h-6 w-6 text-white" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-sm text-foreground">{foundCustomer.name}</p>
-                        <p className="text-xs text-sky-600 dark:text-sky-400">Existing Customer</p>
-                      </div>
-                      {(foundCustomer.total_due || 0) > 0 && (
-                        <Badge variant="destructive" className="shrink-0">
-                          Due: {BANGLADESHI_CURRENCY_SYMBOL}{foundCustomer.total_due}
-                        </Badge>
-                      )}
-                    </div>
-                    {/* Show Name & Address Fields (Read-only for existing) */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2">
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Name</Label>
-                        <div className="h-9 mt-1 px-3 flex items-center rounded-md border bg-muted/50 text-sm font-medium text-foreground">
-                          {foundCustomer.name}
-                        </div>
-                      </div>
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Address</Label>
-                        <div className="h-9 mt-1 px-3 flex items-center rounded-md border bg-muted/50 text-sm text-muted-foreground truncate">
-                          {foundCustomer.address || 'No address'}
-                        </div>
-                      </div>
-                    </div>
+              {/* Name Field - Always Visible */}
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1.5 block">
+                  Name {customerStatus === 'new' && <span className="text-destructive">*</span>}
+                </Label>
+                {customerStatus === 'found' && foundCustomer ? (
+                  <div className="h-11 px-3 flex items-center gap-2 rounded-md border bg-sky-50 dark:bg-sky-950/30 border-sky-200 dark:border-sky-800 text-sm font-medium text-foreground">
+                    <UserCircle className="h-4 w-4 text-sky-500 shrink-0" />
+                    <span className="truncate">{foundCustomer.name}</span>
                   </div>
+                ) : (
+                  <Input
+                    value={newCustomerName}
+                    onChange={(e) => setNewCustomerName(e.target.value)}
+                    placeholder={isWalkin ? "Optional" : "Customer name"}
+                    className="h-11"
+                    disabled={isWalkin && customerStatus === 'idle'}
+                  />
                 )}
+              </div>
 
-                {/* Customer Status Feedback - New Customer */}
-                {customerStatus === 'new' && (
-                  <div className="space-y-2 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900">
-                    <div className="flex items-center gap-2">
-                      <div className="h-8 w-8 rounded-full bg-emerald-500 flex items-center justify-center">
-                        <Sparkles className="h-4 w-4 text-white" />
-                      </div>
-                      <span className="text-sm font-medium text-emerald-700 dark:text-emerald-300">New Customer</span>
-                    </div>
-                    {/* Name & Address Input Fields */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Name *</Label>
-                        <Input
-                          value={newCustomerName}
-                          onChange={(e) => setNewCustomerName(e.target.value)}
-                          placeholder="Customer name"
-                          className="h-10 mt-1"
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Address</Label>
-                        <Input
-                          value={newCustomerAddress}
-                          onChange={(e) => setNewCustomerAddress(e.target.value)}
-                          placeholder="Address (optional)"
-                          className="h-10 mt-1"
-                        />
-                      </div>
-                    </div>
+              {/* Address Field - Always Visible */}
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1.5 block">Address</Label>
+                {customerStatus === 'found' && foundCustomer ? (
+                  <div className="h-11 px-3 flex items-center rounded-md border bg-sky-50 dark:bg-sky-950/30 border-sky-200 dark:border-sky-800 text-sm text-muted-foreground">
+                    <span className="truncate">{foundCustomer.address || 'No address'}</span>
                   </div>
+                ) : (
+                  <Input
+                    value={newCustomerAddress}
+                    onChange={(e) => setNewCustomerAddress(e.target.value)}
+                    placeholder={isWalkin ? "Optional" : "Address"}
+                    className="h-11"
+                    disabled={isWalkin && customerStatus === 'idle'}
+                  />
+                )}
+              </div>
+            </div>
+
+            {/* Row 3: Status Indicator (Compact) */}
+            {customerStatus === 'found' && foundCustomer && (
+              <div className="flex items-center gap-2 px-1">
+                <Badge variant="secondary" className="bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800">
+                  <UserCircle className="h-3 w-3 mr-1" />
+                  Existing Customer
+                </Badge>
+                {(foundCustomer.total_due || 0) > 0 && (
+                  <Badge variant="destructive">
+                    Due: {BANGLADESHI_CURRENCY_SYMBOL}{foundCustomer.total_due?.toLocaleString()}
+                  </Badge>
+                )}
+                {(foundCustomer.cylinders_due || 0) > 0 && (
+                  <Badge variant="outline" className="text-amber-600 border-amber-300">
+                    {foundCustomer.cylinders_due} Cylinder{foundCustomer.cylinders_due > 1 ? 's' : ''} Due
+                  </Badge>
                 )}
               </div>
             )}
+            {customerStatus === 'new' && (
+              <div className="flex items-center gap-2 px-1">
+                <Badge className="bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800">
+                  <Sparkles className="h-3 w-3 mr-1" />
+                  New Customer
+                </Badge>
+              </div>
+            )}
 
-            {/* Settlement/Discount */}
-            <div className="mt-3 grid grid-cols-2 gap-3">
+            {/* Row 4: Settlement & Seller */}
+            <div className="grid grid-cols-2 gap-3 pt-1">
               <div>
-                <Label className="text-xs text-muted-foreground">Settlement/Discount</Label>
+                <Label className="text-xs text-muted-foreground mb-1.5 block">Settlement/Discount</Label>
                 <Input
                   type="number"
                   value={discount}
                   onChange={(e) => setDiscount(e.target.value)}
                   placeholder="0"
-                  className="h-9 mt-1"
+                  className="h-10"
                 />
               </div>
               <div>
-                <Label className="text-xs text-muted-foreground">Seller</Label>
-                <div className={`h-9 mt-1 px-3 flex items-center gap-2 rounded-md border ${ROLE_CONFIG[userRole]?.bgColor || 'bg-muted border-border'}`}>
+                <Label className="text-xs text-muted-foreground mb-1.5 block">Seller</Label>
+                <div className={`h-10 px-3 flex items-center gap-2 rounded-md border ${ROLE_CONFIG[userRole]?.bgColor || 'bg-muted border-border'}`}>
                   <User className={`h-3.5 w-3.5 ${ROLE_CONFIG[userRole]?.color || 'text-foreground'}`} />
                   <span className={`text-sm font-medium ${ROLE_CONFIG[userRole]?.color || 'text-foreground'}`}>
                     {ROLE_CONFIG[userRole]?.label || 'User'}
