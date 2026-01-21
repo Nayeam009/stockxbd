@@ -302,13 +302,10 @@ export const useNotifications = () => {
       )
       .subscribe();
 
-    // Refresh notifications every 5 minutes
-    const interval = setInterval(loadNotifications, 5 * 60 * 1000);
-
+    // Real-time only - no polling interval needed
     return () => {
       supabase.removeChannel(ordersChannel);
       supabase.removeChannel(paymentsChannel);
-      clearInterval(interval);
     };
   }, [loadNotifications]);
 

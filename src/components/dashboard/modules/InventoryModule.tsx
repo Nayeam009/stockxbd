@@ -166,6 +166,26 @@ export const InventoryModule = () => {
     fetchData();
   }, [fetchData]);
 
+  // Real-time inventory sync
+  useEffect(() => {
+    const channels = [
+      supabase.channel('inv-lpg-realtime').on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'lpg_brands' }, 
+        () => fetchData()
+      ).subscribe(),
+      supabase.channel('inv-stoves-realtime').on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'stoves' }, 
+        () => fetchData()
+      ).subscribe(),
+      supabase.channel('inv-regulators-realtime').on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'regulators' }, 
+        () => fetchData()
+      ).subscribe(),
+    ];
+    
+    return () => channels.forEach(ch => supabase.removeChannel(ch));
+  }, [fetchData]);
+
   // Filtered data with useMemo for performance
   const filteredLpgBrands = useMemo(() => 
     lpgBrands.filter(b => b.name.toLowerCase().includes(lpgSearchQuery.toLowerCase())),

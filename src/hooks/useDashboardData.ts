@@ -406,24 +406,32 @@ export const useDashboardData = () => {
     }
   }, []);
 
-  // Fetch real data from Supabase
+  // Fetch real data from Supabase with full real-time sync
   useEffect(() => {
     fetchData();
 
-    // Subscribe to realtime updates for orders
-    const ordersChannel = supabase
-      .channel('orders-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
-        fetchData();
-      })
-      .subscribe();
-
-    // Auto-refresh every 30 seconds for real-time dashboard
-    const refreshInterval = setInterval(fetchData, 30000);
+    // Subscribe to realtime updates for all critical tables
+    const channels = [
+      supabase.channel('dashboard-orders-realtime').on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'orders' }, 
+        () => fetchData()
+      ).subscribe(),
+      supabase.channel('dashboard-pos-realtime').on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'pos_transactions' }, 
+        () => fetchData()
+      ).subscribe(),
+      supabase.channel('dashboard-lpg-realtime').on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'lpg_brands' }, 
+        () => fetchData()
+      ).subscribe(),
+      supabase.channel('dashboard-customers-realtime').on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'customers' }, 
+        () => fetchData()
+      ).subscribe(),
+    ];
 
     return () => {
-      supabase.removeChannel(ordersChannel);
-      clearInterval(refreshInterval);
+      channels.forEach(ch => supabase.removeChannel(ch));
     };
   }, [fetchData]);
 

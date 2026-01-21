@@ -120,6 +120,22 @@ export const ProductPricingModule = () => {
     fetchData();
   }, [fetchData]);
 
+  // Real-time pricing sync
+  useEffect(() => {
+    const channels = [
+      supabase.channel('pricing-prices-realtime').on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'product_prices' }, 
+        () => fetchData()
+      ).subscribe(),
+      supabase.channel('pricing-brands-realtime').on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'lpg_brands' }, 
+        () => fetchData()
+      ).subscribe(),
+    ];
+    
+    return () => channels.forEach(ch => supabase.removeChannel(ch));
+  }, [fetchData]);
+
   // Filter brands by size and weight for LPG with useMemo
   const getFilteredBrands = useMemo(() => {
     return lpgBrands.filter(brand => 

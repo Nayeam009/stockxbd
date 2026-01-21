@@ -303,15 +303,13 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
     if (customersRes.data) setCustomers(customersRes.data);
     if (pricesRes.data) setProductPrices(pricesRes.data);
 
-    // Fetch recent transactions
-    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    // Fetch recent transactions (no time limit - fetch last 20)
     const { data: recentTxns } = await supabase
       .from('pos_transactions')
       .select(`id, transaction_number, total, payment_status, created_at, pos_transaction_items (product_name, quantity)`)
-      .gte('created_at', fiveMinutesAgo)
       .eq('is_voided', false)
       .order('created_at', { ascending: false })
-      .limit(5);
+      .limit(20);
 
     if (recentTxns) {
       setRecentTransactions(recentTxns.map(t => ({

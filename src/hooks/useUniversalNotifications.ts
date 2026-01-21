@@ -647,15 +647,12 @@ export const useUniversalNotifications = (userRole: 'owner' | 'manager' | 'drive
       )
       .subscribe();
 
-    // Refresh every 5 minutes
-    const interval = setInterval(loadNotifications, 5 * 60 * 1000);
-
+    // Real-time only - no polling interval needed
     return () => {
       supabase.removeChannel(ordersChannel);
       supabase.removeChannel(paymentsChannel);
       supabase.removeChannel(posChannel);
       supabase.removeChannel(stockChannel);
-      clearInterval(interval);
     };
   }, [loadNotifications, checkInventoryAlerts]);
 
