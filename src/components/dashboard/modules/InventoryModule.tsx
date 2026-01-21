@@ -700,62 +700,66 @@ export const InventoryModule = () => {
             </Card>
           </div>
 
-          {/* Action Bar - Unified Row: Valve Size + Weight + Search + Buy Button */}
-          <div className="flex flex-col gap-2 sm:gap-3">
-            {/* Row 1: Unified Valve Size Toggle (Single Row like POS) */}
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="flex bg-muted/60 rounded-full p-1 border border-border/50 flex-shrink-0">
-                <button
-                  onClick={() => setSizeTab("22mm")}
-                  className={`h-9 px-3 sm:px-4 rounded-full font-semibold text-xs sm:text-sm transition-all ${
-                    sizeTab === '22mm' 
-                      ? 'bg-primary text-primary-foreground shadow-md' 
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  22mm
-                </button>
-                <button
-                  onClick={() => setSizeTab("20mm")}
-                  className={`h-9 px-3 sm:px-4 rounded-full font-semibold text-xs sm:text-sm transition-all ${
-                    sizeTab === '20mm' 
-                      ? 'bg-cyan-500 text-white shadow-md' 
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  20mm
-                </button>
-              </div>
-              
-              {/* Weight Dropdown (Compact) */}
-              <Select value={selectedWeight} onValueChange={setSelectedWeight}>
-                <SelectTrigger className="h-9 w-24 sm:w-28 text-xs sm:text-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {weightOptions.map(w => (
-                    <SelectItem key={w.value} value={w.value}>{w.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              
-              {/* Search */}
-              <div className="relative flex-1 min-w-0">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Search brands..." value={lpgSearchQuery} onChange={(e) => setLpgSearchQuery(e.target.value)} className="pl-10 h-9" />
-              </div>
-              
-              {/* Buy/Add Button */}
-              <Button 
-                size="sm" 
-                className="gap-1.5 text-xs sm:text-sm h-9 bg-gradient-to-r from-primary to-primary/80 whitespace-nowrap flex-shrink-0"
-                onClick={() => openPOB('lpg')}
+          {/* Action Bar - Row 1: Valve Size + Weight + Buy Button */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex bg-muted/60 rounded-full p-1 border border-border/50 flex-shrink-0">
+              <button
+                onClick={() => setSizeTab("22mm")}
+                className={`h-9 px-3 sm:px-4 rounded-full font-semibold text-xs sm:text-sm transition-all ${
+                  sizeTab === '22mm' 
+                    ? 'bg-primary text-primary-foreground shadow-md' 
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
               >
-                <PackagePlus className="h-4 w-4" />
-                <span className="hidden sm:inline">Buy/Add</span>
-                <span className="sm:hidden">+</span>
-              </Button>
+                22mm
+              </button>
+              <button
+                onClick={() => setSizeTab("20mm")}
+                className={`h-9 px-3 sm:px-4 rounded-full font-semibold text-xs sm:text-sm transition-all ${
+                  sizeTab === '20mm' 
+                    ? 'bg-cyan-500 text-white shadow-md' 
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                20mm
+              </button>
             </div>
+            
+            {/* Weight Dropdown (Compact) */}
+            <Select value={selectedWeight} onValueChange={setSelectedWeight}>
+              <SelectTrigger className="h-9 w-24 sm:w-28 text-xs sm:text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {weightOptions.map(w => (
+                  <SelectItem key={w.value} value={w.value}>{w.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            
+            <div className="flex-1" />
+            
+            {/* Buy/Add Button */}
+            <Button 
+              size="sm" 
+              className="gap-1.5 text-xs sm:text-sm h-9 bg-gradient-to-r from-primary to-primary/80 whitespace-nowrap flex-shrink-0"
+              onClick={() => openPOB('lpg')}
+            >
+              <PackagePlus className="h-4 w-4" />
+              <span className="hidden sm:inline">Buy/Add</span>
+              <span className="sm:hidden">+</span>
+            </Button>
+          </div>
+          
+          {/* Row 2: Search Bar (Full Width - Below for easy mobile access) */}
+          <div className="relative w-full">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input 
+              placeholder="Search brands..." 
+              value={lpgSearchQuery} 
+              onChange={(e) => setLpgSearchQuery(e.target.value)} 
+              className="pl-10 h-11 text-base"
+            />
           </div>
 
 
