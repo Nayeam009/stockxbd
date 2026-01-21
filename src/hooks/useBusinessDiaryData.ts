@@ -408,20 +408,50 @@ export const useBusinessDiaryData = (): UseBusinessDiaryDataReturn => {
   useEffect(() => {
     refetch();
 
-    // Set up real-time subscriptions
-    const channels = [
-      supabase.channel('diary-pos').on('postgres_changes', { event: '*', schema: 'public', table: 'pos_transactions' }, () => fetchSalesData()),
-      supabase.channel('diary-payments').on('postgres_changes', { event: '*', schema: 'public', table: 'customer_payments' }, () => fetchSalesData()),
-      supabase.channel('diary-pob').on('postgres_changes', { event: '*', schema: 'public', table: 'pob_transactions' }, () => fetchExpensesData()),
-      supabase.channel('diary-staff').on('postgres_changes', { event: '*', schema: 'public', table: 'staff_payments' }, () => fetchExpensesData()),
-      supabase.channel('diary-vehicle').on('postgres_changes', { event: '*', schema: 'public', table: 'vehicle_costs' }, () => fetchExpensesData()),
-      supabase.channel('diary-expenses').on('postgres_changes', { event: '*', schema: 'public', table: 'daily_expenses' }, () => fetchExpensesData())
-    ];
+    // Set up real-time subscriptions for instant updates
+    const salesChannel = supabase
+      .channel('diary-sales-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pos_transactions' }, () => {
+        console.log('[BusinessDiary] POS transaction changed - refreshing sales');
+        fetchSalesData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pos_transaction_items' }, () => {
+        console.log('[BusinessDiary] POS items changed - refreshing sales');
+        fetchSalesData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'customer_payments' }, () => {
+        console.log('[BusinessDiary] Customer payment changed - refreshing sales');
+        fetchSalesData();
+      })
+      .subscribe();
 
-    channels.forEach(ch => ch.subscribe());
+    const expensesChannel = supabase
+      .channel('diary-expenses-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pob_transactions' }, () => {
+        console.log('[BusinessDiary] POB transaction changed - refreshing expenses');
+        fetchExpensesData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pob_transaction_items' }, () => {
+        console.log('[BusinessDiary] POB items changed - refreshing expenses');
+        fetchExpensesData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'staff_payments' }, () => {
+        console.log('[BusinessDiary] Staff payment changed - refreshing expenses');
+        fetchExpensesData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicle_costs' }, () => {
+        console.log('[BusinessDiary] Vehicle cost changed - refreshing expenses');
+        fetchExpensesData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_expenses' }, () => {
+        console.log('[BusinessDiary] Daily expense changed - refreshing expenses');
+        fetchExpensesData();
+      })
+      .subscribe();
 
     return () => {
-      channels.forEach(ch => supabase.removeChannel(ch));
+      supabase.removeChannel(salesChannel);
+      supabase.removeChannel(expensesChannel);
     };
   }, [refetch, fetchSalesData, fetchExpensesData]);
 
