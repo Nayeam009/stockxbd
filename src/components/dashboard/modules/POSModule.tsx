@@ -136,15 +136,7 @@ interface ReturnItem {
   weight: string;
 }
 
-interface RecentTransaction {
-  id: string;
-  transactionNumber: string;
-  customerName: string;
-  total: number;
-  status: string;
-  createdAt: Date;
-  items: { name: string; quantity: number }[];
-}
+// RecentTransaction interface removed - void system disabled
 
 // Weight options
 const WEIGHT_OPTIONS_22MM = ["5.5kg", "12kg", "12.5kg", "25kg", "35kg", "45kg"];
@@ -240,9 +232,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
   const [showInvoiceDialog, setShowInvoiceDialog] = useState(false);
   const [lastTransaction, setLastTransaction] = useState<any>(null);
   const [showPrintTypeDialog, setShowPrintTypeDialog] = useState(false);
-  const [recentTransactions, setRecentTransactions] = useState<RecentTransaction[]>([]);
-  const [showVoidDialog, setShowVoidDialog] = useState(false);
-  const [transactionToVoid, setTransactionToVoid] = useState<RecentTransaction | null>(null);
+  // Recent transactions removed - void system disabled
 
   // ============= PHONE-FIRST CUSTOMER LOOKUP =============
   useEffect(() => {
@@ -303,25 +293,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
     if (customersRes.data) setCustomers(customersRes.data);
     if (pricesRes.data) setProductPrices(pricesRes.data);
 
-    // Fetch recent transactions (no time limit - fetch last 20)
-    const { data: recentTxns } = await supabase
-      .from('pos_transactions')
-      .select(`id, transaction_number, total, payment_status, created_at, pos_transaction_items (product_name, quantity)`)
-      .eq('is_voided', false)
-      .order('created_at', { ascending: false })
-      .limit(20);
-
-    if (recentTxns) {
-      setRecentTransactions(recentTxns.map(t => ({
-        id: t.id,
-        transactionNumber: t.transaction_number,
-        customerName: 'Customer',
-        total: Number(t.total),
-        status: t.payment_status,
-        createdAt: new Date(t.created_at),
-        items: t.pos_transaction_items?.map((i: any) => ({ name: i.product_name, quantity: i.quantity })) || []
-      })));
-    }
+    // Void system removed - no recent transactions tracking needed
   }, []);
 
   useEffect(() => {
@@ -1216,26 +1188,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
     }
   };
 
-  // ============= VOID TRANSACTION =============
-  const handleVoidTransaction = async () => {
-    if (!transactionToVoid) return;
-    
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Please log in");
-
-      await supabase.from('pos_transactions')
-        .update({ is_voided: true, voided_at: new Date().toISOString(), voided_by: user.id })
-        .eq('id', transactionToVoid.id);
-
-      toast({ title: "Transaction voided" });
-      setRecentTransactions(prev => prev.filter(t => t.id !== transactionToVoid.id));
-      setShowVoidDialog(false);
-      setTransactionToVoid(null);
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    }
-  };
+  // Void system removed - transactions are permanent
 
   const clearAll = () => {
     setSaleItems([]);
@@ -1959,39 +1912,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
           </CardContent>
         </Card>
 
-        {/* ===== RECENT TRANSACTIONS ===== */}
-        {recentTransactions.length > 0 && (
-          <Card>
-            <CardHeader className="py-2 px-3">
-              <CardTitle className="text-xs flex items-center gap-2">
-                <Undo2 className="h-3.5 w-3.5" /> Recent (Void within 5 min)
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-2">
-              <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
-                {recentTransactions.map(txn => (
-                  <div key={txn.id} className="flex-shrink-0 p-2 rounded-lg border bg-card min-w-[140px]">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[10px] font-mono text-muted-foreground">{txn.transactionNumber}</span>
-                      <Badge variant={txn.status === 'completed' ? 'secondary' : 'outline'} className="text-[8px]">
-                        {txn.status === 'completed' ? 'Paid' : 'Due'}
-                      </Badge>
-                    </div>
-                    <p className="font-bold text-sm">{BANGLADESHI_CURRENCY_SYMBOL}{txn.total.toLocaleString()}</p>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="w-full h-6 mt-1 text-destructive text-[10px]"
-                      onClick={() => { setTransactionToVoid(txn); setShowVoidDialog(true); }}
-                    >
-                      <Trash2 className="h-3 w-3 mr-1" /> Void
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        {/* Recent Transactions section removed - void system disabled */}
 
         {/* ===== STICKY FOOTER (Mobile) ===== */}
         {saleItems.length > 0 && (
@@ -2340,21 +2261,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
           </DialogContent>
         </Dialog>
 
-        {/* Void Confirmation */}
-        <Dialog open={showVoidDialog} onOpenChange={setShowVoidDialog}>
-          <DialogContent className="max-w-sm">
-            <DialogHeader>
-              <DialogTitle>Void Transaction?</DialogTitle>
-              <DialogDescription>
-                This will void {transactionToVoid?.transactionNumber}. This cannot be undone.
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowVoidDialog(false)}>Cancel</Button>
-              <Button variant="destructive" onClick={handleVoidTransaction}>Void</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        {/* Void dialog removed - void system disabled */}
 
         {/* Print Type Dialog */}
         <Dialog open={showPrintTypeDialog} onOpenChange={setShowPrintTypeDialog}>
