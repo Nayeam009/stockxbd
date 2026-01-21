@@ -866,56 +866,54 @@ export const ProductPricingModule = () => {
 
         {/* LPG Tab Content */}
         <TabsContent value="lpg" className="space-y-4 mt-4">
-          {/* Unified Filter Row: Valve Size + Weight Dropdown + Search */}
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center gap-2 sm:gap-3">
-              {/* Unified Valve Size Toggle */}
-              <div className="flex bg-muted/60 rounded-full p-1 border border-border/50 flex-shrink-0">
-                <button
-                  onClick={() => setSizeTab("22mm")}
-                  className={`h-9 px-3 sm:px-4 rounded-full font-semibold text-xs sm:text-sm transition-all ${
-                    sizeTab === '22mm' 
-                      ? 'bg-primary text-primary-foreground shadow-md' 
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  22mm
-                </button>
-                <button
-                  onClick={() => setSizeTab("20mm")}
-                  className={`h-9 px-3 sm:px-4 rounded-full font-semibold text-xs sm:text-sm transition-all ${
-                    sizeTab === '20mm' 
-                      ? 'bg-cyan-500 text-white shadow-md' 
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  20mm
-                </button>
-              </div>
-              
-              {/* Weight Dropdown (Compact) */}
-              <Select value={selectedWeight} onValueChange={setSelectedWeight}>
-                <SelectTrigger className="h-9 w-24 sm:w-28 text-xs sm:text-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {weightOptions.map(option => (
-                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            
-              {/* Search */}
-              <div className="relative flex-1 min-w-0">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input 
-                  placeholder="Search brands..."
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  className="pl-10 h-9 bg-muted/50"
-                />
-              </div>
+          {/* Row 1: Valve Size + Weight Dropdown */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Unified Valve Size Toggle */}
+            <div className="flex bg-muted/60 rounded-full p-1 border border-border/50 flex-shrink-0">
+              <button
+                onClick={() => setSizeTab("22mm")}
+                className={`h-9 px-3 sm:px-4 rounded-full font-semibold text-xs sm:text-sm transition-all ${
+                  sizeTab === '22mm' 
+                    ? 'bg-primary text-primary-foreground shadow-md' 
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                22mm
+              </button>
+              <button
+                onClick={() => setSizeTab("20mm")}
+                className={`h-9 px-3 sm:px-4 rounded-full font-semibold text-xs sm:text-sm transition-all ${
+                  sizeTab === '20mm' 
+                    ? 'bg-cyan-500 text-white shadow-md' 
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                20mm
+              </button>
             </div>
+            
+            {/* Weight Dropdown (Compact) */}
+            <Select value={selectedWeight} onValueChange={setSelectedWeight}>
+              <SelectTrigger className="h-9 w-24 sm:w-28 text-xs sm:text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {weightOptions.map(option => (
+                  <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          
+          {/* Row 2: Search Bar (Full Width - Below for easy mobile access) */}
+          <div className="relative w-full">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input 
+              placeholder="Search brands..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="pl-10 h-11 text-base"
+            />
           </div>
 
           {/* Brand Cards Grid */}
