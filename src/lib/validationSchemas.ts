@@ -71,6 +71,27 @@ export const sanitizeString = (value: string): string => {
 };
 
 /**
+ * Escapes HTML special characters to prevent XSS attacks
+ * Use for any user-generated content that will be inserted into HTML
+ */
+export const escapeHtml = (value: string): string => {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
+};
+
+/**
+ * Sanitizes string for HTML output - combines general sanitization with HTML escaping
+ * Use for dynamic content in print windows or document.write contexts
+ */
+export const sanitizeForHtml = (value: string): string => {
+  return escapeHtml(sanitizeString(value));
+};
+
+/**
  * Sanitizes string specifically for CSV export to prevent formula injection
  */
 export const sanitizeForCSV = (value: string): string => {

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { logger } from "@/lib/logger";
 import { format, startOfMonth, endOfMonth, subMonths, subDays, startOfWeek, endOfWeek, startOfYear, endOfYear } from "date-fns";
 
 export interface SaleEntry {
@@ -216,7 +217,7 @@ export const useBusinessDiaryData = (): UseBusinessDiaryDataReturn => {
         new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
       ));
     } catch (error) {
-      console.error('Error fetching sales data:', error);
+      logger.error('Error fetching sales data', error, { component: 'BusinessDiary' });
     }
   }, []);
 
@@ -395,7 +396,7 @@ export const useBusinessDiaryData = (): UseBusinessDiaryDataReturn => {
         new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
       ));
     } catch (error) {
-      console.error('Error fetching expenses data:', error);
+      logger.error('Error fetching expenses data', error, { component: 'BusinessDiary' });
     }
   }, []);
 
@@ -412,15 +413,15 @@ export const useBusinessDiaryData = (): UseBusinessDiaryDataReturn => {
     const salesChannel = supabase
       .channel('diary-sales-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pos_transactions' }, () => {
-        console.log('[BusinessDiary] POS transaction changed - refreshing sales');
+        logger.debug('POS transaction changed - refreshing sales', null, { component: 'BusinessDiary' });
         fetchSalesData();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pos_transaction_items' }, () => {
-        console.log('[BusinessDiary] POS items changed - refreshing sales');
+        logger.debug('POS items changed - refreshing sales', null, { component: 'BusinessDiary' });
         fetchSalesData();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'customer_payments' }, () => {
-        console.log('[BusinessDiary] Customer payment changed - refreshing sales');
+        logger.debug('Customer payment changed - refreshing sales', null, { component: 'BusinessDiary' });
         fetchSalesData();
       })
       .subscribe();
@@ -428,23 +429,23 @@ export const useBusinessDiaryData = (): UseBusinessDiaryDataReturn => {
     const expensesChannel = supabase
       .channel('diary-expenses-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pob_transactions' }, () => {
-        console.log('[BusinessDiary] POB transaction changed - refreshing expenses');
+        logger.debug('POB transaction changed - refreshing expenses', null, { component: 'BusinessDiary' });
         fetchExpensesData();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pob_transaction_items' }, () => {
-        console.log('[BusinessDiary] POB items changed - refreshing expenses');
+        logger.debug('POB items changed - refreshing expenses', null, { component: 'BusinessDiary' });
         fetchExpensesData();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'staff_payments' }, () => {
-        console.log('[BusinessDiary] Staff payment changed - refreshing expenses');
+        logger.debug('Staff payment changed - refreshing expenses', null, { component: 'BusinessDiary' });
         fetchExpensesData();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicle_costs' }, () => {
-        console.log('[BusinessDiary] Vehicle cost changed - refreshing expenses');
+        logger.debug('Vehicle cost changed - refreshing expenses', null, { component: 'BusinessDiary' });
         fetchExpensesData();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_expenses' }, () => {
-        console.log('[BusinessDiary] Daily expense changed - refreshing expenses');
+        logger.debug('Daily expense changed - refreshing expenses', null, { component: 'BusinessDiary' });
         fetchExpensesData();
       })
       .subscribe();

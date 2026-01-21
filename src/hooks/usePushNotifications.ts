@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { logger } from "@/lib/logger";
 
 export interface PushNotificationState {
   isSupported: boolean;
@@ -54,7 +55,7 @@ export const usePushNotifications = () => {
       
       return permission === "granted";
     } catch (error) {
-      console.error("Error requesting notification permission:", error);
+      logger.error("Error requesting notification permission", error, { component: 'PushNotifications' });
       return false;
     } finally {
       setLoading(false);
@@ -98,7 +99,7 @@ export const usePushNotifications = () => {
 
       return notification;
     } catch (error) {
-      console.error("Error sending notification:", error);
+      logger.error("Error sending notification", error, { component: 'PushNotifications' });
       return null;
     }
   }, [state.isEnabled, state.permission]);
