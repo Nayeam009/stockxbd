@@ -1515,13 +1515,13 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
               </div>
             </div>
 
-            {/* Row 2: Cylinder Type & Valve Size (Prominent Pills) */}
-            <div className="flex items-center gap-3 flex-wrap">
-              {/* Cylinder Type Group */}
-              <div className="flex bg-muted/60 rounded-full p-1 border border-border/50">
+            {/* Row 2: Unified Cylinder Type & Valve Size (Single Row for Mobile) */}
+            <div className="flex items-center">
+              <div className="flex bg-muted/60 rounded-full p-1 border border-border/50 w-full">
+                {/* Cylinder Type Buttons */}
                 <button
                   onClick={() => setCylinderType('refill')}
-                  className={`h-10 px-5 rounded-full font-semibold text-sm transition-all ${
+                  className={`flex-1 h-9 px-2 sm:px-4 rounded-full font-semibold text-xs sm:text-sm transition-all min-w-0 ${
                     cylinderType === 'refill' 
                       ? 'bg-primary text-primary-foreground shadow-md' 
                       : 'text-muted-foreground hover:text-foreground'
@@ -1531,7 +1531,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                 </button>
                 <button
                   onClick={() => setCylinderType('package')}
-                  className={`h-10 px-5 rounded-full font-semibold text-sm transition-all ${
+                  className={`flex-1 h-9 px-2 sm:px-4 rounded-full font-semibold text-xs sm:text-sm transition-all min-w-0 ${
                     cylinderType === 'package' 
                       ? 'bg-primary text-primary-foreground shadow-md' 
                       : 'text-muted-foreground hover:text-foreground'
@@ -1539,13 +1539,14 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                 >
                   Package
                 </button>
-              </div>
-              
-              {/* Valve Size Group */}
-              <div className="flex bg-muted/60 rounded-full p-1 border border-border/50">
+                
+                {/* Visual Separator */}
+                <div className="w-px h-6 bg-border/70 self-center mx-1 sm:mx-2 flex-shrink-0" />
+                
+                {/* Valve Size Buttons */}
                 <button
                   onClick={() => setMouthSize('22mm')}
-                  className={`h-10 px-5 rounded-full font-semibold text-sm transition-all ${
+                  className={`flex-1 h-9 px-2 sm:px-4 rounded-full font-semibold text-xs sm:text-sm transition-all min-w-0 ${
                     mouthSize === '22mm' 
                       ? 'bg-primary text-primary-foreground shadow-md' 
                       : 'text-muted-foreground hover:text-foreground'
@@ -1555,7 +1556,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                 </button>
                 <button
                   onClick={() => setMouthSize('20mm')}
-                  className={`h-10 px-5 rounded-full font-semibold text-sm transition-all ${
+                  className={`flex-1 h-9 px-2 sm:px-4 rounded-full font-semibold text-xs sm:text-sm transition-all min-w-0 ${
                     mouthSize === '20mm' 
                       ? 'bg-primary text-primary-foreground shadow-md' 
                       : 'text-muted-foreground hover:text-foreground'
