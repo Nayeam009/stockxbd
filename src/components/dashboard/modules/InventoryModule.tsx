@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { logger } from "@/lib/logger";
 
 // Interfaces
 interface LPGBrand {
@@ -155,7 +156,7 @@ export const InventoryModule = () => {
       setStoves(stovesRes.data ?? []);
       setRegulators(regulatorsRes.data ?? []);
     } catch (error: any) {
-      console.error("Failed to load inventory data:", error);
+      logger.error('Failed to load inventory data', error, { component: 'Inventory' });
       toast.error(error?.message || "Failed to load inventory data");
     } finally {
       setLoading(false);

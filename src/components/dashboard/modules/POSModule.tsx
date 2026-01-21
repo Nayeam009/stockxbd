@@ -54,6 +54,7 @@ import { parsePositiveNumber, sanitizeString } from "@/lib/validationSchemas";
 import { InvoiceDialog } from "@/components/invoice/InvoiceDialog";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { logger } from "@/lib/logger";
 
 // ============= INTERFACES =============
 interface LPGBrand {
@@ -1182,6 +1183,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
       });
 
     } catch (error: any) {
+      logger.error('POS sale error', error, { component: 'POS' });
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } finally {
       setProcessing(false);

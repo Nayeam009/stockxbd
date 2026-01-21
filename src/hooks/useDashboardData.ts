@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/lib/logger';
 
 // Types that match database schema
 export interface SalesData {
@@ -400,7 +401,7 @@ export const useDashboardData = () => {
       }
 
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
+      logger.error('Error fetching dashboard data', error, { component: 'Dashboard' });
     } finally {
       setLoading(false);
     }
