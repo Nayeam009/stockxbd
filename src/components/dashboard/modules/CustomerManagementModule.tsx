@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,7 +31,11 @@ import {
   History,
   Plus,
   ShoppingCart,
-  Receipt
+  Receipt,
+  Printer,
+  FileText,
+  Phone,
+  X
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -40,6 +44,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
 import { sanitizeString, customerSchema } from "@/lib/validationSchemas";
 import { logger } from "@/lib/logger";
+import { InvoiceDialog } from "@/components/invoice/InvoiceDialog";
 
 interface Customer {
   id: string;
@@ -71,15 +76,32 @@ interface CustomerPayment {
   notes: string | null;
 }
 
-type ViewMode = 'main' | 'due' | 'paid';
+type ViewMode = 'main' | 'due' | 'paid' | 'memo-search';
 
 interface POSTransaction {
   id: string;
   transaction_number: string;
   created_at: string;
   total: number;
+  subtotal: number;
+  discount: number;
   payment_status: string;
+  payment_method: string;
+  customer_id?: string;
+  customer_name?: string;
   items?: string;
+  pos_transaction_items?: Array<{
+    product_name: string;
+    quantity: number;
+    unit_price: number;
+    total_price: number;
+  }>;
+}
+
+interface MemoSearchResult {
+  type: 'customer' | 'transaction';
+  customer?: Customer;
+  transaction?: POSTransaction;
 }
 
 export const CustomerManagementModule = () => {
@@ -107,6 +129,13 @@ export const CustomerManagementModule = () => {
     cylinders_due: "",
     credit_limit: "10000"
   });
+
+  // Memo Recall Feature State
+  const [memoSearchQuery, setMemoSearchQuery] = useState("");
+  const [memoSearchResults, setMemoSearchResults] = useState<MemoSearchResult[]>([]);
+  const [memoSearchLoading, setMemoSearchLoading] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState<POSTransaction | null>(null);
+  const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
 
   useEffect(() => {
     fetchCustomers();
@@ -165,12 +194,16 @@ export const CustomerManagementModule = () => {
         transaction_number,
         created_at,
         total,
+        subtotal,
+        discount,
         payment_status,
-        pos_transaction_items (product_name, quantity)
+        payment_method,
+        customer_id,
+        pos_transaction_items (product_name, quantity, unit_price, total_price)
       `)
       .eq('customer_id', customerId)
       .order('created_at', { ascending: false })
-      .limit(20);
+      .limit(50);
 
     if (data) {
       const history: POSTransaction[] = data.map(t => ({
@@ -178,10 +211,160 @@ export const CustomerManagementModule = () => {
         transaction_number: t.transaction_number,
         created_at: t.created_at,
         total: Number(t.total),
+        subtotal: Number(t.subtotal),
+        discount: Number(t.discount),
         payment_status: t.payment_status,
-        items: t.pos_transaction_items?.map((i: any) => `${i.quantity}x ${i.product_name}`).join(', ') || 'N/A'
+        payment_method: t.payment_method,
+        customer_id: t.customer_id,
+        items: t.pos_transaction_items?.map((i: any) => `${i.quantity}x ${i.product_name}`).join(', ') || 'N/A',
+        pos_transaction_items: t.pos_transaction_items
       }));
       setSalesHistory(history);
+    }
+  };
+
+  // Memo Recall Search Function
+  const handleMemoSearch = useCallback(async (query: string) => {
+    if (!query || query.length < 3) {
+      setMemoSearchResults([]);
+      return;
+    }
+
+    setMemoSearchLoading(true);
+    const results: MemoSearchResult[] = [];
+
+    try {
+      // Search customers by phone
+      const { data: customersByPhone } = await supabase
+        .from('customers')
+        .select('*')
+        .ilike('phone', `%${query}%`)
+        .limit(5);
+
+      if (customersByPhone) {
+        customersByPhone.forEach(c => {
+          results.push({ type: 'customer', customer: c });
+        });
+      }
+
+      // Search customers by name
+      const { data: customersByName } = await supabase
+        .from('customers')
+        .select('*')
+        .ilike('name', `%${query}%`)
+        .limit(5);
+
+      if (customersByName) {
+        customersByName.forEach(c => {
+          // Avoid duplicates
+          if (!results.find(r => r.type === 'customer' && r.customer?.id === c.id)) {
+            results.push({ type: 'customer', customer: c });
+          }
+        });
+      }
+
+      // Search transactions by transaction_number (Memo ID)
+      const { data: transactions } = await supabase
+        .from('pos_transactions')
+        .select(`
+          id,
+          transaction_number,
+          created_at,
+          total,
+          subtotal,
+          discount,
+          payment_status,
+          payment_method,
+          customer_id,
+          pos_transaction_items (product_name, quantity, unit_price, total_price)
+        `)
+        .ilike('transaction_number', `%${query}%`)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (transactions) {
+        // Fetch customer names for transactions
+        const customerIds = transactions.filter(t => t.customer_id).map(t => t.customer_id) as string[];
+        const { data: txCustomers } = customerIds.length > 0 
+          ? await supabase.from('customers').select('id, name').in('id', customerIds)
+          : { data: [] };
+
+        const customerMap = new Map<string, string>();
+        txCustomers?.forEach(c => customerMap.set(c.id, c.name));
+
+        transactions.forEach(t => {
+          results.push({ 
+            type: 'transaction', 
+            transaction: {
+              ...t,
+              customer_name: t.customer_id ? customerMap.get(t.customer_id) || 'Walk-in' : 'Walk-in',
+              items: t.pos_transaction_items?.map((i: any) => `${i.quantity}x ${i.product_name}`).join(', ') || 'N/A',
+            }
+          });
+        });
+      }
+
+      setMemoSearchResults(results);
+    } catch (error) {
+      logger.error('Memo search error', error, { component: 'CustomerManagement' });
+    } finally {
+      setMemoSearchLoading(false);
+    }
+  }, []);
+
+  // Debounced search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      handleMemoSearch(memoSearchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [memoSearchQuery, handleMemoSearch]);
+
+  const handleViewTransaction = async (transaction: POSTransaction) => {
+    // Fetch full transaction details if needed
+    const { data } = await supabase
+      .from('pos_transactions')
+      .select(`
+        id,
+        transaction_number,
+        created_at,
+        total,
+        subtotal,
+        discount,
+        payment_status,
+        payment_method,
+        customer_id,
+        pos_transaction_items (product_name, quantity, unit_price, total_price)
+      `)
+      .eq('id', transaction.id)
+      .single();
+
+    if (data) {
+      // Get customer info
+      let customerName = 'Walk-in Customer';
+      let customerPhone = '';
+      let customerAddress = '';
+      
+      if (data.customer_id) {
+        const { data: customer } = await supabase
+          .from('customers')
+          .select('name, phone, address')
+          .eq('id', data.customer_id)
+          .single();
+        
+        if (customer) {
+          customerName = customer.name;
+          customerPhone = customer.phone || '';
+          customerAddress = customer.address || '';
+        }
+      }
+
+      setSelectedTransaction({
+        ...data,
+        customer_name: customerName,
+        pos_transaction_items: data.pos_transaction_items
+      });
+      setInvoiceDialogOpen(true);
     }
   };
 
@@ -190,12 +373,14 @@ export const CustomerManagementModule = () => {
 
   const filteredDueCustomers = dueCustomers.filter(c =>
     c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    c.email?.toLowerCase().includes(searchQuery.toLowerCase())
+    c.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    c.phone?.includes(searchQuery)
   );
 
   const filteredPaidCustomers = paidCustomers.filter(c =>
     c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    c.email?.toLowerCase().includes(searchQuery.toLowerCase())
+    c.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    c.phone?.includes(searchQuery)
   );
 
   const totalAmountDue = dueCustomers.reduce((sum, c) => sum + Number(c.total_due), 0);
@@ -312,15 +497,43 @@ export const CustomerManagementModule = () => {
 
   const getBillingBadge = (status: string, totalDue: number) => {
     if (totalDue === 0) {
-      return <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Paid</Badge>;
+      return <Badge className="bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/30">Paid</Badge>;
     }
     if (status === 'overdue') {
-      return <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">Overdue</Badge>;
+      return <Badge className="bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/30">Overdue</Badge>;
     }
-    return <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">Pending</Badge>;
+    return <Badge className="bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/30">Pending</Badge>;
   };
 
-  // Main View
+  // Prepare invoice data for selected transaction
+  const getInvoiceData = () => {
+    if (!selectedTransaction) return null;
+
+    return {
+      invoiceNumber: selectedTransaction.transaction_number,
+      date: new Date(selectedTransaction.created_at),
+      customerName: selectedTransaction.customer_name || 'Walk-in Customer',
+      customer: {
+        name: selectedTransaction.customer_name || 'Walk-in Customer',
+        phone: '',
+        address: ''
+      },
+      items: selectedTransaction.pos_transaction_items?.map(item => ({
+        name: item.product_name,
+        quantity: item.quantity,
+        unitPrice: item.unit_price,
+        price: item.unit_price,
+        total: item.total_price
+      })) || [],
+      subtotal: selectedTransaction.subtotal,
+      discount: selectedTransaction.discount,
+      total: selectedTransaction.total,
+      paymentMethod: selectedTransaction.payment_method,
+      paymentStatus: selectedTransaction.payment_status
+    };
+  };
+
+  // Main View with Memo Recall Search Bar
   if (viewMode === 'main') {
     return (
       <div className="space-y-4 sm:space-y-6 pb-4">
@@ -337,7 +550,7 @@ export const CustomerManagementModule = () => {
                   Customer Management
                 </h2>
                 <p className="text-xs sm:text-sm text-muted-foreground">
-                  Manage accounts • Track dues • Collect payments
+                  Manage accounts • Track dues • Recall memos
                 </p>
               </div>
             </div>
@@ -351,6 +564,153 @@ export const CustomerManagementModule = () => {
             </Button>
           </div>
         </div>
+
+        {/* 🔍 MEMO RECALL SEARCH BAR */}
+        <Card className="relative overflow-hidden border-0 shadow-lg">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-cyan-500" />
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="h-8 w-8 rounded-lg bg-blue-500/20 flex items-center justify-center shrink-0">
+                <FileText className="h-4 w-4 text-blue-500" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">Memo Recall</h3>
+                <p className="text-xs text-muted-foreground">Search by Phone, Name, or Memo ID</p>
+              </div>
+            </div>
+            
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by phone, name, or memo ID (e.g., TXN-2025-...)..."
+                value={memoSearchQuery}
+                onChange={(e) => setMemoSearchQuery(e.target.value)}
+                className="pl-10 pr-10 h-12 bg-background border-border shadow-sm text-base"
+              />
+              {memoSearchQuery && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 p-0"
+                  onClick={() => {
+                    setMemoSearchQuery("");
+                    setMemoSearchResults([]);
+                  }}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+
+            {/* Search Results */}
+            {memoSearchLoading && (
+              <div className="mt-4 text-center py-4">
+                <div className="h-6 w-6 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
+                <p className="text-xs text-muted-foreground mt-2">Searching...</p>
+              </div>
+            )}
+
+            {!memoSearchLoading && memoSearchResults.length > 0 && (
+              <div className="mt-4 space-y-2 max-h-80 overflow-y-auto">
+                {memoSearchResults.map((result, idx) => (
+                  <Card 
+                    key={idx} 
+                    className="border border-border/50 shadow-sm hover:shadow-md transition-all cursor-pointer"
+                    onClick={() => {
+                      if (result.type === 'customer' && result.customer) {
+                        setSelectedCustomer(result.customer);
+                        fetchCustomerSalesHistory(result.customer.id);
+                        setHistoryDialogOpen(true);
+                      } else if (result.type === 'transaction' && result.transaction) {
+                        handleViewTransaction(result.transaction);
+                      }
+                    }}
+                  >
+                    <CardContent className="p-3">
+                      {result.type === 'customer' && result.customer && (
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-9 w-9 bg-blue-500/10 shrink-0">
+                              <AvatarFallback className="bg-blue-500/10 text-blue-600 font-semibold text-xs">
+                                {getInitials(result.customer.name)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="text-[10px] bg-blue-500/10 text-blue-600 border-blue-500/30">
+                                  Customer
+                                </Badge>
+                              </div>
+                              <p className="font-medium text-foreground text-sm truncate">{result.customer.name}</p>
+                              <p className="text-xs text-muted-foreground">{result.customer.phone || 'No phone'}</p>
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            {result.customer.total_due > 0 ? (
+                              <Badge className="bg-rose-500/20 text-rose-600 border-rose-500/30">
+                                Due: {BANGLADESHI_CURRENCY_SYMBOL}{result.customer.total_due.toLocaleString()}
+                              </Badge>
+                            ) : (
+                              <Badge className="bg-emerald-500/20 text-emerald-600 border-emerald-500/30">
+                                Clear
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {result.type === 'transaction' && result.transaction && (
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-3">
+                            <div className="h-9 w-9 rounded-lg bg-purple-500/10 flex items-center justify-center shrink-0">
+                              <Receipt className="h-4 w-4 text-purple-500" />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="text-[10px] bg-purple-500/10 text-purple-600 border-purple-500/30">
+                                  Memo
+                                </Badge>
+                              </div>
+                              <p className="font-mono font-medium text-foreground text-sm">
+                                {result.transaction.transaction_number}
+                              </p>
+                              <p className="text-xs text-muted-foreground truncate">
+                                {result.transaction.customer_name} • {format(new Date(result.transaction.created_at), 'MMM dd, yyyy')}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="font-bold text-foreground tabular-nums">
+                              {BANGLADESHI_CURRENCY_SYMBOL}{result.transaction.total.toLocaleString()}
+                            </p>
+                            <Badge 
+                              className={result.transaction.payment_status === 'paid' 
+                                ? 'bg-emerald-500/20 text-emerald-600 border-emerald-500/30' 
+                                : 'bg-amber-500/20 text-amber-600 border-amber-500/30'
+                              }
+                            >
+                              {result.transaction.payment_status}
+                            </Badge>
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+
+            {!memoSearchLoading && memoSearchQuery.length >= 3 && memoSearchResults.length === 0 && (
+              <div className="mt-4 text-center py-6">
+                <div className="h-12 w-12 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-3">
+                  <Search className="h-6 w-6 text-muted-foreground" />
+                </div>
+                <p className="text-sm text-muted-foreground">No results found for "{memoSearchQuery}"</p>
+                <p className="text-xs text-muted-foreground mt-1">Try a different phone number or memo ID</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Premium Summary Stats - 2x2 Grid */}
         <div className="grid grid-cols-2 gap-2 sm:gap-4">
@@ -490,7 +850,7 @@ export const CustomerManagementModule = () => {
 
         {/* Add Customer Dialog */}
         <Dialog open={addCustomerDialogOpen} onOpenChange={setAddCustomerDialogOpen}>
-          <DialogContent className="bg-card border-border">
+          <DialogContent className="bg-card border-border max-w-md">
             <DialogHeader>
               <DialogTitle>Add New Customer</DialogTitle>
             </DialogHeader>
@@ -501,7 +861,16 @@ export const CustomerManagementModule = () => {
                   value={newCustomer.name}
                   onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })}
                   placeholder="Enter customer name"
-                  className="mt-1"
+                  className="mt-1 h-11"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-foreground">Phone</label>
+                <Input
+                  value={newCustomer.phone}
+                  onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })}
+                  placeholder="01XXX-XXXXXX"
+                  className="mt-1 h-11"
                 />
               </div>
               <div>
@@ -511,16 +880,7 @@ export const CustomerManagementModule = () => {
                   value={newCustomer.email}
                   onChange={(e) => setNewCustomer({ ...newCustomer, email: e.target.value })}
                   placeholder="customer@example.com"
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium text-foreground">Phone</label>
-                <Input
-                  value={newCustomer.phone}
-                  onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })}
-                  placeholder="+880 1XXX-XXXXXX"
-                  className="mt-1"
+                  className="mt-1 h-11"
                 />
               </div>
               <div>
@@ -529,18 +889,18 @@ export const CustomerManagementModule = () => {
                   value={newCustomer.address}
                   onChange={(e) => setNewCustomer({ ...newCustomer, address: e.target.value })}
                   placeholder="Enter address"
-                  className="mt-1"
+                  className="mt-1 h-11"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm font-medium text-foreground">Initial Due Amount</label>
+                  <label className="text-sm font-medium text-foreground">Initial Due</label>
                   <Input
                     type="number"
                     value={newCustomer.total_due}
                     onChange={(e) => setNewCustomer({ ...newCustomer, total_due: e.target.value })}
                     placeholder="0"
-                    className="mt-1"
+                    className="mt-1 h-11"
                   />
                 </div>
                 <div>
@@ -550,7 +910,7 @@ export const CustomerManagementModule = () => {
                     value={newCustomer.cylinders_due}
                     onChange={(e) => setNewCustomer({ ...newCustomer, cylinders_due: e.target.value })}
                     placeholder="0"
-                    className="mt-1"
+                    className="mt-1 h-11"
                   />
                 </div>
               </div>
@@ -561,23 +921,160 @@ export const CustomerManagementModule = () => {
                   value={newCustomer.credit_limit}
                   onChange={(e) => setNewCustomer({ ...newCustomer, credit_limit: e.target.value })}
                   placeholder="10000"
-                  className="mt-1"
+                  className="mt-1 h-11"
                 />
-                <p className="text-xs text-muted-foreground mt-1">Maximum credit allowed for this customer</p>
+                <p className="text-xs text-muted-foreground mt-1">Maximum credit allowed</p>
               </div>
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setAddCustomerDialogOpen(false)}>Cancel</Button>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button variant="outline" onClick={() => setAddCustomerDialogOpen(false)} className="h-11">Cancel</Button>
               <Button 
                 onClick={handleAddCustomer}
                 disabled={!newCustomer.name.trim()}
-                className="bg-primary hover:bg-primary/90"
+                className="h-11 bg-primary hover:bg-primary/90"
               >
                 Add Customer
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* History Dialog with Purchase History Tab */}
+        <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
+          <DialogContent className="bg-card border-border max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+            <DialogHeader className="shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                  <History className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <DialogTitle className="text-lg">Customer History</DialogTitle>
+                  <p className="text-sm text-muted-foreground">{selectedCustomer?.name}</p>
+                </div>
+              </div>
+            </DialogHeader>
+            
+            <Tabs defaultValue="sales" className="flex-1 overflow-hidden flex flex-col">
+              <TabsList className="grid w-full grid-cols-2 shrink-0">
+                <TabsTrigger value="sales" className="gap-2">
+                  <ShoppingCart className="h-4 w-4" />
+                  Purchase History
+                </TabsTrigger>
+                <TabsTrigger value="payments" className="gap-2">
+                  <Banknote className="h-4 w-4" />
+                  Payments
+                </TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="sales" className="flex-1 overflow-auto mt-4">
+                {salesHistory.length > 0 ? (
+                  <div className="space-y-2">
+                    {salesHistory.map((tx) => (
+                      <Card 
+                        key={tx.id} 
+                        className="border border-border/50 shadow-sm hover:shadow-md transition-all cursor-pointer"
+                        onClick={() => handleViewTransaction(tx)}
+                      >
+                        <CardContent className="p-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="h-9 w-9 rounded-lg bg-purple-500/10 flex items-center justify-center shrink-0">
+                                <Receipt className="h-4 w-4 text-purple-500" />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="font-mono font-semibold text-foreground text-sm">
+                                  {tx.transaction_number}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {format(new Date(tx.created_at), 'MMM dd, yyyy • HH:mm')}
+                                </p>
+                                <p className="text-xs text-muted-foreground truncate max-w-[200px]">
+                                  {tx.items}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <p className="font-bold text-foreground tabular-nums">
+                                {BANGLADESHI_CURRENCY_SYMBOL}{tx.total.toLocaleString()}
+                              </p>
+                              <Badge 
+                                className={tx.payment_status === 'paid' 
+                                  ? 'bg-emerald-500/20 text-emerald-600 border-emerald-500/30' 
+                                  : 'bg-amber-500/20 text-amber-600 border-amber-500/30'
+                                }
+                              >
+                                {tx.payment_status}
+                              </Badge>
+                              <Button variant="ghost" size="sm" className="h-7 px-2 mt-1">
+                                <Printer className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <div className="h-12 w-12 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-3">
+                      <ShoppingCart className="h-6 w-6 text-muted-foreground" />
+                    </div>
+                    <p className="text-muted-foreground">No purchase history found</p>
+                  </div>
+                )}
+              </TabsContent>
+              
+              <TabsContent value="payments" className="flex-1 overflow-auto mt-4">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-border">
+                      <TableHead className="text-muted-foreground font-semibold">Date</TableHead>
+                      <TableHead className="text-muted-foreground font-semibold text-right">Amount</TableHead>
+                      <TableHead className="text-muted-foreground font-semibold text-right">Cylinders</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {selectedCustomer && getCustomerPayments(selectedCustomer.id).map((payment) => (
+                      <TableRow key={payment.id} className="border-border">
+                        <TableCell className="text-foreground">
+                          {format(new Date(payment.payment_date), 'MMM dd, yyyy HH:mm')}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <span className="font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                            {BANGLADESHI_CURRENCY_SYMBOL}{Number(payment.amount).toLocaleString()}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right font-medium text-foreground tabular-nums">
+                          {payment.cylinders_collected}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {selectedCustomer && getCustomerPayments(selectedCustomer.id).length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={3} className="text-center py-8">
+                          <div className="h-12 w-12 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-3">
+                            <Receipt className="h-6 w-6 text-muted-foreground" />
+                          </div>
+                          <p className="text-muted-foreground">No payment history found</p>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </TabsContent>
+            </Tabs>
+          </DialogContent>
+        </Dialog>
+
+        {/* Invoice Dialog for Memo Reprint */}
+        <InvoiceDialog
+          open={invoiceDialogOpen}
+          onOpenChange={setInvoiceDialogOpen}
+          invoiceData={getInvoiceData()}
+          businessName="Stock-X BD Ltd."
+          businessPhone="+880 1XXX-XXXXXX"
+          businessAddress="Dhaka, Bangladesh"
+        />
       </div>
     );
   }
@@ -676,7 +1173,7 @@ export const CustomerManagementModule = () => {
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search due customers by name or email..."
+            placeholder="Search by name, email, or phone..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10 h-11 bg-card border-border shadow-sm"
@@ -714,7 +1211,7 @@ export const CustomerManagementModule = () => {
                         </Avatar>
                         <div className="min-w-0">
                           <p className="font-semibold text-foreground truncate">{customer.name}</p>
-                          <p className="text-xs text-muted-foreground truncate">{customer.email || customer.phone || 'No contact'}</p>
+                          <p className="text-xs text-muted-foreground truncate">{customer.phone || customer.email || 'No contact'}</p>
                         </div>
                       </div>
                       {getBillingBadge(customer.billing_status, customer.total_due)}
@@ -799,7 +1296,7 @@ export const CustomerManagementModule = () => {
                           </Avatar>
                           <div>
                             <p className="font-medium text-foreground">{customer.name}</p>
-                            <p className="text-sm text-muted-foreground">{customer.email || customer.phone || 'No contact'}</p>
+                            <p className="text-xs text-muted-foreground">{customer.phone || customer.email || 'No contact'}</p>
                           </div>
                         </div>
                       </TableCell>
@@ -811,16 +1308,14 @@ export const CustomerManagementModule = () => {
                           {BANGLADESHI_CURRENCY_SYMBOL}{Number(customer.total_due).toLocaleString()}
                         </span>
                       </TableCell>
-                      <TableCell className="text-right">
-                        <span className="font-bold text-purple-600 dark:text-purple-400 tabular-nums">
-                          {customer.cylinders_due}
-                        </span>
+                      <TableCell className="text-right font-medium text-purple-600 dark:text-purple-400 tabular-nums">
+                        {customer.cylinders_due}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center justify-center gap-2">
                           <Button
                             size="sm"
-                            className="h-9 bg-rose-500 hover:bg-rose-600 text-white font-medium"
+                            className="h-9 bg-rose-500 hover:bg-rose-600 text-white"
                             onClick={() => {
                               setSelectedCustomer(customer);
                               setPaymentAmount(customer.total_due.toString());
@@ -828,20 +1323,19 @@ export const CustomerManagementModule = () => {
                               setSettleDialogOpen(true);
                             }}
                           >
-                            Settle Account
+                            Settle
                           </Button>
                           <Button
                             size="sm"
-                            variant="ghost"
-                            className="h-9 text-muted-foreground hover:text-foreground"
+                            variant="outline"
+                            className="h-9"
                             onClick={() => {
                               setSelectedCustomer(customer);
                               fetchCustomerSalesHistory(customer.id);
                               setHistoryDialogOpen(true);
                             }}
                           >
-                            <History className="h-4 w-4 mr-1" />
-                            History
+                            <History className="h-4 w-4" />
                           </Button>
                         </div>
                       </TableCell>
@@ -868,7 +1362,7 @@ export const CustomerManagementModule = () => {
         <Dialog open={settleDialogOpen} onOpenChange={setSettleDialogOpen}>
           <DialogContent className="bg-card border-border max-w-md">
             <DialogHeader>
-              <div className="flex items-center gap-3 mb-2">
+              <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-xl bg-rose-500/20 flex items-center justify-center">
                   <Banknote className="h-5 w-5 text-rose-500" />
                 </div>
@@ -878,17 +1372,17 @@ export const CustomerManagementModule = () => {
                 </div>
               </div>
             </DialogHeader>
-            <div className="space-y-4 py-2">
+            <div className="py-4 space-y-4">
               {/* Payment Section */}
               <div className="bg-muted/30 rounded-xl p-4 space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-foreground">Payment Details</span>
+                  <span className="text-sm font-medium text-foreground">Payment Collection</span>
                   <Badge variant="outline" className="bg-rose-500/10 text-rose-600 border-rose-500/30">
-                    Due: {BANGLADESHI_CURRENCY_SYMBOL}{Number(selectedCustomer?.total_due || 0).toLocaleString()}
+                    Due: {BANGLADESHI_CURRENCY_SYMBOL}{selectedCustomer?.total_due.toLocaleString()}
                   </Badge>
                 </div>
                 <div>
-                  <label className="text-xs text-muted-foreground font-medium">Payment Amount</label>
+                  <label className="text-xs text-muted-foreground font-medium">Amount Received ({BANGLADESHI_CURRENCY_SYMBOL})</label>
                   <Input
                     type="number"
                     value={paymentAmount}
@@ -935,58 +1429,140 @@ export const CustomerManagementModule = () => {
 
         {/* History Dialog */}
         <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
-          <DialogContent className="bg-card border-border max-w-2xl">
-            <DialogHeader>
+          <DialogContent className="bg-card border-border max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+            <DialogHeader className="shrink-0">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
                   <History className="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <DialogTitle className="text-lg">Payment History</DialogTitle>
+                  <DialogTitle className="text-lg">Customer History</DialogTitle>
                   <p className="text-sm text-muted-foreground">{selectedCustomer?.name}</p>
                 </div>
               </div>
             </DialogHeader>
-            <div className="py-2">
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-border">
-                    <TableHead className="text-muted-foreground font-semibold">Date</TableHead>
-                    <TableHead className="text-muted-foreground font-semibold text-right">Amount Paid</TableHead>
-                    <TableHead className="text-muted-foreground font-semibold text-right">Cylinders</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {selectedCustomer && getCustomerPayments(selectedCustomer.id).map((payment) => (
-                    <TableRow key={payment.id} className="border-border">
-                      <TableCell className="text-foreground">
-                        {format(new Date(payment.payment_date), 'MMM dd, yyyy HH:mm')}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <span className="font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
-                          {BANGLADESHI_CURRENCY_SYMBOL}{Number(payment.amount).toLocaleString()}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right font-medium text-foreground tabular-nums">
-                        {payment.cylinders_collected}
-                      </TableCell>
+            
+            <Tabs defaultValue="sales" className="flex-1 overflow-hidden flex flex-col">
+              <TabsList className="grid w-full grid-cols-2 shrink-0">
+                <TabsTrigger value="sales" className="gap-2">
+                  <ShoppingCart className="h-4 w-4" />
+                  Purchase History
+                </TabsTrigger>
+                <TabsTrigger value="payments" className="gap-2">
+                  <Banknote className="h-4 w-4" />
+                  Payments
+                </TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="sales" className="flex-1 overflow-auto mt-4">
+                {salesHistory.length > 0 ? (
+                  <div className="space-y-2">
+                    {salesHistory.map((tx) => (
+                      <Card 
+                        key={tx.id} 
+                        className="border border-border/50 shadow-sm hover:shadow-md transition-all cursor-pointer"
+                        onClick={() => handleViewTransaction(tx)}
+                      >
+                        <CardContent className="p-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="h-9 w-9 rounded-lg bg-purple-500/10 flex items-center justify-center shrink-0">
+                                <Receipt className="h-4 w-4 text-purple-500" />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="font-mono font-semibold text-foreground text-sm">
+                                  {tx.transaction_number}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {format(new Date(tx.created_at), 'MMM dd, yyyy • HH:mm')}
+                                </p>
+                                <p className="text-xs text-muted-foreground truncate max-w-[200px]">
+                                  {tx.items}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <p className="font-bold text-foreground tabular-nums">
+                                {BANGLADESHI_CURRENCY_SYMBOL}{tx.total.toLocaleString()}
+                              </p>
+                              <Badge 
+                                className={tx.payment_status === 'paid' 
+                                  ? 'bg-emerald-500/20 text-emerald-600 border-emerald-500/30' 
+                                  : 'bg-amber-500/20 text-amber-600 border-amber-500/30'
+                                }
+                              >
+                                {tx.payment_status}
+                              </Badge>
+                              <Button variant="ghost" size="sm" className="h-7 px-2 mt-1">
+                                <Printer className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <div className="h-12 w-12 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-3">
+                      <ShoppingCart className="h-6 w-6 text-muted-foreground" />
+                    </div>
+                    <p className="text-muted-foreground">No purchase history found</p>
+                  </div>
+                )}
+              </TabsContent>
+              
+              <TabsContent value="payments" className="flex-1 overflow-auto mt-4">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-border">
+                      <TableHead className="text-muted-foreground font-semibold">Date</TableHead>
+                      <TableHead className="text-muted-foreground font-semibold text-right">Amount</TableHead>
+                      <TableHead className="text-muted-foreground font-semibold text-right">Cylinders</TableHead>
                     </TableRow>
-                  ))}
-                  {selectedCustomer && getCustomerPayments(selectedCustomer.id).length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={3} className="text-center py-8">
-                        <div className="h-12 w-12 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-3">
-                          <Receipt className="h-6 w-6 text-muted-foreground" />
-                        </div>
-                        <p className="text-muted-foreground">No payment history found</p>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {selectedCustomer && getCustomerPayments(selectedCustomer.id).map((payment) => (
+                      <TableRow key={payment.id} className="border-border">
+                        <TableCell className="text-foreground">
+                          {format(new Date(payment.payment_date), 'MMM dd, yyyy HH:mm')}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <span className="font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                            {BANGLADESHI_CURRENCY_SYMBOL}{Number(payment.amount).toLocaleString()}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right font-medium text-foreground tabular-nums">
+                          {payment.cylinders_collected}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {selectedCustomer && getCustomerPayments(selectedCustomer.id).length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={3} className="text-center py-8">
+                          <div className="h-12 w-12 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-3">
+                            <Receipt className="h-6 w-6 text-muted-foreground" />
+                          </div>
+                          <p className="text-muted-foreground">No payment history found</p>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </TabsContent>
+            </Tabs>
           </DialogContent>
         </Dialog>
+
+        {/* Invoice Dialog for Memo Reprint */}
+        <InvoiceDialog
+          open={invoiceDialogOpen}
+          onOpenChange={setInvoiceDialogOpen}
+          invoiceData={getInvoiceData()}
+          businessName="Stock-X BD Ltd."
+          businessPhone="+880 1XXX-XXXXXX"
+          businessAddress="Dhaka, Bangladesh"
+        />
       </div>
     );
   }
@@ -1025,7 +1601,7 @@ export const CustomerManagementModule = () => {
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search paid customers by name or email..."
+          placeholder="Search by name, email, or phone..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="pl-10 h-11 bg-card border-border shadow-sm"
@@ -1052,7 +1628,15 @@ export const CustomerManagementModule = () => {
           {/* Mobile Card View */}
           <div className="sm:hidden space-y-3">
             {filteredPaidCustomers.map((customer, index) => (
-              <Card key={customer.id} className="border border-border/50 shadow-sm">
+              <Card 
+                key={customer.id} 
+                className="border border-border/50 shadow-sm cursor-pointer hover:shadow-md transition-all"
+                onClick={() => {
+                  setSelectedCustomer(customer);
+                  fetchCustomerSalesHistory(customer.id);
+                  setHistoryDialogOpen(true);
+                }}
+              >
                 <CardContent className="p-4">
                   <div className="flex items-start gap-3">
                     <Avatar className="h-10 w-10 bg-emerald-500/10 shrink-0">
@@ -1068,7 +1652,7 @@ export const CustomerManagementModule = () => {
                         </Badge>
                       </div>
                       <p className="text-xs text-muted-foreground truncate">
-                        {customer.email || customer.phone || 'No contact'}
+                        {customer.phone || customer.email || 'No contact'}
                       </p>
                       <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
                         <span className="font-medium">ID: CUST-{String(index + 1).padStart(3, '0')}</span>
@@ -1104,6 +1688,7 @@ export const CustomerManagementModule = () => {
                   <TableHead className="text-muted-foreground font-semibold">Contact</TableHead>
                   <TableHead className="text-muted-foreground font-semibold">Last Order</TableHead>
                   <TableHead className="text-muted-foreground font-semibold text-center">Status</TableHead>
+                  <TableHead className="text-muted-foreground font-semibold text-center">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -1123,7 +1708,7 @@ export const CustomerManagementModule = () => {
                       </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {customer.email || customer.phone || 'N/A'}
+                      {customer.phone || customer.email || 'N/A'}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {customer.last_order_date 
@@ -1135,11 +1720,26 @@ export const CustomerManagementModule = () => {
                         Clear
                       </Badge>
                     </TableCell>
+                    <TableCell className="text-center">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-9"
+                        onClick={() => {
+                          setSelectedCustomer(customer);
+                          fetchCustomerSalesHistory(customer.id);
+                          setHistoryDialogOpen(true);
+                        }}
+                      >
+                        <History className="h-4 w-4 mr-2" />
+                        History
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
                 {filteredPaidCustomers.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-12">
+                    <TableCell colSpan={6} className="text-center py-12">
                       <div className="h-16 w-16 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-4">
                         <Users className="h-8 w-8 text-muted-foreground" />
                       </div>
@@ -1153,6 +1753,143 @@ export const CustomerManagementModule = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* History Dialog */}
+      <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
+        <DialogContent className="bg-card border-border max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader className="shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                <History className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <DialogTitle className="text-lg">Customer History</DialogTitle>
+                <p className="text-sm text-muted-foreground">{selectedCustomer?.name}</p>
+              </div>
+            </div>
+          </DialogHeader>
+          
+          <Tabs defaultValue="sales" className="flex-1 overflow-hidden flex flex-col">
+            <TabsList className="grid w-full grid-cols-2 shrink-0">
+              <TabsTrigger value="sales" className="gap-2">
+                <ShoppingCart className="h-4 w-4" />
+                Purchase History
+              </TabsTrigger>
+              <TabsTrigger value="payments" className="gap-2">
+                <Banknote className="h-4 w-4" />
+                Payments
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="sales" className="flex-1 overflow-auto mt-4">
+              {salesHistory.length > 0 ? (
+                <div className="space-y-2">
+                  {salesHistory.map((tx) => (
+                    <Card 
+                      key={tx.id} 
+                      className="border border-border/50 shadow-sm hover:shadow-md transition-all cursor-pointer"
+                      onClick={() => handleViewTransaction(tx)}
+                    >
+                      <CardContent className="p-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="h-9 w-9 rounded-lg bg-purple-500/10 flex items-center justify-center shrink-0">
+                              <Receipt className="h-4 w-4 text-purple-500" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-mono font-semibold text-foreground text-sm">
+                                {tx.transaction_number}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {format(new Date(tx.created_at), 'MMM dd, yyyy • HH:mm')}
+                              </p>
+                              <p className="text-xs text-muted-foreground truncate max-w-[200px]">
+                                {tx.items}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="font-bold text-foreground tabular-nums">
+                              {BANGLADESHI_CURRENCY_SYMBOL}{tx.total.toLocaleString()}
+                            </p>
+                            <Badge 
+                              className={tx.payment_status === 'paid' 
+                                ? 'bg-emerald-500/20 text-emerald-600 border-emerald-500/30' 
+                                : 'bg-amber-500/20 text-amber-600 border-amber-500/30'
+                              }
+                            >
+                              {tx.payment_status}
+                            </Badge>
+                            <Button variant="ghost" size="sm" className="h-7 px-2 mt-1">
+                              <Printer className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <div className="h-12 w-12 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-3">
+                    <ShoppingCart className="h-6 w-6 text-muted-foreground" />
+                  </div>
+                  <p className="text-muted-foreground">No purchase history found</p>
+                </div>
+              )}
+            </TabsContent>
+            
+            <TabsContent value="payments" className="flex-1 overflow-auto mt-4">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-border">
+                    <TableHead className="text-muted-foreground font-semibold">Date</TableHead>
+                    <TableHead className="text-muted-foreground font-semibold text-right">Amount</TableHead>
+                    <TableHead className="text-muted-foreground font-semibold text-right">Cylinders</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {selectedCustomer && getCustomerPayments(selectedCustomer.id).map((payment) => (
+                    <TableRow key={payment.id} className="border-border">
+                      <TableCell className="text-foreground">
+                        {format(new Date(payment.payment_date), 'MMM dd, yyyy HH:mm')}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <span className="font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                          {BANGLADESHI_CURRENCY_SYMBOL}{Number(payment.amount).toLocaleString()}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right font-medium text-foreground tabular-nums">
+                        {payment.cylinders_collected}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {selectedCustomer && getCustomerPayments(selectedCustomer.id).length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={3} className="text-center py-8">
+                        <div className="h-12 w-12 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-3">
+                          <Receipt className="h-6 w-6 text-muted-foreground" />
+                        </div>
+                        <p className="text-muted-foreground">No payment history found</p>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TabsContent>
+          </Tabs>
+        </DialogContent>
+      </Dialog>
+
+      {/* Invoice Dialog for Memo Reprint */}
+      <InvoiceDialog
+        open={invoiceDialogOpen}
+        onOpenChange={setInvoiceDialogOpen}
+        invoiceData={getInvoiceData()}
+        businessName="Stock-X BD Ltd."
+        businessPhone="+880 1XXX-XXXXXX"
+        businessAddress="Dhaka, Bangladesh"
+      />
     </div>
   );
 };
