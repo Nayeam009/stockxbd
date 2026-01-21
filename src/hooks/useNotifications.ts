@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { logger } from "@/lib/logger";
 
 export interface Notification {
   id: string;
@@ -27,7 +28,7 @@ const sendBrowserNotification = (title: string, body: string, tag: string) => {
       tag,
     });
   } catch (error) {
-    console.error("Error sending notification:", error);
+    logger.error("Error sending notification", error, { component: 'Notifications' });
   }
 };
 

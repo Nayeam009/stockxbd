@@ -6,6 +6,7 @@ import { InvoiceTemplate } from "./InvoiceTemplate";
 import { GatePassTemplate } from "./GatePassTemplate";
 import { Printer, FileDown, Receipt, Truck } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { escapeHtml } from "@/lib/validationSchemas";
 
 interface InvoiceItem {
   name: string;
@@ -71,11 +72,15 @@ export const InvoiceDialog = ({
       const printContent = ref.current.innerHTML;
       const printWindow = window.open("", "", "width=800,height=600");
       if (printWindow) {
+        // Use escapeHtml for dynamic title content to prevent XSS
+        const safeTitle = escapeHtml(title);
+        const safeInvoiceNumber = escapeHtml(invoiceData?.invoiceNumber || '');
         printWindow.document.write(`
           <!DOCTYPE html>
           <html>
             <head>
-              <title>${title} - ${invoiceData?.invoiceNumber}</title>
+              <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'none'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com;">
+              <title>${safeTitle} - ${safeInvoiceNumber}</title>
               <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&display=swap" rel="stylesheet">
               <style>
                 * { margin: 0; padding: 0; box-sizing: border-box; }

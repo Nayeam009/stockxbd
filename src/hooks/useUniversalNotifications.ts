@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { logger } from "@/lib/logger";
 
 export type NotificationType = 
   | "low_stock" 
@@ -54,7 +55,7 @@ const sendBrowserNotification = (title: string, body: string, tag: string) => {
       tag,
     });
   } catch (error) {
-    console.error("Error sending notification:", error);
+    logger.error("Error sending notification", error, { component: 'UniversalNotifications' });
   }
 };
 

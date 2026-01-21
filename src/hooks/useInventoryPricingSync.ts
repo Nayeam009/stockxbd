@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { logger } from "@/lib/logger";
 
 interface SyncOptions {
   productType: "lpg" | "stove" | "regulator";
@@ -23,7 +24,7 @@ export const syncToProductPricing = async ({
   try {
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) {
-      console.warn("No user found for syncing to product pricing");
+      logger.warn("No user found for syncing to product pricing", null, { component: 'InventoryPricingSync' });
       return false;
     }
 
@@ -50,7 +51,7 @@ export const syncToProductPricing = async ({
     const { data: existing, error: checkError } = await query.maybeSingle();
 
     if (checkError) {
-      console.error("Error checking existing product price:", checkError);
+      logger.error("Error checking existing product price", checkError, { component: 'InventoryPricingSync' });
       return false;
     }
 
@@ -71,17 +72,17 @@ export const syncToProductPricing = async ({
       });
 
       if (insertError) {
-        console.error("Error syncing to product pricing:", insertError);
+        logger.error("Error syncing to product pricing", insertError, { component: 'InventoryPricingSync' });
         return false;
       }
 
-      console.log(`Synced ${productName} to product pricing`);
+      logger.info(`Synced ${productName} to product pricing`, null, { component: 'InventoryPricingSync' });
       return true;
     }
 
     return false; // Already exists
   } catch (error) {
-    console.error("Error in syncToProductPricing:", error);
+    logger.error("Error in syncToProductPricing", error, { component: 'InventoryPricingSync' });
     return false;
   }
 };

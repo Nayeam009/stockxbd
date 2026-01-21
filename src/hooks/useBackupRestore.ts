@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { logger } from "@/lib/logger";
 
 export interface BackupData {
   version: string;
@@ -89,7 +90,7 @@ export const useBackupRestore = () => {
           .select("*");
 
         if (error) {
-          console.error(`Error backing up ${table}:`, error);
+          logger.warn(`Error backing up ${table}`, error, { component: 'BackupRestore' });
           backupData.tables[table as keyof BackupData["tables"]] = [];
         } else {
           backupData.tables[table as keyof BackupData["tables"]] = data || [];
@@ -101,7 +102,7 @@ export const useBackupRestore = () => {
 
       return backupData;
     } catch (error) {
-      console.error("Backup error:", error);
+      logger.error("Backup failed", error, { component: 'BackupRestore' });
       toast({ title: "Backup failed", variant: "destructive" });
       return null;
     } finally {
@@ -197,7 +198,7 @@ export const useBackupRestore = () => {
             });
 
           if (error) {
-            console.warn(`Warning restoring ${table}:`, error.message);
+            logger.warn(`Warning restoring ${table}`, { message: error.message }, { component: 'BackupRestore' });
           }
         }
       }
@@ -216,7 +217,7 @@ export const useBackupRestore = () => {
 
       return true;
     } catch (error) {
-      console.error("Restore error:", error);
+      logger.error("Restore failed", error, { component: 'BackupRestore' });
       toast({ title: "Failed to restore backup", variant: "destructive" });
       return false;
     } finally {
