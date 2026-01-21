@@ -278,6 +278,15 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
     }
   }, [phoneQuery, isWalkin]);
 
+  // ============= HANDLE CUSTOM WEIGHT SELECTION =============
+  useEffect(() => {
+    if (weight === 'custom') {
+      setShowCustomWeightInput(true);
+      // Reset to first weight option while dialog shows
+      setWeight(mouthSize === '22mm' ? WEIGHT_OPTIONS_22MM[0] : WEIGHT_OPTIONS_20MM[0]);
+    }
+  }, [weight, mouthSize]);
+
   // ============= DATA FETCHING =============
   const fetchData = useCallback(async () => {
     const [brandsRes, stovesRes, regulatorsRes, customersRes, pricesRes] = await Promise.all([
@@ -1448,11 +1457,12 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
           </Card>
         </div>
 
-        {/* ===== CONTROL BAR: Scrollable Chips ===== */}
+        {/* ===== CONTROL BAR: Compact Layout ===== */}
         <Card className="border-border/50 bg-card/50">
-          <CardContent className="p-3 space-y-2.5">
-            {/* Row 1: Retail/Wholesale Toggle (Full Width) */}
+          <CardContent className="p-3 space-y-3">
+            {/* Row 1: Retail/Wholesale Toggle + Weight Dropdown + Search */}
             <div className="flex items-center gap-2">
+              {/* Retail/Wholesale Toggle */}
               <div className="flex-1 bg-muted/80 rounded-lg p-0.5 border border-border/50">
                 <div className="grid grid-cols-2 gap-0.5">
                   <Button
@@ -1473,8 +1483,28 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                   </Button>
                 </div>
               </div>
+              
+              {/* Weight Dropdown */}
+              <Select value={weight} onValueChange={setWeight}>
+                <SelectTrigger className="w-24 sm:w-28 h-10 font-semibold bg-primary text-primary-foreground border-primary">
+                  <SelectValue placeholder="Weight" />
+                </SelectTrigger>
+                <SelectContent>
+                  {weightOptions.map((w) => (
+                    <SelectItem key={w} value={w} className="font-medium">
+                      {w}
+                    </SelectItem>
+                  ))}
+                  <SelectItem value="custom" className="font-medium text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <Plus className="h-3 w-3" /> Custom
+                    </span>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              
               {/* Search on Desktop */}
-              <div className="hidden sm:flex relative w-48">
+              <div className="hidden sm:flex relative w-40">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   value={productSearch}
@@ -1485,81 +1515,60 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
               </div>
             </div>
 
-            {/* Row 2: Horizontal Scrollable Chips */}
-            <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar snap-x">
-              {/* Cylinder Type Chips */}
-              <button
-                onClick={() => setCylinderType('refill')}
-                className={`shrink-0 h-9 px-4 rounded-full border transition-all snap-center text-sm font-medium ${
-                  cylinderType === 'refill' 
-                    ? 'bg-primary text-primary-foreground shadow-md border-primary' 
-                    : 'bg-card border-border hover:border-primary/50'
-                }`}
-              >
-                Refill
-              </button>
-              <button
-                onClick={() => setCylinderType('package')}
-                className={`shrink-0 h-9 px-4 rounded-full border transition-all snap-center text-sm font-medium ${
-                  cylinderType === 'package' 
-                    ? 'bg-primary text-primary-foreground shadow-md border-primary' 
-                    : 'bg-card border-border hover:border-primary/50'
-                }`}
-              >
-                Package
-              </button>
-              
-              <Separator orientation="vertical" className="h-9 mx-1" />
-              
-              {/* Weight Chips */}
-              {weightOptions.map((w) => (
+            {/* Row 2: Cylinder Type & Valve Size (Prominent Pills) */}
+            <div className="flex items-center gap-3 flex-wrap">
+              {/* Cylinder Type Group */}
+              <div className="flex bg-muted/60 rounded-full p-1 border border-border/50">
                 <button
-                  key={w}
-                  onClick={() => setWeight(w)}
-                  className={`shrink-0 h-9 px-4 rounded-full border transition-all snap-center text-sm font-medium ${
-                    weight === w 
-                      ? 'bg-primary text-primary-foreground shadow-md border-primary' 
-                      : 'bg-card border-border hover:border-primary/50'
+                  onClick={() => setCylinderType('refill')}
+                  className={`h-10 px-5 rounded-full font-semibold text-sm transition-all ${
+                    cylinderType === 'refill' 
+                      ? 'bg-primary text-primary-foreground shadow-md' 
+                      : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
-                  {w}
+                  Refill
                 </button>
-              ))}
-              <button
-                onClick={() => setShowCustomWeightInput(true)}
-                className="shrink-0 h-9 px-3 rounded-full border border-dashed border-muted-foreground/40 transition-all snap-center text-sm font-medium text-muted-foreground hover:border-primary/50"
-              >
-                <Plus className="h-3.5 w-3.5" />
-              </button>
+                <button
+                  onClick={() => setCylinderType('package')}
+                  className={`h-10 px-5 rounded-full font-semibold text-sm transition-all ${
+                    cylinderType === 'package' 
+                      ? 'bg-primary text-primary-foreground shadow-md' 
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Package
+                </button>
+              </div>
               
-              <Separator orientation="vertical" className="h-9 mx-1" />
-              
-              {/* Valve Size Chips */}
-              <button
-                onClick={() => setMouthSize('22mm')}
-                className={`shrink-0 h-9 px-4 rounded-full border transition-all snap-center text-sm font-medium ${
-                  mouthSize === '22mm' 
-                    ? 'bg-primary text-primary-foreground shadow-md border-primary' 
-                    : 'bg-card border-border hover:border-primary/50'
-                }`}
-              >
-                22mm
-              </button>
-              <button
-                onClick={() => setMouthSize('20mm')}
-                className={`shrink-0 h-9 px-4 rounded-full border transition-all snap-center text-sm font-medium ${
-                  mouthSize === '20mm' 
-                    ? 'bg-primary text-primary-foreground shadow-md border-primary' 
-                    : 'bg-card border-border hover:border-primary/50'
-                }`}
-              >
-                20mm
-              </button>
+              {/* Valve Size Group */}
+              <div className="flex bg-muted/60 rounded-full p-1 border border-border/50">
+                <button
+                  onClick={() => setMouthSize('22mm')}
+                  className={`h-10 px-5 rounded-full font-semibold text-sm transition-all ${
+                    mouthSize === '22mm' 
+                      ? 'bg-primary text-primary-foreground shadow-md' 
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  22mm
+                </button>
+                <button
+                  onClick={() => setMouthSize('20mm')}
+                  className={`h-10 px-5 rounded-full font-semibold text-sm transition-all ${
+                    mouthSize === '20mm' 
+                      ? 'bg-primary text-primary-foreground shadow-md' 
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  20mm
+                </button>
+              </div>
             </div>
 
-            {/* Row 3: Product Type Tabs (Only in Sale Mode) */}
+            {/* Row 3: Product Type Tabs (Only in Sale Mode) - Larger Buttons */}
             {isSaleMode && (
-              <div className="flex gap-1.5 overflow-x-auto no-scrollbar">
+              <div className="flex gap-2">
                 {[
                   { id: 'lpg', label: 'LPG', icon: Cylinder },
                   { id: 'stove', label: 'Stove', icon: ChefHat },
@@ -1568,13 +1577,13 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`shrink-0 flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-medium transition-all ${
+                    className={`flex-1 flex items-center justify-center gap-2 h-10 px-4 rounded-lg text-sm font-medium transition-all border ${
                       activeTab === tab.id 
-                        ? 'bg-muted text-foreground' 
-                        : 'text-muted-foreground hover:bg-muted/50'
+                        ? 'bg-muted border-border text-foreground shadow-sm' 
+                        : 'bg-transparent border-transparent text-muted-foreground hover:bg-muted/50'
                     }`}
                   >
-                    <tab.icon className="h-3.5 w-3.5" />
+                    <tab.icon className="h-4 w-4" />
                     {tab.label}
                   </button>
                 ))}
@@ -1588,7 +1597,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                 value={productSearch}
                 onChange={(e) => setProductSearch(e.target.value)}
                 placeholder="Search products..."
-                className="h-9 pl-8 text-sm"
+                className="h-10 pl-8 text-sm"
               />
             </div>
           </CardContent>
@@ -1842,24 +1851,42 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                   )}
                 </div>
 
-                {/* Customer Status Feedback */}
+                {/* Customer Status Feedback - Found Customer */}
                 {customerStatus === 'found' && foundCustomer && (
-                  <div className="flex items-center gap-3 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900">
-                    <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center shrink-0">
-                      <UserCircle className="h-6 w-6 text-white" />
+                  <div className="space-y-2 p-3 rounded-lg bg-sky-50 dark:bg-sky-950/30 border border-sky-200 dark:border-sky-900">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-full bg-sky-500 flex items-center justify-center shrink-0">
+                        <UserCircle className="h-6 w-6 text-white" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm text-foreground">{foundCustomer.name}</p>
+                        <p className="text-xs text-sky-600 dark:text-sky-400">Existing Customer</p>
+                      </div>
+                      {(foundCustomer.total_due || 0) > 0 && (
+                        <Badge variant="destructive" className="shrink-0">
+                          Due: {BANGLADESHI_CURRENCY_SYMBOL}{foundCustomer.total_due}
+                        </Badge>
+                      )}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-sm text-foreground">{foundCustomer.name}</p>
-                      <p className="text-xs text-muted-foreground truncate">{foundCustomer.address || 'No address'}</p>
+                    {/* Show Name & Address Fields (Read-only for existing) */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2">
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Name</Label>
+                        <div className="h-9 mt-1 px-3 flex items-center rounded-md border bg-muted/50 text-sm font-medium text-foreground">
+                          {foundCustomer.name}
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Address</Label>
+                        <div className="h-9 mt-1 px-3 flex items-center rounded-md border bg-muted/50 text-sm text-muted-foreground truncate">
+                          {foundCustomer.address || 'No address'}
+                        </div>
+                      </div>
                     </div>
-                    {(foundCustomer.total_due || 0) > 0 && (
-                      <Badge variant="destructive" className="shrink-0">
-                        Due: {BANGLADESHI_CURRENCY_SYMBOL}{foundCustomer.total_due}
-                      </Badge>
-                    )}
                   </div>
                 )}
 
+                {/* Customer Status Feedback - New Customer */}
                 {customerStatus === 'new' && (
                   <div className="space-y-2 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900">
                     <div className="flex items-center gap-2">
@@ -1868,18 +1895,27 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                       </div>
                       <span className="text-sm font-medium text-emerald-700 dark:text-emerald-300">New Customer</span>
                     </div>
-                    <Input
-                      value={newCustomerName}
-                      onChange={(e) => setNewCustomerName(e.target.value)}
-                      placeholder="Enter customer name..."
-                      className="h-10"
-                    />
-                    <Input
-                      value={newCustomerAddress}
-                      onChange={(e) => setNewCustomerAddress(e.target.value)}
-                      placeholder="Address (optional)"
-                      className="h-10"
-                    />
+                    {/* Name & Address Input Fields */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Name *</Label>
+                        <Input
+                          value={newCustomerName}
+                          onChange={(e) => setNewCustomerName(e.target.value)}
+                          placeholder="Customer name"
+                          className="h-10 mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Address</Label>
+                        <Input
+                          value={newCustomerAddress}
+                          onChange={(e) => setNewCustomerAddress(e.target.value)}
+                          placeholder="Address (optional)"
+                          className="h-10 mt-1"
+                        />
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
