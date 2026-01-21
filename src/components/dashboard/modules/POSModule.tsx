@@ -10,6 +10,13 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { Separator } from "@/components/ui/separator";
 import { 
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerFooter,
+} from "@/components/ui/drawer";
+import { 
   Plus, 
   Minus, 
   Trash2, 
@@ -32,7 +39,9 @@ import {
   CreditCard,
   Wallet,
   CheckCircle2,
-  RotateCcw
+  RotateCcw,
+  UserCircle,
+  Sparkles
 } from "lucide-react";
 import { BarcodeScanner } from "@/components/pos/BarcodeScanner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
@@ -44,6 +53,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { parsePositiveNumber, sanitizeString } from "@/lib/validationSchemas";
 import { InvoiceDialog } from "@/components/invoice/InvoiceDialog";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 // ============= INTERFACES =============
 interface LPGBrand {
@@ -158,6 +168,7 @@ const ROLE_CONFIG: Record<string, { label: string; color: string; bgColor: strin
 // ============= MAIN POS MODULE =============
 export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModuleProps) => {
   const { t, language } = useLanguage();
+  const isMobile = useIsMobile();
   
   // ===== DATA STATE =====
   const [loading, setLoading] = useState(true);
@@ -167,13 +178,12 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
   const [regulators, setRegulators] = useState<Regulator[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [productPrices, setProductPrices] = useState<ProductPrice[]>([]);
-  // Drivers no longer needed for POS - seller role comes from userRole prop
   
   // ===== ACTIVE TABLE STATE (Sale or Return) =====
   const [activeTable, setActiveTable] = useState<'sale' | 'return'>('sale');
   
   // ===== PRODUCT SELECTION STATE =====
-  const [activeTab, setActiveTab] = useState("all");
+  const [activeTab, setActiveTab] = useState("lpg");
   const [cylinderType, setCylinderType] = useState<"refill" | "package">("refill");
   const [saleType, setSaleType] = useState<"retail" | "wholesale">("retail");
   const [mouthSize, setMouthSize] = useState("22mm");
@@ -203,16 +213,27 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
   const [showCustomWeightInput, setShowCustomWeightInput] = useState(false);
   const [customWeight, setCustomWeight] = useState("");
   
-  // ===== CUSTOMER STATE =====
+  // ===== PHONE-FIRST CUSTOMER STATE =====
+  const [phoneQuery, setPhoneQuery] = useState("");
+  const [customerStatus, setCustomerStatus] = useState<'idle' | 'searching' | 'found' | 'new'>('idle');
+  const [foundCustomer, setFoundCustomer] = useState<Customer | null>(null);
+  const [newCustomerName, setNewCustomerName] = useState("");
+  const [newCustomerAddress, setNewCustomerAddress] = useState("");
+  const [isWalkin, setIsWalkin] = useState(true);
+  
+  // ===== LEGACY CUSTOMER STATE (kept for compatibility) =====
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>("walkin");
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerAddress, setCustomerAddress] = useState("");
   const [discount, setDiscount] = useState("0");
-  // Driver assignment removed - seller identified by userRole and created_by
   const [showAddCustomerDialog, setShowAddCustomerDialog] = useState(false);
   const [customerSearch, setCustomerSearch] = useState("");
+  
+  // ===== PAYMENT MODAL STATE =====
+  const [showPaymentDrawer, setShowPaymentDrawer] = useState(false);
+  const [paymentAmount, setPaymentAmount] = useState("");
   
   // ===== UI STATE =====
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
@@ -222,6 +243,40 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
   const [recentTransactions, setRecentTransactions] = useState<RecentTransaction[]>([]);
   const [showVoidDialog, setShowVoidDialog] = useState(false);
   const [transactionToVoid, setTransactionToVoid] = useState<RecentTransaction | null>(null);
+
+  // ============= PHONE-FIRST CUSTOMER LOOKUP =============
+  useEffect(() => {
+    if (phoneQuery.length >= 11 && !isWalkin) {
+      setCustomerStatus('searching');
+      const timer = setTimeout(async () => {
+        const { data } = await supabase
+          .from('customers')
+          .select('*')
+          .eq('phone', phoneQuery)
+          .single();
+        
+        if (data) {
+          setCustomerStatus('found');
+          setFoundCustomer(data);
+          setSelectedCustomerId(data.id);
+          setSelectedCustomer(data);
+          setCustomerName(data.name);
+          setCustomerPhone(data.phone || "");
+          setCustomerAddress(data.address || "");
+        } else {
+          setCustomerStatus('new');
+          setFoundCustomer(null);
+          setSelectedCustomerId(null);
+          setSelectedCustomer(null);
+          setCustomerPhone(phoneQuery);
+        }
+      }, 300);
+      return () => clearTimeout(timer);
+    } else if (phoneQuery.length < 11 && !isWalkin) {
+      setCustomerStatus('idle');
+      setFoundCustomer(null);
+    }
+  }, [phoneQuery, isWalkin]);
 
   // ============= DATA FETCHING =============
   const fetchData = useCallback(async () => {
@@ -388,6 +443,14 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
   const subtotal = saleItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const discountAmount = parsePositiveNumber(discount, 10000000);
   const total = Math.max(0, subtotal - discountAmount);
+
+  // Payment status calculation
+  const paidAmount = parseFloat(paymentAmount) || 0;
+  const paymentStatus = useMemo(() => {
+    if (paidAmount >= total) return 'paid';
+    if (paidAmount === 0) return 'due';
+    return 'partial';
+  }, [paidAmount, total]);
 
   // ============= PRODUCT ACTIONS =============
   const addLPGToCart = (brand: LPGBrand) => {
@@ -860,6 +923,9 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
       setCustomerName("");
       setCustomerPhone("");
       setCustomerAddress("");
+      setIsWalkin(true);
+      setPhoneQuery("");
+      setCustomerStatus('idle');
       return;
     }
 
@@ -915,7 +981,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
   };
 
   // ============= COMPLETE SALE =============
-  const handleCompleteSale = async (paymentStatus: 'completed' | 'pending') => {
+  const handleCompleteSale = async (paymentStat: 'completed' | 'pending') => {
     if (saleItems.length === 0) {
       toast({ title: "Cart is empty", variant: "destructive" });
       return;
@@ -931,7 +997,9 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
       return;
     }
 
-    if (paymentStatus === 'pending' && selectedCustomerId === "walkin") {
+    const effectiveCustomerId = isWalkin ? "walkin" : selectedCustomerId;
+
+    if (paymentStat === 'pending' && effectiveCustomerId === "walkin") {
       toast({ 
         title: "Cannot save as due", 
         description: "Credit requires a registered customer",
@@ -941,7 +1009,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
     }
 
     // Credit limit check
-    if (paymentStatus === 'pending' && selectedCustomer) {
+    if (paymentStat === 'pending' && selectedCustomer) {
       const currentDue = selectedCustomer.total_due || 0;
       const limit = selectedCustomer.credit_limit || DEFAULT_CREDIT_LIMIT;
       if (currentDue + total > limit) {
@@ -964,16 +1032,16 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
       const { data: txnNum } = await supabase.rpc('generate_transaction_number');
       const transactionNumber = txnNum || `TXN-${Date.now()}`;
 
-      let customerId = selectedCustomerId === "walkin" ? null : selectedCustomerId;
+      let customerId = effectiveCustomerId === "walkin" ? null : effectiveCustomerId;
 
-      // Create customer if needed
-      if (!customerId && customerName) {
+      // Create customer if new (from phone-first flow)
+      if (!customerId && customerStatus === 'new' && newCustomerName) {
         const { data: newCust } = await supabase
           .from('customers')
           .insert({ 
-            name: sanitizeString(customerName),
-            phone: customerPhone || null,
-            address: customerAddress || null,
+            name: sanitizeString(newCustomerName),
+            phone: phoneQuery || null,
+            address: newCustomerAddress || null,
             created_by: user.id,
             owner_id: ownerId || user.id
           })
@@ -992,8 +1060,8 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
           discount: discountAmount,
           total,
           payment_method: 'cash' as const,
-          payment_status: paymentStatus,
-          driver_id: null, // Seller tracked via created_by and userRole
+          payment_status: paymentStat,
+          driver_id: null,
           created_by: user.id,
           owner_id: ownerId || user.id
         })
@@ -1064,10 +1132,9 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
       }
 
       // Update customer dues (track both money and cylinders)
-      if (paymentStatus === 'pending' && customerId) {
+      if (paymentStat === 'pending' && customerId) {
         const customer = customers.find(c => c.id === customerId);
         if (customer) {
-          // Count package cylinders sold on due (these are cylinder assets owed by customer)
           const packageCylindersSold = saleItems
             .filter(i => i.type === 'lpg' && i.cylinderType === 'package')
             .reduce((sum, i) => sum + i.quantity, 0);
@@ -1084,10 +1151,14 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
       }
 
       // Prepare invoice with return items
+      const finalCustomerName = isWalkin ? "Walk-in" : (foundCustomer?.name || newCustomerName || customerName || "Walk-in");
+      const finalPhone = isWalkin ? "" : (foundCustomer?.phone || phoneQuery || customerPhone || "");
+      const finalAddress = isWalkin ? "" : (foundCustomer?.address || newCustomerAddress || customerAddress || "");
+
       setLastTransaction({
         invoiceNumber: transactionNumber,
         date: new Date(),
-        customer: { name: customerName || "Walk-in", phone: customerPhone, address: customerAddress },
+        customer: { name: finalCustomerName, phone: finalPhone, address: finalAddress },
         items: saleItems.map(i => ({
           name: i.name,
           description: i.details,
@@ -1103,23 +1174,31 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
         subtotal,
         discount: discountAmount,
         total,
-        paymentStatus,
+        paymentStatus: paymentStat,
         paymentMethod: 'cash'
       });
+      setShowPaymentDrawer(false);
       setShowPrintTypeDialog(true);
 
       // Reset
       setSaleItems([]);
       setReturnItems([]);
       setDiscount("0");
+      setPaymentAmount("");
       setSelectedCustomerId("walkin");
       setSelectedCustomer(null);
       setCustomerName("");
       setCustomerPhone("");
       setCustomerAddress("");
+      setPhoneQuery("");
+      setNewCustomerName("");
+      setNewCustomerAddress("");
+      setCustomerStatus('idle');
+      setFoundCustomer(null);
+      setIsWalkin(true);
 
       toast({ 
-        title: paymentStatus === 'completed' ? "Sale completed!" : "Saved as due",
+        title: paymentStat === 'completed' ? "Sale completed!" : "Saved as due",
         description: transactionNumber
       });
 
@@ -1155,8 +1234,12 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
     setSaleItems([]);
     setReturnItems([]);
     setDiscount("0");
+    setPaymentAmount("");
     toast({ title: "Cart cleared" });
   };
+
+  // Get weight options based on mouth size
+  const weightOptions = mouthSize === "22mm" ? WEIGHT_OPTIONS_22MM : WEIGHT_OPTIONS_20MM;
 
   // ============= RENDER =============
   if (loading) {
@@ -1168,6 +1251,9 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
     );
   }
 
+  // Determine products to show based on active table
+  const isSaleMode = activeTable === 'sale';
+  const displayBrands = isSaleMode ? filteredBrands : brandsForReturn;
 
   return (
     <TooltipProvider>
@@ -1362,198 +1448,212 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
           </Card>
         </div>
 
-        {/* ===== MIDDLE SECTION: TYPE TOGGLES & FILTERS ===== */}
+        {/* ===== CONTROL BAR: Scrollable Chips ===== */}
         <Card className="border-border/50 bg-card/50">
           <CardContent className="p-3 space-y-2.5">
-            {/* Row 1: Cylinder Type + Sale Type */}
-            <div className="flex flex-wrap items-center gap-2">
-              {/* Cylinder Type */}
-              <div className="flex bg-muted/80 rounded-lg p-0.5 border border-border/50">
-                <Button
-                  size="sm"
-                  variant={cylinderType === 'refill' ? 'default' : 'ghost'}
-                  onClick={() => setCylinderType('refill')}
-                  className={`h-8 text-xs px-3 font-medium ${cylinderType === 'refill' ? 'bg-primary shadow-sm' : ''}`}
-                >
-                  Refill
-                </Button>
-                <Button
-                  size="sm"
-                  variant={cylinderType === 'package' ? 'default' : 'ghost'}
-                  onClick={() => setCylinderType('package')}
-                  className={`h-8 text-xs px-3 font-medium ${cylinderType === 'package' ? 'bg-emerald-600 hover:bg-emerald-700 shadow-sm' : ''}`}
-                >
-                  Package
-                </Button>
+            {/* Row 1: Retail/Wholesale Toggle (Full Width) */}
+            <div className="flex items-center gap-2">
+              <div className="flex-1 bg-muted/80 rounded-lg p-0.5 border border-border/50">
+                <div className="grid grid-cols-2 gap-0.5">
+                  <Button
+                    size="sm"
+                    variant={saleType === 'retail' ? 'default' : 'ghost'}
+                    onClick={() => setSaleType('retail')}
+                    className={`h-10 font-semibold ${saleType === 'retail' ? 'bg-primary shadow-md' : ''}`}
+                  >
+                    Retail
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={saleType === 'wholesale' ? 'default' : 'ghost'}
+                    onClick={() => setSaleType('wholesale')}
+                    className={`h-10 font-semibold ${saleType === 'wholesale' ? 'bg-primary shadow-md' : ''}`}
+                  >
+                    Wholesale
+                  </Button>
+                </div>
               </div>
-              {/* Sale Type */}
-              <div className="flex bg-muted/80 rounded-lg p-0.5 border border-border/50">
-                <Button
-                  size="sm"
-                  variant={saleType === 'retail' ? 'default' : 'ghost'}
-                  onClick={() => setSaleType('retail')}
-                  className={`h-8 text-xs px-3 font-medium ${saleType === 'retail' ? 'bg-primary shadow-sm' : ''}`}
-                >
-                  Retail
-                </Button>
-                <Button
-                  size="sm"
-                  variant={saleType === 'wholesale' ? 'default' : 'ghost'}
-                  onClick={() => setSaleType('wholesale')}
-                  className={`h-8 text-xs px-3 font-medium ${saleType === 'wholesale' ? 'bg-violet-600 hover:bg-violet-700 shadow-sm' : ''}`}
-                >
-                  Wholesale
-                </Button>
-              </div>
-              {/* Mouth Size */}
-              <div className="flex bg-muted/80 rounded-lg p-0.5 border border-border/50">
-                <Button 
-                  size="sm" 
-                  variant={mouthSize === "22mm" ? "default" : "ghost"} 
-                  className={`h-8 text-xs px-3 font-medium ${mouthSize === "22mm" ? 'bg-primary shadow-sm' : ''}`}
-                  onClick={() => { setMouthSize("22mm"); setWeight("12kg"); }}
-                >
-                  22mm
-                </Button>
-                <Button 
-                  size="sm" 
-                  variant={mouthSize === "20mm" ? "default" : "ghost"} 
-                  className={`h-8 text-xs px-3 font-medium ${mouthSize === "20mm" ? 'bg-cyan-600 hover:bg-cyan-700 shadow-sm' : ''}`}
-                  onClick={() => { setMouthSize("20mm"); setWeight("12kg"); }}
-                >
-                  20mm
-                </Button>
+              {/* Search on Desktop */}
+              <div className="hidden sm:flex relative w-48">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={productSearch}
+                  onChange={(e) => setProductSearch(e.target.value)}
+                  placeholder="Search..."
+                  className="h-10 pl-8 text-sm"
+                />
               </div>
             </div>
-            
-            {/* Row 2: Weight Pills */}
-            <div className="flex flex-wrap items-center gap-1.5">
-              {(mouthSize === "22mm" ? WEIGHT_OPTIONS_22MM : WEIGHT_OPTIONS_20MM).map(w => (
-                <Button
+
+            {/* Row 2: Horizontal Scrollable Chips */}
+            <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar snap-x">
+              {/* Cylinder Type Chips */}
+              <button
+                onClick={() => setCylinderType('refill')}
+                className={`shrink-0 h-9 px-4 rounded-full border transition-all snap-center text-sm font-medium ${
+                  cylinderType === 'refill' 
+                    ? 'bg-primary text-primary-foreground shadow-md border-primary' 
+                    : 'bg-card border-border hover:border-primary/50'
+                }`}
+              >
+                Refill
+              </button>
+              <button
+                onClick={() => setCylinderType('package')}
+                className={`shrink-0 h-9 px-4 rounded-full border transition-all snap-center text-sm font-medium ${
+                  cylinderType === 'package' 
+                    ? 'bg-primary text-primary-foreground shadow-md border-primary' 
+                    : 'bg-card border-border hover:border-primary/50'
+                }`}
+              >
+                Package
+              </button>
+              
+              <Separator orientation="vertical" className="h-9 mx-1" />
+              
+              {/* Weight Chips */}
+              {weightOptions.map((w) => (
+                <button
                   key={w}
-                  size="sm"
-                  variant={weight === w ? "default" : "outline"}
-                  className={`h-8 text-xs px-3 font-medium ${weight === w ? 'bg-primary shadow-sm' : 'hover:bg-muted'}`}
                   onClick={() => setWeight(w)}
+                  className={`shrink-0 h-9 px-4 rounded-full border transition-all snap-center text-sm font-medium ${
+                    weight === w 
+                      ? 'bg-primary text-primary-foreground shadow-md border-primary' 
+                      : 'bg-card border-border hover:border-primary/50'
+                  }`}
                 >
                   {w}
-                </Button>
+                </button>
               ))}
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-8 text-xs px-3 font-medium border-dashed"
+              <button
                 onClick={() => setShowCustomWeightInput(true)}
+                className="shrink-0 h-9 px-3 rounded-full border border-dashed border-muted-foreground/40 transition-all snap-center text-sm font-medium text-muted-foreground hover:border-primary/50"
               >
-                <Plus className="h-3.5 w-3.5 mr-1" />
-                Other
-              </Button>
+                <Plus className="h-3.5 w-3.5" />
+              </button>
+              
+              <Separator orientation="vertical" className="h-9 mx-1" />
+              
+              {/* Valve Size Chips */}
+              <button
+                onClick={() => setMouthSize('22mm')}
+                className={`shrink-0 h-9 px-4 rounded-full border transition-all snap-center text-sm font-medium ${
+                  mouthSize === '22mm' 
+                    ? 'bg-primary text-primary-foreground shadow-md border-primary' 
+                    : 'bg-card border-border hover:border-primary/50'
+                }`}
+              >
+                22mm
+              </button>
+              <button
+                onClick={() => setMouthSize('20mm')}
+                className={`shrink-0 h-9 px-4 rounded-full border transition-all snap-center text-sm font-medium ${
+                  mouthSize === '20mm' 
+                    ? 'bg-primary text-primary-foreground shadow-md border-primary' 
+                    : 'bg-card border-border hover:border-primary/50'
+                }`}
+              >
+                20mm
+              </button>
+            </div>
+
+            {/* Row 3: Product Type Tabs (Only in Sale Mode) */}
+            {isSaleMode && (
+              <div className="flex gap-1.5 overflow-x-auto no-scrollbar">
+                {[
+                  { id: 'lpg', label: 'LPG', icon: Cylinder },
+                  { id: 'stove', label: 'Stove', icon: ChefHat },
+                  { id: 'regulator', label: 'Regulator', icon: Gauge },
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`shrink-0 flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-medium transition-all ${
+                      activeTab === tab.id 
+                        ? 'bg-muted text-foreground' 
+                        : 'text-muted-foreground hover:bg-muted/50'
+                    }`}
+                  >
+                    <tab.icon className="h-3.5 w-3.5" />
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Mobile Search */}
+            <div className="sm:hidden relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={productSearch}
+                onChange={(e) => setProductSearch(e.target.value)}
+                placeholder="Search products..."
+                className="h-9 pl-8 text-sm"
+              />
             </div>
           </CardContent>
         </Card>
 
-        {/* ===== PRODUCT CARDS SECTION ===== */}
+        {/* ===== PRODUCT GRID ===== */}
         <Card>
-          <CardHeader className="pb-2 px-3 pt-3">
-            <div className="flex items-center gap-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search products..."
-                  value={productSearch}
-                  onChange={(e) => setProductSearch(e.target.value)}
-                  className="h-9 pl-8"
-                />
-              </div>
-            </div>
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-2">
-              <TabsList className="h-9 w-full grid grid-cols-4">
-                <TabsTrigger value="all" className="text-xs">All</TabsTrigger>
-                <TabsTrigger value="lpg" className="text-xs data-[state=active]:bg-emerald-600 data-[state=active]:text-white">
-                  <Fuel className="h-3.5 w-3.5 mr-1" />LPG
-                </TabsTrigger>
-                <TabsTrigger value="stove" className="text-xs data-[state=active]:bg-orange-500 data-[state=active]:text-white">
-                  <ChefHat className="h-3.5 w-3.5 mr-1" />Stove
-                </TabsTrigger>
-                <TabsTrigger value="regulator" className="text-xs data-[state=active]:bg-violet-500 data-[state=active]:text-white">
-                  <Gauge className="h-3.5 w-3.5 mr-1" />Reg
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </CardHeader>
-          <CardContent className="px-3 pb-3">
-            <ScrollArea className="h-[240px] sm:h-[280px]">
+          <CardContent className="p-3">
+            <ScrollArea className="h-[280px] sm:h-[320px]">
               {/* LPG Cylinders */}
-              {(activeTab === 'lpg' || activeTab === 'all') && (
+              {(activeTab === 'lpg' || !isSaleMode) && (
                 <div className="mb-3">
-                  {activeTab === 'all' && <p className="text-xs font-medium text-muted-foreground mb-2">LPG Cylinders</p>}
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
-                    {(activeTab === 'all' ? filteredBrands.slice(0, 5) : filteredBrands).map(brand => {
+                    {displayBrands.map(brand => {
                       const stock = cylinderType === 'refill' ? brand.refill_cylinder : brand.package_cylinder;
                       const price = getLPGPrice(brand.id, weight, cylinderType, saleType);
-                      const isSaleMode = activeTable === 'sale';
                       
                       return (
                         <button
                           key={brand.id}
                           onClick={() => isSaleMode ? addLPGToCart(brand) : addReturnCylinder(brand)}
                           disabled={isSaleMode && stock === 0}
-                          className={`p-2.5 rounded-lg border-2 text-left transition-all hover:shadow-md relative ${
+                          className={`p-2.5 rounded-lg text-left transition-all hover:shadow-md relative overflow-hidden ${
                             isSaleMode && stock === 0 
-                              ? 'opacity-50 cursor-not-allowed border-muted' 
+                              ? 'opacity-50 cursor-not-allowed border border-muted' 
                               : isSaleMode 
-                                ? 'border-transparent hover:border-emerald-500/50 bg-card' 
-                                : 'border-transparent hover:border-amber-500/50 bg-card'
+                                ? 'border border-transparent hover:border-emerald-500/50 bg-card' 
+                                : 'border border-transparent hover:border-amber-500/50 bg-card'
                           }`}
                         >
-                          {/* Brand Color Header */}
+                          {/* Left Border Color Strip */}
                           <div 
-                            className="absolute top-0 left-0 right-0 h-1 rounded-t-lg"
+                            className="absolute top-0 left-0 bottom-0 w-1.5 rounded-l-lg"
                             style={{ backgroundColor: brand.color }}
                           />
-                          <div className="flex items-start gap-2 pt-1">
-                            <div 
-                              className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
-                              style={{ backgroundColor: brand.color }}
-                            >
-                              <Cylinder className="h-5 w-5 text-white" />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <p className="font-semibold text-xs truncate">{brand.name}</p>
-                              <p className="text-[10px] text-muted-foreground">{weight}</p>
-                            </div>
-                          </div>
-                          {isSaleMode ? (
-                            <div className="flex items-center justify-between mt-2">
-                              <span className="font-bold text-sm text-emerald-600">{BANGLADESHI_CURRENCY_SYMBOL}{price}</span>
-                              <Badge variant={stock > 5 ? "secondary" : stock > 0 ? "outline" : "destructive"} className="text-[9px] px-1.5">
+                          <div className="pl-2">
+                            <div className="flex items-start justify-between gap-1">
+                              <div 
+                                className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                                style={{ backgroundColor: brand.color }}
+                              >
+                                <Cylinder className="h-4 w-4 text-white" />
+                              </div>
+                              <Badge 
+                                variant={stock > 5 ? "secondary" : stock > 0 ? "outline" : "destructive"} 
+                                className="text-[9px] px-1.5 h-5"
+                              >
                                 {stock > 0 ? stock : 'Out'}
                               </Badge>
                             </div>
-                          ) : (
-                            <div className="mt-2 text-center">
-                              <Badge variant="outline" className="text-[9px]">Tap to add</Badge>
+                            <div className="mt-1.5">
+                              <p className="font-semibold text-xs truncate">{brand.name}</p>
+                              <p className="text-[10px] text-muted-foreground">{weight}</p>
                             </div>
-                          )}
+                            {isSaleMode ? (
+                              <p className="font-bold text-sm text-emerald-600 mt-1.5">{BANGLADESHI_CURRENCY_SYMBOL}{price}</p>
+                            ) : (
+                              <p className="text-[10px] text-amber-600 font-medium mt-1.5">Tap to add</p>
+                            )}
+                          </div>
                         </button>
                       );
                     })}
-                    {/* Custom Brand for Return */}
-                    {activeTable === 'return' && (
-                      <button
-                        onClick={() => setShowCustomBrandInput(true)}
-                        className="p-2.5 rounded-lg border-2 border-dashed border-muted-foreground/30 hover:border-amber-500/50 bg-card text-left transition-all"
-                      >
-                        <div className="flex items-center justify-center h-full min-h-[60px]">
-                          <div className="text-center">
-                            <Plus className="h-5 w-5 mx-auto text-muted-foreground mb-1" />
-                            <p className="text-xs text-muted-foreground">Custom</p>
-                          </div>
-                        </div>
-                      </button>
-                    )}
-                    {/* Custom Brand for Sale */}
-                    {activeTable === 'sale' && (
+                    {/* Custom Brand Button */}
+                    {isSaleMode && (
                       <button
                         onClick={() => setShowCustomSellingBrandInput(true)}
                         className="p-2.5 rounded-lg border-2 border-dashed border-muted-foreground/30 hover:border-emerald-500/50 bg-card text-left transition-all"
@@ -1566,44 +1666,55 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                         </div>
                       </button>
                     )}
+                    {!isSaleMode && (
+                      <button
+                        onClick={() => setShowCustomBrandInput(true)}
+                        className="p-2.5 rounded-lg border-2 border-dashed border-muted-foreground/30 hover:border-amber-500/50 bg-card text-left transition-all"
+                      >
+                        <div className="flex items-center justify-center h-full min-h-[60px]">
+                          <div className="text-center">
+                            <Plus className="h-5 w-5 mx-auto text-muted-foreground mb-1" />
+                            <p className="text-xs text-muted-foreground">Custom</p>
+                          </div>
+                        </div>
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
 
               {/* Stoves - Only in Sale Mode */}
-              {(activeTab === 'stove' || activeTab === 'all') && activeTable === 'sale' && (
+              {activeTab === 'stove' && isSaleMode && (
                 <div className="mb-3">
-                  {activeTab === 'all' && <p className="text-xs font-medium text-muted-foreground mb-2">Gas Stoves</p>}
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
-                    {(activeTab === 'all' ? filteredStoves.slice(0, 3) : filteredStoves).map(stove => {
+                    {filteredStoves.map(stove => {
                       const price = getStovePrice(stove.brand, stove.model) || stove.price;
                       return (
                         <button
                           key={stove.id}
                           onClick={() => addStoveToCart(stove)}
                           disabled={stove.quantity === 0}
-                          className={`p-2.5 rounded-lg border-2 text-left transition-all hover:shadow-md relative ${
-                            stove.quantity === 0 ? 'opacity-50 cursor-not-allowed border-muted' : 'border-transparent hover:border-orange-500/50 bg-card'
+                          className={`p-2.5 rounded-lg text-left transition-all hover:shadow-md relative overflow-hidden ${
+                            stove.quantity === 0 ? 'opacity-50 cursor-not-allowed border border-muted' : 'border border-transparent hover:border-orange-500/50 bg-card'
                           }`}
                         >
-                          <div className="absolute top-0 left-0 right-0 h-1 rounded-t-lg bg-orange-500" />
-                          <div className="flex items-start gap-2 pt-1">
-                            <div className="w-9 h-9 rounded-lg bg-orange-500 flex items-center justify-center flex-shrink-0">
-                              <ChefHat className="h-5 w-5 text-white" />
+                          <div className="absolute top-0 left-0 bottom-0 w-1.5 rounded-l-lg bg-orange-500" />
+                          <div className="pl-2">
+                            <div className="flex items-start justify-between gap-1">
+                              <div className="w-8 h-8 rounded-lg bg-orange-500 flex items-center justify-center flex-shrink-0">
+                                <ChefHat className="h-4 w-4 text-white" />
+                              </div>
+                              <Badge variant="secondary" className="text-[9px] px-1.5 h-5">{stove.quantity}</Badge>
                             </div>
-                            <div className="min-w-0 flex-1">
+                            <div className="mt-1.5">
                               <p className="font-semibold text-xs truncate">{stove.brand}</p>
                               <p className="text-[10px] text-muted-foreground">{stove.burners}B • {stove.model}</p>
                             </div>
-                          </div>
-                          <div className="flex items-center justify-between mt-2">
-                            <span className="font-bold text-sm text-orange-600">{BANGLADESHI_CURRENCY_SYMBOL}{price}</span>
-                            <Badge variant="secondary" className="text-[9px] px-1.5">{stove.quantity}</Badge>
+                            <p className="font-bold text-sm text-orange-600 mt-1.5">{BANGLADESHI_CURRENCY_SYMBOL}{price}</p>
                           </div>
                         </button>
                       );
                     })}
-                    {/* Custom Stove Button */}
                     <button
                       onClick={() => setShowCustomStoveInput(true)}
                       className="p-2.5 rounded-lg border-2 border-dashed border-muted-foreground/30 hover:border-orange-500/50 bg-card text-left transition-all"
@@ -1620,39 +1731,37 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
               )}
 
               {/* Regulators - Only in Sale Mode */}
-              {(activeTab === 'regulator' || activeTab === 'all') && activeTable === 'sale' && (
+              {activeTab === 'regulator' && isSaleMode && (
                 <div>
-                  {activeTab === 'all' && <p className="text-xs font-medium text-muted-foreground mb-2">Regulators</p>}
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
-                    {(activeTab === 'all' ? filteredRegulators.slice(0, 3) : filteredRegulators).map(reg => {
+                    {filteredRegulators.map(reg => {
                       const price = getRegulatorPrice(reg.brand, reg.type) || reg.price || 0;
                       return (
                         <button
                           key={reg.id}
                           onClick={() => addRegulatorToCart(reg)}
                           disabled={reg.quantity === 0}
-                          className={`p-2.5 rounded-lg border-2 text-left transition-all hover:shadow-md relative ${
-                            reg.quantity === 0 ? 'opacity-50 cursor-not-allowed border-muted' : 'border-transparent hover:border-violet-500/50 bg-card'
+                          className={`p-2.5 rounded-lg text-left transition-all hover:shadow-md relative overflow-hidden ${
+                            reg.quantity === 0 ? 'opacity-50 cursor-not-allowed border border-muted' : 'border border-transparent hover:border-violet-500/50 bg-card'
                           }`}
                         >
-                          <div className="absolute top-0 left-0 right-0 h-1 rounded-t-lg bg-violet-500" />
-                          <div className="flex items-start gap-2 pt-1">
-                            <div className="w-9 h-9 rounded-lg bg-violet-500 flex items-center justify-center flex-shrink-0">
-                              <Gauge className="h-5 w-5 text-white" />
+                          <div className="absolute top-0 left-0 bottom-0 w-1.5 rounded-l-lg bg-violet-500" />
+                          <div className="pl-2">
+                            <div className="flex items-start justify-between gap-1">
+                              <div className="w-8 h-8 rounded-lg bg-violet-500 flex items-center justify-center flex-shrink-0">
+                                <Gauge className="h-4 w-4 text-white" />
+                              </div>
+                              <Badge variant="secondary" className="text-[9px] px-1.5 h-5">{reg.quantity}</Badge>
                             </div>
-                            <div className="min-w-0 flex-1">
+                            <div className="mt-1.5">
                               <p className="font-semibold text-xs truncate">{reg.brand}</p>
                               <p className="text-[10px] text-muted-foreground">{reg.type}</p>
                             </div>
-                          </div>
-                          <div className="flex items-center justify-between mt-2">
-                            <span className="font-bold text-sm text-violet-600">{BANGLADESHI_CURRENCY_SYMBOL}{price}</span>
-                            <Badge variant="secondary" className="text-[9px] px-1.5">{reg.quantity}</Badge>
+                            <p className="font-bold text-sm text-violet-600 mt-1.5">{BANGLADESHI_CURRENCY_SYMBOL}{price}</p>
                           </div>
                         </button>
                       );
                     })}
-                    {/* Custom Regulator Button */}
                     <button
                       onClick={() => setShowCustomRegulatorInput(true)}
                       className="p-2.5 rounded-lg border-2 border-dashed border-muted-foreground/30 hover:border-violet-500/50 bg-card text-left transition-all"
@@ -1668,16 +1777,8 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                 </div>
               )}
 
-              {/* Return Mode Message for Non-LPG */}
-              {activeTable === 'return' && (activeTab === 'stove' || activeTab === 'regulator') && (
-                <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-                  <ArrowLeftRight className="h-10 w-10 opacity-30 mb-2" />
-                  <p className="text-sm">Only LPG cylinders can be returned</p>
-                </div>
-              )}
-
               {/* Empty State */}
-              {filteredBrands.length === 0 && activeTab === 'lpg' && (
+              {displayBrands.length === 0 && activeTab === 'lpg' && (
                 <div className="text-center py-8 text-muted-foreground">
                   <Cylinder className="h-10 w-10 mx-auto mb-2 opacity-30" />
                   <p className="text-sm">No cylinders found for {mouthSize} / {weight}</p>
@@ -1687,94 +1788,122 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
           </CardContent>
         </Card>
 
-        {/* ===== CHECKOUT SECTION ===== */}
-        <Card>
+        {/* ===== PHONE-FIRST CUSTOMER BAR ===== */}
+        <Card className="border-border/50">
           <CardContent className="p-3">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-              {/* Customer Selection */}
-              <div className="space-y-1.5">
-                <Label className="text-xs">Customer</Label>
-                <div className="flex gap-1.5">
-                  <Select value={selectedCustomerId || "walkin"} onValueChange={handleCustomerSelect}>
-                    <SelectTrigger className="h-9 flex-1">
-                      <SelectValue placeholder="Select customer" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="walkin">
-                        <span className="flex items-center gap-2"><User className="h-3 w-3" /> Walk-in</span>
-                      </SelectItem>
-                      {customers.slice(0, 20).map(c => (
-                        <SelectItem key={c.id} value={c.id}>
-                          <span className="flex items-center justify-between w-full">
-                            <span>{c.name}</span>
-                            {(c.total_due || 0) > 0 && <Badge variant="destructive" className="ml-2 text-[9px]">Due: {BANGLADESHI_CURRENCY_SYMBOL}{c.total_due}</Badge>}
-                          </span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button size="sm" variant="outline" className="h-9 w-9 p-0" onClick={() => setShowAddCustomerDialog(true)}>
-                    <UserPlus className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
+            {/* Walk-in Toggle */}
+            <div className="flex items-center gap-3 mb-3">
+              <button
+                onClick={() => {
+                  setIsWalkin(true);
+                  setPhoneQuery("");
+                  setCustomerStatus('idle');
+                  setFoundCustomer(null);
+                  setSelectedCustomerId("walkin");
+                  setSelectedCustomer(null);
+                }}
+                className={`flex items-center gap-2 h-9 px-4 rounded-full text-sm font-medium transition-all ${
+                  isWalkin 
+                    ? 'bg-muted text-foreground' 
+                    : 'text-muted-foreground hover:bg-muted/50'
+                }`}
+              >
+                <User className="h-4 w-4" />
+                Walk-in
+              </button>
+              <button
+                onClick={() => setIsWalkin(false)}
+                className={`flex items-center gap-2 h-9 px-4 rounded-full text-sm font-medium transition-all ${
+                  !isWalkin 
+                    ? 'bg-primary text-primary-foreground' 
+                    : 'text-muted-foreground hover:bg-muted/50'
+                }`}
+              >
+                <Phone className="h-4 w-4" />
+                By Phone
+              </button>
+            </div>
 
-              {/* Discount */}
-              <div className="space-y-1.5">
-                <Label className="text-xs">Settlement</Label>
+            {/* Phone Input (Only when not Walk-in) */}
+            {!isWalkin && (
+              <div className="space-y-2">
+                <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="tel"
+                    value={phoneQuery}
+                    onChange={(e) => setPhoneQuery(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                    placeholder="Enter 11-digit phone number..."
+                    className="h-11 pl-10 text-base font-medium"
+                    maxLength={11}
+                  />
+                  {customerStatus === 'searching' && (
+                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                  )}
+                </div>
+
+                {/* Customer Status Feedback */}
+                {customerStatus === 'found' && foundCustomer && (
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900">
+                    <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center shrink-0">
+                      <UserCircle className="h-6 w-6 text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm text-foreground">{foundCustomer.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">{foundCustomer.address || 'No address'}</p>
+                    </div>
+                    {(foundCustomer.total_due || 0) > 0 && (
+                      <Badge variant="destructive" className="shrink-0">
+                        Due: {BANGLADESHI_CURRENCY_SYMBOL}{foundCustomer.total_due}
+                      </Badge>
+                    )}
+                  </div>
+                )}
+
+                {customerStatus === 'new' && (
+                  <div className="space-y-2 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900">
+                    <div className="flex items-center gap-2">
+                      <div className="h-8 w-8 rounded-full bg-emerald-500 flex items-center justify-center">
+                        <Sparkles className="h-4 w-4 text-white" />
+                      </div>
+                      <span className="text-sm font-medium text-emerald-700 dark:text-emerald-300">New Customer</span>
+                    </div>
+                    <Input
+                      value={newCustomerName}
+                      onChange={(e) => setNewCustomerName(e.target.value)}
+                      placeholder="Enter customer name..."
+                      className="h-10"
+                    />
+                    <Input
+                      value={newCustomerAddress}
+                      onChange={(e) => setNewCustomerAddress(e.target.value)}
+                      placeholder="Address (optional)"
+                      className="h-10"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Settlement/Discount */}
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs text-muted-foreground">Settlement/Discount</Label>
                 <Input
                   type="number"
                   value={discount}
                   onChange={(e) => setDiscount(e.target.value)}
                   placeholder="0"
-                  className="h-9"
+                  className="h-9 mt-1"
                 />
               </div>
-
-              {/* Seller Role Indicator */}
-              <div className="space-y-1.5">
-                <Label className="text-xs">Seller</Label>
-                <div className={`h-9 px-3 flex items-center gap-2 rounded-md border ${ROLE_CONFIG[userRole]?.bgColor || 'bg-muted border-border'}`}>
-                  <User className={`h-4 w-4 ${ROLE_CONFIG[userRole]?.color || 'text-foreground'}`} />
+              <div>
+                <Label className="text-xs text-muted-foreground">Seller</Label>
+                <div className={`h-9 mt-1 px-3 flex items-center gap-2 rounded-md border ${ROLE_CONFIG[userRole]?.bgColor || 'bg-muted border-border'}`}>
+                  <User className={`h-3.5 w-3.5 ${ROLE_CONFIG[userRole]?.color || 'text-foreground'}`} />
                   <span className={`text-sm font-medium ${ROLE_CONFIG[userRole]?.color || 'text-foreground'}`}>
                     {ROLE_CONFIG[userRole]?.label || 'User'}
                   </span>
-                </div>
-              </div>
-
-              {/* Summary & Actions */}
-              <div className="space-y-1.5">
-                <div className="flex justify-between items-center">
-                  <Label className="text-xs">Grand Total</Label>
-                  <span className="font-bold text-lg text-emerald-600">{BANGLADESHI_CURRENCY_SYMBOL}{total.toLocaleString()}</span>
-                </div>
-                <div className="grid grid-cols-2 gap-1.5">
-                  <Button
-                    onClick={() => handleCompleteSale('completed')}
-                    disabled={processing || saleItems.length === 0}
-                    className="h-9 bg-emerald-600 hover:bg-emerald-700"
-                  >
-                    {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Wallet className="h-4 w-4 mr-1" /> Cash</>}
-                  </Button>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="w-full">
-                        <Button
-                          onClick={() => handleCompleteSale('pending')}
-                          disabled={processing || saleItems.length === 0 || selectedCustomerId === "walkin" || !isWholesaleEligible}
-                          variant="outline"
-                          className="h-9 w-full border-amber-500 text-amber-600 hover:bg-amber-50 disabled:opacity-50"
-                        >
-                          <CreditCard className="h-4 w-4 mr-1" /> Due
-                        </Button>
-                      </span>
-                    </TooltipTrigger>
-                    {!isWholesaleEligible && saleItems.length > 0 && (
-                      <TooltipContent>
-                        <p className="text-xs">Due requires 2+ items (wholesale)</p>
-                      </TooltipContent>
-                    )}
-                  </Tooltip>
                 </div>
               </div>
             </div>
@@ -1790,7 +1919,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
               </CardTitle>
             </CardHeader>
             <CardContent className="p-2">
-              <div className="flex gap-2 overflow-x-auto pb-1">
+              <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
                 {recentTransactions.map(txn => (
                   <div key={txn.id} className="flex-shrink-0 p-2 rounded-lg border bg-card min-w-[140px]">
                     <div className="flex items-center justify-between mb-1">
@@ -1814,6 +1943,113 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
             </CardContent>
           </Card>
         )}
+
+        {/* ===== STICKY FOOTER (Mobile) ===== */}
+        {saleItems.length > 0 && (
+          <div className="fixed bottom-16 md:bottom-0 left-0 right-0 z-40 bg-card border-t border-border shadow-lg safe-area-pb">
+            <div className="flex items-center justify-between p-3 max-w-7xl mx-auto">
+              <div>
+                <p className="text-2xl font-bold text-foreground tabular-nums">{BANGLADESHI_CURRENCY_SYMBOL}{total.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">{saleItemsCount} item{saleItemsCount > 1 ? 's' : ''}</p>
+              </div>
+              <Button 
+                size="lg"
+                onClick={() => {
+                  setPaymentAmount(total.toString());
+                  setShowPaymentDrawer(true);
+                }}
+                disabled={processing || !isReturnCountMatched}
+                className="h-12 px-6 bg-emerald-600 hover:bg-emerald-700 text-base font-semibold"
+              >
+                {processing ? <Loader2 className="h-5 w-5 animate-spin" /> : 'PROCEED TO PAY →'}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* ===== PAYMENT DRAWER ===== */}
+        <Drawer open={showPaymentDrawer} onOpenChange={setShowPaymentDrawer}>
+          <DrawerContent>
+            <DrawerHeader className="text-left">
+              <DrawerTitle>Complete Payment</DrawerTitle>
+            </DrawerHeader>
+            <div className="p-4 space-y-4">
+              {/* Total Display */}
+              <div className="text-center py-4 bg-muted/50 rounded-xl">
+                <p className="text-sm text-muted-foreground">Total Bill</p>
+                <p className="text-4xl font-bold text-foreground tabular-nums">{BANGLADESHI_CURRENCY_SYMBOL}{total.toLocaleString()}</p>
+              </div>
+
+              {/* Amount Input */}
+              <div>
+                <Label className="text-sm font-medium">Amount Paid</Label>
+                <Input
+                  type="number"
+                  value={paymentAmount}
+                  onChange={(e) => setPaymentAmount(e.target.value)}
+                  placeholder="Enter amount..."
+                  className="h-12 text-xl font-semibold mt-1.5"
+                  autoFocus
+                />
+              </div>
+
+              {/* Payment Status Indicator */}
+              <div className="flex items-center justify-center gap-4 py-3">
+                {[
+                  { id: 'paid', label: 'PAID', color: 'bg-emerald-500' },
+                  { id: 'partial', label: 'PARTIAL', color: 'bg-amber-500' },
+                  { id: 'due', label: 'DUE', color: 'bg-rose-500' },
+                ].map((status) => (
+                  <div 
+                    key={status.id}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-full ${
+                      paymentStatus === status.id 
+                        ? `${status.color} text-white` 
+                        : 'bg-muted text-muted-foreground'
+                    }`}
+                  >
+                    <div className={`w-2 h-2 rounded-full ${paymentStatus === status.id ? 'bg-white' : 'bg-muted-foreground/50'}`} />
+                    <span className="text-sm font-medium">{status.label}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Due Warning */}
+              {paymentStatus === 'due' && isWalkin && (
+                <p className="text-xs text-destructive text-center">
+                  ⚠ Due requires a registered customer
+                </p>
+              )}
+            </div>
+            <DrawerFooter className="flex-row gap-3">
+              <Button 
+                variant="outline" 
+                className="flex-1 h-12"
+                onClick={() => setShowPaymentDrawer(false)}
+              >
+                Cancel
+              </Button>
+              {paymentStatus === 'paid' ? (
+                <Button 
+                  className="flex-1 h-12 bg-emerald-600 hover:bg-emerald-700"
+                  onClick={() => handleCompleteSale('completed')}
+                  disabled={processing}
+                >
+                  {processing ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Confirm & Print'}
+                </Button>
+              ) : (
+                <Button 
+                  className="flex-1 h-12"
+                  variant="outline"
+                  onClick={() => handleCompleteSale('pending')}
+                  disabled={processing || isWalkin}
+                >
+                  {processing ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Save as Due'}
+                </Button>
+              )}
+            </DrawerFooter>
+          </DrawerContent>
+        </Drawer>
 
         {/* ===== DIALOGS ===== */}
         {/* Barcode Scanner */}
