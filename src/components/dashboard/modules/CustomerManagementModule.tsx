@@ -167,6 +167,7 @@ export const CustomerManagementModule = () => {
       .order('created_at', { ascending: false });
 
     if (error) {
+      logger.error('Error fetching customers', error, { component: 'CustomerManagement' });
       toast({ title: "Error fetching customers", description: error.message, variant: "destructive" });
     } else {
       setCustomers(data || []);
@@ -180,6 +181,9 @@ export const CustomerManagementModule = () => {
       .select('*')
       .order('payment_date', { ascending: false });
 
+    if (error) {
+      logger.error('Error fetching payments', error, { component: 'CustomerManagement' });
+    }
     if (!error) {
       setPayments(data || []);
     }
@@ -405,6 +409,7 @@ export const CustomerManagementModule = () => {
       });
 
     if (paymentError) {
+      logger.error('Error recording payment', paymentError, { component: 'CustomerManagement' });
       toast({ title: "Error recording payment", description: paymentError.message, variant: "destructive" });
       return;
     }
@@ -425,6 +430,7 @@ export const CustomerManagementModule = () => {
       .eq('id', selectedCustomer.id);
 
     if (updateError) {
+      logger.error('Error updating customer dues', updateError, { component: 'CustomerManagement' });
       toast({ title: "Error updating customer", description: updateError.message, variant: "destructive" });
       return;
     }

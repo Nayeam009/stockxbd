@@ -34,6 +34,7 @@ import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
 import { LPG_BRANDS, STOVE_BRANDS, REGULATOR_BRANDS, getLpgBrandColor } from "@/lib/brandConstants";
 import { supabase } from "@/integrations/supabase/client";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { logger } from "@/lib/logger";
 
 // Interfaces
 interface LPGBrand {
@@ -376,7 +377,7 @@ export const InventoryPOBDrawer = ({
         }
       }
     } catch (error) {
-      console.error('Error updating product pricing:', error);
+      logger.error('Error updating product pricing', error, { component: 'POBDrawer' });
     }
   };
 
@@ -732,7 +733,7 @@ export const InventoryPOBDrawer = ({
       onOpenChange(false);
 
     } catch (error: any) {
-      console.error('Purchase error:', error);
+      logger.error('Purchase error', error, { component: 'POBDrawer' });
       toast({ title: "Error completing purchase", description: error.message, variant: "destructive" });
     } finally {
       setProcessing(false);
@@ -1395,7 +1396,7 @@ export const InventoryPOBDrawer = ({
       onPurchaseComplete();
       onOpenChange(false);
     } catch (error: any) {
-      console.error('Quick add error:', error);
+      logger.error('Quick add error', error, { component: 'POBDrawer' });
       toast({ title: "Error adding stock", description: error.message, variant: "destructive" });
     } finally {
       setProcessing(false);
