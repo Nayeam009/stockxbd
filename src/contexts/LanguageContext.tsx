@@ -483,6 +483,12 @@ export const translations: Translations = {
   "full_access": { en: "Full access to all features", bn: "সব বৈশিষ্ট্যে সম্পূর্ণ অ্যাক্সেস" },
   "limited_access": { en: "Limited access for deliveries", bn: "ডেলিভারির জন্য সীমিত অ্যাক্সেস" },
   "remove": { en: "Remove", bn: "সরান" },
+  
+  // Account Settings
+  "account_settings": { en: "Account", bn: "অ্যাকাউন্ট" },
+  "account_settings_desc": { en: "Profile, appearance & team", bn: "প্রোফাইল, চেহারা ও টিম" },
+  "profile_sharing": { en: "Profile Sharing", bn: "প্রোফাইল শেয়ারিং" },
+  "profile_sharing_desc": { en: "Share your profile with others", bn: "অন্যদের সাথে আপনার প্রোফাইল শেয়ার করুন" },
 };
 
 interface LanguageContextType {

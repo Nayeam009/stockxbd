@@ -3,42 +3,24 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
   Settings, 
-  Building2, 
   Shield, 
   Trash2,
-  Save,
-  Globe,
-  Moon,
-  Sun,
-  Check,
   Loader2,
   Lock,
-  User,
-  Mail,
-  Phone,
-  Calendar,
   AlertTriangle,
   UserX,
-  Store,
   Zap,
   Database,
-  Palette,
   Bell,
-  Users,
-  Share2,
-  ShoppingBag,
   ChevronRight,
-  Package
+  UserCircle
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { useTheme } from "@/contexts/ThemeContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -59,10 +41,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ProfileSharingCard } from "@/components/settings/ProfileSharingCard";
 import { BackupRestoreCard } from "@/components/settings/BackupRestoreCard";
 import { PushNotificationCard } from "@/components/settings/PushNotificationCard";
-import { TeamManagementCard } from "@/components/settings/TeamManagementCard";
+import { AccountSettingsSection } from "@/components/settings/AccountSettingsSection";
 
 interface SettingsSectionProps {
   icon: React.ReactNode;
@@ -75,7 +56,7 @@ interface SettingsSectionProps {
 const SettingsSection = ({ icon, title, description, active, onClick }: SettingsSectionProps) => (
   <button
     onClick={onClick}
-    className={`w-full flex items-center gap-3 p-3 rounded-lg text-left transition-all ${
+    className={`w-full flex items-center gap-3 p-3 rounded-lg text-left transition-all min-h-[56px] ${
       active 
         ? 'bg-primary/10 text-primary border border-primary/20' 
         : 'hover:bg-muted/50 text-foreground'
@@ -93,28 +74,18 @@ const SettingsSection = ({ icon, title, description, active, onClick }: Settings
 );
 
 export const SettingsModule = () => {
-  const { theme, setTheme } = useTheme();
-  const { language, setLanguage, t } = useLanguage();
-  const [activeSection, setActiveSection] = useState('profile');
+  const { t } = useLanguage();
+  const [activeSection, setActiveSection] = useState('account');
   
-  const [businessName, setBusinessName] = useState("Stock-X LPG Distribution");
-  const [businessPhone, setBusinessPhone] = useState("+880 1XXX-XXXXXX");
-  const [businessAddress, setBusinessAddress] = useState("Dhaka, Bangladesh");
-  const [saving, setSaving] = useState(false);
+  // Password change state
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
-  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [changingPassword, setChangingPassword] = useState(false);
   
-  // User profile state
+  // User state for role check and account deletion
   const [userEmail, setUserEmail] = useState("");
   const [userRole, setUserRole] = useState<string>("driver");
-  const [userCreatedAt, setUserCreatedAt] = useState("");
-  const [fullName, setFullName] = useState("");
-  const [userPhone, setUserPhone] = useState("");
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [savingProfile, setSavingProfile] = useState(false);
   
   // Account deletion state
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -123,6 +94,7 @@ export const SettingsModule = () => {
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   
+  // Notification settings
   const [notifications, setNotifications] = useState({
     lowStock: true,
     newOrders: true,
@@ -130,18 +102,13 @@ export const SettingsModule = () => {
     dailyReports: false
   });
 
-  const isOwner = userRole === 'owner';
-  const isOwnerOrManager = userRole === 'owner' || userRole === 'manager';
-
-  // Load user profile data
+  // Load user role for security features
   useEffect(() => {
-    const fetchUserProfile = async () => {
+    const fetchUserRole = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setUserEmail(user.email || "");
-        setUserCreatedAt(user.created_at || "");
         
-        // Fetch role
         const { data: roleData } = await supabase
           .from('user_roles')
           .select('role')
@@ -151,94 +118,19 @@ export const SettingsModule = () => {
         if (roleData?.role) {
           setUserRole(roleData.role);
         }
-        
-        // Fetch profile
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('user_id', user.id)
-          .single();
-        
-        if (profileData) {
-          setFullName(profileData.full_name || "");
-          setUserPhone(profileData.phone || "");
-          setAvatarUrl(profileData.avatar_url);
-        }
       }
     };
     
-    fetchUserProfile();
+    fetchUserRole();
   }, []);
 
-  // Load settings from localStorage
+  // Load notification settings from localStorage
   useEffect(() => {
-    const savedSettings = localStorage.getItem("business-settings");
-    if (savedSettings) {
-      const parsed = JSON.parse(savedSettings);
-      setBusinessName(parsed.businessName || businessName);
-      setBusinessPhone(parsed.businessPhone || businessPhone);
-      setBusinessAddress(parsed.businessAddress || businessAddress);
-    }
     const savedNotifications = localStorage.getItem("notification-settings");
     if (savedNotifications) {
       setNotifications(JSON.parse(savedNotifications));
     }
   }, []);
-
-  const handleSaveProfile = async () => {
-    setSavingProfile(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      
-      const { error } = await supabase
-        .from('profiles')
-        .upsert({
-          user_id: user.id,
-          full_name: fullName,
-          phone: userPhone,
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'user_id' });
-      
-      if (error) throw error;
-      toast({ title: "Profile updated successfully" });
-    } catch (error: any) {
-      toast({ title: error.message || "Failed to update profile", variant: "destructive" });
-    } finally {
-      setSavingProfile(false);
-    }
-  };
-
-  const getRoleBadgeStyle = (role: string) => {
-    switch (role) {
-      case 'owner': return 'bg-gradient-to-r from-amber-500 to-orange-500 text-white border-0';
-      case 'manager': return 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white border-0';
-      case 'driver': return 'bg-gradient-to-r from-green-500 to-emerald-500 text-white border-0';
-      default: return 'bg-muted text-muted-foreground';
-    }
-  };
-
-  const getInitials = (name: string) => {
-    if (!name) return "U";
-    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-  };
-
-  const handleSaveSettings = async () => {
-    setSaving(true);
-    try {
-      localStorage.setItem("business-settings", JSON.stringify({
-        businessName,
-        businessPhone,
-        businessAddress
-      }));
-      await new Promise(resolve => setTimeout(resolve, 300));
-      toast({ title: t("settings_saved") });
-    } catch (error) {
-      toast({ title: "Error saving settings", variant: "destructive" });
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const handleNotificationChange = (key: keyof typeof notifications, value: boolean) => {
     const updated = { ...notifications, [key]: value };
@@ -278,7 +170,6 @@ export const SettingsModule = () => {
 
       toast({ title: "Password changed successfully" });
       setShowPasswordDialog(false);
-      setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
     } catch (error: any) {
@@ -341,214 +232,18 @@ export const SettingsModule = () => {
     }
   };
 
+  // Simplified sections: Account (merged), Notifications, Security, Advanced
   const sections = [
-    { id: 'profile', icon: <User className="h-4 w-4" />, title: 'Profile', description: 'Personal info' },
-    { id: 'appearance', icon: <Palette className="h-4 w-4" />, title: 'Appearance', description: 'Theme & language' },
-    { id: 'business', icon: <Building2 className="h-4 w-4" />, title: 'Business', description: 'Company details' },
-    ...(isOwner ? [
-      { id: 'team', icon: <Users className="h-4 w-4" />, title: 'Team', description: 'Manage members' },
-    ] : []),
-    { id: 'notifications', icon: <Bell className="h-4 w-4" />, title: 'Notifications', description: 'Alerts & updates' },
-    { id: 'security', icon: <Shield className="h-4 w-4" />, title: 'Security', description: 'Password & access' },
-    { id: 'advanced', icon: <Zap className="h-4 w-4" />, title: 'Advanced', description: 'Data & cache' },
+    { id: 'account', icon: <UserCircle className="h-4 w-4" />, title: t('account_settings') || 'Account', description: t('account_settings_desc') || 'Profile, appearance & team' },
+    { id: 'notifications', icon: <Bell className="h-4 w-4" />, title: t('notifications'), description: t('notifications_desc') },
+    { id: 'security', icon: <Shield className="h-4 w-4" />, title: t('security'), description: t('security_desc') },
+    { id: 'advanced', icon: <Zap className="h-4 w-4" />, title: t('data_management') || 'Advanced', description: t('data_management_desc') },
   ];
 
   const renderSectionContent = () => {
     switch (activeSection) {
-      case 'profile':
-        return (
-          <div className="space-y-6">
-            {/* Profile Header Card */}
-            <Card className="overflow-hidden border-0 shadow-lg">
-              <div className="h-20 bg-gradient-to-r from-primary via-primary-light to-secondary" />
-              <CardContent className="relative pt-0 -mt-12 pb-6">
-                <div className="flex flex-col sm:flex-row items-start sm:items-end gap-4">
-                  <Avatar className="h-24 w-24 border-4 border-background shadow-xl">
-                    <AvatarImage src={avatarUrl || undefined} alt={fullName} />
-                    <AvatarFallback className="text-2xl font-bold bg-gradient-to-br from-primary to-secondary text-primary-foreground">
-                      {getInitials(fullName || userEmail)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 space-y-1">
-                    <div className="flex items-center gap-3">
-                      <h2 className="text-xl font-bold text-foreground">{fullName || 'User'}</h2>
-                      <Badge className={`${getRoleBadgeStyle(userRole)} px-3`}>
-                        {userRole.charAt(0).toUpperCase() + userRole.slice(1)}
-                      </Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground">{userEmail}</p>
-                    <p className="text-xs text-muted-foreground">
-                      Member since {userCreatedAt ? new Date(userCreatedAt).toLocaleDateString() : 'N/A'}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Profile Form */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Personal Information</CardTitle>
-                <CardDescription>Update your profile details</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="fullName" className="flex items-center gap-2">
-                      <User className="h-4 w-4 text-muted-foreground" />
-                      Full Name
-                    </Label>
-                    <Input
-                      id="fullName"
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      placeholder="Enter your full name"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="userPhone" className="flex items-center gap-2">
-                      <Phone className="h-4 w-4 text-muted-foreground" />
-                      Phone Number
-                    </Label>
-                    <Input
-                      id="userPhone"
-                      value={userPhone}
-                      onChange={(e) => setUserPhone(e.target.value)}
-                      placeholder="+880 1XXX-XXXXXX"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="userEmail" className="flex items-center gap-2">
-                    <Mail className="h-4 w-4 text-muted-foreground" />
-                    Email Address
-                  </Label>
-                  <Input id="userEmail" value={userEmail} disabled className="bg-muted/50" />
-                </div>
-                <Button onClick={handleSaveProfile} disabled={savingProfile} className="w-full sm:w-auto">
-                  {savingProfile ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-                  Save Profile
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Profile Sharing (Owner only) */}
-            {isOwner && <ProfileSharingCard />}
-          </div>
-        );
-
-      case 'appearance':
-        return (
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Globe className="h-5 w-5 text-primary" />
-                  Language
-                </CardTitle>
-                <CardDescription>Choose your preferred language</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-3">
-                  <Button
-                    variant={language === "en" ? "default" : "outline"}
-                    className={`h-20 flex flex-col gap-2 relative ${language === "en" ? "ring-2 ring-primary" : ""}`}
-                    onClick={() => setLanguage("en")}
-                  >
-                    <span className="text-2xl font-bold">EN</span>
-                    <span className="text-xs opacity-80">{t("english")}</span>
-                    {language === "en" && <Check className="h-4 w-4 absolute top-2 right-2" />}
-                  </Button>
-                  <Button
-                    variant={language === "bn" ? "default" : "outline"}
-                    className={`h-20 flex flex-col gap-2 relative ${language === "bn" ? "ring-2 ring-primary" : ""}`}
-                    onClick={() => setLanguage("bn")}
-                  >
-                    <span className="text-2xl font-bold">বাং</span>
-                    <span className="text-xs opacity-80">{t("bangla")}</span>
-                    {language === "bn" && <Check className="h-4 w-4 absolute top-2 right-2" />}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Palette className="h-5 w-5 text-primary" />
-                  Theme
-                </CardTitle>
-                <CardDescription>Select your visual preference</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-3">
-                  <Button
-                    variant={theme === "light" ? "default" : "outline"}
-                    className={`h-20 flex flex-col gap-2 ${theme === "light" ? "ring-2 ring-primary" : ""}`}
-                    onClick={() => setTheme("light")}
-                  >
-                    <Sun className="h-6 w-6" />
-                    <span className="text-xs">Light Mode</span>
-                  </Button>
-                  <Button
-                    variant={theme === "dark" ? "default" : "outline"}
-                    className={`h-20 flex flex-col gap-2 ${theme === "dark" ? "ring-2 ring-primary" : ""}`}
-                    onClick={() => setTheme("dark")}
-                  >
-                    <Moon className="h-6 w-6" />
-                    <span className="text-xs">{t("dark_mode")}</span>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        );
-
-      case 'business':
-        return (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Building2 className="h-5 w-5 text-primary" />
-                {t("business_info")}
-              </CardTitle>
-              <CardDescription>{t("business_info_desc")}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="businessName">{t("business_name")}</Label>
-                <Input
-                  id="businessName"
-                  value={businessName}
-                  onChange={(e) => setBusinessName(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="businessPhone">{t("phone_number")}</Label>
-                <Input
-                  id="businessPhone"
-                  value={businessPhone}
-                  onChange={(e) => setBusinessPhone(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="businessAddress">{t("address")}</Label>
-                <Input
-                  id="businessAddress"
-                  value={businessAddress}
-                  onChange={(e) => setBusinessAddress(e.target.value)}
-                />
-              </div>
-              <Button onClick={handleSaveSettings} disabled={saving} className="w-full">
-                {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-                {t("save_changes")}
-              </Button>
-            </CardContent>
-          </Card>
-        );
-
-      case 'team':
-        return <TeamManagementCard />;
+      case 'account':
+        return <AccountSettingsSection />;
 
       case 'notifications':
         return (
@@ -560,9 +255,9 @@ export const SettingsModule = () => {
 
       case 'security':
         return (
-          <div className="space-y-6">
+          <div className="space-y-4">
             <Card>
-              <CardHeader>
+              <CardHeader className="pb-3">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Shield className="h-5 w-5 text-primary" />
                   {t("security")}
@@ -570,7 +265,11 @@ export const SettingsModule = () => {
                 <CardDescription>{t("security_desc")}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                <Button variant="outline" className="w-full justify-start h-14" onClick={() => setShowPasswordDialog(true)}>
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start h-14" 
+                  onClick={() => setShowPasswordDialog(true)}
+                >
                   <Lock className="h-5 w-5 mr-3 text-primary" />
                   <div className="text-left">
                     <p className="font-medium">{t("change_password")}</p>
@@ -592,7 +291,7 @@ export const SettingsModule = () => {
 
             {/* Danger Zone */}
             <Card className="border-destructive/30 bg-destructive/5">
-              <CardHeader>
+              <CardHeader className="pb-3">
                 <CardTitle className="text-lg flex items-center gap-2 text-destructive">
                   <AlertTriangle className="h-5 w-5" />
                   Danger Zone
@@ -605,7 +304,7 @@ export const SettingsModule = () => {
                     <p className="font-medium text-foreground">Delete Account</p>
                     <p className="text-sm text-muted-foreground">Permanently remove your account and data</p>
                   </div>
-                  <Button variant="destructive" onClick={handleDeleteAccountRequest}>
+                  <Button variant="destructive" onClick={handleDeleteAccountRequest} className="h-11">
                     <UserX className="h-4 w-4 mr-2" />
                     Delete Account
                   </Button>
@@ -617,11 +316,11 @@ export const SettingsModule = () => {
 
       case 'advanced':
         return (
-          <div className="space-y-6">
+          <div className="space-y-4">
             <BackupRestoreCard />
             
             <Card>
-              <CardHeader>
+              <CardHeader className="pb-3">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Database className="h-5 w-5 text-primary" />
                   {t("data_management")}
@@ -631,11 +330,11 @@ export const SettingsModule = () => {
               <CardContent>
                 <Button 
                   variant="outline" 
-                  className="w-full h-16 flex flex-col items-center justify-center gap-2"
+                  className="w-full h-14 flex items-center justify-center gap-3"
                   onClick={handleClearCache}
                 >
                   <Trash2 className="h-5 w-5 text-muted-foreground" />
-                  <span className="text-sm">{t("clear_cache")}</span>
+                  <span>{t("clear_cache")}</span>
                 </Button>
               </CardContent>
             </Card>
@@ -648,43 +347,43 @@ export const SettingsModule = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
         <div className="p-2 bg-primary/10 rounded-lg">
-          <Settings className="h-6 w-6 text-primary" />
+          <Settings className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
         </div>
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">{t("settings")}</h1>
-          <p className="text-sm text-muted-foreground">{t("settings_desc")}</p>
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground">{t("settings")}</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">{t("settings_desc")}</p>
         </div>
       </div>
 
-      {/* Mobile Tabs / Desktop Sidebar Layout */}
+      {/* Mobile Tabs Layout */}
       <div className="lg:hidden">
         <Tabs value={activeSection} onValueChange={setActiveSection}>
           <ScrollArea className="w-full">
-            <TabsList className="w-full justify-start px-1 h-auto flex-nowrap">
+            <TabsList className="w-full justify-start px-1 h-12 flex-nowrap bg-muted/50">
               {sections.map(section => (
                 <TabsTrigger 
                   key={section.id} 
                   value={section.id}
-                  className="flex items-center gap-2 px-3 py-2 shrink-0"
+                  className="flex items-center gap-2 px-3 py-2 shrink-0 min-h-[44px] data-[state=active]:bg-background"
                 >
                   {section.icon}
-                  <span className="hidden sm:inline">{section.title}</span>
+                  <span className="text-sm">{section.title.split(' ')[0]}</span>
                 </TabsTrigger>
               ))}
             </TabsList>
           </ScrollArea>
-          <div className="mt-6">
+          <div className="mt-4">
             {renderSectionContent()}
           </div>
         </Tabs>
       </div>
 
       {/* Desktop Layout */}
-      <div className="hidden lg:grid lg:grid-cols-[280px_1fr] gap-6">
+      <div className="hidden lg:grid lg:grid-cols-[260px_1fr] gap-6">
         {/* Sidebar */}
         <Card className="h-fit sticky top-6">
           <CardContent className="p-3 space-y-1">
@@ -723,6 +422,7 @@ export const SettingsModule = () => {
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 placeholder="Enter new password"
+                className="h-11"
               />
             </div>
             <div className="space-y-2">
@@ -733,12 +433,13 @@ export const SettingsModule = () => {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Confirm new password"
+                className="h-11"
               />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowPasswordDialog(false)}>{t("cancel")}</Button>
-            <Button onClick={handleChangePassword} disabled={changingPassword}>
+            <Button onClick={handleChangePassword} disabled={changingPassword} className="h-11">
               {changingPassword && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               {t("save")}
             </Button>
@@ -801,6 +502,7 @@ export const SettingsModule = () => {
                 value={deletePassword}
                 onChange={(e) => setDeletePassword(e.target.value)}
                 placeholder="Enter your password"
+                className="h-11"
               />
             </div>
             <div className="space-y-2">
@@ -809,7 +511,7 @@ export const SettingsModule = () => {
                 id="deleteConfirm"
                 value={deleteConfirmText}
                 onChange={(e) => setDeleteConfirmText(e.target.value.toUpperCase())}
-                className="font-mono"
+                className="font-mono h-11"
                 placeholder="DELETE"
               />
             </div>
@@ -826,6 +528,7 @@ export const SettingsModule = () => {
               variant="destructive"
               onClick={handleDeleteAccount}
               disabled={deletingAccount || deleteConfirmText !== 'DELETE' || !deletePassword}
+              className="h-11"
             >
               {deletingAccount && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Permanently Delete
