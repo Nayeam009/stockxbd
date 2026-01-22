@@ -42,20 +42,19 @@ export const useSwipeNavigation = (config: SwipeConfig = {}) => {
   };
 };
 
-// Module navigation order for swipe gestures
+// Module navigation order for swipe gestures - matches new sidebar order
 export const getModuleNavigationOrder = (userRole: 'owner' | 'manager' | 'driver') => {
   const allModules = [
     { id: 'overview', roles: ['owner', 'manager', 'driver'] },
-    { id: 'pos', roles: ['owner', 'manager', 'driver'] },
     { id: 'business-diary', roles: ['owner', 'manager'] },
+    { id: 'pos', roles: ['owner', 'manager', 'driver'] },
+    { id: 'community', roles: ['owner', 'manager'] },
     { id: 'inventory', roles: ['owner', 'manager'] },
     { id: 'product-pricing', roles: ['owner', 'manager'] },
-    { id: 'marketplace-orders', roles: ['owner', 'manager'] },
     { id: 'customers', roles: ['owner', 'manager'] },
-    { id: 'staff-salary', roles: ['owner', 'manager'] },
-    { id: 'vehicle-cost', roles: ['owner', 'manager'] },
-    { id: 'community', roles: ['owner', 'manager', 'driver'] },
-    { id: 'settings', roles: ['owner', 'manager'] },
+    { id: 'utility-expense', roles: ['owner', 'manager'] },
+    { id: 'analysis-search', roles: ['owner', 'manager'] },
+    { id: 'settings', roles: ['owner'] },
   ];
 
   return allModules.filter(m => m.roles.includes(userRole)).map(m => m.id);

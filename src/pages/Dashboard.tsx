@@ -9,11 +9,9 @@ import { InventoryModule } from "@/components/dashboard/modules/InventoryModule"
 import { MarketplaceOrdersModule } from "@/components/dashboard/modules/MarketplaceOrdersModule";
 import { AnalysisSearchReportModule } from "@/components/dashboard/modules/AnalysisSearchReportModule";
 import { POSModule } from "@/components/dashboard/modules/POSModule";
-
 import { CommunityModule } from "@/components/dashboard/modules/CommunityModule";
 import { ProductPricingModule } from "@/components/dashboard/modules/ProductPricingModule";
-import { VehicleCostModule } from "@/components/dashboard/modules/VehicleCostModule";
-import { StaffSalaryModule } from "@/components/dashboard/modules/StaffSalaryModule";
+import { UtilityExpenseModule } from "@/components/dashboard/modules/UtilityExpenseModule";
 import { CustomerManagementModule } from "@/components/dashboard/modules/CustomerManagementModule";
 import { SettingsModule } from "@/components/dashboard/modules/SettingsModule";
 import { ProfileModule } from "@/components/dashboard/modules/ProfileModule";
@@ -145,10 +143,10 @@ const Dashboard = () => {
         return <BusinessDiaryModule />;
       case "community":
         return <CommunityModule />;
+      case "utility-expense":
       case "staff-salary":
-        return <StaffSalaryModule />;
       case "vehicle-cost":
-        return <VehicleCostModule />;
+        return <UtilityExpenseModule />;
       case "search":
       case "analysis-search":
         return (
