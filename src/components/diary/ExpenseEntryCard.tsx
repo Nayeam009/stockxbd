@@ -9,7 +9,12 @@ import {
   Truck,
   Users,
   FileText,
-  ExternalLink
+  ExternalLink,
+  Crown,
+  UserCog,
+  User,
+  Calendar,
+  HelpCircle
 } from "lucide-react";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
 import { format } from "date-fns";
@@ -48,14 +53,24 @@ const sourceConfig: Record<string, { icon: React.ComponentType<any>; color: stri
   }
 };
 
+const staffRoleConfig: Record<string, { icon: React.ComponentType<any>; color: string; bgColor: string; label: string }> = {
+  owner: { icon: Crown, color: 'text-purple-700 dark:text-purple-300', bgColor: 'bg-purple-100 dark:bg-purple-900/40', label: 'Owner' },
+  manager: { icon: UserCog, color: 'text-blue-700 dark:text-blue-300', bgColor: 'bg-blue-100 dark:bg-blue-900/40', label: 'Manager' },
+  driver: { icon: Truck, color: 'text-amber-700 dark:text-amber-300', bgColor: 'bg-amber-100 dark:bg-amber-900/40', label: 'Driver' },
+  staff: { icon: Users, color: 'text-slate-700 dark:text-slate-300', bgColor: 'bg-slate-100 dark:bg-slate-900/40', label: 'Staff' },
+  unknown: { icon: User, color: 'text-gray-700 dark:text-gray-300', bgColor: 'bg-gray-100 dark:bg-gray-900/40', label: 'Staff' }
+};
+
 export const ExpenseEntryCard = ({ entry, onViewDetails, onNavigateToSource }: ExpenseEntryCardProps) => {
   const sourceConf = sourceConfig[entry.source] || sourceConfig['Manual Entry'];
   const SourceIcon = sourceConf.icon;
+  const roleConf = staffRoleConfig[entry.staffRole] || staffRoleConfig.unknown;
+  const RoleIcon = roleConf.icon;
 
   return (
     <Card className="border overflow-hidden transition-all duration-300 hover:shadow-lg bg-card hover:bg-gradient-to-r hover:from-rose-50/30 dark:hover:from-rose-950/20 hover:to-card border-border/60 group">
       {/* Top Color Bar */}
-      <div className="h-0.5 bg-rose-400/60" />
+      <div className="h-1 bg-rose-400/80" />
       
       <CardContent className="p-3.5 sm:p-4">
         <div className="flex items-start justify-between gap-3">
@@ -97,6 +112,14 @@ export const ExpenseEntryCard = ({ entry, onViewDetails, onNavigateToSource }: E
               </div>
             </div>
 
+            {/* Why Spent Tag */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <Badge variant="secondary" className="text-xs bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 border-0 font-medium">
+                <HelpCircle className="h-3 w-3 mr-1" />
+                Why: {entry.whySpent}
+              </Badge>
+            </div>
+
             {/* Metadata Tags */}
             <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
               {entry.supplierName && (
@@ -118,6 +141,10 @@ export const ExpenseEntryCard = ({ entry, onViewDetails, onNavigateToSource }: E
                 </span>
               )}
               <span className="flex items-center gap-1.5">
+                <Calendar className="h-3 w-3" />
+                {format(new Date(entry.date), 'MMM dd, yyyy')}
+              </span>
+              <span className="flex items-center gap-1.5">
                 <Clock className="h-3 w-3" />
                 {format(new Date(entry.timestamp), 'hh:mm a')}
               </span>
@@ -126,18 +153,19 @@ export const ExpenseEntryCard = ({ entry, onViewDetails, onNavigateToSource }: E
           </div>
 
           {/* Right: Amount & Staff */}
-          <div className="flex flex-col items-end gap-2.5 shrink-0">
+          <div className="flex flex-col items-end gap-2 shrink-0">
+            {/* Staff Role Badge - Who Spent */}
+            <Badge variant="outline" className={`${roleConf.bgColor} ${roleConf.color} border-0 text-xs font-medium px-2 py-1`}>
+              <RoleIcon className="h-3 w-3 mr-1" />
+              {roleConf.label}
+            </Badge>
+
             {/* Amount with Emphasis */}
             <div className="text-right">
               <p className="text-lg sm:text-xl lg:text-2xl font-bold text-rose-600 dark:text-rose-400 tabular-nums">
                 -{BANGLADESHI_CURRENCY_SYMBOL}{entry.amount.toLocaleString()}
               </p>
             </div>
-
-            {/* Staff Badge */}
-            <Badge variant="secondary" className="text-xs bg-muted text-muted-foreground border-0 font-medium">
-              {entry.staffName}
-            </Badge>
 
             {/* View Details Button */}
             {onViewDetails && (

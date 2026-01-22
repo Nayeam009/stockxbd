@@ -1075,7 +1075,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
 
       if (txnError) throw txnError;
 
-      // Insert items
+      // Insert items with error handling
       if (transaction) {
         const items = saleItems.map(item => ({
           transaction_id: transaction.id,
@@ -1086,7 +1086,11 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
           total_price: item.price * item.quantity,
           created_by: user.id
         }));
-        await supabase.from('pos_transaction_items').insert(items);
+        
+        const { error: itemsError } = await supabase.from('pos_transaction_items').insert(items);
+        if (itemsError) {
+          logger.error('Failed to insert transaction items', itemsError, { component: 'POS' });
+        }
       }
 
       // Update inventory for LPG sales
@@ -1136,18 +1140,32 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
         }
       }
 
-      // Update customer dues (track both money and cylinders)
+      // Update customer dues (track both money AND cylinders including refill debt)
       if (paymentStat === 'pending' && customerId) {
         const customer = customers.find(c => c.id === customerId);
         if (customer) {
+          // Package cylinders = always owed (customer gets new cylinder)
           const packageCylindersSold = saleItems
             .filter(i => i.type === 'lpg' && i.cylinderType === 'package')
             .reduce((sum, i) => sum + i.quantity, 0);
           
+          // Refill cylinders = owed ONLY if empty not returned (refill needs exchange)
+          const refillCylindersSold = saleItems
+            .filter(i => i.type === 'lpg' && i.cylinderType === 'refill')
+            .reduce((sum, i) => sum + i.quantity, 0);
+          
+          const emptyReturned = returnItems.reduce((sum, r) => sum + r.quantity, 0);
+          
+          // Missing refill returns = cylinders the customer owes
+          const missingRefillReturns = Math.max(0, refillCylindersSold - emptyReturned);
+          
+          // Total cylinder debt = packages (always) + missing refill returns
+          const totalCylinderDebt = packageCylindersSold + missingRefillReturns;
+          
           await supabase.from('customers')
             .update({ 
               total_due: (customer.total_due || 0) + total,
-              cylinders_due: (customer.cylinders_due || 0) + packageCylindersSold,
+              cylinders_due: (customer.cylinders_due || 0) + totalCylinderDebt,
               billing_status: 'pending',
               last_order_date: new Date().toISOString()
             })

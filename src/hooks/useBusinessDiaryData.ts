@@ -9,15 +9,18 @@ export interface SaleEntry {
   date: string;
   timestamp: string;
   staffName: string;
+  staffRole: 'owner' | 'manager' | 'driver' | 'staff' | 'unknown';
   staffId: string | null;
   productName: string;
   productDetails: string;
+  returnCylinders: { brand: string; quantity: number; type: 'empty' | 'problem' }[];
   quantity: number;
   unitPrice: number;
   totalAmount: number;
   paymentMethod: string;
   paymentStatus: 'paid' | 'due' | 'partial';
   customerName: string;
+  customerPhone: string | null;
   customerId: string | null;
   transactionType: 'retail' | 'wholesale';
   transactionNumber: string;
@@ -31,11 +34,13 @@ export interface ExpenseEntry {
   date: string;
   timestamp: string;
   staffName: string;
+  staffRole: 'owner' | 'manager' | 'driver' | 'staff' | 'unknown';
   staffId: string | null;
   category: string;
   categoryIcon: string;
   categoryColor: string;
   description: string;
+  whySpent: string;
   amount: number;
   source: string;
   sourceId: string;
@@ -104,13 +109,21 @@ export const useBusinessDiaryData = (): UseBusinessDiaryDataReturn => {
 
   const fetchSalesData = useCallback(async () => {
     try {
-      // Fetch POS transactions with items
+      // Fetch user roles for staff display
+      const { data: userRoles } = await supabase
+        .from('user_roles')
+        .select('user_id, role');
+      
+      const roleMap = new Map<string, string>(userRoles?.map(r => [r.user_id, r.role]) || []);
+
+      // Fetch POS transactions with items and created_by
       const { data: posTransactions, error: posError } = await supabase
         .from('pos_transactions')
         .select(`
           id,
           transaction_number,
           created_at,
+          created_by,
           total,
           subtotal,
           discount,
@@ -144,6 +157,7 @@ export const useBusinessDiaryData = (): UseBusinessDiaryDataReturn => {
           payment_date,
           notes,
           created_at,
+          created_by,
           customers (
             name,
             phone
@@ -161,27 +175,86 @@ export const useBusinessDiaryData = (): UseBusinessDiaryDataReturn => {
 
       const customerMap = new Map(customers?.map(c => [c.id, c]) || []);
 
-      // Process POS transactions
+      // Helper to parse return cylinders from product name
+      const parseReturnCylinders = (productName: string): { brand: string; quantity: number; type: 'empty' | 'problem' }[] => {
+        // Only show returns for Refill products
+        if (!productName.toLowerCase().includes('refill')) {
+          return [];
+        }
+        const match = productName.match(/Return:\s*(.+)$/i);
+        if (match) {
+          return [{ brand: match[1].trim(), quantity: 1, type: 'empty' }];
+        }
+        return [];
+      };
+
+      // Helper to get staff role label
+      const getStaffRole = (userId: string | null): 'owner' | 'manager' | 'driver' | 'staff' | 'unknown' => {
+        if (!userId) return 'unknown';
+        const role = roleMap.get(userId);
+        if (role === 'owner') return 'owner';
+        if (role === 'manager') return 'manager';
+        if (role === 'driver') return 'driver';
+        return 'staff';
+      };
+
+      const getStaffName = (role: string): string => {
+        return role.charAt(0).toUpperCase() + role.slice(1);
+      };
+
+      // Process POS transactions - handle both items and itemless transactions
       const posEntries: SaleEntry[] = (posTransactions || []).flatMap(txn => {
         const customer = txn.customer_id ? customerMap.get(txn.customer_id) : null;
         const items = txn.pos_transaction_items || [];
         const isWholesale = items.length > 1;
+        const staffRole = getStaffRole(txn.created_by);
+        
+        // If no items but transaction has value, create single summary entry
+        if (items.length === 0 && Number(txn.total) > 0) {
+          return [{
+            id: txn.id,
+            type: 'pos' as const,
+            date: format(new Date(txn.created_at), 'yyyy-MM-dd'),
+            timestamp: txn.created_at,
+            staffName: getStaffName(staffRole),
+            staffRole,
+            staffId: txn.created_by,
+            productName: 'POS Sale',
+            productDetails: `Total: ৳${Number(txn.total).toLocaleString()}`,
+            returnCylinders: [],
+            quantity: 1,
+            unitPrice: Number(txn.total),
+            totalAmount: Number(txn.total),
+            paymentMethod: txn.payment_method,
+            paymentStatus: (txn.payment_status === 'paid' ? 'paid' : txn.payment_status === 'partial' ? 'partial' : 'due') as 'paid' | 'due' | 'partial',
+            customerName: customer?.name || 'Walk-in Customer',
+            customerPhone: customer?.phone || null,
+            customerId: txn.customer_id,
+            transactionType: 'retail' as 'retail' | 'wholesale',
+            transactionNumber: txn.transaction_number,
+            source: 'POS',
+            sourceId: txn.id
+          }];
+        }
         
         return items.map((item: any) => ({
           id: item.id,
           type: 'pos' as const,
           date: format(new Date(txn.created_at), 'yyyy-MM-dd'),
           timestamp: txn.created_at,
-          staffName: 'Staff',
-          staffId: null,
+          staffName: getStaffName(staffRole),
+          staffRole,
+          staffId: txn.created_by,
           productName: item.product_name || 'Unknown Product',
           productDetails: `${item.quantity} x ৳${item.unit_price}`,
+          returnCylinders: parseReturnCylinders(item.product_name || ''),
           quantity: item.quantity,
           unitPrice: Number(item.unit_price),
           totalAmount: Number(item.total_price),
           paymentMethod: txn.payment_method,
           paymentStatus: (txn.payment_status === 'paid' ? 'paid' : txn.payment_status === 'partial' ? 'partial' : 'due') as 'paid' | 'due' | 'partial',
           customerName: customer?.name || 'Walk-in Customer',
+          customerPhone: customer?.phone || null,
           customerId: txn.customer_id,
           transactionType: isWholesale ? 'wholesale' : 'retail' as 'retail' | 'wholesale',
           transactionNumber: txn.transaction_number,
@@ -191,27 +264,33 @@ export const useBusinessDiaryData = (): UseBusinessDiaryDataReturn => {
       });
 
       // Process customer payments (due collections)
-      const paymentEntries: SaleEntry[] = (customerPayments || []).map(payment => ({
-        id: payment.id,
-        type: 'payment' as const,
-        date: format(new Date(payment.payment_date), 'yyyy-MM-dd'),
-        timestamp: payment.created_at,
-        staffName: 'Staff',
-        staffId: null,
-        productName: 'Due Payment Received',
-        productDetails: payment.cylinders_collected ? `+ ${payment.cylinders_collected} cylinders returned` : '',
-        quantity: 1,
-        unitPrice: Number(payment.amount),
-        totalAmount: Number(payment.amount),
-        paymentMethod: 'cash',
-        paymentStatus: 'paid' as const,
-        customerName: (payment.customers as any)?.name || 'Unknown Customer',
-        customerId: payment.customer_id,
-        transactionType: 'retail' as const,
-        transactionNumber: `PAY-${payment.id.slice(0, 8)}`,
-        source: 'Customer Payment',
-        sourceId: payment.id
-      }));
+      const paymentEntries: SaleEntry[] = (customerPayments || []).map(payment => {
+        const staffRole = getStaffRole(payment.created_by);
+        return {
+          id: payment.id,
+          type: 'payment' as const,
+          date: format(new Date(payment.payment_date), 'yyyy-MM-dd'),
+          timestamp: payment.created_at,
+          staffName: getStaffName(staffRole),
+          staffRole,
+          staffId: payment.created_by,
+          productName: 'Due Payment Received',
+          productDetails: payment.cylinders_collected ? `+ ${payment.cylinders_collected} cylinders returned` : '',
+          returnCylinders: [],
+          quantity: 1,
+          unitPrice: Number(payment.amount),
+          totalAmount: Number(payment.amount),
+          paymentMethod: 'cash',
+          paymentStatus: 'paid' as const,
+          customerName: (payment.customers as any)?.name || 'Unknown Customer',
+          customerPhone: (payment.customers as any)?.phone || null,
+          customerId: payment.customer_id,
+          transactionType: 'retail' as const,
+          transactionNumber: `PAY-${payment.id.slice(0, 8)}`,
+          source: 'Customer Payment',
+          sourceId: payment.id
+        };
+      });
 
       setSales([...posEntries, ...paymentEntries].sort((a, b) => 
         new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
@@ -223,6 +302,27 @@ export const useBusinessDiaryData = (): UseBusinessDiaryDataReturn => {
 
   const fetchExpensesData = useCallback(async () => {
     try {
+      // Fetch user roles for staff display
+      const { data: userRoles } = await supabase
+        .from('user_roles')
+        .select('user_id, role');
+      
+      const roleMap = new Map<string, string>(userRoles?.map(r => [r.user_id, r.role]) || []);
+
+      // Helper to get staff role label
+      const getStaffRole = (userId: string | null): 'owner' | 'manager' | 'driver' | 'staff' | 'unknown' => {
+        if (!userId) return 'unknown';
+        const role = roleMap.get(userId);
+        if (role === 'owner') return 'owner';
+        if (role === 'manager') return 'manager';
+        if (role === 'driver') return 'driver';
+        return 'staff';
+      };
+
+      const getStaffName = (role: string): string => {
+        return role.charAt(0).toUpperCase() + role.slice(1);
+      };
+
       // Fetch POB transactions
       const { data: pobTransactions, error: pobError } = await supabase
         .from('pob_transactions')
@@ -230,6 +330,7 @@ export const useBusinessDiaryData = (): UseBusinessDiaryDataReturn => {
           id,
           transaction_number,
           created_at,
+          created_by,
           total,
           supplier_name,
           payment_method,
@@ -259,6 +360,7 @@ export const useBusinessDiaryData = (): UseBusinessDiaryDataReturn => {
           payment_date,
           notes,
           created_at,
+          created_by,
           staff (
             name,
             role
@@ -282,6 +384,7 @@ export const useBusinessDiaryData = (): UseBusinessDiaryDataReturn => {
           liters_filled,
           odometer_reading,
           created_at,
+          created_by,
           vehicles (
             name,
             license_plate
@@ -310,18 +413,21 @@ export const useBusinessDiaryData = (): UseBusinessDiaryDataReturn => {
                             productType === 'stove' ? 'Gas Stove Purchase' : 
                             productType === 'regulator' ? 'Regulator Purchase' : 'Other';
         const catInfo = getCategoryInfo(categoryName);
+        const staffRole = getStaffRole(txn.created_by);
         
         return {
           id: txn.id,
           type: 'pob' as const,
           date: format(new Date(txn.created_at), 'yyyy-MM-dd'),
           timestamp: txn.created_at,
-          staffName: 'Manager',
-          staffId: null,
+          staffName: getStaffName(staffRole),
+          staffRole,
+          staffId: txn.created_by,
           category: categoryName,
           categoryIcon: catInfo.icon,
           categoryColor: catInfo.color,
-          description: items.map((i: any) => `${i.quantity}x ${i.product_name}`).join(', '),
+          description: items.map((i: any) => `${i.quantity}x ${i.product_name}`).join(', ') || 'Product purchase',
+          whySpent: 'Product bought with POB',
           amount: Number(txn.total),
           source: 'POB',
           sourceId: txn.id,
@@ -332,17 +438,20 @@ export const useBusinessDiaryData = (): UseBusinessDiaryDataReturn => {
       // Process staff payments
       const salaryEntries: ExpenseEntry[] = (staffPayments || []).map(payment => {
         const catInfo = getCategoryInfo('Staff Salary');
+        const staffRole = getStaffRole(payment.created_by);
         return {
           id: payment.id,
           type: 'salary' as const,
           date: format(new Date(payment.payment_date), 'yyyy-MM-dd'),
           timestamp: payment.created_at,
-          staffName: 'Manager',
-          staffId: null,
+          staffName: getStaffName(staffRole),
+          staffRole,
+          staffId: payment.created_by,
           category: 'Staff Salary',
           categoryIcon: catInfo.icon,
           categoryColor: catInfo.color,
           description: payment.notes || `Salary payment to ${(payment.staff as any)?.name || 'Staff'}`,
+          whySpent: 'Staff salary payment',
           amount: Number(payment.amount),
           source: 'Staff Salary',
           sourceId: payment.id,
@@ -354,17 +463,20 @@ export const useBusinessDiaryData = (): UseBusinessDiaryDataReturn => {
       const vehicleEntries: ExpenseEntry[] = (vehicleCosts || []).map(cost => {
         const catName = cost.cost_type === 'fuel' ? 'Vehicle Fuel' : 'Vehicle Maintenance';
         const catInfo = getCategoryInfo(catName);
+        const staffRole = getStaffRole(cost.created_by);
         return {
           id: cost.id,
           type: 'vehicle' as const,
           date: format(new Date(cost.cost_date), 'yyyy-MM-dd'),
           timestamp: cost.created_at,
-          staffName: 'Driver',
-          staffId: null,
+          staffName: getStaffName(staffRole),
+          staffRole,
+          staffId: cost.created_by,
           category: catName,
           categoryIcon: catInfo.icon,
           categoryColor: catInfo.color,
           description: cost.description || `${cost.cost_type} for ${(cost.vehicles as any)?.name || 'Vehicle'}${cost.liters_filled ? ` (${cost.liters_filled}L)` : ''}`,
+          whySpent: 'Vehicle operational cost',
           amount: Number(cost.amount),
           source: 'Vehicle Cost',
           sourceId: cost.id,
@@ -375,17 +487,24 @@ export const useBusinessDiaryData = (): UseBusinessDiaryDataReturn => {
       // Process manual expenses
       const manualEntries: ExpenseEntry[] = (manualExpenses || []).map(expense => {
         const catInfo = getCategoryInfo(expense.category);
+        const staffRole = getStaffRole(expense.created_by);
         return {
           id: expense.id,
           type: 'manual' as const,
           date: expense.expense_date,
           timestamp: expense.created_at,
-          staffName: 'Staff',
+          staffName: getStaffName(staffRole),
+          staffRole,
           staffId: expense.created_by,
           category: expense.category,
           categoryIcon: catInfo.icon,
           categoryColor: catInfo.color,
           description: expense.description || expense.category,
+          whySpent: expense.category === 'Utilities' ? 'Utility bill payment' : 
+                    expense.category === 'Rent' ? 'Shop rent payment' :
+                    expense.category === 'Loading' ? 'Loading/labor cost' :
+                    expense.category === 'Entertainment' ? 'Business entertainment' :
+                    'General expense',
           amount: Number(expense.amount),
           source: 'Manual Entry',
           sourceId: expense.id
