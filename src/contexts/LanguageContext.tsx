@@ -106,6 +106,7 @@ export const translations: Translations = {
   "analysis_search": { en: "Analytics", bn: "বিশ্লেষণ" },
   "more": { en: "More", bn: "আরও" },
   "all_modules": { en: "All Modules", bn: "সব মডিউল" },
+  "my_shop": { en: "My Shop", bn: "আমার শপ" },
   "utility_expense": { en: "Utility Expense", bn: "ইউটিলিটি খরচ" },
   "total_sale": { en: "Total Sale", bn: "মোট বিক্রয়" },
   "total_expense": { en: "Total Expense", bn: "মোট খরচ" },
