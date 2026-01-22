@@ -10,7 +10,13 @@ import {
   Clock,
   ArrowUpRight,
   Eye,
-  Hash
+  Hash,
+  Phone,
+  RotateCcw,
+  Crown,
+  UserCog,
+  Truck,
+  Users
 } from "lucide-react";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
 import { format } from "date-fns";
@@ -35,12 +41,30 @@ const statusConfig: Record<string, { color: string; bgColor: string; label: stri
   partial: { color: 'text-amber-700 dark:text-amber-300', bgColor: 'bg-amber-100 dark:bg-amber-900/40 border-amber-200 dark:border-amber-800', label: 'Partial' }
 };
 
+const staffRoleConfig: Record<string, { icon: React.ComponentType<any>; color: string; bgColor: string; label: string }> = {
+  owner: { icon: Crown, color: 'text-purple-700 dark:text-purple-300', bgColor: 'bg-purple-100 dark:bg-purple-900/40', label: 'Owner' },
+  manager: { icon: UserCog, color: 'text-blue-700 dark:text-blue-300', bgColor: 'bg-blue-100 dark:bg-blue-900/40', label: 'Manager' },
+  driver: { icon: Truck, color: 'text-amber-700 dark:text-amber-300', bgColor: 'bg-amber-100 dark:bg-amber-900/40', label: 'Driver' },
+  staff: { icon: Users, color: 'text-slate-700 dark:text-slate-300', bgColor: 'bg-slate-100 dark:bg-slate-900/40', label: 'Staff' },
+  unknown: { icon: User, color: 'text-gray-700 dark:text-gray-300', bgColor: 'bg-gray-100 dark:bg-gray-900/40', label: 'Staff' }
+};
+
 export const SaleEntryCard = ({ entry, onViewDetails }: SaleEntryCardProps) => {
   const paymentConfig = paymentMethodConfig[entry.paymentMethod] || paymentMethodConfig.cash;
   const PaymentIcon = paymentConfig.icon;
   const statusConf = statusConfig[entry.paymentStatus] || statusConfig.paid;
+  const roleConf = staffRoleConfig[entry.staffRole] || staffRoleConfig.unknown;
+  const RoleIcon = roleConf.icon;
   
   const isPayment = entry.type === 'payment';
+  const hasReturnCylinders = entry.returnCylinders && entry.returnCylinders.length > 0;
+
+  // Get status bar color
+  const getStatusBarColor = () => {
+    if (entry.paymentStatus === 'paid') return 'bg-emerald-400';
+    if (entry.paymentStatus === 'due') return 'bg-rose-400';
+    return 'bg-amber-400';
+  };
 
   return (
     <Card className={`
@@ -50,8 +74,8 @@ export const SaleEntryCard = ({ entry, onViewDetails }: SaleEntryCardProps) => {
         : 'bg-card hover:bg-gradient-to-r hover:from-muted/30 hover:to-card border-border/60'
       }
     `}>
-      {/* Top Color Bar */}
-      <div className={`h-0.5 ${isPayment ? 'bg-emerald-400' : 'bg-primary/60'}`} />
+      {/* Top Color Bar - Based on Payment Status */}
+      <div className={`h-1 ${getStatusBarColor()}`} />
       
       <CardContent className="p-3.5 sm:p-4">
         <div className="flex items-start justify-between gap-3">
@@ -90,12 +114,28 @@ export const SaleEntryCard = ({ entry, onViewDetails }: SaleEntryCardProps) => {
               )}
             </div>
 
+            {/* Return Cylinders (only for Refill sales) */}
+            {hasReturnCylinders && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <Badge variant="outline" className="bg-cyan-100 dark:bg-cyan-900/40 text-cyan-700 dark:text-cyan-300 border-cyan-200 dark:border-cyan-700 text-xs">
+                  <RotateCcw className="h-3 w-3 mr-1" />
+                  Return: {entry.returnCylinders.map(r => `${r.quantity}x ${r.brand}`).join(', ')}
+                </Badge>
+              </div>
+            )}
+
             {/* Customer & Time Info */}
             <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
               <span className="flex items-center gap-1.5 bg-muted/50 px-2 py-1 rounded-md">
                 <User className="h-3 w-3" />
                 <span className="font-medium">{entry.customerName}</span>
               </span>
+              {entry.customerPhone && (
+                <span className="flex items-center gap-1.5 bg-muted/50 px-2 py-1 rounded-md">
+                  <Phone className="h-3 w-3" />
+                  <span className="font-medium">{entry.customerPhone}</span>
+                </span>
+              )}
               <span className="flex items-center gap-1.5">
                 <Clock className="h-3 w-3" />
                 {format(new Date(entry.timestamp), 'hh:mm a')}
@@ -114,8 +154,14 @@ export const SaleEntryCard = ({ entry, onViewDetails }: SaleEntryCardProps) => {
             </div>
           </div>
 
-          {/* Right: Amount & Payment */}
-          <div className="flex flex-col items-end gap-2.5 shrink-0">
+          {/* Right: Amount, Staff & Payment */}
+          <div className="flex flex-col items-end gap-2 shrink-0">
+            {/* Staff Role Badge */}
+            <Badge variant="outline" className={`${roleConf.bgColor} ${roleConf.color} border-0 text-xs font-medium px-2 py-1`}>
+              <RoleIcon className="h-3 w-3 mr-1" />
+              {roleConf.label}
+            </Badge>
+            
             {/* Amount with Emphasis */}
             <div className="text-right">
               <p className="text-lg sm:text-xl lg:text-2xl font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
