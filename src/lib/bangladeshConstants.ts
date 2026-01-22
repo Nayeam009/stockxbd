@@ -3,6 +3,48 @@
 export const BANGLADESHI_CURRENCY_SYMBOL = '৳';
 export const BANGLADESHI_PHONE_PREFIX = '+880';
 
+// Bangladesh Divisions and Districts
+export const DIVISIONS = [
+  'Dhaka',
+  'Chittagong',
+  'Rajshahi',
+  'Khulna',
+  'Sylhet',
+  'Barishal',
+  'Rangpur',
+  'Mymensingh'
+];
+
+export const DISTRICTS_BY_DIVISION: Record<string, string[]> = {
+  'Dhaka': ['Dhaka', 'Gazipur', 'Narayanganj', 'Tangail', 'Manikganj', 'Munshiganj', 'Narsingdi', 'Faridpur', 'Gopalganj', 'Kishoreganj', 'Madaripur', 'Rajbari', 'Shariatpur'],
+  'Chittagong': ['Chittagong', 'Comilla', 'Brahmanbaria', 'Chandpur', 'Lakshmipur', 'Noakhali', 'Feni', 'Khagrachhari', 'Rangamati', 'Bandarban', "Cox's Bazar"],
+  'Rajshahi': ['Rajshahi', 'Bogra', 'Joypurhat', 'Naogaon', 'Natore', 'Nawabganj', 'Pabna', 'Sirajganj'],
+  'Khulna': ['Khulna', 'Jessore', 'Satkhira', 'Bagerhat', 'Narail', 'Magura', 'Jhenaidah', 'Chuadanga', 'Kushtia', 'Meherpur'],
+  'Sylhet': ['Sylhet', 'Moulvibazar', 'Habiganj', 'Sunamganj'],
+  'Barishal': ['Barishal', 'Bhola', 'Jhalokati', 'Patuakhali', 'Pirojpur', 'Barguna'],
+  'Rangpur': ['Rangpur', 'Dinajpur', 'Gaibandha', 'Kurigram', 'Lalmonirhat', 'Nilphamari', 'Panchagarh', 'Thakurgaon'],
+  'Mymensingh': ['Mymensingh', 'Jamalpur', 'Netrokona', 'Sherpur']
+};
+
+export const THANAS_BY_DISTRICT: Record<string, string[]> = {
+  'Dhaka': ['Dhanmondi', 'Gulshan', 'Uttara', 'Mirpur', 'Mohammadpur', 'Motijheel', 'Ramna', 'Tejgaon', 'Banani', 'Badda', 'Khilgaon', 'Pallabi', 'Kafrul', 'Cantonment', 'Demra', 'Jatrabari', 'Kadamtali', 'Kamrangirchar', 'Kotwali', 'Lalbagh', 'Shahbagh', 'Sutrapur', 'Wari'],
+  'Gazipur': ['Gazipur Sadar', 'Kaliakair', 'Kaliganj', 'Kapasia', 'Sreepur'],
+  'Narayanganj': ['Narayanganj Sadar', 'Araihazar', 'Bandar', 'Rupganj', 'Sonargaon'],
+  'Chittagong': ['Kotwali', 'Pahartali', 'Panchlaish', 'Khulshi', 'Bakalia', 'Double Mooring', 'Halishahar', 'Bayazid', 'Chandgaon', 'Bandar', 'EPZ', 'Patenga', 'Agrabad'],
+  'Sylhet': ['Kotwali', 'South Surma', 'Airport', 'Jalalabad', 'Moglabazar', 'Shah Poran', 'Osmani Nagar'],
+  'Rajshahi': ['Boalia', 'Rajpara', 'Motihar', 'Shah Makhdum', 'Katakhali'],
+  'Khulna': ['Kotwali', 'Sonadanga', 'Khalishpur', 'Daulatpur', 'Khan Jahan Ali'],
+  'Comilla': ['Comilla Sadar', 'Comilla Adarsha Sadar', 'Brahmanpara', 'Burichang', 'Chandina', 'Chauddagram', 'Daudkandi', 'Debidwar', 'Homna', 'Laksam', 'Muradnagar', 'Nangalkot', 'Titas']
+};
+
+export const getDistricts = (division: string): string[] => {
+  return DISTRICTS_BY_DIVISION[division] || [];
+};
+
+export const getThanas = (district: string): string[] => {
+  return THANAS_BY_DISTRICT[district] || [];
+};
+
 export const BANGLADESHI_NAMES = {
   male: [
     'Abdul Rahman', 'Mohammad Karim', 'Rafiq Ahmed', 'Shahid Islam', 'Nasir Uddin',
@@ -45,7 +87,7 @@ export const BANGLADESHI_LPG_PRODUCTS = [
 ];
 
 export const getRandomBangladeshiName = () => {
-  const isMale = Math.random() > 0.3; // 70% male names as common in LPG business
+  const isMale = Math.random() > 0.3;
   const names = isMale ? BANGLADESHI_NAMES.male : BANGLADESHI_NAMES.female;
   return names[Math.floor(Math.random() * names.length)];
 };
@@ -55,7 +97,6 @@ export const getRandomBangladeshiLocation = () => {
 };
 
 export const getRandomBangladeshiPhone = () => {
-  // Bangladesh mobile numbers typically start with 01
   const prefixes = ['017', '019', '018', '016', '015', '013'];
   const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
   const number = Math.floor(Math.random() * 10000000).toString().padStart(7, '0');

@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Shield, Truck, Loader2, Users, Crown, AlertCircle, UserPlus, LogIn } from "lucide-react";
+import { ArrowLeft, Shield, Truck, Loader2, Users, Crown, AlertCircle, UserPlus, LogIn, ShoppingCart } from "lucide-react";
 import stockXLogo from "@/assets/stock-x-logo.png";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -13,7 +13,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type AuthMode = 'signin' | 'signup' | 'invite';
-type UserRole = 'owner' | 'manager' | 'driver';
+type UserRole = 'owner' | 'manager' | 'driver' | 'customer';
 
 const Auth = () => {
   const [searchParams] = useSearchParams();
@@ -177,7 +177,12 @@ const Auth = () => {
           });
         }
         
-        navigate('/dashboard');
+        // Redirect based on role - customers go to community, others to dashboard
+        if (selectedRole === 'customer') {
+          navigate('/community');
+        } else {
+          navigate('/dashboard');
+        }
       }
     } catch (error: any) {
       toast({ 
@@ -274,6 +279,7 @@ const Auth = () => {
       case 'owner': return 'Owner';
       case 'manager': return 'Manager';
       case 'driver': return 'Driver';
+      case 'customer': return 'Customer';
       default: return role;
     }
   };
@@ -282,6 +288,7 @@ const Auth = () => {
     switch (role) {
       case 'owner': return Crown;
       case 'manager': return Users;
+      case 'customer': return ShoppingCart;
       default: return Truck;
     }
   };
@@ -592,6 +599,12 @@ const Auth = () => {
                           <SelectValue placeholder="Select a role" />
                         </SelectTrigger>
                         <SelectContent>
+                          <SelectItem value="customer">
+                            <div className="flex items-center space-x-2">
+                              <ShoppingCart className="h-4 w-4 text-emerald-600" />
+                              <span>Customer - Order LPG online</span>
+                            </div>
+                          </SelectItem>
                           <SelectItem value="owner">
                             <div className="flex items-center space-x-2">
                               <Crown className="h-4 w-4 text-amber-600" />
@@ -613,6 +626,7 @@ const Auth = () => {
                         </SelectContent>
                       </Select>
                       <p className="text-xs text-muted-foreground">
+                        {selectedRole === 'customer' && 'Browse shops and order LPG products for home delivery'}
                         {selectedRole === 'owner' && 'Full control over business settings, team, and all features'}
                         {selectedRole === 'manager' && 'Access to inventory, sales, customers, and team coordination'}
                         {selectedRole === 'driver' && 'Access to deliveries, customer updates, and sales recording'}
