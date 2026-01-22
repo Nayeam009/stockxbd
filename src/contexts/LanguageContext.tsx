@@ -100,6 +100,9 @@ export const translations: Translations = {
   "logout": { en: "Sign Out", bn: "সাইন আউট" },
   "exchange": { en: "Exchange", bn: "এক্সচেঞ্জ" },
   "business_diary": { en: "Business Diary", bn: "ব্যবসার ডায়েরি" },
+  "shop_orders": { en: "Shop Orders", bn: "শপ অর্ডার" },
+  "inventory": { en: "Inventory", bn: "ইনভেন্টরি" },
+  "analysis_search": { en: "Analytics", bn: "বিশ্লেষণ" },
   "more": { en: "More", bn: "আরও" },
   "all_modules": { en: "All Modules", bn: "সব মডিউল" },
   // ==================== Dashboard Overview ====================

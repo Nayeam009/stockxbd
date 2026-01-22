@@ -65,17 +65,12 @@ export const AppSidebar = ({
     icon: Tag,
     roles: ['owner', 'manager']
   }];
-  const operationsItems = [{
-    id: 'orders',
-    titleKey: 'online_delivery',
-    icon: Truck,
-    roles: ['owner', 'manager', 'driver'],
+  const marketplaceItems = [{
+    id: 'marketplace-orders',
+    titleKey: 'shop_orders',
+    icon: PackagePlus,
+    roles: ['owner', 'manager'],
     badge: analytics.activeOrders > 0 ? analytics.activeOrders : null
-  }, {
-    id: 'exchange',
-    titleKey: 'exchange',
-    icon: RefreshCw,
-    roles: ['owner', 'manager', 'driver']
   }];
   const managementItems = [{
     id: 'customers',
@@ -242,7 +237,7 @@ export const AppSidebar = ({
         {renderNavGroup(inventoryItems, 'Inventory')}
         
         <div className={`mx-4 h-px bg-border/50 transition-all duration-300 ${isCollapsed ? 'opacity-0 my-0' : 'opacity-100 my-2'}`} />
-        {renderNavGroup(operationsItems, 'Operations')}
+        {renderNavGroup(marketplaceItems, 'Marketplace')}
         
         <div className={`mx-4 h-px bg-border/50 transition-all duration-300 ${isCollapsed ? 'opacity-0 my-0' : 'opacity-100 my-2'}`} />
         {renderNavGroup(managementItems, 'Manage')}
