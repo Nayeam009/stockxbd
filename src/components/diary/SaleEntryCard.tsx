@@ -16,7 +16,8 @@ import {
   Crown,
   UserCog,
   Truck,
-  Users
+  Users,
+  Globe
 } from "lucide-react";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
 import { format } from "date-fns";
@@ -92,6 +93,12 @@ export const SaleEntryCard = ({ entry, onViewDetails }: SaleEntryCardProps) => {
                 <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30 text-xs font-medium">
                   <Receipt className="h-3 w-3 mr-1" />
                   Sale
+                </Badge>
+              )}
+              {entry.isOnlineOrder && (
+                <Badge className="bg-blue-500 text-white text-xs font-medium">
+                  <Globe className="h-3 w-3 mr-1" />
+                  Online
                 </Badge>
               )}
               <Badge variant="outline" className={`${statusConf.bgColor} ${statusConf.color} text-xs font-medium border`}>

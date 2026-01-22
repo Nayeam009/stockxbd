@@ -25,6 +25,7 @@ export type Database = {
           product_name: string
           product_type: string
           quantity: number
+          return_cylinder_brand: string | null
           return_cylinder_qty: number | null
           return_cylinder_type: string | null
           weight: string | null
@@ -39,6 +40,7 @@ export type Database = {
           product_name: string
           product_type: string
           quantity?: number
+          return_cylinder_brand?: string | null
           return_cylinder_qty?: number | null
           return_cylinder_type?: string | null
           weight?: string | null
@@ -53,6 +55,7 @@ export type Database = {
           product_name?: string
           product_type?: string
           quantity?: number
+          return_cylinder_brand?: string | null
           return_cylinder_qty?: number | null
           return_cylinder_type?: string | null
           weight?: string | null
@@ -868,6 +871,7 @@ export type Database = {
       }
       pos_transactions: {
         Row: {
+          community_order_id: string | null
           created_at: string
           created_by: string | null
           customer_id: string | null
@@ -875,6 +879,7 @@ export type Database = {
           driver_id: string | null
           id: string
           is_demo: boolean | null
+          is_online_order: boolean | null
           is_voided: boolean | null
           notes: string | null
           owner_id: string | null
@@ -888,6 +893,7 @@ export type Database = {
           voided_by: string | null
         }
         Insert: {
+          community_order_id?: string | null
           created_at?: string
           created_by?: string | null
           customer_id?: string | null
@@ -895,6 +901,7 @@ export type Database = {
           driver_id?: string | null
           id?: string
           is_demo?: boolean | null
+          is_online_order?: boolean | null
           is_voided?: boolean | null
           notes?: string | null
           owner_id?: string | null
@@ -908,6 +915,7 @@ export type Database = {
           voided_by?: string | null
         }
         Update: {
+          community_order_id?: string | null
           created_at?: string
           created_by?: string | null
           customer_id?: string | null
@@ -915,6 +923,7 @@ export type Database = {
           driver_id?: string | null
           id?: string
           is_demo?: boolean | null
+          is_online_order?: boolean | null
           is_voided?: boolean | null
           notes?: string | null
           owner_id?: string | null
@@ -928,6 +937,13 @@ export type Database = {
           voided_by?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "pos_transactions_community_order_id_fkey"
+            columns: ["community_order_id"]
+            isOneToOne: false
+            referencedRelation: "community_orders"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "pos_transactions_customer_id_fkey"
             columns: ["customer_id"]

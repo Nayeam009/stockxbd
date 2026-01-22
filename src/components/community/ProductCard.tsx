@@ -1,9 +1,10 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ShoppingCart, Plus, Minus, Flame, Package } from "lucide-react";
+import { ShoppingCart, Plus, Minus, Flame, Package, AlertCircle } from "lucide-react";
 import { ShopProduct, CartItem } from "@/hooks/useCommunityData";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { toast } from "@/hooks/use-toast";
 
 interface ProductCardProps {
   product: ShopProduct;
@@ -17,6 +18,14 @@ export const ProductCard = ({ product, onAddToCart, cartItem }: ProductCardProps
   const [returnType, setReturnType] = useState<'empty' | 'leaked' | null>(cartItem?.return_cylinder_type || null);
 
   const isLpg = product.product_type === 'lpg_refill' || product.product_type === 'lpg_package';
+  const isRefill = product.product_type === 'lpg_refill';
+
+  // Auto-sync return quantity with product quantity for refills
+  useEffect(() => {
+    if (isRefill && returnType) {
+      setReturnQty(quantity);
+    }
+  }, [quantity, isRefill, returnType]);
 
   const getProductIcon = () => {
     switch (product.product_type) {
@@ -44,13 +53,28 @@ export const ProductCard = ({ product, onAddToCart, cartItem }: ProductCardProps
   };
 
   const handleAddToCart = () => {
+    // Validation: Refill requires return cylinder selection
+    if (isRefill && !returnType) {
+      toast({
+        title: "Return Cylinder Required",
+        description: "Please select your empty cylinder type (Empty or Leaked) for refill orders",
+        variant: "destructive"
+      });
+      return;
+    }
+
     const item: CartItem = {
       ...product,
       quantity,
-      return_cylinder_qty: returnQty,
+      return_cylinder_qty: isRefill ? quantity : returnQty,
       return_cylinder_type: returnType
     };
     onAddToCart(item);
+    
+    toast({
+      title: "Added to Cart",
+      description: `${product.brand_name} x${quantity} added`
+    });
   };
 
   return (
@@ -99,7 +123,7 @@ export const ProductCard = ({ product, onAddToCart, cartItem }: ProductCardProps
               <Button 
                 variant="outline" 
                 size="icon" 
-                className="h-8 w-8"
+                className="h-10 w-10"
                 onClick={() => setQuantity(Math.max(1, quantity - 1))}
               >
                 <Minus className="h-4 w-4" />
@@ -108,7 +132,7 @@ export const ProductCard = ({ product, onAddToCart, cartItem }: ProductCardProps
               <Button 
                 variant="outline" 
                 size="icon" 
-                className="h-8 w-8"
+                className="h-10 w-10"
                 onClick={() => setQuantity(quantity + 1)}
               >
                 <Plus className="h-4 w-4" />
@@ -116,15 +140,22 @@ export const ProductCard = ({ product, onAddToCart, cartItem }: ProductCardProps
             </div>
           </div>
 
-          {/* Return Cylinder (for LPG products) */}
+          {/* Return Cylinder (MANDATORY for Refill, optional for Package) */}
           {isLpg && (
-            <div className="p-3 rounded-lg bg-muted/50 space-y-2">
-              <span className="text-xs font-medium text-muted-foreground">Returning cylinder?</span>
+            <div className={`p-3 rounded-lg space-y-2 ${isRefill && !returnType ? 'bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800' : 'bg-muted/50'}`}>
+              <div className="flex items-center gap-2">
+                {isRefill && !returnType && (
+                  <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0" />
+                )}
+                <span className={`text-xs font-medium ${isRefill && !returnType ? 'text-amber-700 dark:text-amber-300' : 'text-muted-foreground'}`}>
+                  {isRefill ? 'Select your empty cylinder to return *' : 'Returning cylinder? (Optional)'}
+                </span>
+              </div>
               <div className="flex items-center gap-2">
                 <Button 
                   variant={returnType === 'empty' ? 'default' : 'outline'}
                   size="sm"
-                  className="flex-1 text-xs"
+                  className="flex-1 text-xs h-10"
                   onClick={() => {
                     setReturnType(returnType === 'empty' ? null : 'empty');
                     setReturnQty(returnType === 'empty' ? 0 : quantity);
@@ -135,7 +166,7 @@ export const ProductCard = ({ product, onAddToCart, cartItem }: ProductCardProps
                 <Button 
                   variant={returnType === 'leaked' ? 'destructive' : 'outline'}
                   size="sm"
-                  className="flex-1 text-xs"
+                  className="flex-1 text-xs h-10"
                   onClick={() => {
                     setReturnType(returnType === 'leaked' ? null : 'leaked');
                     setReturnQty(returnType === 'leaked' ? 0 : quantity);
@@ -145,14 +176,15 @@ export const ProductCard = ({ product, onAddToCart, cartItem }: ProductCardProps
                 </Button>
               </div>
               {returnType && (
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between pt-1">
                   <span className="text-xs text-muted-foreground">Return qty</span>
                   <div className="flex items-center gap-2">
                     <Button 
                       variant="outline" 
                       size="icon" 
-                      className="h-6 w-6"
+                      className="h-8 w-8"
                       onClick={() => setReturnQty(Math.max(0, returnQty - 1))}
+                      disabled={isRefill} // Fixed for refills
                     >
                       <Minus className="h-3 w-3" />
                     </Button>
@@ -160,13 +192,19 @@ export const ProductCard = ({ product, onAddToCart, cartItem }: ProductCardProps
                     <Button 
                       variant="outline" 
                       size="icon" 
-                      className="h-6 w-6"
+                      className="h-8 w-8"
                       onClick={() => setReturnQty(Math.min(quantity, returnQty + 1))}
+                      disabled={isRefill} // Fixed for refills
                     >
                       <Plus className="h-3 w-3" />
                     </Button>
                   </div>
                 </div>
+              )}
+              {isRefill && returnType && (
+                <p className="text-[10px] text-muted-foreground">
+                  Returning {returnQty} {returnType} cylinder(s) for exchange
+                </p>
               )}
             </div>
           )}
@@ -174,11 +212,12 @@ export const ProductCard = ({ product, onAddToCart, cartItem }: ProductCardProps
 
         {/* Add to Cart */}
         <Button 
-          className="w-full bg-gradient-primary hover:opacity-90" 
+          className="w-full bg-gradient-primary hover:opacity-90 h-12" 
           onClick={handleAddToCart}
+          disabled={isRefill && !returnType}
         >
           <ShoppingCart className="h-4 w-4 mr-2" />
-          Add to Cart • ৳{(product.price * quantity).toLocaleString()}
+          {isRefill && !returnType ? 'Select Return Cylinder' : `Add to Cart • ৳${(product.price * quantity).toLocaleString()}`}
         </Button>
       </CardContent>
     </Card>

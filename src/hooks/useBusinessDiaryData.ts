@@ -26,6 +26,8 @@ export interface SaleEntry {
   transactionNumber: string;
   source: string;
   sourceId: string;
+  isOnlineOrder?: boolean;
+  communityOrderId?: string | null;
 }
 
 export interface ExpenseEntry {
@@ -143,6 +145,12 @@ export const useBusinessDiaryData = (): UseBusinessDiaryDataReturn => {
         .eq('is_voided', false)
         .order('created_at', { ascending: false })
         .limit(500);
+      
+      // Separately fetch online order info to avoid type issues with new columns
+      const { data: onlineOrderInfo } = await supabase
+        .from('pos_transactions')
+        .select('id, is_online_order, community_order_id')
+        .not('community_order_id', 'is', null);
 
       if (posError) throw posError;
 
@@ -202,12 +210,23 @@ export const useBusinessDiaryData = (): UseBusinessDiaryDataReturn => {
         return role.charAt(0).toUpperCase() + role.slice(1);
       };
 
+      // Build a map of online order transactions
+      const onlineOrderMap = new Map<string, { isOnline: boolean; communityOrderId: string | null }>(
+        (onlineOrderInfo || []).map((info: any) => [info.id, { 
+          isOnline: info.is_online_order || false, 
+          communityOrderId: info.community_order_id 
+        }])
+      );
+
       // Process POS transactions - handle both items and itemless transactions
       const posEntries: SaleEntry[] = (posTransactions || []).flatMap(txn => {
         const customer = txn.customer_id ? customerMap.get(txn.customer_id) : null;
         const items = txn.pos_transaction_items || [];
         const isWholesale = items.length > 1;
         const staffRole = getStaffRole(txn.created_by);
+        const onlineInfo = onlineOrderMap.get(txn.id);
+        const isOnlineOrder = onlineInfo?.isOnline || false;
+        const communityOrderId = onlineInfo?.communityOrderId || null;
         
         // If no items but transaction has value, create single summary entry
         if (items.length === 0 && Number(txn.total) > 0) {
@@ -232,8 +251,10 @@ export const useBusinessDiaryData = (): UseBusinessDiaryDataReturn => {
             customerId: txn.customer_id,
             transactionType: 'retail' as 'retail' | 'wholesale',
             transactionNumber: txn.transaction_number,
-            source: 'POS',
-            sourceId: txn.id
+            source: isOnlineOrder ? 'Online Order' : 'POS',
+            sourceId: txn.id,
+            isOnlineOrder,
+            communityOrderId
           }];
         }
         
@@ -258,8 +279,10 @@ export const useBusinessDiaryData = (): UseBusinessDiaryDataReturn => {
           customerId: txn.customer_id,
           transactionType: isWholesale ? 'wholesale' : 'retail' as 'retail' | 'wholesale',
           transactionNumber: txn.transaction_number,
-          source: 'POS',
-          sourceId: txn.id
+          source: isOnlineOrder ? 'Online Order' : 'POS',
+          sourceId: txn.id,
+          isOnlineOrder,
+          communityOrderId
         }));
       });
 
