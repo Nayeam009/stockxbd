@@ -251,35 +251,25 @@ export const CommunityModule = () => {
         })) as Post[]);
       }
 
-      // Fetch exchanges
+      // Fetch exchanges - using correct column structure
       const { data: exchangesData } = await supabase
         .from('cylinder_exchanges')
-        .select(`
-          id,
-          quantity,
-          weight,
-          status,
-          notes,
-          created_by,
-          created_at,
-          from_brand:from_brand_id(id, name),
-          to_brand:to_brand_id(id, name)
-        `)
+        .select('*')
         .order('created_at', { ascending: false })
         .limit(50);
 
       if (exchangesData) {
         setExchanges(exchangesData.map((e: any) => ({
           id: e.id,
-          from_brand_id: e.from_brand?.id || '',
-          from_brand_name: e.from_brand?.name || 'Unknown',
-          to_brand_id: e.to_brand?.id || '',
-          to_brand_name: e.to_brand?.name || 'Unknown',
-          quantity: e.quantity,
-          weight: e.weight,
-          status: e.status,
-          notes: e.notes,
-          created_by: e.created_by,
+          from_brand_id: e.id,
+          from_brand_name: e.from_brand || 'Unknown',
+          to_brand_id: e.id,
+          to_brand_name: e.to_brand || 'Unknown',
+          quantity: e.quantity || 0,
+          weight: e.from_weight || '12kg',
+          status: e.status || 'active',
+          notes: null,
+          created_by: e.user_id,
           created_at: e.created_at
         })));
       }
@@ -497,15 +487,16 @@ export const CommunityModule = () => {
     }
 
     try {
-      // Create exchange record
+      // Create exchange record using correct column names
       const { error } = await supabase.from('cylinder_exchanges').insert({
-        from_brand_id: exchangeFromBrand,
-        to_brand_id: exchangeToBrand,
+        from_brand: brands.find(b => b.id === exchangeFromBrand)?.name || exchangeFromBrand,
+        to_brand: brands.find(b => b.id === exchangeToBrand)?.name || exchangeToBrand,
+        from_weight: exchangeWeight || '12kg',
+        to_weight: exchangeWeight || '12kg',
         quantity: qty,
-        weight: exchangeWeight || '12kg',
-        notes: exchangeNotes || null,
-        status: 'completed',
-        created_by: currentUser.id
+        status: 'active',
+        user_id: currentUser.id,
+        author_name: currentUser.name
       });
 
       if (error) throw error;
@@ -624,10 +615,11 @@ export const CommunityModule = () => {
     <div className="space-y-4 pb-20 md:pb-6">
       {/* Header */}
       <PremiumModuleHeader
-        icon={Store}
+        icon={<Store className="h-5 w-5 sm:h-6 sm:w-6 text-white" />}
         title={t('lpg_marketplace') || 'LPG Marketplace'}
-        description={t('lpg_marketplace_desc') || 'Manage orders, posts, and cylinder exchanges'}
-        gradient="from-violet-500 via-purple-500 to-fuchsia-500"
+        subtitle={t('lpg_marketplace_desc') || 'Manage orders, posts, and cylinder exchanges'}
+        gradientFrom="from-violet-500/10"
+        gradientTo="to-fuchsia-500/10"
       />
 
       {/* Stats Grid */}
@@ -635,29 +627,26 @@ export const CommunityModule = () => {
         <PremiumStatCard
           title="Pending"
           value={stats.pendingOrders}
-          icon={Clock}
-          variant="amber"
-          onClick={() => { setActiveTab('orders'); setOrderFilter('pending'); }}
+          icon={<Clock className="h-5 w-5 text-amber-600" />}
+          colorScheme="amber"
         />
         <PremiumStatCard
           title="In Transit"
           value={stats.dispatchedOrders}
-          icon={Truck}
-          variant="default"
-          onClick={() => { setActiveTab('orders'); setOrderFilter('dispatched'); }}
+          icon={<Truck className="h-5 w-5 text-primary" />}
+          colorScheme="primary"
         />
         <PremiumStatCard
           title="Delivered"
           value={stats.deliveredOrders}
-          icon={CheckCircle2}
-          variant="emerald"
-          onClick={() => { setActiveTab('orders'); setOrderFilter('delivered'); }}
+          icon={<CheckCircle2 className="h-5 w-5 text-emerald-600" />}
+          colorScheme="emerald"
         />
         <PremiumStatCard
           title="Today's Revenue"
           value={`৳${stats.todayRevenue.toLocaleString()}`}
-          icon={ShoppingBag}
-          variant="default"
+          icon={<ShoppingBag className="h-5 w-5 text-purple-600" />}
+          colorScheme="purple"
         />
       </div>
 
@@ -736,9 +725,9 @@ export const CommunityModule = () => {
           {/* Order List */}
           {filteredOrders.length === 0 ? (
             <EmptyStateCard
-              icon={ShoppingBag}
+              icon={<ShoppingBag className="h-8 w-8" />}
               title="No Orders Found"
-              description={shopId ? "You'll see customer orders here when they place them." : "Create a shop profile to start receiving orders."}
+              subtitle={shopId ? "You'll see customer orders here when they place them." : "Create a shop profile to start receiving orders."}
               actionLabel={!shopId ? "Create Shop" : undefined}
               onAction={!shopId ? () => setActiveTab('shop') : undefined}
             />
@@ -917,9 +906,9 @@ export const CommunityModule = () => {
           {/* Posts List */}
           {filteredPosts.length === 0 ? (
             <EmptyStateCard
-              icon={MessageSquare}
+              icon={<MessageSquare className="h-8 w-8" />}
               title="No Posts Yet"
-              description="Be the first to share something with the community!"
+              subtitle="Be the first to share something with the community!"
               actionLabel="Create Post"
               onAction={() => setCreatePostOpen(true)}
             />
@@ -1193,9 +1182,9 @@ export const CommunityModule = () => {
             </Card>
           ) : (
             <EmptyStateCard
-              icon={Store}
+              icon={<Store className="h-8 w-8" />}
               title="No Shop Profile"
-              description="Create a shop profile to start selling on the LPG marketplace"
+              subtitle="Create a shop profile to start selling on the LPG marketplace"
               actionLabel="Create Shop"
               onAction={() => window.dispatchEvent(new CustomEvent('navigate-module', { detail: 'settings' }))}
             />
