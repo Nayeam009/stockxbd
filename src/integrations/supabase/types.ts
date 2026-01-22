@@ -81,6 +81,7 @@ export type Database = {
           customer_id: string
           customer_name: string
           customer_phone: string
+          customer_type: string | null
           delivered_at: string | null
           delivery_address: string
           delivery_fee: number | null
@@ -88,6 +89,7 @@ export type Database = {
           district: string
           division: string
           id: string
+          is_self_order: boolean | null
           order_notes: string | null
           order_number: string
           payment_method: string | null
@@ -106,6 +108,7 @@ export type Database = {
           customer_id: string
           customer_name: string
           customer_phone: string
+          customer_type?: string | null
           delivered_at?: string | null
           delivery_address: string
           delivery_fee?: number | null
@@ -113,6 +116,7 @@ export type Database = {
           district: string
           division: string
           id?: string
+          is_self_order?: boolean | null
           order_notes?: string | null
           order_number: string
           payment_method?: string | null
@@ -131,6 +135,7 @@ export type Database = {
           customer_id?: string
           customer_name?: string
           customer_phone?: string
+          customer_type?: string | null
           delivered_at?: string | null
           delivery_address?: string
           delivery_fee?: number | null
@@ -138,6 +143,7 @@ export type Database = {
           district?: string
           division?: string
           id?: string
+          is_self_order?: boolean | null
           order_notes?: string | null
           order_number?: string
           payment_method?: string | null
@@ -357,6 +363,69 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      cylinder_exchange_requests: {
+        Row: {
+          brand_name: string
+          completed_at: string | null
+          created_at: string | null
+          id: string
+          notes: string | null
+          quantity: number
+          requester_id: string
+          requester_shop_id: string
+          responded_at: string | null
+          response_notes: string | null
+          status: string | null
+          target_shop_id: string
+          weight: string
+        }
+        Insert: {
+          brand_name: string
+          completed_at?: string | null
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          quantity: number
+          requester_id: string
+          requester_shop_id: string
+          responded_at?: string | null
+          response_notes?: string | null
+          status?: string | null
+          target_shop_id: string
+          weight: string
+        }
+        Update: {
+          brand_name?: string
+          completed_at?: string | null
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          quantity?: number
+          requester_id?: string
+          requester_shop_id?: string
+          responded_at?: string | null
+          response_notes?: string | null
+          status?: string | null
+          target_shop_id?: string
+          weight?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cylinder_exchange_requests_requester_shop_id_fkey"
+            columns: ["requester_shop_id"]
+            isOneToOne: false
+            referencedRelation: "shop_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cylinder_exchange_requests_target_shop_id_fkey"
+            columns: ["target_shop_id"]
+            isOneToOne: false
+            referencedRelation: "shop_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       cylinder_exchanges: {
         Row: {

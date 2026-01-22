@@ -5,14 +5,22 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Shield, Truck, Loader2, Users, Crown, AlertCircle, UserPlus, LogIn, ShoppingCart, Package, Globe, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Shield, Truck, Loader2, Users, Crown, AlertCircle, UserPlus, LogIn, ShoppingCart, Package, Globe, CheckCircle2, Building2, Eye, EyeOff } from "lucide-react";
 import stockXLogo from "@/assets/stock-x-logo.png";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
-type AuthMode = 'signin' | 'signup' | 'invite';
-type UserRole = 'owner' | 'manager' | 'driver' | 'customer';
+type AuthMode = 'signin' | 'signup' | 'invite' | 'team-signup';
+type UserRole = 'owner' | 'manager' | 'driver' | 'customer' | 'staff';
+type SignupCategory = 'customer' | 'owner' | 'team';
 
 interface RoleOption {
   id: UserRole;
@@ -24,6 +32,46 @@ interface RoleOption {
   borderColor: string;
   features: string[];
 }
+
+interface SignupCategoryOption {
+  id: SignupCategory;
+  label: string;
+  description: string;
+  icon: React.ElementType;
+  color: string;
+  bgColor: string;
+  borderColor: string;
+}
+
+const signupCategories: SignupCategoryOption[] = [
+  {
+    id: 'customer',
+    label: 'Customer',
+    description: 'Order LPG online',
+    icon: ShoppingCart,
+    color: 'text-emerald-600',
+    bgColor: 'bg-emerald-50 dark:bg-emerald-950/30',
+    borderColor: 'border-emerald-500',
+  },
+  {
+    id: 'owner',
+    label: 'Shop Owner',
+    description: 'Full business control',
+    icon: Crown,
+    color: 'text-amber-600',
+    bgColor: 'bg-amber-50 dark:bg-amber-950/30',
+    borderColor: 'border-amber-500',
+  },
+  {
+    id: 'team',
+    label: 'Team Member',
+    description: 'Join a shop',
+    icon: Users,
+    color: 'text-primary',
+    bgColor: 'bg-primary/5',
+    borderColor: 'border-primary',
+  }
+];
 
 const roleOptions: RoleOption[] = [
   {
@@ -68,12 +116,19 @@ const roleOptions: RoleOption[] = [
   }
 ];
 
+const teamRoleOptions = [
+  { value: 'manager', label: 'Manager', description: 'Inventory & sales access' },
+  { value: 'driver', label: 'Driver', description: 'Delivery & route access' },
+  { value: 'staff', label: 'Staff', description: 'Basic POS access' }
+];
+
 const Auth = () => {
   const [searchParams] = useSearchParams();
   const inviteCode = searchParams.get('invite');
   const inviteRoleParam = searchParams.get('role');
   
   const [authMode, setAuthMode] = useState<AuthMode>('signin');
+  const [signupCategory, setSignupCategory] = useState<SignupCategory>('customer');
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -84,6 +139,16 @@ const Auth = () => {
   const [ownersExist, setOwnersExist] = useState(true);
   const [inviteValid, setInviteValid] = useState<boolean | null>(null);
   const [inviteRole, setInviteRole] = useState<string>('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  
+  // Team member specific fields
+  const [ownerEmail, setOwnerEmail] = useState("");
+  const [teamRole, setTeamRole] = useState<string>("manager");
+  const [verifyingOwner, setVerifyingOwner] = useState(false);
+  const [ownerVerified, setOwnerVerified] = useState(false);
+  const [ownerShopName, setOwnerShopName] = useState("");
+  
   const navigate = useNavigate();
 
   // Check system state on mount
@@ -184,6 +249,122 @@ const Auth = () => {
     checkSystemState();
   }, [inviteCode, navigate, inviteRoleParam]);
 
+  // Verify owner email
+  const verifyOwnerEmail = async () => {
+    if (!ownerEmail) {
+      toast({ title: "Please enter owner's email", variant: "destructive" });
+      return;
+    }
+
+    setVerifyingOwner(true);
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/verify-owner`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`
+          },
+          body: JSON.stringify({ owner_email: ownerEmail })
+        }
+      );
+
+      const data = await response.json();
+
+      if (data.exists) {
+        setOwnerVerified(true);
+        setOwnerShopName(data.shop_name || '');
+        toast({ 
+          title: "Owner Verified!", 
+          description: data.shop_name ? `Shop: ${data.shop_name}` : "You can now complete registration" 
+        });
+      } else {
+        setOwnerVerified(false);
+        toast({ 
+          title: "Owner Not Found", 
+          description: data.error || "Please check the email and try again", 
+          variant: "destructive" 
+        });
+      }
+    } catch (error) {
+      console.error('Error verifying owner:', error);
+      toast({ title: "Verification Failed", variant: "destructive" });
+    } finally {
+      setVerifyingOwner(false);
+    }
+  };
+
+  // Handle team member registration
+  const handleTeamSignUp = async () => {
+    if (!ownerEmail || !password || !fullName || !email) {
+      toast({ title: "Please fill in all fields", variant: "destructive" });
+      return;
+    }
+
+    if (!ownerVerified) {
+      toast({ title: "Please verify the owner's email first", variant: "destructive" });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/register-team-member`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`
+          },
+          body: JSON.stringify({
+            owner_email: ownerEmail,
+            owner_password: password,
+            member_name: fullName,
+            member_email: email,
+            member_role: teamRole
+          })
+        }
+      );
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast({ 
+          title: "Registration Successful!", 
+          description: data.message || `You've been registered as ${teamRole}` 
+        });
+        
+        // Sign in the new team member
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: email,
+          password: password // Uses owner's password
+        });
+
+        if (signInError) {
+          toast({ 
+            title: "Please sign in", 
+            description: "Your account has been created. Please sign in." 
+          });
+          setAuthMode('signin');
+        } else {
+          navigate('/dashboard');
+        }
+      } else {
+        toast({ 
+          title: "Registration Failed", 
+          description: data.error || "Please try again", 
+          variant: "destructive" 
+        });
+      }
+    } catch (error: any) {
+      console.error('Error registering team member:', error);
+      toast({ title: "Registration Failed", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSignUp = async () => {
     if (!email || !password) {
       toast({ title: "Please fill in all fields", variant: "destructive" });
@@ -203,6 +384,9 @@ const Auth = () => {
     setLoading(true);
 
     try {
+      const actualRole = signupCategory === 'customer' ? 'customer' : 
+                         signupCategory === 'owner' ? 'owner' : selectedRole;
+
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -212,8 +396,7 @@ const Auth = () => {
             : window.location.origin,
           data: {
             full_name: fullName || undefined,
-            // Pass selected role to database trigger (only for non-invite signups)
-            requested_role: inviteCode ? undefined : selectedRole
+            requested_role: inviteCode ? undefined : actualRole
           }
         }
       });
@@ -234,15 +417,14 @@ const Auth = () => {
             description: `You've successfully joined as ${getRoleLabel(inviteRole)}` 
           });
         } else {
-          // Role is now assigned by database trigger using requested_role from metadata
           toast({ 
             title: "Account Created Successfully!", 
-            description: `Welcome! You've signed up as ${getRoleLabel(selectedRole)}` 
+            description: `Welcome! You've signed up as ${getRoleLabel(actualRole)}` 
           });
         }
         
         // Redirect based on role - customers go to community, others to dashboard
-        if (selectedRole === 'customer') {
+        if (actualRole === 'customer') {
           navigate('/community');
         } else {
           navigate('/dashboard');
@@ -345,6 +527,8 @@ const Auth = () => {
     
     if (authMode === 'signin') {
       await handleSignIn();
+    } else if (authMode === 'team-signup') {
+      await handleTeamSignUp();
     } else {
       await handleSignUp();
     }
@@ -356,6 +540,7 @@ const Auth = () => {
       case 'manager': return 'Manager';
       case 'driver': return 'Driver';
       case 'customer': return 'Customer';
+      case 'staff': return 'Staff';
       default: return role;
     }
   };
@@ -369,8 +554,7 @@ const Auth = () => {
     }
   };
 
-  const isSignUpMode = authMode === 'signup' || authMode === 'invite';
-  const selectedRoleData = roleOptions.find(r => r.id === selectedRole);
+  const isSignUpMode = authMode === 'signup' || authMode === 'invite' || authMode === 'team-signup';
 
   if (checkingSystem) {
     return (
@@ -500,11 +684,22 @@ const Auth = () => {
                     Set up the first owner account for your business
                   </CardDescription>
                 </>
+              ) : authMode === 'team-signup' ? (
+                <>
+                  <Badge variant="secondary" className="w-fit mx-auto mb-2 px-4 py-2 bg-primary/10 text-primary">
+                    <Users className="h-3 w-3 mr-1" />
+                    Join a Shop
+                  </Badge>
+                  <CardTitle className="text-2xl">Team Member Registration</CardTitle>
+                  <CardDescription>
+                    Use your shop owner's credentials to join their team
+                  </CardDescription>
+                </>
               ) : authMode === 'signup' ? (
                 <>
                   <CardTitle className="text-2xl">Create Account</CardTitle>
                   <CardDescription>
-                    Select your role and sign up to get started
+                    Select your account type and sign up to get started
                   </CardDescription>
                 </>
               ) : (
@@ -551,48 +746,38 @@ const Auth = () => {
                 </div>
               )}
 
-              {/* Visual Role Selection Cards - Only for Sign Up without invite */}
+              {/* Signup Category Selection - Only for Signup (not invite, not team-signup) */}
               {authMode === 'signup' && !inviteCode && ownersExist && (
                 <div className="mb-6">
-                  <Label className="mb-3 block">Select Your Role</Label>
-                  <div className="grid grid-cols-2 gap-3">
-                    {roleOptions.map((role) => {
-                      const Icon = role.icon;
-                      const isSelected = selectedRole === role.id;
+                  <Label className="mb-3 block">I want to...</Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {signupCategories.map((category) => {
+                      const Icon = category.icon;
+                      const isSelected = signupCategory === category.id;
                       return (
                         <button
-                          key={role.id}
+                          key={category.id}
                           type="button"
-                          onClick={() => setSelectedRole(role.id)}
+                          onClick={() => {
+                            setSignupCategory(category.id);
+                            if (category.id === 'team') {
+                              setAuthMode('team-signup');
+                            }
+                          }}
                           disabled={loading}
-                          className={`p-4 rounded-xl border-2 transition-all text-left ${
+                          className={`p-3 rounded-xl border-2 transition-all text-center ${
                             isSelected 
-                              ? `${role.borderColor} ${role.bgColor}` 
+                              ? `${category.borderColor} ${category.bgColor}` 
                               : 'border-border hover:border-muted-foreground/50'
                           }`}
                         >
-                          <Icon className={`h-7 w-7 mx-auto mb-2 ${role.color}`} />
-                          <span className="font-semibold text-sm block text-center">{role.label}</span>
-                          <span className="text-xs text-muted-foreground block text-center">{role.description}</span>
+                          <Icon className={`h-6 w-6 mx-auto mb-1.5 ${category.color}`} />
+                          <span className="font-semibold text-xs block">{category.label}</span>
+                          <span className="text-[10px] text-muted-foreground block leading-tight">{category.description}</span>
                         </button>
                       );
                     })}
                   </div>
-                  
-                  {/* Selected Role Features */}
-                  {selectedRoleData && (
-                    <div className="mt-4 p-3 rounded-lg bg-muted/50">
-                      <p className="text-xs font-medium text-muted-foreground mb-2">What you'll get:</p>
-                      <ul className="space-y-1">
-                        {selectedRoleData.features.map((feature, i) => (
-                          <li key={i} className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <CheckCircle2 className={`h-3 w-3 ${selectedRoleData.color}`} />
-                            {feature}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
                 </div>
               )}
 
@@ -611,190 +796,354 @@ const Auth = () => {
                 </div>
               )}
 
-              <form onSubmit={handleSubmit} className="space-y-4">
-                {/* Full Name - Only for Sign Up */}
-                {isSignUpMode && (
-                  <div className="space-y-2">
-                    <Label htmlFor="fullName">Full Name (Optional)</Label>
+              {/* Team Member Registration Form */}
+              {authMode === 'team-signup' && (
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  {/* Owner Verification Section */}
+                  <div className="space-y-3 p-4 rounded-xl border bg-muted/30">
+                    <Label className="text-sm font-medium">Step 1: Verify Shop Owner</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="email"
+                        placeholder="Shop owner's email"
+                        value={ownerEmail}
+                        onChange={(e) => {
+                          setOwnerEmail(e.target.value);
+                          setOwnerVerified(false);
+                        }}
+                        disabled={loading || verifyingOwner}
+                        className="h-11 flex-1"
+                      />
+                      <Button
+                        type="button"
+                        variant={ownerVerified ? "secondary" : "default"}
+                        onClick={verifyOwnerEmail}
+                        disabled={loading || verifyingOwner || !ownerEmail}
+                        className="h-11 px-4"
+                      >
+                        {verifyingOwner ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : ownerVerified ? (
+                          <CheckCircle2 className="h-4 w-4 text-success" />
+                        ) : (
+                          "Verify"
+                        )}
+                      </Button>
+                    </div>
+                    {ownerVerified && ownerShopName && (
+                      <div className="flex items-center gap-2 text-sm text-success">
+                        <Building2 className="h-4 w-4" />
+                        <span>Shop: {ownerShopName}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Member Details Section */}
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium">Step 2: Your Details</Label>
+                    
                     <Input 
-                      id="fullName" 
                       type="text" 
-                      placeholder="Enter your full name"
+                      placeholder="Your full name"
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
                       disabled={loading}
-                      className="h-12"
+                      className="h-11"
                     />
-                  </div>
-                )}
 
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email Address</Label>
-                  <Input 
-                    id="email" 
-                    type="email" 
-                    placeholder="your@email.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    disabled={loading}
-                    className="h-12"
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
-                  <Input 
-                    id="password" 
-                    type="password" 
-                    placeholder={isSignUpMode ? "Create a password (min 6 characters)" : "Enter your password"}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    disabled={loading}
-                    className="h-12"
-                  />
-                </div>
-
-                {/* Confirm Password - Only for Sign Up */}
-                {isSignUpMode && (
-                  <div className="space-y-2">
-                    <Label htmlFor="confirmPassword">Confirm Password</Label>
                     <Input 
-                      id="confirmPassword" 
-                      type="password" 
-                      placeholder="Re-enter your password"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      type="email" 
+                      placeholder="Your email address"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      disabled={loading}
+                      className="h-11"
+                    />
+
+                    <Select value={teamRole} onValueChange={setTeamRole}>
+                      <SelectTrigger className="h-11">
+                        <SelectValue placeholder="Select your role" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {teamRoleOptions.map(role => (
+                          <SelectItem key={role.value} value={role.value}>
+                            <span className="font-medium">{role.label}</span>
+                            <span className="text-muted-foreground ml-2 text-xs">- {role.description}</span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Password Section */}
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium">Step 3: Owner's Password</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Enter the shop owner's password to verify your team membership
+                    </p>
+                    <div className="relative">
+                      <Input 
+                        type={showPassword ? "text" : "password"}
+                        placeholder="Enter owner's password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        disabled={loading}
+                        className="h-11 pr-10"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
+                        onClick={() => setShowPassword(!showPassword)}
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                  </div>
+
+                  <Button 
+                    type="submit" 
+                    className="w-full h-12 bg-gradient-primary hover:opacity-90 transition-opacity text-base"
+                    disabled={loading || !ownerVerified}
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                        Registering...
+                      </>
+                    ) : (
+                      <>
+                        <UserPlus className="mr-2 h-5 w-5" />
+                        Join Team
+                      </>
+                    )}
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => {
+                      setAuthMode('signup');
+                      setSignupCategory('customer');
+                    }}
+                  >
+                    <ArrowLeft className="mr-2 h-4 w-4" />
+                    Back to Sign Up Options
+                  </Button>
+                </form>
+              )}
+
+              {/* Regular Sign In / Sign Up Form */}
+              {authMode !== 'team-signup' && (
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  {/* Full Name - Only for Sign Up */}
+                  {isSignUpMode && (
+                    <div className="space-y-2">
+                      <Label htmlFor="fullName">Full Name</Label>
+                      <Input 
+                        id="fullName" 
+                        type="text" 
+                        placeholder="Enter your full name"
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        disabled={loading}
+                        className="h-12"
+                      />
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email Address</Label>
+                    <Input 
+                      id="email" 
+                      type="email" 
+                      placeholder="your@email.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
                       required
                       disabled={loading}
                       className="h-12"
                     />
                   </div>
-                )}
-
-                <Button 
-                  type="submit" 
-                  className="w-full h-12 bg-gradient-primary hover:opacity-90 transition-opacity text-base"
-                  disabled={loading}
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                      {authMode === 'signin' ? 'Signing In...' : 'Creating Account...'}
-                    </>
-                  ) : (
-                    <>
-                      {authMode === 'signin' ? (
-                        <>
-                          <LogIn className="mr-2 h-5 w-5" />
-                          Sign In
-                        </>
-                      ) : (
-                        <>
-                          <UserPlus className="mr-2 h-5 w-5" />
-                          Create Account
-                        </>
-                      )}
-                    </>
-                  )}
-                </Button>
-
-                {/* Divider */}
-                <div className="relative my-4">
-                  <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t border-border" />
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
-                  </div>
-                </div>
-
-                {/* Google OAuth */}
-                <Button 
-                  type="button"
-                  variant="outline"
-                  className="w-full h-12"
-                  onClick={handleGoogleAuth}
-                  disabled={loading}
-                >
-                  <svg className="mr-2 h-5 w-5" viewBox="0 0 24 24">
-                    <path
-                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                      fill="#4285F4"
-                    />
-                    <path
-                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                      fill="#34A853"
-                    />
-                    <path
-                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                      fill="#FBBC05"
-                    />
-                    <path
-                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                      fill="#EA4335"
-                    />
-                  </svg>
-                  Continue with Google
-                </Button>
-
-                {/* Toggle Between Sign In and Sign Up */}
-                <div className="pt-4 border-t border-border">
-                  {authMode === 'invite' ? (
-                    <div className="text-center space-y-2">
-                      <p className="text-sm text-muted-foreground">
-                        Already have an account?
-                      </p>
-                      <Button 
-                        variant="outline" 
-                        className="w-full h-11"
-                        onClick={() => setAuthMode('signin')}
-                        type="button"
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Password</Label>
+                    <div className="relative">
+                      <Input 
+                        id="password" 
+                        type={showPassword ? "text" : "password"}
+                        placeholder={isSignUpMode ? "Create a password (min 6 characters)" : "Enter your password"}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
                         disabled={loading}
+                        className="h-12 pr-10"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
+                        onClick={() => setShowPassword(!showPassword)}
                       >
-                        <LogIn className="mr-2 h-4 w-4" />
-                        Sign In Instead
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </Button>
                     </div>
-                  ) : authMode === 'signin' ? (
-                    <div className="text-center space-y-3">
-                      <p className="text-sm text-muted-foreground">
-                        Don't have an account yet?
-                      </p>
-                      <Button 
-                        variant="outline" 
-                        className="w-full h-11"
-                        onClick={() => setAuthMode('signup')}
-                        type="button"
-                        disabled={loading}
-                      >
-                        <UserPlus className="mr-2 h-4 w-4" />
-                        Create New Account
-                      </Button>
-                      <p className="text-xs text-muted-foreground">
-                        Team member? Ask your owner for an invite link
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="text-center space-y-3">
-                      <p className="text-sm text-muted-foreground">
-                        Already have an account?
-                      </p>
-                      <Button 
-                        variant="outline" 
-                        className="w-full h-11"
-                        onClick={() => setAuthMode('signin')}
-                        type="button"
-                        disabled={loading}
-                      >
-                        <LogIn className="mr-2 h-4 w-4" />
-                        Sign In Instead
-                      </Button>
+                  </div>
+
+                  {/* Confirm Password - Only for Sign Up */}
+                  {isSignUpMode && (
+                    <div className="space-y-2">
+                      <Label htmlFor="confirmPassword">Confirm Password</Label>
+                      <div className="relative">
+                        <Input 
+                          id="confirmPassword" 
+                          type={showConfirmPassword ? "text" : "password"}
+                          placeholder="Re-enter your password"
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          required
+                          disabled={loading}
+                          className="h-12 pr-10"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        >
+                          {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </Button>
+                      </div>
                     </div>
                   )}
-                </div>
-              </form>
+
+                  <Button 
+                    type="submit" 
+                    className="w-full h-12 bg-gradient-primary hover:opacity-90 transition-opacity text-base"
+                    disabled={loading}
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                        {authMode === 'signin' ? 'Signing In...' : 'Creating Account...'}
+                      </>
+                    ) : (
+                      <>
+                        {authMode === 'signin' ? (
+                          <>
+                            <LogIn className="mr-2 h-5 w-5" />
+                            Sign In
+                          </>
+                        ) : (
+                          <>
+                            <UserPlus className="mr-2 h-5 w-5" />
+                            Create Account
+                          </>
+                        )}
+                      </>
+                    )}
+                  </Button>
+
+                  {/* Divider */}
+                  <div className="relative my-4">
+                    <div className="absolute inset-0 flex items-center">
+                      <span className="w-full border-t border-border" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
+                    </div>
+                  </div>
+
+                  {/* Google OAuth */}
+                  <Button 
+                    type="button"
+                    variant="outline"
+                    className="w-full h-12"
+                    onClick={handleGoogleAuth}
+                    disabled={loading}
+                  >
+                    <svg className="mr-2 h-5 w-5" viewBox="0 0 24 24">
+                      <path
+                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                        fill="#4285F4"
+                      />
+                      <path
+                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                        fill="#34A853"
+                      />
+                      <path
+                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                        fill="#FBBC05"
+                      />
+                      <path
+                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                        fill="#EA4335"
+                      />
+                    </svg>
+                    Continue with Google
+                  </Button>
+
+                  {/* Toggle Between Sign In and Sign Up */}
+                  <div className="pt-4 border-t border-border">
+                    {authMode === 'invite' ? (
+                      <div className="text-center space-y-2">
+                        <p className="text-sm text-muted-foreground">
+                          Already have an account?
+                        </p>
+                        <Button 
+                          variant="outline" 
+                          className="w-full h-11"
+                          onClick={() => setAuthMode('signin')}
+                          type="button"
+                          disabled={loading}
+                        >
+                          <LogIn className="mr-2 h-4 w-4" />
+                          Sign In Instead
+                        </Button>
+                      </div>
+                    ) : authMode === 'signin' ? (
+                      <div className="text-center space-y-3">
+                        <p className="text-sm text-muted-foreground">
+                          Don't have an account yet?
+                        </p>
+                        <Button 
+                          variant="outline" 
+                          className="w-full h-11"
+                          onClick={() => setAuthMode('signup')}
+                          type="button"
+                          disabled={loading}
+                        >
+                          <UserPlus className="mr-2 h-4 w-4" />
+                          Create New Account
+                        </Button>
+                        <p className="text-xs text-muted-foreground">
+                          Team member? Click above and select "Team Member"
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="text-center space-y-3">
+                        <p className="text-sm text-muted-foreground">
+                          Already have an account?
+                        </p>
+                        <Button 
+                          variant="outline" 
+                          className="w-full h-11"
+                          onClick={() => setAuthMode('signin')}
+                          type="button"
+                          disabled={loading}
+                        >
+                          <LogIn className="mr-2 h-4 w-4" />
+                          Sign In Instead
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </form>
+              )}
             </CardContent>
           </Card>
         </div>
