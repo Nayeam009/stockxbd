@@ -15,6 +15,7 @@ import { UtilityExpenseModule } from "@/components/dashboard/modules/UtilityExpe
 import { CustomerManagementModule } from "@/components/dashboard/modules/CustomerManagementModule";
 import { SettingsModule } from "@/components/dashboard/modules/SettingsModule";
 import { ProfileModule } from "@/components/dashboard/modules/ProfileModule";
+import { MyShopProfileModule } from "@/components/dashboard/modules/MyShopProfileModule";
 import { MobileBottomNav } from "@/components/dashboard/MobileBottomNav";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { getNextModule } from "@/hooks/useSwipeNavigation";
@@ -141,6 +142,8 @@ const Dashboard = () => {
       case "analytics":
       case "driver-sales":
         return <BusinessDiaryModule />;
+      case "my-shop":
+        return <MyShopProfileModule />;
       case "community":
         return <CommunityModule />;
       case "utility-expense":
