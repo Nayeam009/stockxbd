@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { 
   Plus, 
   Minus, 
@@ -17,15 +18,16 @@ import {
   Loader2,
   Cylinder,
   CheckCircle2,
-  Building2,
+  CreditCard,
   Calculator,
-  Save,
   CircleDot,
   CircleDashed,
   Flame,
   ChefHat,
   Gauge,
-  Info
+  Info,
+  Building2,
+  ChevronDown
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
@@ -34,7 +36,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { logger } from "@/lib/logger";
 import { BrandSelect } from "@/components/shared/BrandSelect";
-import { SupplierSelect } from "@/components/shared/SupplierSelect";
 
 // Interfaces
 interface LPGBrand {
@@ -111,9 +112,10 @@ export const InventoryPOBDrawer = ({
   const [stoves, setStoves] = useState<Stove[]>([]);
   const [regulators, setRegulators] = useState<Regulator[]>([]);
   
-  // Mobile step and POB mode
-  const [mobileStep, setMobileStep] = useState<'product' | 'cart' | 'checkout'>('product');
+  // Mobile step and POB mode - simplified to 2 steps
+  const [mobileStep, setMobileStep] = useState<'product' | 'cart'>('product');
   const [pobMode, setPobMode] = useState<'buy' | 'add'>('buy');
+  const [showSupplierInput, setShowSupplierInput] = useState(false);
   
   // LPG Config
   const [lpgBrandName, setLpgBrandName] = useState("");
@@ -774,11 +776,13 @@ export const InventoryPOBDrawer = ({
       const txnNumber = `POB-${dateStr}-${String((count || 0) + 1).padStart(4, '0')}`;
 
       // Create transaction with created_by tracking
+      // Default supplier to first item's brand name or "Direct Purchase" if not provided
+      const defaultSupplier = purchaseItems[0]?.name || 'Direct Purchase';
       const { data: txnData, error: txnError } = await supabase
         .from('pob_transactions')
         .insert({
           transaction_number: txnNumber,
-          supplier_name: supplierName || 'Unknown Supplier',
+          supplier_name: supplierName.trim() || defaultSupplier,
           subtotal: subtotal,
           total: total,
           payment_method: 'cash',
@@ -868,11 +872,12 @@ export const InventoryPOBDrawer = ({
       // Create expense entry with created_by
       const expenseCategory = purchaseItems.some(i => i.type === 'lpg') ? 'LPG Purchase' : 'Inventory Purchase';
       const itemNames = purchaseItems.map(i => `${i.quantity}x ${i.name}`).join(', ');
+      const finalSupplier = supplierName.trim() || defaultSupplier;
       
       await supabase.from('daily_expenses').insert({
         category: expenseCategory,
         amount: total,
-        description: `${txnNumber}: ${supplierName || 'Unknown Supplier'} - ${itemNames}`,
+        description: `${txnNumber}: ${finalSupplier} - ${itemNames}`,
         expense_date: today.toISOString().slice(0, 10),
         created_by: userId
       });
@@ -1285,7 +1290,7 @@ export const InventoryPOBDrawer = ({
     return null;
   };
 
-  // Cart view
+  // Cart view with integrated checkout (2-step flow)
   const renderCart = () => (
     <div className="flex flex-col h-full">
       <ScrollArea className="flex-1">
@@ -1327,6 +1332,7 @@ export const InventoryPOBDrawer = ({
       
       {purchaseItems.length > 0 && (
         <div className="p-4 bg-muted/50 border-t space-y-3">
+          {/* Summary Cards */}
           <div className="grid grid-cols-2 gap-3">
             <Card className="border-2 border-success/30 bg-success/10">
               <CardContent className="p-3 text-center">
@@ -1341,77 +1347,63 @@ export const InventoryPOBDrawer = ({
               </CardContent>
             </Card>
           </div>
-          {isMobile && (
-            <Button type="button" size="lg" className="w-full h-12 font-bold" onClick={() => setMobileStep('checkout')}>
-              <CheckCircle2 className="h-5 w-5 mr-2" />Proceed to Checkout
-            </Button>
-          )}
-        </div>
-      )}
-    </div>
-  );
 
-  // Checkout view (optimized for mobile)
-  const renderCheckout = () => (
-    <div className="space-y-4">
-      {/* Supplier - Using SupplierSelect */}
-      <Card>
-        <CardHeader className="py-3 px-4 border-b">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Building2 className="h-5 w-5" />Supplier
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-4">
-          <SupplierSelect
-            type={productType}
-            value={supplierName}
-            onChange={setSupplierName}
-            allowCustom={true}
-            className="h-12"
-          />
-        </CardContent>
-      </Card>
+          {/* Optional Supplier - Collapsible */}
+          <Collapsible open={showSupplierInput} onOpenChange={setShowSupplierInput}>
+            <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-muted rounded-lg hover:bg-muted/80 transition-colors">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Building2 className="h-4 w-4" />
+                <span>Add Supplier (Optional)</span>
+              </div>
+              <ChevronDown className={`h-4 w-4 transition-transform ${showSupplierInput ? 'rotate-180' : ''}`} />
+            </CollapsibleTrigger>
+            <CollapsibleContent className="pt-2">
+              <Input
+                placeholder="Enter supplier name..."
+                value={supplierName}
+                onChange={(e) => setSupplierName(e.target.value)}
+                className="h-11"
+              />
+              <p className="text-[10px] text-muted-foreground mt-1 text-center">
+                If left empty, brand name will be used as supplier
+              </p>
+            </CollapsibleContent>
+          </Collapsible>
 
-      {/* Summary */}
-      <Card className="border-primary/20">
-        <CardHeader className="py-3 px-4 bg-primary/5 border-b">
-          <CardTitle className="text-base">Order Summary</CardTitle>
-        </CardHeader>
-        <CardContent className="p-4 space-y-4">
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Items</span>
-            <span className="font-medium">{purchaseItemsCount}</span>
-          </div>
-          <Separator />
-          <div className="flex justify-between items-baseline">
-            <span className="font-semibold">Total D.O.</span>
-            <span className="text-2xl font-extrabold text-primary">{BANGLADESHI_CURRENCY_SYMBOL}{total.toLocaleString()}</span>
-          </div>
-
-          <div className="space-y-3 pt-2">
+          {/* Complete Purchase Buttons */}
+          <div className="space-y-2">
             <Button 
               type="button" 
               size="lg" 
-              className="w-full h-14 font-semibold" 
-              onClick={() => handleCompletePurchase('completed')} 
-              disabled={processing || purchaseItems.length === 0}
+              className="w-full h-12 font-bold bg-gradient-to-r from-success to-emerald-600 hover:from-success/90 hover:to-emerald-600/90" 
+              onClick={() => handleCompletePurchase('completed')}
+              disabled={processing}
             >
-              {processing ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <CheckCircle2 className="h-5 w-5 mr-2" />}
+              {processing ? (
+                <Loader2 className="h-5 w-5 animate-spin mr-2" />
+              ) : (
+                <CheckCircle2 className="h-5 w-5 mr-2" />
+              )}
               Complete (Paid)
             </Button>
             <Button 
               type="button" 
-              variant="outline" 
               size="lg" 
-              className="w-full h-14 font-semibold border-warning text-warning hover:bg-warning/10" 
-              onClick={() => handleCompletePurchase('pending')} 
-              disabled={processing || purchaseItems.length === 0}
+              variant="outline"
+              className="w-full h-12 font-bold border-2 border-warning text-warning hover:bg-warning/10" 
+              onClick={() => handleCompletePurchase('pending')}
+              disabled={processing}
             >
-              <Save className="h-5 w-5 mr-2" />Save as Credit
+              {processing ? (
+                <Loader2 className="h-5 w-5 animate-spin mr-2" />
+              ) : (
+                <CreditCard className="h-5 w-5 mr-2" />
+              )}
+              Save as Credit
             </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      )}
     </div>
   );
 
@@ -1434,7 +1426,7 @@ export const InventoryPOBDrawer = ({
     }
   };
 
-  // Mobile cart view (without h-full constraint)
+  // Mobile cart view with integrated checkout (2-step flow)
   const renderCartMobile = () => (
     <div className="pb-6">
       {purchaseItems.length === 0 ? (
@@ -1470,7 +1462,7 @@ export const InventoryPOBDrawer = ({
             </Card>
           ))}
           
-          {/* Cart Summary */}
+          {/* Cart Summary with Checkout */}
           <div className="pt-4 space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <Card className="border-2 border-success/30 bg-success/10">
@@ -1486,9 +1478,61 @@ export const InventoryPOBDrawer = ({
                 </CardContent>
               </Card>
             </div>
-            <Button type="button" size="lg" className="w-full h-14 font-bold" onClick={() => setMobileStep('checkout')}>
-              <CheckCircle2 className="h-5 w-5 mr-2" />Proceed to Checkout
-            </Button>
+
+            {/* Optional Supplier - Collapsible */}
+            <Collapsible open={showSupplierInput} onOpenChange={setShowSupplierInput}>
+              <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-muted rounded-lg hover:bg-muted/80 transition-colors">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Building2 className="h-4 w-4" />
+                  <span>Add Supplier (Optional)</span>
+                </div>
+                <ChevronDown className={`h-4 w-4 transition-transform ${showSupplierInput ? 'rotate-180' : ''}`} />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pt-2">
+                <Input
+                  placeholder="Enter supplier name..."
+                  value={supplierName}
+                  onChange={(e) => setSupplierName(e.target.value)}
+                  className="h-11"
+                />
+                <p className="text-[10px] text-muted-foreground mt-1 text-center">
+                  If left empty, brand name will be used as supplier
+                </p>
+              </CollapsibleContent>
+            </Collapsible>
+
+            {/* Complete Purchase Buttons */}
+            <div className="space-y-2">
+              <Button 
+                type="button" 
+                size="lg" 
+                className="w-full h-14 font-bold bg-gradient-to-r from-success to-emerald-600 hover:from-success/90 hover:to-emerald-600/90" 
+                onClick={() => handleCompletePurchase('completed')}
+                disabled={processing}
+              >
+                {processing ? (
+                  <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                ) : (
+                  <CheckCircle2 className="h-5 w-5 mr-2" />
+                )}
+                Complete (Paid)
+              </Button>
+              <Button 
+                type="button" 
+                size="lg" 
+                variant="outline"
+                className="w-full h-14 font-bold border-2 border-warning text-warning hover:bg-warning/10" 
+                onClick={() => handleCompletePurchase('pending')}
+                disabled={processing}
+              >
+                {processing ? (
+                  <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                ) : (
+                  <CreditCard className="h-5 w-5 mr-2" />
+                )}
+                Save as Credit
+              </Button>
+            </div>
           </div>
         </div>
       )}
@@ -1723,6 +1767,7 @@ export const InventoryPOBDrawer = ({
     setMobileStep('product');
     setPobMode('buy');
     setSupplierName("");
+    setShowSupplierInput(false);
   };
 
   return (
@@ -1812,7 +1857,7 @@ export const InventoryPOBDrawer = ({
         ) : (
           /* Buy Mode - Full Cart/Checkout Flow */
           <>
-            {/* Mobile Step Navigation - Compact */}
+            {/* Mobile Step Navigation - 2 Steps */}
             {isMobile && (
               <div className="flex items-center bg-muted/30 p-1 mx-3 mt-2 rounded-lg flex-shrink-0">
                 <Button 
@@ -1831,19 +1876,10 @@ export const InventoryPOBDrawer = ({
                   className="flex-1 h-10 relative text-xs font-medium" 
                   onClick={() => setMobileStep('cart')}
                 >
-                  2. Cart
+                  2. Cart & Pay
                   {purchaseItemsCount > 0 && (
                     <Badge className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center text-[9px]">{purchaseItemsCount}</Badge>
                   )}
-                </Button>
-                <Button 
-                  type="button"
-                  variant={mobileStep === 'checkout' ? 'default' : 'ghost'} 
-                  size="sm" 
-                  className="flex-1 h-10 text-xs font-medium" 
-                  onClick={() => setMobileStep('checkout')}
-                >
-                  3. Pay
                 </Button>
               </div>
             )}
@@ -1858,11 +1894,6 @@ export const InventoryPOBDrawer = ({
                     </div>
                   )}
                   {mobileStep === 'cart' && renderCartMobile()}
-                  {mobileStep === 'checkout' && (
-                    <div>
-                      {renderCheckout()}
-                    </div>
-                  )}
                 </div>
               </ScrollArea>
             ) : (
@@ -1873,8 +1904,6 @@ export const InventoryPOBDrawer = ({
                     {renderProductForm()}
                     <Separator className="my-4" />
                     {renderCart()}
-                    <Separator className="my-4" />
-                    {renderCheckout()}
                   </div>
                 </ScrollArea>
               </div>
