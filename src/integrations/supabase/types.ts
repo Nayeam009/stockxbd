@@ -14,6 +14,152 @@ export type Database = {
   }
   public: {
     Tables: {
+      community_order_items: {
+        Row: {
+          brand_name: string | null
+          created_at: string | null
+          id: string
+          order_id: string
+          price: number
+          product_id: string | null
+          product_name: string
+          product_type: string
+          quantity: number
+          return_cylinder_qty: number | null
+          return_cylinder_type: string | null
+          weight: string | null
+        }
+        Insert: {
+          brand_name?: string | null
+          created_at?: string | null
+          id?: string
+          order_id: string
+          price: number
+          product_id?: string | null
+          product_name: string
+          product_type: string
+          quantity?: number
+          return_cylinder_qty?: number | null
+          return_cylinder_type?: string | null
+          weight?: string | null
+        }
+        Update: {
+          brand_name?: string | null
+          created_at?: string | null
+          id?: string
+          order_id?: string
+          price?: number
+          product_id?: string | null
+          product_name?: string
+          product_type?: string
+          quantity?: number
+          return_cylinder_qty?: number | null
+          return_cylinder_type?: string | null
+          weight?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "community_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_order_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "shop_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      community_orders: {
+        Row: {
+          confirmed_at: string | null
+          created_at: string | null
+          customer_id: string
+          customer_name: string
+          customer_phone: string
+          delivered_at: string | null
+          delivery_address: string
+          delivery_fee: number | null
+          dispatched_at: string | null
+          district: string
+          division: string
+          id: string
+          order_notes: string | null
+          order_number: string
+          payment_method: string | null
+          payment_status: string | null
+          rejection_reason: string | null
+          shop_id: string
+          status: string | null
+          subtotal: number
+          thana: string | null
+          total_amount: number
+          updated_at: string | null
+        }
+        Insert: {
+          confirmed_at?: string | null
+          created_at?: string | null
+          customer_id: string
+          customer_name: string
+          customer_phone: string
+          delivered_at?: string | null
+          delivery_address: string
+          delivery_fee?: number | null
+          dispatched_at?: string | null
+          district: string
+          division: string
+          id?: string
+          order_notes?: string | null
+          order_number: string
+          payment_method?: string | null
+          payment_status?: string | null
+          rejection_reason?: string | null
+          shop_id: string
+          status?: string | null
+          subtotal: number
+          thana?: string | null
+          total_amount: number
+          updated_at?: string | null
+        }
+        Update: {
+          confirmed_at?: string | null
+          created_at?: string | null
+          customer_id?: string
+          customer_name?: string
+          customer_phone?: string
+          delivered_at?: string | null
+          delivery_address?: string
+          delivery_fee?: number | null
+          dispatched_at?: string | null
+          district?: string
+          division?: string
+          id?: string
+          order_notes?: string | null
+          order_number?: string
+          payment_method?: string | null
+          payment_status?: string | null
+          rejection_reason?: string | null
+          shop_id?: string
+          status?: string | null
+          subtotal?: number
+          thana?: string | null
+          total_amount?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_orders_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shop_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       community_post_comments: {
         Row: {
           author_name: string
@@ -902,6 +1048,179 @@ export type Database = {
         }
         Relationships: []
       }
+      shop_products: {
+        Row: {
+          brand_name: string
+          created_at: string | null
+          description: string | null
+          id: string
+          image_url: string | null
+          is_available: boolean | null
+          price: number
+          product_type: string
+          shop_id: string
+          updated_at: string | null
+          valve_size: string | null
+          weight: string | null
+        }
+        Insert: {
+          brand_name: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          is_available?: boolean | null
+          price: number
+          product_type: string
+          shop_id: string
+          updated_at?: string | null
+          valve_size?: string | null
+          weight?: string | null
+        }
+        Update: {
+          brand_name?: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          is_available?: boolean | null
+          price?: number
+          product_type?: string
+          shop_id?: string
+          updated_at?: string | null
+          valve_size?: string | null
+          weight?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shop_products_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shop_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shop_profiles: {
+        Row: {
+          address: string
+          cover_image_url: string | null
+          created_at: string | null
+          delivery_fee: number | null
+          description: string | null
+          district: string
+          division: string
+          id: string
+          is_open: boolean | null
+          is_verified: boolean | null
+          latitude: number | null
+          logo_url: string | null
+          longitude: number | null
+          owner_id: string
+          phone: string
+          rating: number | null
+          shop_name: string
+          thana: string | null
+          total_orders: number | null
+          total_reviews: number | null
+          updated_at: string | null
+          whatsapp: string | null
+        }
+        Insert: {
+          address: string
+          cover_image_url?: string | null
+          created_at?: string | null
+          delivery_fee?: number | null
+          description?: string | null
+          district: string
+          division: string
+          id?: string
+          is_open?: boolean | null
+          is_verified?: boolean | null
+          latitude?: number | null
+          logo_url?: string | null
+          longitude?: number | null
+          owner_id: string
+          phone: string
+          rating?: number | null
+          shop_name: string
+          thana?: string | null
+          total_orders?: number | null
+          total_reviews?: number | null
+          updated_at?: string | null
+          whatsapp?: string | null
+        }
+        Update: {
+          address?: string
+          cover_image_url?: string | null
+          created_at?: string | null
+          delivery_fee?: number | null
+          description?: string | null
+          district?: string
+          division?: string
+          id?: string
+          is_open?: boolean | null
+          is_verified?: boolean | null
+          latitude?: number | null
+          logo_url?: string | null
+          longitude?: number | null
+          owner_id?: string
+          phone?: string
+          rating?: number | null
+          shop_name?: string
+          thana?: string | null
+          total_orders?: number | null
+          total_reviews?: number | null
+          updated_at?: string | null
+          whatsapp?: string | null
+        }
+        Relationships: []
+      }
+      shop_reviews: {
+        Row: {
+          comment: string | null
+          created_at: string | null
+          customer_id: string
+          id: string
+          order_id: string | null
+          rating: number
+          shop_id: string
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string | null
+          customer_id: string
+          id?: string
+          order_id?: string | null
+          rating: number
+          shop_id: string
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string | null
+          customer_id?: string
+          id?: string
+          order_id?: string | null
+          rating?: number
+          shop_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shop_reviews_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: true
+            referencedRelation: "community_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shop_reviews_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shop_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       staff: {
         Row: {
           created_at: string
@@ -1323,7 +1642,7 @@ export type Database = {
       validate_invite_secure: { Args: { _code: string }; Returns: boolean }
     }
     Enums: {
-      app_role: "owner" | "manager" | "driver"
+      app_role: "owner" | "manager" | "driver" | "customer"
       payment_method: "cash" | "bkash" | "nagad" | "rocket" | "card"
       product_category: "lpg_cylinder" | "stove" | "regulator" | "accessory"
     }
@@ -1453,7 +1772,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["owner", "manager", "driver"],
+      app_role: ["owner", "manager", "driver", "customer"],
       payment_method: ["cash", "bkash", "nagad", "rocket", "card"],
       product_category: ["lpg_cylinder", "stove", "regulator", "accessory"],
     },

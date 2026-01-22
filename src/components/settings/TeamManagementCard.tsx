@@ -39,7 +39,7 @@ interface TeamMember {
   id: string;
   member_user_id: string;
   member_email: string;
-  role: 'owner' | 'manager' | 'driver';
+  role: 'owner' | 'manager' | 'driver' | 'customer';
   created_at: string;
   profile?: {
     full_name: string | null;
@@ -51,7 +51,7 @@ interface TeamMember {
 interface PendingInvite {
   id: string;
   code: string;
-  role: 'owner' | 'manager' | 'driver';
+  role: 'owner' | 'manager' | 'driver' | 'customer';
   expires_at: string;
   created_at: string;
 }
