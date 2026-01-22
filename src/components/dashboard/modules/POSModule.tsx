@@ -1563,29 +1563,78 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
               </div>
             </div>
 
-            {/* Row 3: Product Type Tabs (Only in Sale Mode) - Larger Buttons */}
-            {isSaleMode && (
-              <div className="flex gap-2">
-                {[
-                  { id: 'lpg', label: 'LPG', icon: Cylinder },
-                  { id: 'stove', label: 'Stove', icon: ChefHat },
-                  { id: 'regulator', label: 'Regulator', icon: Gauge },
-                ].map(tab => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`flex-1 flex items-center justify-center gap-2 h-10 px-4 rounded-lg text-sm font-medium transition-all border ${
-                      activeTab === tab.id 
-                        ? 'bg-muted border-border text-foreground shadow-sm' 
-                        : 'bg-transparent border-transparent text-muted-foreground hover:bg-muted/50'
-                    }`}
-                  >
-                    <tab.icon className="h-4 w-4" />
-                    {tab.label}
-                  </button>
-                ))}
+            {/* Row 3: Selling/Return Switch (Desktop Only) + Product Type Tabs */}
+            <div className="flex items-center gap-3">
+              {/* Desktop Selling/Return Switch */}
+              <div className="hidden lg:flex items-center bg-muted/60 rounded-full p-1 border border-border/50">
+                <button
+                  onClick={() => setActiveTable('sale')}
+                  className={`flex items-center gap-2 h-9 px-4 rounded-full font-semibold text-sm transition-all ${
+                    isSaleMode 
+                      ? 'bg-emerald-600 text-white shadow-md' 
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <ShoppingCart className="h-4 w-4" />
+                  Selling
+                  {saleItemsCount > 0 && (
+                    <Badge variant="secondary" className="ml-1 bg-white/20 text-white text-[10px] px-1.5">
+                      {saleItemsCount}
+                    </Badge>
+                  )}
+                </button>
+                <button
+                  onClick={() => setActiveTable('return')}
+                  className={`flex items-center gap-2 h-9 px-4 rounded-full font-semibold text-sm transition-all ${
+                    !isSaleMode 
+                      ? 'bg-amber-500 text-white shadow-md' 
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <ArrowLeftRight className="h-4 w-4" />
+                  Return
+                  {returnCylindersCount > 0 && (
+                    <Badge variant="secondary" className="ml-1 bg-white/20 text-white text-[10px] px-1.5">
+                      {returnCylindersCount}
+                    </Badge>
+                  )}
+                </button>
               </div>
-            )}
+
+              {/* Product Type Tabs (Only in Sale Mode) */}
+              {isSaleMode && (
+                <div className="flex flex-1 gap-2">
+                  {[
+                    { id: 'lpg', label: 'LPG', icon: Cylinder },
+                    { id: 'stove', label: 'Stove', icon: ChefHat },
+                    { id: 'regulator', label: 'Regulator', icon: Gauge },
+                  ].map(tab => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`flex-1 flex items-center justify-center gap-2 h-10 px-4 rounded-lg text-sm font-medium transition-all border ${
+                        activeTab === tab.id 
+                          ? 'bg-muted border-border text-foreground shadow-sm' 
+                          : 'bg-transparent border-transparent text-muted-foreground hover:bg-muted/50'
+                      }`}
+                    >
+                      <tab.icon className="h-4 w-4" />
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Return Mode Label (Desktop) */}
+              {!isSaleMode && (
+                <div className="hidden lg:flex items-center gap-2 flex-1 px-3 py-2 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
+                  <Cylinder className="h-4 w-4 text-amber-600" />
+                  <span className="text-sm font-medium text-amber-700 dark:text-amber-400">
+                    Select cylinders to add as return
+                  </span>
+                </div>
+              )}
+            </div>
 
             {/* Mobile Search */}
             <div className="sm:hidden relative">
