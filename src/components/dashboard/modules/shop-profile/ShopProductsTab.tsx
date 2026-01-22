@@ -235,6 +235,46 @@ export const ShopProductsTab = ({ shopId }: ShopProductsTabProps) => {
     toast({ title: "Inventory synced successfully!" });
   };
 
+  // Quick Enable All - Auto-populate prices from retail prices and enable all products
+  const handleQuickEnableAll = async () => {
+    if (!shopId) return;
+    
+    setSaving(true);
+    try {
+      const productsToEnable = products.filter(p => p.retail_price > 0 && p.stock > 0);
+      
+      for (const product of productsToEnable) {
+        const productData = {
+          shop_id: shopId,
+          lpg_brand_id: product.lpg_brand_id || null,
+          product_type: product.product_type,
+          price: product.retail_price, // Use retail price
+          is_available: true,
+          brand_name: product.brand_name,
+          weight: product.weight,
+          updated_at: new Date().toISOString()
+        };
+
+        if (product.id) {
+          await supabase.from('shop_products').update(productData).eq('id', product.id);
+        } else {
+          await supabase.from('shop_products').insert(productData);
+        }
+      }
+
+      await fetchData(); // Refresh data
+      toast({ 
+        title: "Products enabled!", 
+        description: `${productsToEnable.length} products are now available in your shop listing.` 
+      });
+    } catch (error: any) {
+      console.error('Error enabling products:', error);
+      toast({ title: "Failed to enable products", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleSaveAll = async () => {
     if (!shopId) {
       toast({ 
@@ -608,15 +648,24 @@ export const ShopProductsTab = ({ shopId }: ShopProductsTabProps) => {
                 <p className="text-sm text-muted-foreground">Products Listed in Marketplace</p>
               </div>
             </div>
-            <div className="flex items-center gap-2 w-full sm:w-auto">
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+              {stats.listed === 0 && products.length > 0 && (
+                <Button 
+                  onClick={handleQuickEnableAll} 
+                  disabled={saving} 
+                  className="gap-2 h-11 bg-emerald-600 hover:bg-emerald-700"
+                >
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                  Quick Enable All
+                </Button>
+              )}
               <Button variant="outline" onClick={handleSyncInventory} disabled={syncing} className="gap-2 h-11">
                 <RefreshCcw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
-                <span className="hidden sm:inline">Sync Inventory</span>
-                <span className="sm:hidden">Sync</span>
+                <span className="hidden sm:inline">Sync</span>
               </Button>
               <Button onClick={handleSaveAll} disabled={saving} className="gap-2 h-11 flex-1 sm:flex-none">
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                Save All
+                Save
               </Button>
             </div>
           </div>
