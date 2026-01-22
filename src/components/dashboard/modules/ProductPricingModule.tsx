@@ -321,7 +321,7 @@ export const ProductPricingModule = () => {
     );
   };
 
-  // Brand Price Card Component
+  // Brand Price Card Component - Unified Refill & Package display
   const BrandPriceCard = ({ brand }: { brand: LpgBrand }) => {
     const brandProducts = getProductsForBrand(brand.id);
     const refillProduct = brandProducts.find(p => p.variant === "Refill");
@@ -350,102 +350,284 @@ export const ProductPricingModule = () => {
     }
 
     return (
-      <Card className="border-border hover:shadow-md transition-shadow">
-        <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-6 pt-3 sm:pt-4">
+      <Card className="border-border hover:shadow-lg transition-all duration-200">
+        {/* Card Header - Brand Name + Weight Badge */}
+        <CardHeader className="pb-3 px-4 sm:px-5 pt-4">
           <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2 text-sm sm:text-lg">
+            <CardTitle className="flex items-center gap-2.5 text-base sm:text-lg font-semibold">
               <span 
-                className="h-3 w-3 sm:h-4 sm:w-4 rounded-full flex-shrink-0" 
-                style={{ backgroundColor: brand.color }}
+                className="h-3.5 w-3.5 sm:h-4 sm:w-4 rounded-full flex-shrink-0 ring-2 ring-offset-2 ring-offset-background" 
+                style={{ backgroundColor: brand.color, boxShadow: `0 0 8px ${brand.color}40` }}
               />
               <span className="truncate">{brand.name}</span>
             </CardTitle>
-            <Badge variant="outline" className="text-[10px] sm:text-xs">
+            <Badge variant="secondary" className="text-xs px-2.5 py-0.5 font-medium">
               {selectedWeight}
             </Badge>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4 px-3 sm:px-6 pb-3 sm:pb-4">
+
+        <CardContent className="space-y-5 px-4 sm:px-5 pb-4">
           {/* Refill Section */}
           {refillProduct && (
-            <div className="space-y-2">
+            <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <Badge className="bg-blue-500/20 text-blue-700 dark:text-blue-300 text-[10px] sm:text-xs">
+                <Badge className="bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-xs px-3 py-1 font-medium">
                   Refill
                 </Badge>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-6 w-6 text-destructive hover:text-destructive"
+                  className="h-7 w-7 text-destructive/60 hover:text-destructive hover:bg-destructive/10"
                   onClick={() => handleDeleteProduct(refillProduct.id)}
                 >
-                  <Trash2 className="h-3 w-3" />
+                  <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                <EditablePriceCell 
-                  product={refillProduct} 
-                  field="company_price" 
-                  icon={Building}
-                  label="Company"
-                  bgColor="bg-orange-100 dark:bg-orange-900/30"
-                />
-                <EditablePriceCell 
-                  product={refillProduct} 
-                  field="distributor_price" 
-                  icon={Truck}
-                  label="Wholesale"
-                  bgColor="bg-purple-100 dark:bg-purple-900/30"
-                />
-                <EditablePriceCell 
-                  product={refillProduct} 
-                  field="retail_price" 
-                  icon={Store}
-                  label="Retail"
-                  bgColor="bg-green-100 dark:bg-green-900/30"
-                />
+              <div className="grid grid-cols-3 gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[11px] text-muted-foreground flex items-center gap-1.5 font-medium">
+                    <Building className="h-3.5 w-3.5" />
+                    Company
+                  </span>
+                  <div
+                    onClick={() => setEditingCell({ id: refillProduct.id, field: "company_price" })}
+                    className={`
+                      px-3 py-2.5 rounded-lg cursor-pointer transition-all text-center
+                      bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 dark:hover:bg-orange-900/30
+                      ${editedPrices[refillProduct.id]?.company_price !== undefined ? "ring-2 ring-primary ring-offset-1" : ""}
+                    `}
+                  >
+                    {editingCell?.id === refillProduct.id && editingCell?.field === "company_price" ? (
+                      <Input
+                        type="number"
+                        defaultValue={getValue(refillProduct, "company_price")}
+                        onBlur={(e) => {
+                          handlePriceChange(refillProduct.id, "company_price", Number(e.target.value));
+                          setEditingCell(null);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            handlePriceChange(refillProduct.id, "company_price", Number((e.target as HTMLInputElement).value));
+                            setEditingCell(null);
+                          }
+                          if (e.key === "Escape") setEditingCell(null);
+                        }}
+                        className="h-7 text-center font-semibold border-0 bg-transparent p-0"
+                        autoFocus
+                        min={0}
+                      />
+                    ) : (
+                      <span className="font-semibold text-sm sm:text-base tabular-nums">৳{getValue(refillProduct, "company_price").toLocaleString()}</span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[11px] text-muted-foreground flex items-center gap-1.5 font-medium">
+                    <Truck className="h-3.5 w-3.5" />
+                    Wholesale
+                  </span>
+                  <div
+                    onClick={() => setEditingCell({ id: refillProduct.id, field: "distributor_price" })}
+                    className={`
+                      px-3 py-2.5 rounded-lg cursor-pointer transition-all text-center
+                      bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30
+                      ${editedPrices[refillProduct.id]?.distributor_price !== undefined ? "ring-2 ring-primary ring-offset-1" : ""}
+                    `}
+                  >
+                    {editingCell?.id === refillProduct.id && editingCell?.field === "distributor_price" ? (
+                      <Input
+                        type="number"
+                        defaultValue={getValue(refillProduct, "distributor_price")}
+                        onBlur={(e) => {
+                          handlePriceChange(refillProduct.id, "distributor_price", Number(e.target.value));
+                          setEditingCell(null);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            handlePriceChange(refillProduct.id, "distributor_price", Number((e.target as HTMLInputElement).value));
+                            setEditingCell(null);
+                          }
+                          if (e.key === "Escape") setEditingCell(null);
+                        }}
+                        className="h-7 text-center font-semibold border-0 bg-transparent p-0"
+                        autoFocus
+                        min={0}
+                      />
+                    ) : (
+                      <span className="font-semibold text-sm sm:text-base tabular-nums">৳{getValue(refillProduct, "distributor_price").toLocaleString()}</span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[11px] text-muted-foreground flex items-center gap-1.5 font-medium">
+                    <Store className="h-3.5 w-3.5" />
+                    Retail
+                  </span>
+                  <div
+                    onClick={() => setEditingCell({ id: refillProduct.id, field: "retail_price" })}
+                    className={`
+                      px-3 py-2.5 rounded-lg cursor-pointer transition-all text-center
+                      bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30
+                      ${editedPrices[refillProduct.id]?.retail_price !== undefined ? "ring-2 ring-primary ring-offset-1" : ""}
+                    `}
+                  >
+                    {editingCell?.id === refillProduct.id && editingCell?.field === "retail_price" ? (
+                      <Input
+                        type="number"
+                        defaultValue={getValue(refillProduct, "retail_price")}
+                        onBlur={(e) => {
+                          handlePriceChange(refillProduct.id, "retail_price", Number(e.target.value));
+                          setEditingCell(null);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            handlePriceChange(refillProduct.id, "retail_price", Number((e.target as HTMLInputElement).value));
+                            setEditingCell(null);
+                          }
+                          if (e.key === "Escape") setEditingCell(null);
+                        }}
+                        className="h-7 text-center font-semibold border-0 bg-transparent p-0"
+                        autoFocus
+                        min={0}
+                      />
+                    ) : (
+                      <span className="font-semibold text-sm sm:text-base tabular-nums">৳{getValue(refillProduct, "retail_price").toLocaleString()}</span>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           )}
 
           {/* Package Section */}
           {packageProduct && (
-            <div className="space-y-2">
+            <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <Badge className="bg-green-500/20 text-green-700 dark:text-green-300 text-[10px] sm:text-xs">
+                <Badge className="bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 text-xs px-3 py-1 font-medium">
                   Package (New)
                 </Badge>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-6 w-6 text-destructive hover:text-destructive"
+                  className="h-7 w-7 text-destructive/60 hover:text-destructive hover:bg-destructive/10"
                   onClick={() => handleDeleteProduct(packageProduct.id)}
                 >
-                  <Trash2 className="h-3 w-3" />
+                  <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                <EditablePriceCell 
-                  product={packageProduct} 
-                  field="company_price" 
-                  icon={Building}
-                  label="Company"
-                  bgColor="bg-orange-100 dark:bg-orange-900/30"
-                />
-                <EditablePriceCell 
-                  product={packageProduct} 
-                  field="distributor_price" 
-                  icon={Truck}
-                  label="Wholesale"
-                  bgColor="bg-purple-100 dark:bg-purple-900/30"
-                />
-                <EditablePriceCell 
-                  product={packageProduct} 
-                  field="retail_price" 
-                  icon={Store}
-                  label="Retail"
-                  bgColor="bg-green-100 dark:bg-green-900/30"
-                />
+              <div className="grid grid-cols-3 gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[11px] text-muted-foreground flex items-center gap-1.5 font-medium">
+                    <Building className="h-3.5 w-3.5" />
+                    Company
+                  </span>
+                  <div
+                    onClick={() => setEditingCell({ id: packageProduct.id, field: "company_price" })}
+                    className={`
+                      px-3 py-2.5 rounded-lg cursor-pointer transition-all text-center
+                      bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 dark:hover:bg-orange-900/30
+                      ${editedPrices[packageProduct.id]?.company_price !== undefined ? "ring-2 ring-primary ring-offset-1" : ""}
+                    `}
+                  >
+                    {editingCell?.id === packageProduct.id && editingCell?.field === "company_price" ? (
+                      <Input
+                        type="number"
+                        defaultValue={getValue(packageProduct, "company_price")}
+                        onBlur={(e) => {
+                          handlePriceChange(packageProduct.id, "company_price", Number(e.target.value));
+                          setEditingCell(null);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            handlePriceChange(packageProduct.id, "company_price", Number((e.target as HTMLInputElement).value));
+                            setEditingCell(null);
+                          }
+                          if (e.key === "Escape") setEditingCell(null);
+                        }}
+                        className="h-7 text-center font-semibold border-0 bg-transparent p-0"
+                        autoFocus
+                        min={0}
+                      />
+                    ) : (
+                      <span className="font-semibold text-sm sm:text-base tabular-nums">৳{getValue(packageProduct, "company_price").toLocaleString()}</span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[11px] text-muted-foreground flex items-center gap-1.5 font-medium">
+                    <Truck className="h-3.5 w-3.5" />
+                    Wholesale
+                  </span>
+                  <div
+                    onClick={() => setEditingCell({ id: packageProduct.id, field: "distributor_price" })}
+                    className={`
+                      px-3 py-2.5 rounded-lg cursor-pointer transition-all text-center
+                      bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30
+                      ${editedPrices[packageProduct.id]?.distributor_price !== undefined ? "ring-2 ring-primary ring-offset-1" : ""}
+                    `}
+                  >
+                    {editingCell?.id === packageProduct.id && editingCell?.field === "distributor_price" ? (
+                      <Input
+                        type="number"
+                        defaultValue={getValue(packageProduct, "distributor_price")}
+                        onBlur={(e) => {
+                          handlePriceChange(packageProduct.id, "distributor_price", Number(e.target.value));
+                          setEditingCell(null);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            handlePriceChange(packageProduct.id, "distributor_price", Number((e.target as HTMLInputElement).value));
+                            setEditingCell(null);
+                          }
+                          if (e.key === "Escape") setEditingCell(null);
+                        }}
+                        className="h-7 text-center font-semibold border-0 bg-transparent p-0"
+                        autoFocus
+                        min={0}
+                      />
+                    ) : (
+                      <span className="font-semibold text-sm sm:text-base tabular-nums">৳{getValue(packageProduct, "distributor_price").toLocaleString()}</span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[11px] text-muted-foreground flex items-center gap-1.5 font-medium">
+                    <Store className="h-3.5 w-3.5" />
+                    Retail
+                  </span>
+                  <div
+                    onClick={() => setEditingCell({ id: packageProduct.id, field: "retail_price" })}
+                    className={`
+                      px-3 py-2.5 rounded-lg cursor-pointer transition-all text-center
+                      bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30
+                      ${editedPrices[packageProduct.id]?.retail_price !== undefined ? "ring-2 ring-primary ring-offset-1" : ""}
+                    `}
+                  >
+                    {editingCell?.id === packageProduct.id && editingCell?.field === "retail_price" ? (
+                      <Input
+                        type="number"
+                        defaultValue={getValue(packageProduct, "retail_price")}
+                        onBlur={(e) => {
+                          handlePriceChange(packageProduct.id, "retail_price", Number(e.target.value));
+                          setEditingCell(null);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            handlePriceChange(packageProduct.id, "retail_price", Number((e.target as HTMLInputElement).value));
+                            setEditingCell(null);
+                          }
+                          if (e.key === "Escape") setEditingCell(null);
+                        }}
+                        className="h-7 text-center font-semibold border-0 bg-transparent p-0"
+                        autoFocus
+                        min={0}
+                      />
+                    ) : (
+                      <span className="font-semibold text-sm sm:text-base tabular-nums">৳{getValue(packageProduct, "retail_price").toLocaleString()}</span>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           )}
