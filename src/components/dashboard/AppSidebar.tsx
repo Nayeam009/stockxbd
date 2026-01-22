@@ -2,7 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar, SidebarHeader, SidebarFooter } from "@/components/ui/sidebar";
-import { BarChart3, Users, Search, Home, Receipt, Tag, Settings, LogOut, Package, ChevronRight, CircleDot, Store, Wallet } from "lucide-react";
+import { BarChart3, Users, Search, Home, Receipt, Tag, Settings, LogOut, Package, ChevronRight, Store, Wallet } from "lucide-react";
 import stockXLogo from "@/assets/stock-x-logo.png";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -33,72 +33,19 @@ export const AppSidebar = ({
   // Collapsed means icon-only mode on desktop
   const isCollapsed = state === "collapsed" && !isMobile;
   
-  // Primary navigation - Dashboard only
-  const mainNavItems = [{
-    id: 'overview',
-    titleKey: 'overview',
-    icon: Home,
-    roles: ['owner', 'manager', 'driver']
-  }];
-
-  // Business Operations - Core workflows in new order
-  const businessItems = [{
-    id: 'business-diary',
-    titleKey: 'business_diary',
-    icon: BarChart3,
-    roles: ['owner', 'manager']
-  }, {
-    id: 'pos',
-    titleKey: 'pos',
-    icon: Receipt,
-    roles: ['owner', 'manager', 'driver']
-  }, {
-    id: 'community',
-    titleKey: 'lpg_marketplace',
-    icon: Store,
-    roles: ['owner', 'manager'],
-    badge: analytics.activeOrders > 0 ? analytics.activeOrders : null
-  }];
-
-  // Inventory Management
-  const inventoryItems = [{
-    id: 'inventory',
-    titleKey: 'inventory',
-    icon: Package,
-    roles: ['owner', 'manager'],
-    badge: analytics.lowStockItems.length > 0 ? analytics.lowStockItems.length : null
-  }, {
-    id: 'product-pricing',
-    titleKey: 'product_pricing',
-    icon: Tag,
-    roles: ['owner', 'manager']
-  }];
-
-  // Customer & Utility Management
-  const managementItems = [{
-    id: 'customers',
-    titleKey: 'customers',
-    icon: Users,
-    roles: ['owner', 'manager']
-  }, {
-    id: 'utility-expense',
-    titleKey: 'utility_expense',
-    icon: Wallet,
-    roles: ['owner', 'manager']
-  }];
-
-  // Analytics & Settings
-  const otherItems = [{
-    id: 'analysis-search',
-    titleKey: 'analysis_search',
-    icon: Search,
-    roles: ['owner', 'manager']
-  }, {
-    id: 'settings',
-    titleKey: 'settings',
-    icon: Settings,
-    roles: ['owner']
-  }];
+  // All navigation items in a single flat list - no groups, no separators
+  const allNavItems = [
+    { id: 'overview', titleKey: 'overview', icon: Home, roles: ['owner', 'manager', 'driver'] },
+    { id: 'business-diary', titleKey: 'business_diary', icon: BarChart3, roles: ['owner', 'manager'] },
+    { id: 'pos', titleKey: 'pos', icon: Receipt, roles: ['owner', 'manager', 'driver'] },
+    { id: 'community', titleKey: 'lpg_marketplace', icon: Store, roles: ['owner', 'manager'], badge: analytics.activeOrders > 0 ? analytics.activeOrders : null },
+    { id: 'inventory', titleKey: 'inventory', icon: Package, roles: ['owner', 'manager'], badge: analytics.lowStockItems.length > 0 ? analytics.lowStockItems.length : null },
+    { id: 'product-pricing', titleKey: 'product_pricing', icon: Tag, roles: ['owner', 'manager'] },
+    { id: 'customers', titleKey: 'customers', icon: Users, roles: ['owner', 'manager'] },
+    { id: 'utility-expense', titleKey: 'utility_expense', icon: Wallet, roles: ['owner', 'manager'] },
+    { id: 'analysis-search', titleKey: 'analysis_search', icon: Search, roles: ['owner', 'manager'] },
+    { id: 'settings', titleKey: 'settings', icon: Settings, roles: ['owner'] },
+  ];
   const handleModuleChange = (moduleId: string) => {
     setActiveModule(moduleId);
     if (isMobile) setOpenMobile(false);
@@ -161,28 +108,8 @@ export const AppSidebar = ({
     }
     return <SidebarMenuItem key={item.id} className="py-0">{button}</SidebarMenuItem>;
   };
-  const renderNavGroup = (items: {
-    id: string;
-    titleKey: string;
-    titleSuffix?: string;
-    icon: any;
-    roles: string[];
-    badge?: number | null;
-  }[], label?: string) => {
-    const filteredItems = items.filter(item => item.roles.includes(userRole));
-    if (filteredItems.length === 0) return null;
-    return <SidebarGroup className="py-0.5">
-        {label && !isCollapsed && <SidebarGroupLabel className="text-[9px] uppercase tracking-wider text-muted-foreground/70 font-semibold px-3 py-1 flex items-center gap-1.5 h-6">
-            <CircleDot className="h-1 w-1 text-primary/60" />
-            {label}
-          </SidebarGroupLabel>}
-        <SidebarGroupContent>
-          <SidebarMenu className={`gap-0 ${isCollapsed ? 'px-1' : 'px-1.5'}`}>
-            {filteredItems.map(renderMenuItem)}
-          </SidebarMenu>
-        </SidebarGroupContent>
-      </SidebarGroup>;
-  };
+  // Filter items by role
+  const filteredNavItems = allNavItems.filter(item => item.roles.includes(userRole));
   return <Sidebar collapsible="icon" className="border-r border-border/40 bg-sidebar shadow-lg transition-all duration-300">
       {/* Header with Logo */}
       <SidebarHeader className={`border-b border-border/40 transition-all duration-300 ${isCollapsed ? 'p-2' : 'p-3'}`}>
@@ -223,19 +150,13 @@ export const AppSidebar = ({
       )}
 
       <SidebarContent className="py-1 overflow-x-hidden transition-all duration-300">
-        {renderNavGroup(mainNavItems)}
-        
-        <div className={`mx-3 h-px bg-border/40 transition-all duration-300 ${isCollapsed ? 'opacity-0 my-0' : 'opacity-100 my-1'}`} />
-        {renderNavGroup(businessItems, 'Business')}
-        
-        <div className={`mx-3 h-px bg-border/40 transition-all duration-300 ${isCollapsed ? 'opacity-0 my-0' : 'opacity-100 my-1'}`} />
-        {renderNavGroup(inventoryItems, 'Inventory')}
-        
-        <div className={`mx-3 h-px bg-border/40 transition-all duration-300 ${isCollapsed ? 'opacity-0 my-0' : 'opacity-100 my-1'}`} />
-        {renderNavGroup(managementItems, 'Management')}
-        
-        <div className={`mx-3 h-px bg-border/40 transition-all duration-300 ${isCollapsed ? 'opacity-0 my-0' : 'opacity-100 my-1'}`} />
-        {renderNavGroup(otherItems)}
+        <SidebarGroup className="py-0">
+          <SidebarGroupContent>
+            <SidebarMenu className={`gap-0.5 ${isCollapsed ? 'px-1' : 'px-1.5'}`}>
+              {filteredNavItems.map(renderMenuItem)}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
 
       {/* Footer */}
