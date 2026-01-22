@@ -51,10 +51,12 @@ interface Regulator {
 interface ProductPrice {
   id: string;
   product_type: string;
-  brand_name: string;
+  product_name?: string;
+  brand_id?: string;
   size?: string;
   variant?: string;
   retail_price: number;
+  company_price: number;
 }
 
 interface ShopProduct {
@@ -92,29 +94,67 @@ export const ShopProductsTab = ({ shopId }: ShopProductsTabProps) => {
     
     setLoading(true);
     try {
-      // Fetch all inventory types and prices in parallel
+      // Get current user's owner_id for filtering prices
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
+      // Get the owner_id from shop profile
+      const { data: shopData } = await supabase
+        .from('shop_profiles')
+        .select('owner_id')
+        .eq('id', shopId)
+        .single();
+      
+      const ownerId = shopData?.owner_id;
+
+      // Fetch all inventory types and prices in parallel (filtered by owner_id)
       const [lpgResult, stovesResult, regulatorsResult, pricesResult, existingProductsResult] = await Promise.all([
-        supabase.from('lpg_brands').select('id, name, color, size, weight, refill_cylinder').eq('is_active', true).gt('refill_cylinder', 0).order('name'),
-        supabase.from('stoves').select('id, brand, model, burners, quantity').eq('is_active', true).gt('quantity', 0).order('brand'),
-        supabase.from('regulators').select('id, brand, type, quantity').eq('is_active', true).gt('quantity', 0).order('brand'),
-        supabase.from('product_prices').select('*').eq('is_active', true),
+        supabase.from('lpg_brands').select('id, name, color, size, weight, refill_cylinder, owner_id').eq('is_active', true).gt('refill_cylinder', 0).order('name'),
+        supabase.from('stoves').select('id, brand, model, burners, quantity, owner_id').eq('is_active', true).gt('quantity', 0).order('brand'),
+        supabase.from('regulators').select('id, brand, type, quantity, owner_id').eq('is_active', true).gt('quantity', 0).order('brand'),
+        supabase.from('product_prices').select('*').eq('is_active', true).eq('owner_id', ownerId),
         supabase.from('shop_products').select('*').eq('shop_id', shopId)
       ]);
 
       const productList: ShopProduct[] = [];
       const existingProducts = existingProductsResult.data || [];
-      const prices = pricesResult.data || [];
+      const prices = (pricesResult.data || []) as ProductPrice[];
+
+      // Normalize brand name for matching (case-insensitive, removes spaces/special chars)
+      const normalizeName = (name: string) => 
+        name.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/gi, '');
 
       // LPG Products - ONLY REFILL with stock > 0
       lpgResult.data?.forEach(brand => {
-        const price = prices.find(p => 
+        // Match prices by multiple strategies:
+        // 1. Match by brand_id (most reliable)
+        // 2. Match by normalized name in product_name
+        let price = prices.find(p => 
           p.product_type === 'lpg' && 
-          p.product_name?.toLowerCase().includes(brand.name.toLowerCase()) &&
+          p.brand_id === brand.id &&
           p.variant === 'Refill'
         );
+        
+        if (!price) {
+          const normalizedBrandName = normalizeName(brand.name);
+          price = prices.find(p => 
+            p.product_type === 'lpg' && 
+            p.variant === 'Refill' &&
+            normalizeName(p.product_name || '').includes(normalizedBrandName)
+          );
+        }
+
         const existing = existingProducts.find(
           p => p.brand_name === brand.name && p.product_type === 'lpg_refill'
         );
+        
+        // Get best available price: existing > retail_price > company_price with markup
+        const retailPrice = price?.retail_price || 0;
+        const companyPrice = price?.company_price || 0;
+        const fallbackPrice = retailPrice > 0 ? retailPrice : Math.ceil(companyPrice * 1.1);
         
         productList.push({
           id: existing?.id,
@@ -127,7 +167,7 @@ export const ShopProductsTab = ({ shopId }: ShopProductsTabProps) => {
           weight: brand.weight,
           size: brand.size,
           stock: brand.refill_cylinder,
-          retail_price: price?.retail_price || 0,
+          retail_price: fallbackPrice,
           brand_color: brand.color || getLpgBrandColor(brand.name)
         });
       });
@@ -135,13 +175,20 @@ export const ShopProductsTab = ({ shopId }: ShopProductsTabProps) => {
       // Stove Products - only with stock > 0
       stovesResult.data?.forEach(stove => {
         const productName = `${stove.brand} ${stove.model}`;
-        const price = prices.find(p => 
+        const normalizedBrandName = normalizeName(stove.brand);
+        
+        let price = prices.find(p => 
           p.product_type === 'stove' && 
-          p.product_name?.toLowerCase().includes(stove.brand.toLowerCase())
+          normalizeName(p.product_name || '').includes(normalizedBrandName)
         );
+        
         const existing = existingProducts.find(
           p => p.brand_name === productName && p.product_type === 'stove'
         );
+        
+        const retailPrice = price?.retail_price || 0;
+        const companyPrice = price?.company_price || 0;
+        const fallbackPrice = retailPrice > 0 ? retailPrice : Math.ceil(companyPrice * 1.1);
         
         productList.push({
           id: existing?.id,
@@ -152,7 +199,7 @@ export const ShopProductsTab = ({ shopId }: ShopProductsTabProps) => {
           brand_name: productName,
           model: stove.model,
           stock: stove.quantity,
-          retail_price: price?.retail_price || 0,
+          retail_price: fallbackPrice,
           burners: stove.burners
         });
       });
@@ -160,13 +207,20 @@ export const ShopProductsTab = ({ shopId }: ShopProductsTabProps) => {
       // Regulator Products - only with stock > 0
       regulatorsResult.data?.forEach(regulator => {
         const productName = `${regulator.brand} ${regulator.type}`;
-        const price = prices.find(p => 
+        const normalizedBrandName = normalizeName(regulator.brand);
+        
+        let price = prices.find(p => 
           p.product_type === 'regulator' && 
-          p.product_name?.toLowerCase().includes(regulator.brand.toLowerCase())
+          normalizeName(p.product_name || '').includes(normalizedBrandName)
         );
+        
         const existing = existingProducts.find(
           p => p.brand_name === productName && p.product_type === 'regulator'
         );
+        
+        const retailPrice = price?.retail_price || 0;
+        const companyPrice = price?.company_price || 0;
+        const fallbackPrice = retailPrice > 0 ? retailPrice : Math.ceil(companyPrice * 1.1);
         
         productList.push({
           id: existing?.id,
@@ -177,7 +231,7 @@ export const ShopProductsTab = ({ shopId }: ShopProductsTabProps) => {
           brand_name: productName,
           size: regulator.type,
           stock: regulator.quantity,
-          retail_price: price?.retail_price || 0
+          retail_price: fallbackPrice
         });
       });
 
@@ -235,37 +289,54 @@ export const ShopProductsTab = ({ shopId }: ShopProductsTabProps) => {
     toast({ title: "Inventory synced successfully!" });
   };
 
-  // Quick Enable All - Auto-populate prices from retail prices and enable all products
+  // Quick Enable All - Auto-populate prices from retail prices and enable all products with stock
   const handleQuickEnableAll = async () => {
     if (!shopId) return;
     
     setSaving(true);
     try {
-      const productsToEnable = products.filter(p => p.retail_price > 0 && p.stock > 0);
+      // Enable ALL products with stock > 0 (use retail_price as fallback, which already includes company_price markup)
+      const productsToEnable = products.filter(p => p.stock > 0 && p.retail_price > 0);
       
+      if (productsToEnable.length === 0) {
+        toast({ 
+          title: "No products to enable", 
+          description: "Add retail prices in Product Pricing module first, or purchase products via POB.",
+          variant: "destructive" 
+        });
+        setSaving(false);
+        return;
+      }
+
+      let enabledCount = 0;
       for (const product of productsToEnable) {
-        const productData = {
+        const productData: Record<string, any> = {
           shop_id: shopId,
-          lpg_brand_id: product.lpg_brand_id || null,
           product_type: product.product_type,
-          price: product.retail_price, // Use retail price
+          price: product.retail_price,
           is_available: true,
           brand_name: product.brand_name,
-          weight: product.weight,
+          weight: product.weight || null,
+          valve_size: product.size || null, // Add valve_size for LPG products
           updated_at: new Date().toISOString()
         };
 
-        if (product.id) {
-          await supabase.from('shop_products').update(productData).eq('id', product.id);
-        } else {
-          await supabase.from('shop_products').insert(productData);
+        try {
+          if (product.id) {
+            await supabase.from('shop_products').update(productData).eq('id', product.id);
+          } else {
+            await supabase.from('shop_products').insert([productData] as any);
+          }
+          enabledCount++;
+        } catch (err) {
+          console.error('Error enabling product:', product.brand_name, err);
         }
       }
 
       await fetchData(); // Refresh data
       toast({ 
         title: "Products enabled!", 
-        description: `${productsToEnable.length} products are now available in your shop listing.` 
+        description: `${enabledCount} products are now available in your online shop.` 
       });
     } catch (error: any) {
       console.error('Error enabling products:', error);
@@ -290,21 +361,21 @@ export const ShopProductsTab = ({ shopId }: ShopProductsTabProps) => {
       const productsToSave = products.filter(p => p.price > 0);
       
       for (const product of productsToSave) {
-        const productData = {
+        const productData: Record<string, any> = {
           shop_id: shopId,
-          lpg_brand_id: product.lpg_brand_id || null,
           product_type: product.product_type,
           price: product.price,
           is_available: product.is_available,
           brand_name: product.brand_name,
-          weight: product.weight,
+          weight: product.weight || null,
+          valve_size: product.size || null, // Add valve_size for proper product identification
           updated_at: new Date().toISOString()
         };
 
         if (product.id) {
           await supabase.from('shop_products').update(productData).eq('id', product.id);
         } else {
-          const { data } = await supabase.from('shop_products').insert(productData).select().single();
+          const { data } = await supabase.from('shop_products').insert([productData] as any).select().single();
           if (data) {
             setProducts(prev => prev.map(p => 
               p.brand_name === product.brand_name && p.product_type === product.product_type
@@ -343,7 +414,8 @@ export const ShopProductsTab = ({ shopId }: ShopProductsTabProps) => {
 
   const stats = useMemo(() => ({
     listed: products.filter(p => p.price > 0 && p.is_available).length,
-    total: products.length
+    total: products.length,
+    readyToEnable: products.filter(p => p.stock > 0 && p.retail_price > 0 && !p.is_available).length
   }), [products]);
 
   // ==================== CARD COMPONENTS ====================
@@ -649,14 +721,14 @@ export const ShopProductsTab = ({ shopId }: ShopProductsTabProps) => {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-              {stats.listed === 0 && products.length > 0 && (
+              {stats.readyToEnable > 0 && (
                 <Button 
                   onClick={handleQuickEnableAll} 
                   disabled={saving} 
                   className="gap-2 h-11 bg-emerald-600 hover:bg-emerald-700"
                 >
                   {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                  Quick Enable All
+                  Quick Enable ({stats.readyToEnable})
                 </Button>
               )}
               <Button variant="outline" onClick={handleSyncInventory} disabled={syncing} className="gap-2 h-11">
