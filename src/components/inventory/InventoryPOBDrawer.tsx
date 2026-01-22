@@ -222,7 +222,7 @@ export const InventoryPOBDrawer = ({
   const total = subtotal;
   const purchaseItemsCount = purchaseItems.reduce((s, i) => s + i.quantity, 0);
 
-  // Update product pricing
+  // Update product pricing with price change detection
   const updateProductPricing = async (
     type: 'lpg' | 'stove' | 'regulator',
     productName: string,
@@ -235,25 +235,34 @@ export const InventoryPOBDrawer = ({
       burnerType?: string;
       regulatorType?: string;
     }
-  ) => {
+  ): Promise<{ priceChanged: boolean; oldPrice?: number }> => {
     try {
       if (type === 'lpg' && options.brandId) {
         const variant = options.cylinderType === 'refill' ? 'Refill' : 'Package';
         const fullProductName = `${productName} LP Gas ${options.weight} Cylinder (${options.valveSize}) ${variant}`;
 
+        // Case-insensitive search for existing pricing by brand name + variant
         const { data: existingPrice } = await supabase
           .from('product_prices')
-          .select('id')
-          .eq('brand_id', options.brandId)
+          .select('id, company_price, package_price')
+          .ilike('product_name', `%${productName}%`)
           .eq('variant', variant)
           .eq('product_type', 'lpg')
           .eq('is_active', true)
           .maybeSingle();
 
         if (existingPrice) {
+          const currentPrice = options.cylinderType === 'package' 
+            ? existingPrice.package_price 
+            : existingPrice.company_price;
+          
+          const priceChanged = currentPrice !== companyPrice && currentPrice > 0;
+          
+          // Always update with latest price and link to canonical brand_id
           const updateData: Record<string, unknown> = { 
             updated_at: new Date().toISOString(),
-            product_name: fullProductName
+            product_name: fullProductName,
+            brand_id: options.brandId  // Link to canonical brand
           };
           
           if (options.cylinderType === 'package') {
@@ -266,7 +275,14 @@ export const InventoryPOBDrawer = ({
             .from('product_prices')
             .update(updateData)
             .eq('id', existingPrice.id);
+          
+          if (priceChanged) {
+            logger.info(`Company price updated: ${productName} ${variant} ৳${currentPrice} → ৳${companyPrice}`, null, { component: 'POBDrawer' });
+          }
+          
+          return { priceChanged, oldPrice: currentPrice };
         } else {
+          // Create new pricing record
           await supabase.from('product_prices').insert({
             product_type: 'lpg',
             product_name: fullProductName,
@@ -279,20 +295,24 @@ export const InventoryPOBDrawer = ({
             retail_price: 0,
             is_active: true
           });
+          return { priceChanged: false };
         }
       } else if (type === 'stove') {
         const burnerText = options.burnerType === 'single' ? 'Single' : 'Double';
         const fullProductName = `${productName} - ${burnerText} Burner`;
         
+        // Case-insensitive lookup
         const { data: existingPrice } = await supabase
           .from('product_prices')
-          .select('id')
+          .select('id, company_price')
           .ilike('product_name', `%${productName}%`)
           .eq('product_type', 'stove')
           .eq('is_active', true)
           .maybeSingle();
 
         if (existingPrice) {
+          const priceChanged = existingPrice.company_price !== companyPrice && existingPrice.company_price > 0;
+          
           await supabase
             .from('product_prices')
             .update({ 
@@ -302,6 +322,8 @@ export const InventoryPOBDrawer = ({
               updated_at: new Date().toISOString() 
             })
             .eq('id', existingPrice.id);
+          
+          return { priceChanged, oldPrice: existingPrice.company_price };
         } else {
           await supabase.from('product_prices').insert({
             product_type: 'stove',
@@ -313,13 +335,15 @@ export const InventoryPOBDrawer = ({
             package_price: 0,
             is_active: true
           });
+          return { priceChanged: false };
         }
       } else if (type === 'regulator') {
         const fullProductName = `${productName} Regulator - ${options.regulatorType}`;
         
+        // Case-insensitive lookup
         const { data: existingPrice } = await supabase
           .from('product_prices')
-          .select('id')
+          .select('id, company_price')
           .ilike('product_name', `%${productName}%`)
           .eq('size', options.regulatorType)
           .eq('product_type', 'regulator')
@@ -327,6 +351,8 @@ export const InventoryPOBDrawer = ({
           .maybeSingle();
 
         if (existingPrice) {
+          const priceChanged = existingPrice.company_price !== companyPrice && existingPrice.company_price > 0;
+          
           await supabase
             .from('product_prices')
             .update({ 
@@ -335,6 +361,8 @@ export const InventoryPOBDrawer = ({
               updated_at: new Date().toISOString() 
             })
             .eq('id', existingPrice.id);
+          
+          return { priceChanged, oldPrice: existingPrice.company_price };
         } else {
           await supabase.from('product_prices').insert({
             product_type: 'regulator',
@@ -346,14 +374,17 @@ export const InventoryPOBDrawer = ({
             package_price: 0,
             is_active: true
           });
+          return { priceChanged: false };
         }
       }
+      return { priceChanged: false };
     } catch (error) {
       logger.error('Error updating product pricing', error, { component: 'POBDrawer' });
+      return { priceChanged: false };
     }
   };
 
-  // Add LPG to cart
+  // Add LPG to cart with case-insensitive brand lookup
   const addLPGToCart = async () => {
     if (!lpgBrandName || lpgTotalQty <= 0 || lpgTotalDO <= 0) {
       toast({ title: "Please fill all required fields", variant: "destructive" });
@@ -370,22 +401,29 @@ export const InventoryPOBDrawer = ({
     const companyPrice = lpgCompanyPrice;
     const brandColor = getLpgBrandColor(lpgBrandName);
     const itemsToAdd: PurchaseItem[] = [];
+    let priceChangedNotification = false;
+    let oldPriceValue = 0;
 
     for (const valveSize of ['22mm', '20mm'] as const) {
       const qty = valveSize === '22mm' ? lpgQty22mm : lpgQty20mm;
       if (qty <= 0) continue;
 
       let brandId = "";
-      const existingBrand = lpgBrands.find(b => 
-        b.name.toLowerCase() === lpgBrandName.toLowerCase() && 
-        b.size === valveSize && 
-        b.weight === lpgWeight
-      );
+      
+      // CASE-INSENSITIVE brand lookup using database query
+      const { data: existingBrand } = await supabase
+        .from('lpg_brands')
+        .select('*')
+        .ilike('name', lpgBrandName)
+        .eq('size', valveSize)
+        .eq('weight', lpgWeight)
+        .eq('is_active', true)
+        .maybeSingle();
 
       if (existingBrand) {
         brandId = existingBrand.id;
       } else {
-        // Create new brand
+        // Create new brand record
         const { data: newBrand, error } = await supabase
           .from('lpg_brands')
           .insert({
@@ -402,12 +440,12 @@ export const InventoryPOBDrawer = ({
           .single();
 
         if (error) {
-          // Handle duplicate - fetch existing
+          // Handle duplicate - case-insensitive fetch
           if (error.code === '23505') {
             const { data: existing } = await supabase
               .from('lpg_brands')
               .select('id')
-              .eq('name', lpgBrandName)
+              .ilike('name', lpgBrandName)
               .eq('size', valveSize)
               .eq('weight', lpgWeight)
               .maybeSingle();
@@ -421,12 +459,18 @@ export const InventoryPOBDrawer = ({
         }
       }
 
-      await updateProductPricing('lpg', lpgBrandName, companyPrice, {
+      // Update pricing and detect price changes
+      const { priceChanged, oldPrice } = await updateProductPricing('lpg', lpgBrandName, companyPrice, {
         brandId,
         weight: lpgWeight,
         valveSize,
         cylinderType: lpgCylinderType
       });
+      
+      if (priceChanged && oldPrice) {
+        priceChangedNotification = true;
+        oldPriceValue = oldPrice;
+      }
 
       itemsToAdd.push({
         id: `lpg-${valveSize}-${Date.now()}`,
@@ -449,12 +493,23 @@ export const InventoryPOBDrawer = ({
     }
 
     setPurchaseItems([...purchaseItems, ...itemsToAdd]);
-    toast({ title: "Added to cart!", description: `${lpgTotalQty}x ${lpgBrandName}` });
+    
+    // Show price change notification if applicable
+    if (priceChangedNotification) {
+      toast({ 
+        title: "Price Updated!", 
+        description: `${lpgBrandName}: ৳${oldPriceValue.toLocaleString()} → ৳${companyPrice.toLocaleString()}`,
+        variant: "default"
+      });
+    } else {
+      toast({ title: "Added to cart!", description: `${lpgTotalQty}x ${lpgBrandName}` });
+    }
+    
     if (isMobile) setMobileStep('cart');
     resetLPGForm();
   };
 
-  // Add Stove to cart
+  // Add Stove to cart with case-insensitive lookup
   const addStoveToCart = async () => {
     if (!stoveBrand || !stoveModel || stoveTotalQty <= 0 || stoveTotalAmount <= 0) {
       toast({ title: "Please fill all required fields", variant: "destructive" });
@@ -463,6 +518,8 @@ export const InventoryPOBDrawer = ({
 
     const companyPrice = stoveCompanyPrice;
     const itemsToAdd: PurchaseItem[] = [];
+    let priceChangedNotification = false;
+    let oldPriceValue = 0;
 
     for (const burnerType of ['single', 'double'] as const) {
       const qty = burnerType === 'single' ? stoveQtySingle : stoveQtyDouble;
@@ -471,11 +528,15 @@ export const InventoryPOBDrawer = ({
       const burners = burnerType === 'single' ? 1 : 2;
       let stoveId = "";
       
-      const existingStove = stoves.find(s => 
-        s.brand.toLowerCase() === stoveBrand.toLowerCase() && 
-        s.model.toLowerCase() === stoveModel.toLowerCase() &&
-        s.burners === burners
-      );
+      // CASE-INSENSITIVE stove lookup using database query
+      const { data: existingStove } = await supabase
+        .from('stoves')
+        .select('*')
+        .ilike('brand', stoveBrand)
+        .ilike('model', stoveModel)
+        .eq('burners', burners)
+        .eq('is_active', true)
+        .maybeSingle();
 
       if (existingStove) {
         stoveId = existingStove.id;
@@ -497,8 +558,8 @@ export const InventoryPOBDrawer = ({
             const { data: existing } = await supabase
               .from('stoves')
               .select('id')
-              .eq('brand', stoveBrand)
-              .eq('model', stoveModel)
+              .ilike('brand', stoveBrand)
+              .ilike('model', stoveModel)
               .eq('burners', burners)
               .maybeSingle();
             if (existing) stoveId = existing.id;
@@ -511,7 +572,13 @@ export const InventoryPOBDrawer = ({
         }
       }
 
-      await updateProductPricing('stove', `${stoveBrand} ${stoveModel}`, companyPrice, { burnerType });
+      // Update pricing and detect price changes
+      const { priceChanged, oldPrice } = await updateProductPricing('stove', `${stoveBrand} ${stoveModel}`, companyPrice, { burnerType });
+      
+      if (priceChanged && oldPrice) {
+        priceChangedNotification = true;
+        oldPriceValue = oldPrice;
+      }
 
       itemsToAdd.push({
         id: `stove-${burnerType}-${Date.now()}`,
@@ -532,12 +599,23 @@ export const InventoryPOBDrawer = ({
     }
 
     setPurchaseItems([...purchaseItems, ...itemsToAdd]);
-    toast({ title: "Added to cart!", description: `${stoveTotalQty}x ${stoveBrand} ${stoveModel}` });
+    
+    // Show price change notification
+    if (priceChangedNotification) {
+      toast({ 
+        title: "Price Updated!", 
+        description: `${stoveBrand} ${stoveModel}: ৳${oldPriceValue.toLocaleString()} → ৳${companyPrice.toLocaleString()}`,
+        variant: "default"
+      });
+    } else {
+      toast({ title: "Added to cart!", description: `${stoveTotalQty}x ${stoveBrand} ${stoveModel}` });
+    }
+    
     if (isMobile) setMobileStep('cart');
     resetStoveForm();
   };
 
-  // Add Regulator to cart
+  // Add Regulator to cart with case-insensitive lookup
   const addRegulatorToCart = async () => {
     if (!regulatorBrand || regTotalQty <= 0 || regulatorTotalAmount <= 0) {
       toast({ title: "Please fill all required fields", variant: "destructive" });
@@ -546,16 +624,23 @@ export const InventoryPOBDrawer = ({
 
     const companyPrice = regulatorCompanyPrice;
     const itemsToAdd: PurchaseItem[] = [];
+    let priceChangedNotification = false;
+    let oldPriceValue = 0;
 
     for (const valveType of ['22mm', '20mm'] as const) {
       const qty = valveType === '22mm' ? regQty22mm : regQty20mm;
       if (qty <= 0) continue;
 
       let regId = "";
-      const existingReg = regulators.find(r => 
-        r.brand.toLowerCase() === regulatorBrand.toLowerCase() && 
-        r.type === valveType
-      );
+      
+      // CASE-INSENSITIVE regulator lookup using database query
+      const { data: existingReg } = await supabase
+        .from('regulators')
+        .select('*')
+        .ilike('brand', regulatorBrand)
+        .eq('type', valveType)
+        .eq('is_active', true)
+        .maybeSingle();
 
       if (existingReg) {
         regId = existingReg.id;
@@ -576,7 +661,7 @@ export const InventoryPOBDrawer = ({
             const { data: existing } = await supabase
               .from('regulators')
               .select('id')
-              .eq('brand', regulatorBrand)
+              .ilike('brand', regulatorBrand)
               .eq('type', valveType)
               .maybeSingle();
             if (existing) regId = existing.id;
@@ -589,7 +674,13 @@ export const InventoryPOBDrawer = ({
         }
       }
 
-      await updateProductPricing('regulator', regulatorBrand, companyPrice, { regulatorType: valveType });
+      // Update pricing and detect price changes
+      const { priceChanged, oldPrice } = await updateProductPricing('regulator', regulatorBrand, companyPrice, { regulatorType: valveType });
+      
+      if (priceChanged && oldPrice) {
+        priceChangedNotification = true;
+        oldPriceValue = oldPrice;
+      }
 
       itemsToAdd.push({
         id: `regulator-${valveType}-${Date.now()}`,
@@ -609,7 +700,18 @@ export const InventoryPOBDrawer = ({
     }
 
     setPurchaseItems([...purchaseItems, ...itemsToAdd]);
-    toast({ title: "Added to cart!", description: `${regTotalQty}x ${regulatorBrand}` });
+    
+    // Show price change notification
+    if (priceChangedNotification) {
+      toast({ 
+        title: "Price Updated!", 
+        description: `${regulatorBrand}: ৳${oldPriceValue.toLocaleString()} → ৳${companyPrice.toLocaleString()}`,
+        variant: "default"
+      });
+    } else {
+      toast({ title: "Added to cart!", description: `${regTotalQty}x ${regulatorBrand}` });
+    }
+    
     if (isMobile) setMobileStep('cart');
     resetRegulatorForm();
   };
@@ -705,32 +807,59 @@ export const InventoryPOBDrawer = ({
 
       await supabase.from('pob_transaction_items').insert(items);
 
-      // Update inventory - INCREASE stock
+      // Update inventory - INCREASE stock using direct DB queries (not in-memory)
       for (const item of purchaseItems) {
         if (item.type === 'lpg' && item.brandId) {
           const stockField = item.cylinderType === 'refill' ? 'refill_cylinder' : 'package_cylinder';
-          const brand = lpgBrands.find(b => b.id === item.brandId);
-          if (brand) {
-            const currentStock = brand[stockField as keyof LPGBrand] as number;
+          
+          // Fetch current stock from DB (not in-memory) to avoid stale data
+          const { data: currentBrand } = await supabase
+            .from('lpg_brands')
+            .select(stockField)
+            .eq('id', item.brandId)
+            .single();
+          
+          if (currentBrand) {
+            const currentStock = currentBrand[stockField as keyof typeof currentBrand] as number || 0;
             await supabase
               .from('lpg_brands')
-              .update({ [stockField]: currentStock + item.quantity })
+              .update({ 
+                [stockField]: currentStock + item.quantity,
+                updated_at: new Date().toISOString()
+              })
               .eq('id', item.brandId);
           }
         } else if (item.type === 'stove' && item.stoveId) {
-          const stove = stoves.find(s => s.id === item.stoveId);
-          if (stove) {
+          // Fetch current stock from DB
+          const { data: currentStove } = await supabase
+            .from('stoves')
+            .select('quantity')
+            .eq('id', item.stoveId)
+            .single();
+          
+          if (currentStove) {
             await supabase
               .from('stoves')
-              .update({ quantity: stove.quantity + item.quantity })
+              .update({ 
+                quantity: (currentStove.quantity || 0) + item.quantity,
+                updated_at: new Date().toISOString()
+              })
               .eq('id', item.stoveId);
           }
         } else if (item.type === 'regulator' && item.regulatorId) {
-          const reg = regulators.find(r => r.id === item.regulatorId);
-          if (reg) {
+          // Fetch current stock from DB
+          const { data: currentReg } = await supabase
+            .from('regulators')
+            .select('quantity')
+            .eq('id', item.regulatorId)
+            .single();
+          
+          if (currentReg) {
             await supabase
               .from('regulators')
-              .update({ quantity: reg.quantity + item.quantity })
+              .update({ 
+                quantity: (currentReg.quantity || 0) + item.quantity
+              })
               .eq('id', item.regulatorId);
           }
         }
@@ -1366,7 +1495,7 @@ export const InventoryPOBDrawer = ({
     </div>
   );
 
-  // Quick Add to Stock (without cart/checkout flow)
+  // Quick Add to Stock (without cart/checkout flow) - CASE-INSENSITIVE DB QUERIES
   const quickAddToStock = async () => {
     setProcessing(true);
     try {
@@ -1389,21 +1518,29 @@ export const InventoryPOBDrawer = ({
           const qty = valveSize === '22mm' ? lpgQty22mm : lpgQty20mm;
           if (qty <= 0) continue;
 
-          const existingBrand = lpgBrands.find(b => 
-            b.name.toLowerCase() === lpgBrandName.toLowerCase() && 
-            b.size === valveSize && 
-            b.weight === lpgWeight
-          );
+          // CASE-INSENSITIVE DB lookup
+          const { data: existingBrand } = await supabase
+            .from('lpg_brands')
+            .select('id, refill_cylinder, package_cylinder')
+            .ilike('name', lpgBrandName)
+            .eq('size', valveSize)
+            .eq('weight', lpgWeight)
+            .eq('is_active', true)
+            .maybeSingle();
 
           if (existingBrand) {
             const stockField = lpgCylinderType === 'refill' ? 'refill_cylinder' : 'package_cylinder';
+            const currentStock = existingBrand[stockField as keyof typeof existingBrand] as number || 0;
             await supabase
               .from('lpg_brands')
-              .update({ [stockField]: existingBrand[stockField] + qty })
+              .update({ 
+                [stockField]: currentStock + qty,
+                updated_at: new Date().toISOString()
+              })
               .eq('id', existingBrand.id);
           } else {
             const brandColor = getLpgBrandColor(lpgBrandName);
-            await supabase
+            const { error: insertError } = await supabase
               .from('lpg_brands')
               .insert({
                 name: lpgBrandName,
@@ -1415,6 +1552,26 @@ export const InventoryPOBDrawer = ({
                 empty_cylinder: 0,
                 problem_cylinder: 0
               });
+            
+            // Handle duplicate (race condition) - update instead
+            if (insertError?.code === '23505') {
+              const { data: duplicate } = await supabase
+                .from('lpg_brands')
+                .select('id, refill_cylinder, package_cylinder')
+                .ilike('name', lpgBrandName)
+                .eq('size', valveSize)
+                .eq('weight', lpgWeight)
+                .maybeSingle();
+              
+              if (duplicate) {
+                const stockField = lpgCylinderType === 'refill' ? 'refill_cylinder' : 'package_cylinder';
+                const currentStock = duplicate[stockField as keyof typeof duplicate] as number || 0;
+                await supabase
+                  .from('lpg_brands')
+                  .update({ [stockField]: currentStock + qty })
+                  .eq('id', duplicate.id);
+              }
+            }
           }
         }
         toast({ title: "Stock Added!", description: `${lpgTotalQty} ${lpgBrandName} cylinders added` });
@@ -1430,19 +1587,27 @@ export const InventoryPOBDrawer = ({
           if (qty <= 0) continue;
 
           const burners = burnerType === 'single' ? 1 : 2;
-          const existingStove = stoves.find(s => 
-            s.brand.toLowerCase() === stoveBrand.toLowerCase() && 
-            s.model.toLowerCase() === stoveModel.toLowerCase() &&
-            s.burners === burners
-          );
+          
+          // CASE-INSENSITIVE DB lookup
+          const { data: existingStove } = await supabase
+            .from('stoves')
+            .select('id, quantity')
+            .ilike('brand', stoveBrand)
+            .ilike('model', stoveModel)
+            .eq('burners', burners)
+            .eq('is_active', true)
+            .maybeSingle();
 
           if (existingStove) {
             await supabase
               .from('stoves')
-              .update({ quantity: existingStove.quantity + qty })
+              .update({ 
+                quantity: (existingStove.quantity || 0) + qty,
+                updated_at: new Date().toISOString()
+              })
               .eq('id', existingStove.id);
           } else {
-            await supabase
+            const { error: insertError } = await supabase
               .from('stoves')
               .insert({
                 brand: stoveBrand,
@@ -1451,6 +1616,24 @@ export const InventoryPOBDrawer = ({
                 quantity: qty,
                 price: 0
               });
+            
+            // Handle duplicate
+            if (insertError?.code === '23505') {
+              const { data: duplicate } = await supabase
+                .from('stoves')
+                .select('id, quantity')
+                .ilike('brand', stoveBrand)
+                .ilike('model', stoveModel)
+                .eq('burners', burners)
+                .maybeSingle();
+              
+              if (duplicate) {
+                await supabase
+                  .from('stoves')
+                  .update({ quantity: (duplicate.quantity || 0) + qty })
+                  .eq('id', duplicate.id);
+              }
+            }
           }
         }
         toast({ title: "Stock Added!", description: `${stoveTotalQty} ${stoveBrand} stoves added` });
@@ -1465,24 +1648,45 @@ export const InventoryPOBDrawer = ({
           const qty = valveType === '22mm' ? regQty22mm : regQty20mm;
           if (qty <= 0) continue;
 
-          const existingReg = regulators.find(r => 
-            r.brand.toLowerCase() === regulatorBrand.toLowerCase() && 
-            r.type === valveType
-          );
+          // CASE-INSENSITIVE DB lookup
+          const { data: existingReg } = await supabase
+            .from('regulators')
+            .select('id, quantity')
+            .ilike('brand', regulatorBrand)
+            .eq('type', valveType)
+            .eq('is_active', true)
+            .maybeSingle();
 
           if (existingReg) {
             await supabase
               .from('regulators')
-              .update({ quantity: existingReg.quantity + qty })
+              .update({ quantity: (existingReg.quantity || 0) + qty })
               .eq('id', existingReg.id);
           } else {
-            await supabase
+            const { error: insertError } = await supabase
               .from('regulators')
               .insert({
                 brand: regulatorBrand,
                 type: valveType,
                 quantity: qty
               });
+            
+            // Handle duplicate
+            if (insertError?.code === '23505') {
+              const { data: duplicate } = await supabase
+                .from('regulators')
+                .select('id, quantity')
+                .ilike('brand', regulatorBrand)
+                .eq('type', valveType)
+                .maybeSingle();
+              
+              if (duplicate) {
+                await supabase
+                  .from('regulators')
+                  .update({ quantity: (duplicate.quantity || 0) + qty })
+                  .eq('id', duplicate.id);
+              }
+            }
           }
         }
         toast({ title: "Stock Added!", description: `${regTotalQty} ${regulatorBrand} regulators added` });
