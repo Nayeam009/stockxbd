@@ -6,14 +6,21 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { 
   Store, 
   Save, 
   Loader2, 
   MapPin,
   Phone,
-  ExternalLink,
-  Eye
+  Eye,
+  Copy,
+  Check,
+  Upload,
+  Image as ImageIcon,
+  MessageCircle,
+  Clock,
+  Truck
 } from "lucide-react";
 import {
   Select,
@@ -26,6 +33,15 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { DIVISIONS, getDistricts, getThanas } from "@/lib/bangladeshConstants";
 import { useNavigate } from "react-router-dom";
+import { QRCodeSVG } from "qrcode.react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 interface ShopProfile {
   id?: string;
@@ -42,12 +58,20 @@ interface ShopProfile {
   is_open: boolean;
   logo_url?: string;
   cover_image_url?: string;
+  rating?: number;
+  total_orders?: number;
+  total_reviews?: number;
 }
 
 export const ShopProfileCard = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [showQRDialog, setShowQRDialog] = useState(false);
+  
   const [shopProfile, setShopProfile] = useState<ShopProfile>({
     shop_name: '',
     description: '',
@@ -63,6 +87,10 @@ export const ShopProfileCard = () => {
 
   const availableDistricts = shopProfile.division ? getDistricts(shopProfile.division) : [];
   const availableThanas = shopProfile.district ? getThanas(shopProfile.district) : [];
+
+  const shopUrl = shopProfile.id 
+    ? `${window.location.origin}/community/shop/${shopProfile.id}` 
+    : '';
 
   useEffect(() => {
     fetchShopProfile();
@@ -96,13 +124,57 @@ export const ShopProfileCard = () => {
           delivery_fee: data.delivery_fee || 50,
           is_open: data.is_open || false,
           logo_url: data.logo_url,
-          cover_image_url: data.cover_image_url
+          cover_image_url: data.cover_image_url,
+          rating: data.rating,
+          total_orders: data.total_orders,
+          total_reviews: data.total_reviews
         });
       }
     } catch (error: any) {
       console.error('Error fetching shop profile:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleImageUpload = async (file: File, type: 'logo' | 'cover') => {
+    if (!shopProfile.id) {
+      toast({ title: "Please save your shop first", variant: "destructive" });
+      return;
+    }
+
+    const setUploading = type === 'logo' ? setUploadingLogo : setUploadingCover;
+    setUploading(true);
+
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${shopProfile.id}/${type}-${Date.now()}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(fileName, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(fileName);
+
+      const updateField = type === 'logo' ? 'logo_url' : 'cover_image_url';
+      const { error: updateError } = await supabase
+        .from('shop_profiles')
+        .update({ [updateField]: publicUrl })
+        .eq('id', shopProfile.id);
+
+      if (updateError) throw updateError;
+
+      setShopProfile(prev => ({ ...prev, [updateField]: publicUrl }));
+      toast({ title: `${type === 'logo' ? 'Logo' : 'Cover'} uploaded successfully!` });
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      toast({ title: "Upload failed", description: error.message, variant: "destructive" });
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -168,6 +240,15 @@ export const ShopProfileCard = () => {
     }
   };
 
+  const handleCopyLink = () => {
+    if (shopUrl) {
+      navigator.clipboard.writeText(shopUrl);
+      setCopied(true);
+      toast({ title: "Shop link copied!" });
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
   const handleDivisionChange = (value: string) => {
     setShopProfile(prev => ({ ...prev, division: value, district: '', thana: '' }));
   };
@@ -187,23 +268,117 @@ export const ShopProfileCard = () => {
   }
 
   return (
-    <Card className="bg-card border-border">
-      <CardHeader>
+    <Card className="bg-card border-border overflow-hidden">
+      {/* Cover Image Area */}
+      <div className="relative h-32 bg-gradient-to-r from-primary/20 via-secondary/20 to-accent/20">
+        {shopProfile.cover_image_url && (
+          <img 
+            src={shopProfile.cover_image_url} 
+            alt="Shop cover" 
+            className="w-full h-full object-cover"
+          />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-background/80 to-transparent" />
+        
+        {/* Upload Cover Button */}
+        <label className="absolute top-2 right-2 cursor-pointer">
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0], 'cover')}
+            disabled={uploadingCover || !shopProfile.id}
+          />
+          <Button size="sm" variant="secondary" className="gap-2" asChild>
+            <span>
+              {uploadingCover ? <Loader2 className="h-3 w-3 animate-spin" /> : <ImageIcon className="h-3 w-3" />}
+              Cover
+            </span>
+          </Button>
+        </label>
+        
+        {/* Logo Avatar */}
+        <div className="absolute -bottom-10 left-4">
+          <div className="relative">
+            <Avatar className="h-20 w-20 border-4 border-background shadow-lg">
+              <AvatarImage src={shopProfile.logo_url || undefined} alt={shopProfile.shop_name} />
+              <AvatarFallback className="bg-primary text-primary-foreground text-2xl font-bold">
+                {shopProfile.shop_name?.[0] || 'S'}
+              </AvatarFallback>
+            </Avatar>
+            <label className="absolute -bottom-1 -right-1 cursor-pointer">
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0], 'logo')}
+                disabled={uploadingLogo || !shopProfile.id}
+              />
+              <Button size="icon" variant="secondary" className="h-7 w-7 rounded-full shadow" asChild>
+                <span>
+                  {uploadingLogo ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+                </span>
+              </Button>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <CardHeader className="pt-14 pb-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Store className="h-5 w-5 text-primary" />
-            <CardTitle className="text-foreground">LPG Community Shop</CardTitle>
+            <CardTitle className="text-foreground">{shopProfile.shop_name || 'Your Shop'}</CardTitle>
+            {shopProfile.id && (
+              <Badge className={shopProfile.is_open ? 'bg-emerald-500 text-white' : 'bg-muted text-muted-foreground'}>
+                {shopProfile.is_open ? 'Open' : 'Closed'}
+              </Badge>
+            )}
           </div>
           {shopProfile.id && (
-            <Badge className={shopProfile.is_open ? 'bg-emerald-500 text-white' : 'bg-muted text-muted-foreground'}>
-              {shopProfile.is_open ? 'Open' : 'Closed'}
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" onClick={handleCopyLink}>
+                {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+              </Button>
+              <Dialog open={showQRDialog} onOpenChange={setShowQRDialog}>
+                <DialogTrigger asChild>
+                  <Button size="sm" variant="outline">QR</Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-xs">
+                  <DialogHeader>
+                    <DialogTitle>Shop QR Code</DialogTitle>
+                    <DialogDescription>Scan to visit your shop</DialogDescription>
+                  </DialogHeader>
+                  <div className="flex justify-center p-4">
+                    <QRCodeSVG value={shopUrl} size={200} />
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
           )}
         </div>
         <CardDescription>
-          List your shop on the LPG Community marketplace to receive online orders
+          {shopProfile.id ? 'Manage your marketplace presence' : 'Create your shop to start receiving orders'}
         </CardDescription>
+
+        {/* Stats Row */}
+        {shopProfile.id && (
+          <div className="flex items-center gap-4 mt-3 text-sm">
+            <div className="flex items-center gap-1 text-muted-foreground">
+              <span className="font-semibold text-foreground">{shopProfile.rating?.toFixed(1) || '0.0'}</span>
+              ⭐ Rating
+            </div>
+            <div className="flex items-center gap-1 text-muted-foreground">
+              <span className="font-semibold text-foreground">{shopProfile.total_orders || 0}</span>
+              Orders
+            </div>
+            <div className="flex items-center gap-1 text-muted-foreground">
+              <span className="font-semibold text-foreground">{shopProfile.total_reviews || 0}</span>
+              Reviews
+            </div>
+          </div>
+        )}
       </CardHeader>
+
       <CardContent className="space-y-4">
         {/* Shop Name */}
         <div className="space-y-2">
@@ -242,7 +417,9 @@ export const ShopProfileCard = () => {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="shopWhatsApp">WhatsApp</Label>
+            <Label htmlFor="shopWhatsApp" className="flex items-center gap-1">
+              <MessageCircle className="h-3 w-3" /> WhatsApp
+            </Label>
             <Input
               id="shopWhatsApp"
               placeholder="Same as phone if empty"
@@ -318,7 +495,9 @@ export const ShopProfileCard = () => {
 
         {/* Delivery Fee */}
         <div className="space-y-2">
-          <Label htmlFor="deliveryFee">Delivery Fee (৳)</Label>
+          <Label htmlFor="deliveryFee" className="flex items-center gap-1">
+            <Truck className="h-3 w-3" /> Delivery Fee (৳)
+          </Label>
           <Input
             id="deliveryFee"
             type="number"
@@ -329,12 +508,17 @@ export const ShopProfileCard = () => {
         </div>
 
         {/* Shop Open Toggle */}
-        <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
-          <div>
-            <p className="font-medium">Shop Status</p>
-            <p className="text-sm text-muted-foreground">
-              {shopProfile.is_open ? 'Your shop is visible and accepting orders' : 'Your shop is hidden from marketplace'}
-            </p>
+        <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50 border">
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-lg ${shopProfile.is_open ? 'bg-emerald-500/20' : 'bg-muted'}`}>
+              <Clock className={`h-4 w-4 ${shopProfile.is_open ? 'text-emerald-600' : 'text-muted-foreground'}`} />
+            </div>
+            <div>
+              <p className="font-medium">Shop Status</p>
+              <p className="text-sm text-muted-foreground">
+                {shopProfile.is_open ? 'Visible and accepting orders' : 'Hidden from marketplace'}
+              </p>
+            </div>
           </div>
           <Switch
             checked={shopProfile.is_open}
@@ -363,7 +547,7 @@ export const ShopProfileCard = () => {
               onClick={() => navigate(`/community/shop/${shopProfile.id}`)}
             >
               <Eye className="h-4 w-4 mr-2" />
-              View Shop
+              Preview Shop
             </Button>
           )}
         </div>
