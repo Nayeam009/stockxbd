@@ -6,6 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
   Settings, 
   Building2, 
@@ -25,6 +27,15 @@ import {
   AlertTriangle,
   UserX,
   Store,
+  Zap,
+  Database,
+  Palette,
+  Bell,
+  Users,
+  Share2,
+  ShoppingBag,
+  ChevronRight,
+  Package
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -55,9 +66,38 @@ import { TeamManagementCard } from "@/components/settings/TeamManagementCard";
 import { ShopProfileCard } from "@/components/settings/ShopProfileCard";
 import { ShopProductsCard } from "@/components/settings/ShopProductsCard";
 
+interface SettingsSectionProps {
+  icon: React.ReactNode;
+  title: string;
+  description?: string;
+  active?: boolean;
+  onClick: () => void;
+}
+
+const SettingsSection = ({ icon, title, description, active, onClick }: SettingsSectionProps) => (
+  <button
+    onClick={onClick}
+    className={`w-full flex items-center gap-3 p-3 rounded-lg text-left transition-all ${
+      active 
+        ? 'bg-primary/10 text-primary border border-primary/20' 
+        : 'hover:bg-muted/50 text-foreground'
+    }`}
+  >
+    <div className={`p-2 rounded-lg ${active ? 'bg-primary/20' : 'bg-muted'}`}>
+      {icon}
+    </div>
+    <div className="flex-1 min-w-0">
+      <p className="font-medium text-sm truncate">{title}</p>
+      {description && <p className="text-xs text-muted-foreground truncate">{description}</p>}
+    </div>
+    <ChevronRight className={`h-4 w-4 shrink-0 ${active ? 'text-primary' : 'text-muted-foreground'}`} />
+  </button>
+);
+
 export const SettingsModule = () => {
   const { theme, setTheme } = useTheme();
   const { language, setLanguage, t } = useLanguage();
+  const [activeSection, setActiveSection] = useState('profile');
   
   const [businessName, setBusinessName] = useState("Stock-X LPG Distribution");
   const [businessPhone, setBusinessPhone] = useState("+880 1XXX-XXXXXX");
@@ -91,6 +131,9 @@ export const SettingsModule = () => {
     payments: true,
     dailyReports: false
   });
+
+  const isOwner = userRole === 'owner';
+  const isOwnerOrManager = userRole === 'owner' || userRole === 'manager';
 
   // Load user profile data
   useEffect(() => {
@@ -129,7 +172,7 @@ export const SettingsModule = () => {
     fetchUserProfile();
   }, []);
 
-  // Load settings from localStorage on mount
+  // Load settings from localStorage
   useEffect(() => {
     const savedSettings = localStorage.getItem("business-settings");
     if (savedSettings) {
@@ -142,7 +185,7 @@ export const SettingsModule = () => {
     if (savedNotifications) {
       setNotifications(JSON.parse(savedNotifications));
     }
-  }, [businessName, businessPhone, businessAddress]);
+  }, []);
 
   const handleSaveProfile = async () => {
     setSavingProfile(true);
@@ -168,7 +211,7 @@ export const SettingsModule = () => {
     }
   };
 
-  const getRoleBadgeColor = (role: string) => {
+  const getRoleBadgeStyle = (role: string) => {
     switch (role) {
       case 'owner': return 'bg-gradient-to-r from-amber-500 to-orange-500 text-white border-0';
       case 'manager': return 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white border-0';
@@ -185,13 +228,12 @@ export const SettingsModule = () => {
   const handleSaveSettings = async () => {
     setSaving(true);
     try {
-      // Save to localStorage
       localStorage.setItem("business-settings", JSON.stringify({
         businessName,
         businessPhone,
         businessAddress
       }));
-      await new Promise(resolve => setTimeout(resolve, 500)); // Simulate async
+      await new Promise(resolve => setTimeout(resolve, 300));
       toast({ title: t("settings_saved") });
     } catch (error) {
       toast({ title: "Error saving settings", variant: "destructive" });
@@ -208,7 +250,6 @@ export const SettingsModule = () => {
   };
 
   const handleClearCache = () => {
-    // Clear specific caches, not all localStorage
     const keysToKeep = ["app-theme", "app-language", "business-settings", "notification-settings"];
     const savedItems: Record<string, string> = {};
     keysToKeep.forEach(key => {
@@ -234,10 +275,7 @@ export const SettingsModule = () => {
 
     setChangingPassword(true);
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: newPassword
-      });
-
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
 
       toast({ title: "Password changed successfully" });
@@ -254,10 +292,8 @@ export const SettingsModule = () => {
 
   const handleDeleteAccountRequest = () => {
     if (userRole === 'owner') {
-      // Owners need password verification
       setShowDeletePasswordDialog(true);
     } else {
-      // Non-owners see a simple confirmation
       setShowDeleteConfirm(true);
     }
   };
@@ -273,13 +309,11 @@ export const SettingsModule = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("No user found");
 
-      // For owners, verify password first
       if (userRole === 'owner') {
         const { error: signInError } = await supabase.auth.signInWithPassword({
           email: userEmail,
           password: deletePassword
         });
-
         if (signInError) {
           toast({ title: "Incorrect password", variant: "destructive" });
           setDeletingAccount(false);
@@ -287,30 +321,19 @@ export const SettingsModule = () => {
         }
       }
 
-      // Delete user's profile data
       await supabase.from('profiles').delete().eq('user_id', user.id);
-      
-      // Delete user's role
       await supabase.from('user_roles').delete().eq('user_id', user.id);
 
-      // If owner, delete team memberships
       if (userRole === 'owner') {
         await supabase.from('team_members').delete().eq('owner_id', user.id);
         await supabase.from('team_invites').delete().eq('created_by', user.id);
       }
 
-      // Sign out the user
       await supabase.auth.signOut();
-      
-      toast({ title: language === 'bn' ? 'অ্যাকাউন্ট মুছে ফেলা হয়েছে' : 'Account deleted successfully' });
-      
-      // Redirect to home
+      toast({ title: 'Account deleted successfully' });
       window.location.href = '/';
     } catch (error: any) {
-      toast({ 
-        title: error.message || "Failed to delete account", 
-        variant: "destructive" 
-      });
+      toast({ title: error.message || "Failed to delete account", variant: "destructive" });
     } finally {
       setDeletingAccount(false);
       setShowDeleteConfirm(false);
@@ -320,386 +343,421 @@ export const SettingsModule = () => {
     }
   };
 
+  const sections = [
+    { id: 'profile', icon: <User className="h-4 w-4" />, title: 'Profile', description: 'Personal info' },
+    { id: 'appearance', icon: <Palette className="h-4 w-4" />, title: 'Appearance', description: 'Theme & language' },
+    { id: 'business', icon: <Building2 className="h-4 w-4" />, title: 'Business', description: 'Company details' },
+    ...(isOwner ? [
+      { id: 'marketplace', icon: <Store className="h-4 w-4" />, title: 'Marketplace', description: 'Shop settings' },
+      { id: 'team', icon: <Users className="h-4 w-4" />, title: 'Team', description: 'Manage members' },
+    ] : []),
+    { id: 'notifications', icon: <Bell className="h-4 w-4" />, title: 'Notifications', description: 'Alerts & updates' },
+    { id: 'security', icon: <Shield className="h-4 w-4" />, title: 'Security', description: 'Password & access' },
+    { id: 'advanced', icon: <Zap className="h-4 w-4" />, title: 'Advanced', description: 'Data & cache' },
+  ];
+
+  const renderSectionContent = () => {
+    switch (activeSection) {
+      case 'profile':
+        return (
+          <div className="space-y-6">
+            {/* Profile Header Card */}
+            <Card className="overflow-hidden border-0 shadow-lg">
+              <div className="h-20 bg-gradient-to-r from-primary via-primary-light to-secondary" />
+              <CardContent className="relative pt-0 -mt-12 pb-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-end gap-4">
+                  <Avatar className="h-24 w-24 border-4 border-background shadow-xl">
+                    <AvatarImage src={avatarUrl || undefined} alt={fullName} />
+                    <AvatarFallback className="text-2xl font-bold bg-gradient-to-br from-primary to-secondary text-primary-foreground">
+                      {getInitials(fullName || userEmail)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 space-y-1">
+                    <div className="flex items-center gap-3">
+                      <h2 className="text-xl font-bold text-foreground">{fullName || 'User'}</h2>
+                      <Badge className={`${getRoleBadgeStyle(userRole)} px-3`}>
+                        {userRole.charAt(0).toUpperCase() + userRole.slice(1)}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground">{userEmail}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Member since {userCreatedAt ? new Date(userCreatedAt).toLocaleDateString() : 'N/A'}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Profile Form */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Personal Information</CardTitle>
+                <CardDescription>Update your profile details</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="fullName" className="flex items-center gap-2">
+                      <User className="h-4 w-4 text-muted-foreground" />
+                      Full Name
+                    </Label>
+                    <Input
+                      id="fullName"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      placeholder="Enter your full name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="userPhone" className="flex items-center gap-2">
+                      <Phone className="h-4 w-4 text-muted-foreground" />
+                      Phone Number
+                    </Label>
+                    <Input
+                      id="userPhone"
+                      value={userPhone}
+                      onChange={(e) => setUserPhone(e.target.value)}
+                      placeholder="+880 1XXX-XXXXXX"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="userEmail" className="flex items-center gap-2">
+                    <Mail className="h-4 w-4 text-muted-foreground" />
+                    Email Address
+                  </Label>
+                  <Input id="userEmail" value={userEmail} disabled className="bg-muted/50" />
+                </div>
+                <Button onClick={handleSaveProfile} disabled={savingProfile} className="w-full sm:w-auto">
+                  {savingProfile ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                  Save Profile
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Profile Sharing (Owner only) */}
+            {isOwner && <ProfileSharingCard />}
+          </div>
+        );
+
+      case 'appearance':
+        return (
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Globe className="h-5 w-5 text-primary" />
+                  Language
+                </CardTitle>
+                <CardDescription>Choose your preferred language</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-3">
+                  <Button
+                    variant={language === "en" ? "default" : "outline"}
+                    className={`h-20 flex flex-col gap-2 relative ${language === "en" ? "ring-2 ring-primary" : ""}`}
+                    onClick={() => setLanguage("en")}
+                  >
+                    <span className="text-2xl font-bold">EN</span>
+                    <span className="text-xs opacity-80">{t("english")}</span>
+                    {language === "en" && <Check className="h-4 w-4 absolute top-2 right-2" />}
+                  </Button>
+                  <Button
+                    variant={language === "bn" ? "default" : "outline"}
+                    className={`h-20 flex flex-col gap-2 relative ${language === "bn" ? "ring-2 ring-primary" : ""}`}
+                    onClick={() => setLanguage("bn")}
+                  >
+                    <span className="text-2xl font-bold">বাং</span>
+                    <span className="text-xs opacity-80">{t("bangla")}</span>
+                    {language === "bn" && <Check className="h-4 w-4 absolute top-2 right-2" />}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Palette className="h-5 w-5 text-primary" />
+                  Theme
+                </CardTitle>
+                <CardDescription>Select your visual preference</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-3">
+                  <Button
+                    variant={theme === "light" ? "default" : "outline"}
+                    className={`h-20 flex flex-col gap-2 ${theme === "light" ? "ring-2 ring-primary" : ""}`}
+                    onClick={() => setTheme("light")}
+                  >
+                    <Sun className="h-6 w-6" />
+                    <span className="text-xs">Light Mode</span>
+                  </Button>
+                  <Button
+                    variant={theme === "dark" ? "default" : "outline"}
+                    className={`h-20 flex flex-col gap-2 ${theme === "dark" ? "ring-2 ring-primary" : ""}`}
+                    onClick={() => setTheme("dark")}
+                  >
+                    <Moon className="h-6 w-6" />
+                    <span className="text-xs">{t("dark_mode")}</span>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        );
+
+      case 'business':
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Building2 className="h-5 w-5 text-primary" />
+                {t("business_info")}
+              </CardTitle>
+              <CardDescription>{t("business_info_desc")}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="businessName">{t("business_name")}</Label>
+                <Input
+                  id="businessName"
+                  value={businessName}
+                  onChange={(e) => setBusinessName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="businessPhone">{t("phone_number")}</Label>
+                <Input
+                  id="businessPhone"
+                  value={businessPhone}
+                  onChange={(e) => setBusinessPhone(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="businessAddress">{t("address")}</Label>
+                <Input
+                  id="businessAddress"
+                  value={businessAddress}
+                  onChange={(e) => setBusinessAddress(e.target.value)}
+                />
+              </div>
+              <Button onClick={handleSaveSettings} disabled={saving} className="w-full">
+                {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                {t("save_changes")}
+              </Button>
+            </CardContent>
+          </Card>
+        );
+
+      case 'marketplace':
+        return (
+          <div className="space-y-6">
+            <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-secondary/10 to-accent/10 rounded-xl border border-secondary/20">
+              <div className="p-3 bg-secondary/20 rounded-lg">
+                <ShoppingBag className="h-6 w-6 text-secondary" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-foreground">LPG Community Marketplace</h3>
+                <p className="text-sm text-muted-foreground">Manage your online shop presence and products</p>
+              </div>
+            </div>
+            <ShopProfileCard />
+            <ShopProductsCard />
+          </div>
+        );
+
+      case 'team':
+        return <TeamManagementCard />;
+
+      case 'notifications':
+        return (
+          <PushNotificationCard
+            notifications={notifications}
+            onNotificationChange={handleNotificationChange}
+          />
+        );
+
+      case 'security':
+        return (
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Shield className="h-5 w-5 text-primary" />
+                  {t("security")}
+                </CardTitle>
+                <CardDescription>{t("security_desc")}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Button variant="outline" className="w-full justify-start h-14" onClick={() => setShowPasswordDialog(true)}>
+                  <Lock className="h-5 w-5 mr-3 text-primary" />
+                  <div className="text-left">
+                    <p className="font-medium">{t("change_password")}</p>
+                    <p className="text-xs text-muted-foreground">Update your account password</p>
+                  </div>
+                </Button>
+                <Button variant="outline" className="w-full justify-between h-14" disabled>
+                  <div className="flex items-center">
+                    <Shield className="h-5 w-5 mr-3 text-muted-foreground" />
+                    <div className="text-left">
+                      <p className="font-medium">{t("two_factor")}</p>
+                      <p className="text-xs text-muted-foreground">Add an extra layer of security</p>
+                    </div>
+                  </div>
+                  <Badge variant="secondary">Coming Soon</Badge>
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Danger Zone */}
+            <Card className="border-destructive/30 bg-destructive/5">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2 text-destructive">
+                  <AlertTriangle className="h-5 w-5" />
+                  Danger Zone
+                </CardTitle>
+                <CardDescription>Irreversible actions. Proceed with caution.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 border border-destructive/30 rounded-lg">
+                  <div>
+                    <p className="font-medium text-foreground">Delete Account</p>
+                    <p className="text-sm text-muted-foreground">Permanently remove your account and data</p>
+                  </div>
+                  <Button variant="destructive" onClick={handleDeleteAccountRequest}>
+                    <UserX className="h-4 w-4 mr-2" />
+                    Delete Account
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        );
+
+      case 'advanced':
+        return (
+          <div className="space-y-6">
+            <BackupRestoreCard />
+            
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Database className="h-5 w-5 text-primary" />
+                  {t("data_management")}
+                </CardTitle>
+                <CardDescription>{t("data_management_desc")}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button 
+                  variant="outline" 
+                  className="w-full h-16 flex flex-col items-center justify-center gap-2"
+                  onClick={handleClearCache}
+                >
+                  <Trash2 className="h-5 w-5 text-muted-foreground" />
+                  <span className="text-sm">{t("clear_cache")}</span>
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h2 className="text-2xl sm:text-3xl font-bold text-foreground">{t("settings")}</h2>
-        <p className="text-muted-foreground">{t("settings_desc")}</p>
-      </div>
-
-      {/* User Profile Card - Full Width */}
-      <Card className="bg-card border-border">
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <User className="h-5 w-5 text-primary" />
-            <CardTitle className="text-foreground">{t("profile")}</CardTitle>
-          </div>
-          <CardDescription>Manage your personal information and account details</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col md:flex-row gap-6">
-            {/* Avatar Section */}
-            <div className="flex flex-col items-center gap-3">
-              <Avatar className="h-24 w-24 border-4 border-primary/20">
-                <AvatarImage src={avatarUrl || undefined} alt={fullName} />
-                <AvatarFallback className="text-2xl font-bold bg-gradient-to-br from-primary to-primary/80 text-primary-foreground">
-                  {getInitials(fullName || userEmail)}
-                </AvatarFallback>
-              </Avatar>
-              <Badge className={`${getRoleBadgeColor(userRole)} px-3 py-1`}>
-                {userRole.charAt(0).toUpperCase() + userRole.slice(1)}
-              </Badge>
-            </div>
-            
-            {/* Profile Form */}
-            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="fullName" className="flex items-center gap-2">
-                  <User className="h-4 w-4 text-muted-foreground" />
-                  Full Name
-                </Label>
-                <Input
-                  id="fullName"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  placeholder="Enter your full name"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="userEmail" className="flex items-center gap-2">
-                  <Mail className="h-4 w-4 text-muted-foreground" />
-                  Email
-                </Label>
-                <Input
-                  id="userEmail"
-                  value={userEmail}
-                  disabled
-                  className="bg-muted"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="userPhone" className="flex items-center gap-2">
-                  <Phone className="h-4 w-4 text-muted-foreground" />
-                  Phone Number
-                </Label>
-                <Input
-                  id="userPhone"
-                  value={userPhone}
-                  onChange={(e) => setUserPhone(e.target.value)}
-                  placeholder="+880 1XXX-XXXXXX"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                  Member Since
-                </Label>
-                <Input
-                  value={userCreatedAt ? new Date(userCreatedAt).toLocaleDateString() : "N/A"}
-                  disabled
-                  className="bg-muted"
-                />
-              </div>
-              <div className="md:col-span-2">
-                <Button 
-                  onClick={handleSaveProfile}
-                  disabled={savingProfile}
-                  className="w-full md:w-auto"
-                >
-                  {savingProfile ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Save className="h-4 w-4 mr-2" />
-                  )}
-                  Save Profile
-                </Button>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Owner-only Cards Row */}
-      {userRole === 'owner' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-          <ProfileSharingCard />
-          <TeamManagementCard />
+      <div className="flex items-center gap-3">
+        <div className="p-2 bg-primary/10 rounded-lg">
+          <Settings className="h-6 w-6 text-primary" />
         </div>
-      )}
-
-      {/* LPG Community Marketplace Section - Owner Only */}
-      {userRole === 'owner' && (
-        <>
-          <div className="pt-4">
-            <div className="flex items-center gap-2 mb-4">
-              <Store className="h-5 w-5 text-primary" />
-              <h3 className="text-lg font-semibold text-foreground">LPG Community Marketplace</h3>
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-              <ShopProfileCard />
-              <ShopProductsCard />
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* Main Settings Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-        {/* Language & Theme */}
-        <Card className="bg-card border-border">
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Globe className="h-5 w-5 text-primary" />
-              <CardTitle className="text-foreground">{t("language")} & {t("appearance")}</CardTitle>
-            </div>
-            <CardDescription>{t("language_desc")}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Language Selection */}
-            <div className="space-y-3">
-              <Label className="text-base font-medium">{t("language")}</Label>
-              <div className="grid grid-cols-2 gap-3">
-                <Button
-                  variant={language === "en" ? "default" : "outline"}
-                  className={`h-16 flex flex-col gap-1 relative ${language === "en" ? "bg-primary" : ""}`}
-                  onClick={() => setLanguage("en")}
-                >
-                  <span className="text-lg font-bold">EN</span>
-                  <span className="text-xs opacity-80">{t("english")}</span>
-                  {language === "en" && <Check className="h-4 w-4 absolute top-2 right-2" />}
-                </Button>
-                <Button
-                  variant={language === "bn" ? "default" : "outline"}
-                  className={`h-16 flex flex-col gap-1 relative ${language === "bn" ? "bg-primary" : ""}`}
-                  onClick={() => setLanguage("bn")}
-                >
-                  <span className="text-lg font-bold">বাং</span>
-                  <span className="text-xs opacity-80">{t("bangla")}</span>
-                  {language === "bn" && <Check className="h-4 w-4 absolute top-2 right-2" />}
-                </Button>
-              </div>
-            </div>
-
-            <Separator className="bg-border" />
-
-            {/* Theme Selection */}
-            <div className="space-y-3">
-              <Label className="text-base font-medium">{t("appearance")}</Label>
-              <div className="grid grid-cols-2 gap-3">
-                <Button
-                  variant={theme === "light" ? "default" : "outline"}
-                  className={`h-16 flex flex-col gap-1 ${theme === "light" ? "bg-primary" : ""}`}
-                  onClick={() => setTheme("light")}
-                >
-                  <Sun className="h-5 w-5" />
-                  <span className="text-xs">Light Mode</span>
-                </Button>
-                <Button
-                  variant={theme === "dark" ? "default" : "outline"}
-                  className={`h-16 flex flex-col gap-1 ${theme === "dark" ? "bg-primary" : ""}`}
-                  onClick={() => setTheme("dark")}
-                >
-                  <Moon className="h-5 w-5" />
-                  <span className="text-xs">{t("dark_mode")}</span>
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Business Information */}
-        <Card className="bg-card border-border">
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Building2 className="h-5 w-5 text-primary" />
-              <CardTitle className="text-foreground">{t("business_info")}</CardTitle>
-            </div>
-            <CardDescription>{t("business_info_desc")}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <Label htmlFor="businessName">{t("business_name")}</Label>
-              <Input
-                id="businessName"
-                value={businessName}
-                onChange={(e) => setBusinessName(e.target.value)}
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <Label htmlFor="businessPhone">{t("phone_number")}</Label>
-              <Input
-                id="businessPhone"
-                value={businessPhone}
-                onChange={(e) => setBusinessPhone(e.target.value)}
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <Label htmlFor="businessAddress">{t("address")}</Label>
-              <Input
-                id="businessAddress"
-                value={businessAddress}
-                onChange={(e) => setBusinessAddress(e.target.value)}
-                className="mt-1"
-              />
-            </div>
-            <Button 
-              onClick={handleSaveSettings} 
-              className="w-full bg-primary hover:bg-primary/90"
-              disabled={saving}
-            >
-              {saving ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Save className="h-4 w-4 mr-2" />
-              )}
-              {t("save_changes")}
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Push Notifications */}
-        <PushNotificationCard
-          notifications={notifications}
-          onNotificationChange={handleNotificationChange}
-        />
-
-        {/* Security */}
-        <Card className="bg-card border-border">
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Shield className="h-5 w-5 text-primary" />
-              <CardTitle className="text-foreground">{t("security")}</CardTitle>
-            </div>
-            <CardDescription>{t("security_desc")}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Button 
-              variant="outline" 
-              className="w-full justify-start"
-              onClick={() => setShowPasswordDialog(true)}
-            >
-              <Lock className="h-4 w-4 mr-2" />
-              {t("change_password")}
-            </Button>
-            <Button variant="outline" className="w-full justify-start" disabled>
-              {t("two_factor")}
-              <span className="ml-auto text-xs text-muted-foreground">Coming Soon</span>
-            </Button>
-            <Button variant="outline" className="w-full justify-start" disabled>
-              {t("active_sessions")}
-              <span className="ml-auto text-xs text-muted-foreground">Coming Soon</span>
-            </Button>
-            <Button variant="outline" className="w-full justify-start" disabled>
-              {t("access_logs")}
-              <span className="ml-auto text-xs text-muted-foreground">Coming Soon</span>
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Backup & Restore */}
-        <BackupRestoreCard />
-
-        {/* Cache & Data Management */}
-        <Card className="bg-card border-border">
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Trash2 className="h-5 w-5 text-primary" />
-              <CardTitle className="text-foreground">{t("data_management")}</CardTitle>
-            </div>
-            <CardDescription>{t("data_management_desc")}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Button 
-              variant="outline" 
-              className="w-full h-16 flex flex-col items-center justify-center gap-2 text-muted-foreground hover:text-foreground"
-              onClick={handleClearCache}
-            >
-              <Trash2 className="h-5 w-5" />
-              <span>{t("clear_cache")}</span>
-            </Button>
-          </CardContent>
-        </Card>
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">{t("settings")}</h1>
+          <p className="text-sm text-muted-foreground">{t("settings_desc")}</p>
+        </div>
       </div>
 
-      {/* Danger Zone - Account Deletion */}
-      <Card className="bg-card border-destructive/50">
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-destructive" />
-            <CardTitle className="text-destructive">
-              {language === 'bn' ? 'বিপদ অঞ্চল' : 'Danger Zone'}
-            </CardTitle>
+      {/* Mobile Tabs / Desktop Sidebar Layout */}
+      <div className="lg:hidden">
+        <Tabs value={activeSection} onValueChange={setActiveSection}>
+          <ScrollArea className="w-full">
+            <TabsList className="w-full justify-start px-1 h-auto flex-nowrap">
+              {sections.map(section => (
+                <TabsTrigger 
+                  key={section.id} 
+                  value={section.id}
+                  className="flex items-center gap-2 px-3 py-2 shrink-0"
+                >
+                  {section.icon}
+                  <span className="hidden sm:inline">{section.title}</span>
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </ScrollArea>
+          <div className="mt-6">
+            {renderSectionContent()}
           </div>
-          <CardDescription>
-            {language === 'bn' 
-              ? 'এই কাজগুলি পূর্বাবস্থায় ফেরানো যাবে না। অনুগ্রহ করে সাবধানে এগিয়ে যান।'
-              : 'These actions are irreversible. Please proceed with caution.'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 border border-destructive/30 rounded-lg bg-destructive/5">
-            <div className="space-y-1">
-              <p className="font-medium text-foreground">
-                {language === 'bn' ? 'অ্যাকাউন্ট মুছে ফেলুন' : 'Delete Account'}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                {language === 'bn' 
-                  ? 'আপনার অ্যাকাউন্ট এবং সমস্ত ডেটা স্থায়ীভাবে মুছে ফেলুন'
-                  : 'Permanently delete your account and all associated data'}
-              </p>
-            </div>
-            <Button 
-              variant="destructive"
-              onClick={handleDeleteAccountRequest}
-              className="shrink-0"
-            >
-              <UserX className="h-4 w-4 mr-2" />
-              {language === 'bn' ? 'অ্যাকাউন্ট মুছুন' : 'Delete Account'}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+        </Tabs>
+      </div>
+
+      {/* Desktop Layout */}
+      <div className="hidden lg:grid lg:grid-cols-[280px_1fr] gap-6">
+        {/* Sidebar */}
+        <Card className="h-fit sticky top-6">
+          <CardContent className="p-3 space-y-1">
+            {sections.map(section => (
+              <SettingsSection
+                key={section.id}
+                icon={section.icon}
+                title={section.title}
+                description={section.description}
+                active={activeSection === section.id}
+                onClick={() => setActiveSection(section.id)}
+              />
+            ))}
+          </CardContent>
+        </Card>
+
+        {/* Content */}
+        <div className="min-w-0">
+          {renderSectionContent()}
+        </div>
+      </div>
 
       {/* Change Password Dialog */}
       <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{t("change_password")}</DialogTitle>
-            <DialogDescription>
-              Enter your new password below.
-            </DialogDescription>
+            <DialogDescription>Enter your new password below.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div>
+            <div className="space-y-2">
               <Label htmlFor="newPassword">New Password</Label>
               <Input
                 id="newPassword"
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                className="mt-1"
                 placeholder="Enter new password"
               />
             </div>
-            <div>
+            <div className="space-y-2">
               <Label htmlFor="confirmPassword">Confirm Password</Label>
               <Input
                 id="confirmPassword"
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="mt-1"
                 placeholder="Confirm new password"
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPasswordDialog(false)}>
-              {t("cancel")}
-            </Button>
+            <Button variant="outline" onClick={() => setShowPasswordDialog(false)}>{t("cancel")}</Button>
             <Button onClick={handleChangePassword} disabled={changingPassword}>
               {changingPassword && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               {t("save")}
@@ -714,12 +772,10 @@ export const SettingsModule = () => {
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2 text-destructive">
               <AlertTriangle className="h-5 w-5" />
-              {language === 'bn' ? 'অ্যাকাউন্ট মুছে ফেলবেন?' : 'Delete Account?'}
+              Delete Account?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {language === 'bn'
-                ? 'এই কাজটি পূর্বাবস্থায় ফেরানো যাবে না। আপনার অ্যাকাউন্ট এবং সমস্ত ডেটা স্থায়ীভাবে মুছে ফেলা হবে।'
-                : 'This action cannot be undone. Your account and all associated data will be permanently deleted.'}
+              This action cannot be undone. Your account and all associated data will be permanently deleted.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -730,7 +786,7 @@ export const SettingsModule = () => {
               disabled={deletingAccount}
             >
               {deletingAccount && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              {language === 'bn' ? 'হ্যাঁ, মুছুন' : 'Yes, Delete'}
+              Yes, Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -742,47 +798,38 @@ export const SettingsModule = () => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-destructive">
               <AlertTriangle className="h-5 w-5" />
-              {language === 'bn' ? 'অ্যাকাউন্ট মুছে ফেলুন' : 'Delete Account'}
+              Delete Account
             </DialogTitle>
             <DialogDescription>
-              {language === 'bn'
-                ? 'এই কাজটি স্থায়ী এবং পূর্বাবস্থায় ফেরানো যাবে না। নিশ্চিত করতে আপনার পাসওয়ার্ড দিন এবং DELETE লিখুন।'
-                : 'This action is permanent and cannot be undone. Enter your password and type DELETE to confirm.'}
+              This action is permanent. Enter your password and type DELETE to confirm.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="p-4 bg-destructive/10 rounded-lg text-sm text-destructive border border-destructive/20">
-              <p className="font-medium mb-2">
-                {language === 'bn' ? 'সতর্কতা: এটি নিম্নলিখিতগুলি মুছে ফেলবে:' : 'Warning: This will delete:'}
-              </p>
+            <div className="p-4 bg-destructive/10 rounded-lg text-sm border border-destructive/20">
+              <p className="font-medium text-destructive mb-2">Warning: This will delete:</p>
               <ul className="list-disc list-inside space-y-1 text-muted-foreground">
-                <li>{language === 'bn' ? 'আপনার অ্যাকাউন্ট এবং প্রোফাইল' : 'Your account and profile'}</li>
-                <li>{language === 'bn' ? 'সমস্ত টিম সদস্য এবং আমন্ত্রণ' : 'All team members and invites'}</li>
-                <li>{language === 'bn' ? 'অ্যাপে অ্যাক্সেস' : 'Access to the application'}</li>
+                <li>Your account and profile</li>
+                <li>All team members and invites</li>
+                <li>Access to the application</li>
               </ul>
             </div>
-            <div>
-              <Label htmlFor="deletePassword">
-                {language === 'bn' ? 'পাসওয়ার্ড' : 'Password'}
-              </Label>
+            <div className="space-y-2">
+              <Label htmlFor="deletePassword">Password</Label>
               <Input
                 id="deletePassword"
                 type="password"
                 value={deletePassword}
                 onChange={(e) => setDeletePassword(e.target.value)}
-                className="mt-1"
-                placeholder={language === 'bn' ? 'আপনার পাসওয়ার্ড দিন' : 'Enter your password'}
+                placeholder="Enter your password"
               />
             </div>
-            <div>
-              <Label htmlFor="deleteConfirm">
-                {language === 'bn' ? 'নিশ্চিত করতে DELETE লিখুন' : 'Type DELETE to confirm'}
-              </Label>
+            <div className="space-y-2">
+              <Label htmlFor="deleteConfirm">Type DELETE to confirm</Label>
               <Input
                 id="deleteConfirm"
                 value={deleteConfirmText}
                 onChange={(e) => setDeleteConfirmText(e.target.value.toUpperCase())}
-                className="mt-1 font-mono"
+                className="font-mono"
                 placeholder="DELETE"
               />
             </div>
@@ -801,7 +848,7 @@ export const SettingsModule = () => {
               disabled={deletingAccount || deleteConfirmText !== 'DELETE' || !deletePassword}
             >
               {deletingAccount && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              {language === 'bn' ? 'স্থায়ীভাবে মুছুন' : 'Permanently Delete'}
+              Permanently Delete
             </Button>
           </DialogFooter>
         </DialogContent>
