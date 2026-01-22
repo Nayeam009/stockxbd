@@ -24,88 +24,81 @@ import {
   MapPin,
   Play,
   Menu,
-  X
+  X,
+  ShoppingCart,
+  Bell,
+  MapPinned,
+  Boxes
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useState } from "react";
 import stockXLogo from "@/assets/stock-x-logo.png";
-import heroBanner from "@/assets/hero-banner.jpg";
+import heroLpgImage from "@/assets/hero-lpg-cylinders.png";
 
 const Welcome = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const services = [
-    {
-      icon: PieChart,
-      title: "Daily Sales Management",
-      description: "Efficiently track and manage all your daily sales activities with comprehensive reporting.",
-      features: ["Add, edit & view daily sales", "Track by staff/driver", "Multiple payment methods", "Export PDF/Excel"],
-    },
+  const mainFeatures = [
     {
       icon: Package,
-      title: "LPG Stock Management",
-      description: "Track your LPG cylinder inventory in real-time with automated alerts and comprehensive tracking.",
-      features: ["Real-time cylinder tracking", "Low-stock alerts", "QR code tracking", "Stock movement history"],
-    },
-    {
-      icon: Flame,
-      title: "Gas Stove Inventory",
-      description: "Comprehensive inventory management for LPG stoves and accessories with real-time tracking.",
-      features: ["Track by model/brand", "Auto-update on sale", "Accessory management", "Usage history"],
+      title: "L.P.G Inventory Management",
+      description: "Complete real-time tracking of all cylinders, stoves, and regulators with automated alerts.",
+      features: [
+        "Real-time cylinder stock levels",
+        "Low-stock & refill alerts",
+        "POB/POS auto-sync",
+        "Multi-brand tracking",
+        "Empty cylinder returns"
+      ],
+      gradient: "from-primary to-primary-light",
+      cta: "Explore Inventory"
     },
     {
       icon: Truck,
-      title: "Driver's Sales",
-      description: "Monitor and analyze individual driver performance with detailed sales tracking and reporting.",
-      features: ["Driver performance", "Payment tracking", "Daily/weekly reports", "Commission calculation"],
-    },
+      title: "Online Delivery Platform",
+      description: "Complete marketplace for LPG businesses with real-time order tracking and customer notifications.",
+      features: [
+        "Online order placement",
+        "Real-time delivery tracking",
+        "Customer notifications",
+        "Shop profile & products",
+        "Order management"
+      ],
+      gradient: "from-secondary to-secondary-light",
+      cta: "View Marketplace"
+    }
+  ];
+
+  const services = [
     {
-      icon: Users,
-      title: "LPG Community",
-      description: "Build and manage your customer database with comprehensive tracking and communication tools.",
-      features: ["Customer database", "Order history", "SMS/Email alerts", "Loyalty tracking"],
-    },
-    {
-      icon: DollarSign,
-      title: "Staff Salary",
-      description: "Streamline your payroll process with automated calculations and comprehensive salary management.",
-      features: ["Payroll automation", "Salary slips", "Commission calculation", "Bank transfer integration"],
-    },
-    {
-      icon: CreditCard,
-      title: "Vehicle Cost",
-      description: "Track and manage all vehicle-related expenses to optimize your fleet operations and costs.",
-      features: ["Fuel tracking", "Maintenance logs", "Cost analysis", "Vehicle performance"],
+      icon: PieChart,
+      title: "Daily Sales (POS)",
+      description: "Track all daily sales with comprehensive reporting and multi-payment support.",
     },
     {
       icon: FileText,
-      title: "Daily Expenses",
-      description: "Monitor and control daily operational expenses with detailed categorization and reporting.",
-      features: ["Expense categories", "Receipt tracking", "Budget alerts", "Monthly summaries"],
+      title: "Business Diary",
+      description: "Monitor all expenses and income with detailed categorization and analysis.",
     },
     {
-      icon: Globe,
-      title: "Online Delivery",
-      description: "Manage online orders and deliveries with real-time notifications and tracking.",
-      features: ["Online order management", "Delivery tracking", "Customer notifications", "Route optimization"],
+      icon: Users,
+      title: "Customer Management",
+      description: "Complete customer database with payment tracking and order history.",
     },
     {
       icon: BarChart3,
       title: "Analytics & Reports",
-      description: "Comprehensive reporting on operations and delivery performance with actionable insights.",
-      features: ["Performance metrics", "Custom dashboards", "Trend analysis", "Export options"],
+      description: "Comprehensive profit/loss reports with actionable business insights.",
+    },
+    {
+      icon: DollarSign,
+      title: "Staff & Salary",
+      description: "Manage staff payments, commissions, and monthly salary tracking.",
     },
     {
       icon: Search,
       title: "Smart Search",
-      description: "Quickly find records and information across the entire platform with intelligent filtering.",
-      features: ["Global search", "Quick navigation", "Advanced filters", "Recent history"],
-    },
-    {
-      icon: Clock,
-      title: "Smart ETA",
-      description: "AI-powered tool providing accurate ETAs for all LPG deliveries with route optimization.",
-      features: ["AI predictions", "Route optimization", "Live tracking", "Delay notifications"],
+      description: "Quickly find customers, products, and transactions across the platform.",
     }
   ];
 
@@ -116,16 +109,10 @@ const Welcome = () => {
     { value: "24/7", label: "Support" }
   ];
 
-  const highlights = [
-    { icon: Truck, title: "Smart Delivery", description: "AI-powered ETA predictions and real-time delivery tracking for optimal route management." },
-    { icon: BarChart3, title: "Inventory Control", description: "Real-time tracking of cylinders, gas stoves, and stock levels to prevent shortages." },
-    { icon: Users, title: "Customer Management", description: "Comprehensive customer database with purchase history and delivery preferences." }
-  ];
-
   return (
     <div className="min-h-screen bg-background overflow-hidden">
       {/* Header */}
-<header className="sticky top-0 z-50 bg-card/95 backdrop-blur-xl border-b border-border/50 shadow-sm">
+      <header className="sticky top-0 z-50 bg-card/95 backdrop-blur-xl border-b border-border/50 shadow-sm">
         <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-3 sm:py-4">
           <nav className="flex items-center justify-between">
             {/* Logo */}
@@ -146,9 +133,9 @@ const Welcome = () => {
             {/* Desktop Navigation */}
             <div className="hidden lg:flex items-center space-x-6 xl:space-x-8">
               <a href="#features" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">Features</a>
-              <a href="#services" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">How It Works</a>
+              <a href="#services" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">Services</a>
               <a href="#pricing" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">Pricing</a>
-              <a href="#stats" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">Success Stories</a>
+              <Link to="/community" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">Marketplace</Link>
             </div>
 
             {/* CTA Buttons */}
@@ -180,17 +167,17 @@ const Welcome = () => {
           {mobileMenuOpen && (
             <div className="md:hidden absolute top-full left-0 right-0 bg-card border-b border-border shadow-xl py-4 px-4 space-y-3 animate-fade-in">
               <a href="#features" className="block py-2.5 px-3 text-sm font-medium text-muted-foreground hover:text-primary hover:bg-muted/50 rounded-lg transition-colors">Features</a>
-              <a href="#services" className="block py-2.5 px-3 text-sm font-medium text-muted-foreground hover:text-primary hover:bg-muted/50 rounded-lg transition-colors">How It Works</a>
+              <a href="#services" className="block py-2.5 px-3 text-sm font-medium text-muted-foreground hover:text-primary hover:bg-muted/50 rounded-lg transition-colors">Services</a>
               <a href="#pricing" className="block py-2.5 px-3 text-sm font-medium text-muted-foreground hover:text-primary hover:bg-muted/50 rounded-lg transition-colors">Pricing</a>
-              <a href="#stats" className="block py-2.5 px-3 text-sm font-medium text-muted-foreground hover:text-primary hover:bg-muted/50 rounded-lg transition-colors">Success Stories</a>
+              <Link to="/community" className="block py-2.5 px-3 text-sm font-medium text-muted-foreground hover:text-primary hover:bg-muted/50 rounded-lg transition-colors">Marketplace</Link>
               <div className="pt-2 space-y-2">
                 <Link to="/auth" className="block">
-                  <Button variant="outline" className="w-full border-primary/20 text-primary">
+                  <Button variant="outline" className="w-full border-primary/20 text-primary h-11">
                     Free Demo
                   </Button>
                 </Link>
                 <Link to="/auth" className="block">
-                  <Button className="w-full btn-cta text-secondary-foreground font-semibold">
+                  <Button className="w-full btn-cta text-secondary-foreground font-semibold h-11">
                     Get Started
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
@@ -201,8 +188,8 @@ const Welcome = () => {
         </div>
       </header>
 
-{/* Hero Section */}
-      <section className="relative hero-gradient text-primary-foreground py-12 sm:py-16 lg:py-24 xl:py-28 overflow-hidden">
+      {/* Hero Section - Split Layout */}
+      <section className="relative hero-gradient text-primary-foreground overflow-hidden">
         {/* Background Pattern */}
         <div className="absolute inset-0 opacity-10">
           <div className="absolute inset-0" style={{
@@ -211,34 +198,92 @@ const Welcome = () => {
         </div>
         
         <div className="container mx-auto px-4 sm:px-6 relative">
-          <div className="max-w-4xl mx-auto text-center space-y-5 sm:space-y-6 lg:space-y-8">
-            <Badge className="bg-white/10 text-white border-white/20 hover:bg-white/15 px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium">
-              <Flame className="h-3 w-3 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
-              Complete LPG Business Management
-            </Badge>
-            
-            <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-extrabold leading-tight px-2">
-              Complete Feature Set for
-              <br />
-              <span className="text-secondary">LPG Business Excellence</span>
-            </h1>
-            
-            <p className="text-sm sm:text-base md:text-lg lg:text-xl text-white/80 max-w-2xl mx-auto leading-relaxed px-4">
-              From daily sales to delivery tracking, STOCK X has every tool you need to streamline your LPG operations
-            </p>
+          <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center py-10 sm:py-14 lg:py-20">
+            {/* Left: Text Content */}
+            <div className="text-center lg:text-left space-y-5 sm:space-y-6 order-2 lg:order-1">
+              <Badge className="bg-white/10 text-white border-white/20 hover:bg-white/15 px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium inline-flex">
+                <Flame className="h-3 w-3 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
+                #1 LPG Business Platform in Bangladesh
+              </Badge>
+              
+              <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-extrabold leading-tight">
+                <span className="text-white">STOCK X</span>
+                <br />
+                <span className="text-secondary">L.P.G Inventory &</span>
+                <br />
+                <span className="text-secondary">Online Delivery Platform</span>
+              </h1>
+              
+              <p className="text-sm sm:text-base lg:text-lg text-white/80 max-w-xl mx-auto lg:mx-0 leading-relaxed">
+                Complete business management solution for LPG distributors. Track inventory, manage customers, process sales, and deliver online — all in one platform.
+              </p>
 
-            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center pt-2 sm:pt-4 px-4 sm:px-0">
-              <Link to="/auth" className="w-full sm:w-auto">
-                <Button size="lg" className="btn-cta text-secondary-foreground font-bold text-sm sm:text-base lg:text-lg px-6 sm:px-8 py-4 sm:py-5 lg:py-6 w-full">
-                  <Play className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
-                  Start Free Trial
-                </Button>
-              </Link>
-              <a href="#services" className="w-full sm:w-auto">
-                <Button size="lg" variant="outline" className="bg-white/10 border-white/30 text-white hover:bg-white/20 hover:border-white/40 transition-all duration-300 text-sm sm:text-base lg:text-lg px-6 sm:px-8 py-4 sm:py-5 lg:py-6 w-full">
-                  Explore Features
-                </Button>
-              </a>
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center lg:justify-start pt-2">
+                <Link to="/auth" className="w-full sm:w-auto">
+                  <Button size="lg" className="btn-cta text-secondary-foreground font-bold text-sm sm:text-base px-6 sm:px-8 h-12 sm:h-14 w-full">
+                    <Play className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
+                    Start Free Trial
+                  </Button>
+                </Link>
+                <Link to="/community" className="w-full sm:w-auto">
+                  <Button size="lg" variant="outline" className="bg-white/10 border-white/30 text-white hover:bg-white/20 hover:border-white/40 transition-all duration-300 text-sm sm:text-base px-6 sm:px-8 h-12 sm:h-14 w-full">
+                    <ShoppingCart className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
+                    Explore Marketplace
+                  </Button>
+                </Link>
+              </div>
+
+              {/* Quick Stats in Hero */}
+              <div className="grid grid-cols-3 gap-4 pt-4 lg:pt-6 max-w-md mx-auto lg:mx-0">
+                <div className="text-center lg:text-left">
+                  <div className="text-xl sm:text-2xl font-bold text-white">500+</div>
+                  <div className="text-[10px] sm:text-xs text-white/60">Businesses</div>
+                </div>
+                <div className="text-center lg:text-left">
+                  <div className="text-xl sm:text-2xl font-bold text-white">50K+</div>
+                  <div className="text-[10px] sm:text-xs text-white/60">Deliveries/Day</div>
+                </div>
+                <div className="text-center lg:text-left">
+                  <div className="text-xl sm:text-2xl font-bold text-white">99.9%</div>
+                  <div className="text-[10px] sm:text-xs text-white/60">Uptime</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right: Hero Image */}
+            <div className="relative order-1 lg:order-2">
+              <div className="relative mx-auto max-w-md lg:max-w-none">
+                {/* Glow Effect */}
+                <div className="absolute -inset-4 bg-secondary/20 rounded-3xl blur-2xl" />
+                
+                <img 
+                  src={heroLpgImage} 
+                  alt="LPG Cylinders - Stock X Inventory Management" 
+                  className="relative w-full h-auto rounded-2xl sm:rounded-3xl shadow-2xl border-4 border-white/10"
+                />
+
+                {/* Floating Badge - Inventory */}
+                <div className="absolute -bottom-4 -left-4 sm:bottom-4 sm:left-4 bg-card text-foreground rounded-xl sm:rounded-2xl p-3 sm:p-4 shadow-xl border border-border/50 hidden sm:flex items-center gap-3">
+                  <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-gradient-to-br from-primary to-primary-light flex items-center justify-center">
+                    <Boxes className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground">Real-Time Stock</div>
+                    <div className="font-bold text-sm sm:text-base">1,250 Cylinders</div>
+                  </div>
+                </div>
+
+                {/* Floating Badge - Delivery */}
+                <div className="absolute -top-4 -right-4 sm:top-4 sm:right-4 bg-card text-foreground rounded-xl sm:rounded-2xl p-3 sm:p-4 shadow-xl border border-border/50 hidden sm:flex items-center gap-3">
+                  <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-gradient-to-br from-secondary to-secondary-light flex items-center justify-center">
+                    <Bell className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground">New Order</div>
+                    <div className="font-bold text-sm sm:text-base text-success">+12 Today</div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -251,20 +296,52 @@ const Welcome = () => {
         </div>
       </section>
 
-      {/* Feature Highlights */}
+      {/* Two Main Feature Highlights */}
       <section id="features" className="container mx-auto px-4 sm:px-6 py-10 sm:py-12 lg:py-16 -mt-6 sm:-mt-8 relative z-10">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 lg:gap-6">
-          {highlights.map((item, index) => {
-            const Icon = item.icon;
+        <div className="text-center mb-8 sm:mb-10">
+          <Badge className="bg-secondary/10 text-secondary border-secondary/20 px-3 sm:px-4 py-1.5 text-xs sm:text-sm font-medium">
+            Core Features
+          </Badge>
+          <h2 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-foreground mt-3">
+            Two Powerful Platforms, One Solution
+          </h2>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-5 sm:gap-6 lg:gap-8">
+          {mainFeatures.map((feature, index) => {
+            const Icon = feature.icon;
             return (
-              <Card key={index} className="feature-card p-5 sm:p-6 lg:p-8 shadow-lg hover:shadow-2xl">
-                <div className="space-y-3 sm:space-y-4">
-                  <div className="feature-icon w-12 h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16">
-                    <Icon className="h-5 w-5 sm:h-6 sm:w-6 lg:h-7 lg:w-7 text-primary transition-colors duration-300 group-hover:text-primary-foreground" />
+              <Card key={index} className="relative overflow-hidden border-2 border-border hover:border-primary/50 transition-all duration-300 hover:shadow-2xl group">
+                {/* Gradient Top Bar */}
+                <div className={`h-2 bg-gradient-to-r ${feature.gradient}`} />
+                
+                <CardContent className="p-5 sm:p-6 lg:p-8 space-y-4 sm:space-y-5">
+                  <div className="flex items-start gap-4">
+                    <div className={`h-14 w-14 sm:h-16 sm:w-16 rounded-2xl bg-gradient-to-br ${feature.gradient} flex items-center justify-center flex-shrink-0 shadow-lg group-hover:scale-110 transition-transform duration-300`}>
+                      <Icon className="h-7 w-7 sm:h-8 sm:w-8 text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-lg sm:text-xl lg:text-2xl font-bold text-foreground">{feature.title}</h3>
+                      <p className="text-sm sm:text-base text-muted-foreground mt-1">{feature.description}</p>
+                    </div>
                   </div>
-                  <h3 className="text-base sm:text-lg lg:text-xl font-bold text-foreground">{item.title}</h3>
-                  <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">{item.description}</p>
-                </div>
+                  
+                  <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                    {feature.features.map((item, idx) => (
+                      <li key={idx} className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <CheckCircle2 className="h-4 w-4 text-success flex-shrink-0" />
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <Link to="/auth" className="block pt-2">
+                    <Button className={`w-full h-11 sm:h-12 font-semibold bg-gradient-to-r ${feature.gradient} hover:opacity-90 text-white`}>
+                      {feature.cta}
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </Link>
+                </CardContent>
               </Card>
             );
           })}
@@ -272,7 +349,7 @@ const Welcome = () => {
       </section>
 
       {/* Stats Section */}
-      <section id="stats" className="container mx-auto px-4 sm:px-6 py-10 sm:py-12 lg:py-16">
+      <section className="container mx-auto px-4 sm:px-6 py-10 sm:py-12 lg:py-16">
         <div className="relative rounded-2xl sm:rounded-3xl overflow-hidden hero-gradient p-6 sm:p-8 lg:p-12">
           <div className="absolute inset-0 opacity-20" style={{
             backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.3'%3E%3Cpath d='M36 34c0-2.21-1.79-4-4-4s-4 1.79-4 4 1.79 4 4 4 4-1.79 4-4z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
@@ -288,42 +365,33 @@ const Welcome = () => {
         </div>
       </section>
 
-      {/* Services Grid */}
+      {/* Services Grid - Simplified 6 Items */}
       <section id="services" className="container mx-auto px-4 sm:px-6 py-10 sm:py-12 lg:py-16">
         <div className="text-center space-y-3 sm:space-y-4 mb-8 sm:mb-10 lg:mb-12">
-          <Badge className="bg-secondary/10 text-secondary border-secondary/20 px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium">
+          <Badge className="bg-primary/10 text-primary border-primary/20 px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium">
             Complete Solution
           </Badge>
           <h2 className="text-xl sm:text-2xl lg:text-3xl xl:text-4xl font-extrabold text-foreground px-4">
-            Everything You Need to Manage Your
-            <span className="gradient-text-hero block mt-1 sm:mt-2">LPG Business</span>
+            More Powerful Features
           </h2>
           <p className="text-sm sm:text-base lg:text-lg text-muted-foreground max-w-2xl mx-auto px-4">
-            Comprehensive suite of tools designed specifically for LPG distributors
+            Everything you need to run your LPG business efficiently
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5 lg:gap-6">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 lg:gap-6">
           {services.map((service, index) => {
             const Icon = service.icon;
             return (
               <Card key={index} className="feature-card group overflow-hidden">
-                <CardContent className="p-4 sm:p-5 lg:p-6 space-y-3 sm:space-y-4">
-                  <div className="feature-icon w-12 h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16">
+                <CardContent className="p-4 sm:p-5 lg:p-6 space-y-3">
+                  <div className="feature-icon w-12 h-12 sm:w-14 sm:h-14">
                     <Icon className="h-5 w-5 sm:h-6 sm:w-6 text-primary group-hover:text-primary-foreground transition-colors duration-300" />
                   </div>
                   <div>
-                    <h3 className="text-base sm:text-lg font-bold text-foreground mb-1 sm:mb-2">{service.title}</h3>
-                    <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed line-clamp-2">{service.description}</p>
+                    <h3 className="text-sm sm:text-base lg:text-lg font-bold text-foreground">{service.title}</h3>
+                    <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed mt-1 line-clamp-2">{service.description}</p>
                   </div>
-                  <ul className="space-y-1.5 sm:space-y-2">
-                    {service.features.map((feature, idx) => (
-                      <li key={idx} className="text-[11px] sm:text-xs text-muted-foreground flex items-center gap-1.5 sm:gap-2">
-                        <CheckCircle2 className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-accent flex-shrink-0" />
-                        <span className="truncate">{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
                 </CardContent>
               </Card>
             );
@@ -331,7 +399,7 @@ const Welcome = () => {
         </div>
       </section>
 
-      {/* Testimonial / Success Section */}
+      {/* Testimonial Section */}
       <section className="container mx-auto px-4 sm:px-6 py-10 sm:py-12 lg:py-16">
         <div className="relative rounded-2xl sm:rounded-3xl overflow-hidden bg-muted/50 border border-border/50 p-6 sm:p-8 lg:p-12 xl:p-16">
           <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
@@ -379,7 +447,7 @@ const Welcome = () => {
                   </div>
                 </div>
                 <blockquote className="text-sm sm:text-base text-muted-foreground italic leading-relaxed">
-                  "With STOCK X's sales management, we reduced reporting time by 80% and increased our sales team's productivity by 35%. The real-time tracking has been a game-changer for our delivery operations."
+                  "With STOCK X's inventory management and online delivery platform, we reduced reporting time by 80% and increased our sales team's productivity by 35%. The real-time tracking has been a game-changer."
                 </blockquote>
                 <div className="flex items-center gap-0.5 sm:gap-1 mt-3 sm:mt-4">
                   {[...Array(5)].map((_, i) => (
@@ -424,11 +492,11 @@ const Welcome = () => {
               <ul className="space-y-3">
                 <li className="flex items-center gap-3 text-sm sm:text-base">
                   <CheckCircle2 className="h-5 w-5 text-success flex-shrink-0" />
-                  <span>Daily Sales Management</span>
+                  <span>Full Inventory Management</span>
                 </li>
                 <li className="flex items-center gap-3 text-sm sm:text-base">
                   <CheckCircle2 className="h-5 w-5 text-success flex-shrink-0" />
-                  <span>LPG Stock Tracking</span>
+                  <span>POS & Daily Sales</span>
                 </li>
                 <li className="flex items-center gap-3 text-sm sm:text-base">
                   <CheckCircle2 className="h-5 w-5 text-success flex-shrink-0" />
@@ -445,7 +513,7 @@ const Welcome = () => {
               </ul>
 
               <Link to="/auth" className="block">
-                <Button variant="outline" className="w-full py-5 sm:py-6 text-sm sm:text-base font-semibold border-primary text-primary hover:bg-primary hover:text-primary-foreground transition-all">
+                <Button variant="outline" className="w-full h-12 sm:h-14 text-sm sm:text-base font-semibold border-primary text-primary hover:bg-primary hover:text-primary-foreground transition-all">
                   Get Started
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
@@ -476,7 +544,7 @@ const Welcome = () => {
                 </li>
                 <li className="flex items-center gap-3 text-sm sm:text-base">
                   <CheckCircle2 className="h-5 w-5 text-success flex-shrink-0" />
-                  <span>Online Delivery Module</span>
+                  <span>Online Delivery Platform</span>
                 </li>
                 <li className="flex items-center gap-3 text-sm sm:text-base">
                   <CheckCircle2 className="h-5 w-5 text-success flex-shrink-0" />
@@ -497,7 +565,7 @@ const Welcome = () => {
               </ul>
 
               <Link to="/auth" className="block">
-                <Button className="w-full py-5 sm:py-6 text-sm sm:text-base font-bold btn-cta text-secondary-foreground">
+                <Button className="w-full h-12 sm:h-14 text-sm sm:text-base font-bold btn-cta text-secondary-foreground">
                   Get Premium
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
@@ -523,7 +591,7 @@ const Welcome = () => {
             </p>
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center pt-2 sm:pt-4 px-4 sm:px-0">
               <Link to="/auth" className="w-full sm:w-auto">
-                <Button size="lg" className="btn-cta text-secondary-foreground font-bold text-sm sm:text-base lg:text-lg px-6 sm:px-8 lg:px-10 py-4 sm:py-5 lg:py-6 w-full">
+                <Button size="lg" className="btn-cta text-secondary-foreground font-bold text-sm sm:text-base lg:text-lg px-6 sm:px-8 lg:px-10 h-12 sm:h-14 w-full">
                   Get Started Free
                   <ArrowRight className="ml-2 h-4 w-4 sm:h-5 sm:w-5" />
                 </Button>
@@ -567,9 +635,9 @@ const Welcome = () => {
               <h4 className="font-bold text-base sm:text-lg">Quick Links</h4>
               <ul className="space-y-2 sm:space-y-3 text-sm sm:text-base text-white/70">
                 <li><a href="#features" className="hover:text-secondary transition-colors">Features</a></li>
-                <li><a href="#services" className="hover:text-secondary transition-colors">How It Works</a></li>
-                <li><a href="#stats" className="hover:text-secondary transition-colors">Success Stories</a></li>
-                <li><Link to="/auth" className="hover:text-secondary transition-colors">Get Started</Link></li>
+                <li><a href="#services" className="hover:text-secondary transition-colors">Services</a></li>
+                <li><a href="#pricing" className="hover:text-secondary transition-colors">Pricing</a></li>
+                <li><Link to="/community" className="hover:text-secondary transition-colors">Marketplace</Link></li>
               </ul>
             </div>
 
