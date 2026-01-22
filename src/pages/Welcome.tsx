@@ -141,11 +141,6 @@ const Welcome = () => {
             {/* CTA Buttons */}
             <div className="hidden md:flex items-center gap-2 lg:gap-3">
               <Link to="/auth">
-                <Button variant="outline" size="sm" className="border-primary/20 text-primary hover:bg-primary hover:text-primary-foreground transition-all duration-300 text-xs lg:text-sm px-3 lg:px-4">
-                  Free Demo
-                </Button>
-              </Link>
-              <Link to="/auth">
                 <Button size="sm" className="btn-cta text-secondary-foreground font-semibold text-xs lg:text-sm px-3 lg:px-4">
                   Get Started
                   <ArrowRight className="ml-1 lg:ml-2 h-3 w-3 lg:h-4 lg:w-4" />
@@ -171,11 +166,6 @@ const Welcome = () => {
               <a href="#pricing" className="block py-2.5 px-3 text-sm font-medium text-muted-foreground hover:text-primary hover:bg-muted/50 rounded-lg transition-colors">Pricing</a>
               <Link to="/community" className="block py-2.5 px-3 text-sm font-medium text-muted-foreground hover:text-primary hover:bg-muted/50 rounded-lg transition-colors">Marketplace</Link>
               <div className="pt-2 space-y-2">
-                <Link to="/auth" className="block">
-                  <Button variant="outline" className="w-full border-primary/20 text-primary h-11">
-                    Free Demo
-                  </Button>
-                </Link>
                 <Link to="/auth" className="block">
                   <Button className="w-full btn-cta text-secondary-foreground font-semibold h-11">
                     Get Started
@@ -260,6 +250,11 @@ const Welcome = () => {
                   src={heroLpgImage} 
                   alt="LPG Cylinders - Stock X Inventory Management" 
                   className="relative w-full h-auto rounded-2xl sm:rounded-3xl shadow-2xl border-4 border-white/10"
+                  loading="eager"
+                  decoding="async"
+                  fetchPriority="high"
+                  width="600"
+                  height="400"
                 />
 
                 {/* Floating Badge - Inventory */}
