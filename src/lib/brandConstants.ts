@@ -34,6 +34,33 @@ export const LPG_BRANDS: LpgBrandInfo[] = [
   { name: "Confidence", mouthSize: "22mm", color: "#9333ea" },
   { name: "Unique", mouthSize: "22mm", color: "#ea580c" },
   { name: "S Alam", mouthSize: "22mm", color: "#0d9488" },
+  // Additional 22mm Brands
+  { name: "Cylinderwala (BM)", mouthSize: "22mm", color: "#2563eb" },
+  { name: "Universal Gas", mouthSize: "22mm", color: "#7c3aed" },
+  { name: "Unigas", mouthSize: "22mm", color: "#0891b2" },
+  { name: "Star", mouthSize: "22mm", color: "#eab308" },
+  { name: "Pioneer", mouthSize: "22mm", color: "#16a34a" },
+  { name: "Summit", mouthSize: "22mm", color: "#ea580c" },
+  { name: "Aftab", mouthSize: "22mm", color: "#dc2626" },
+  { name: "Bengal", mouthSize: "22mm", color: "#059669" },
+  { name: "MEGA", mouthSize: "22mm", color: "#8b5cf6" },
+  { name: "Metro", mouthSize: "22mm", color: "#0284c7" },
+  { name: "Crown", mouthSize: "22mm", color: "#ca8a04" },
+  { name: "Sunrise", mouthSize: "22mm", color: "#f97316" },
+  { name: "Super", mouthSize: "22mm", color: "#6366f1" },
+  { name: "Royal", mouthSize: "22mm", color: "#9333ea" },
+  { name: "Speed", mouthSize: "22mm", color: "#14b8a6" },
+  { name: "National", mouthSize: "22mm", color: "#ef4444" },
+  { name: "Atlas", mouthSize: "22mm", color: "#3b82f6" },
+  { name: "Quality", mouthSize: "22mm", color: "#10b981" },
+  { name: "Excel", mouthSize: "22mm", color: "#7c3aed" },
+  { name: "Prime", mouthSize: "22mm", color: "#f59e0b" },
+  { name: "Elite", mouthSize: "22mm", color: "#4f46e5" },
+  { name: "Standard", mouthSize: "22mm", color: "#71717a" },
+  { name: "Trust", mouthSize: "22mm", color: "#0d9488" },
+  { name: "Safe", mouthSize: "22mm", color: "#22c55e" },
+  { name: "Shikha", mouthSize: "22mm", color: "#f472b6" },
+  { name: "Baraka", mouthSize: "22mm", color: "#059669" },
   // 20mm Brands
   { name: "Totalgaz", mouthSize: "20mm", color: "#0891b2" },
   { name: "Laugfs", mouthSize: "20mm", color: "#7c3aed" },
@@ -41,12 +68,17 @@ export const LPG_BRANDS: LpgBrandInfo[] = [
   { name: "K-Gas", mouthSize: "20mm", color: "#059669" },
   { name: "Lufs", mouthSize: "20mm", color: "#f59e0b" },
   { name: "Shell", mouthSize: "20mm", color: "#facc15" },
+  { name: "HP Gas", mouthSize: "20mm", color: "#1e40af" },
+  { name: "Indane", mouthSize: "20mm", color: "#4f46e5" },
+  { name: "Bharat Gas", mouthSize: "20mm", color: "#7c2d12" },
+  { name: "Super Gas", mouthSize: "20mm", color: "#be185d" },
+  { name: "IOC", mouthSize: "20mm", color: "#0369a1" },
 ];
 
 // ============= GAS STOVE BRANDS =============
 export interface StoveBrandInfo {
   name: string;
-  country: "BD" | "JP" | "CN" | "IN" | "US" | "DE" | "KR" | "TW";
+  country: "BD" | "JP" | "CN" | "IN" | "US" | "DE" | "KR" | "TW" | "IT" | "MY";
   countryName: string;
 }
 
@@ -64,6 +96,17 @@ export const STOVE_BRANDS: StoveBrandInfo[] = [
   { name: "Kiam", country: "BD", countryName: "Bangladesh" },
   { name: "Rangs", country: "BD", countryName: "Bangladesh" },
   { name: "Electra", country: "BD", countryName: "Bangladesh" },
+  { name: "Marcel", country: "BD", countryName: "Bangladesh" },
+  { name: "Sony", country: "BD", countryName: "Bangladesh" },
+  { name: "Transtec", country: "BD", countryName: "Bangladesh" },
+  { name: "Youwe", country: "BD", countryName: "Bangladesh" },
+  { name: "Ocean", country: "BD", countryName: "Bangladesh" },
+  { name: "Click", country: "BD", countryName: "Bangladesh" },
+  { name: "Konka", country: "BD", countryName: "Bangladesh" },
+  { name: "Golden", country: "BD", countryName: "Bangladesh" },
+  { name: "Atom", country: "BD", countryName: "Bangladesh" },
+  { name: "Energy", country: "BD", countryName: "Bangladesh" },
+  { name: "Queen", country: "BD", countryName: "Bangladesh" },
   // International
   { name: "Rinnai", country: "JP", countryName: "Japan" },
   { name: "Midea", country: "CN", countryName: "China" },
@@ -72,12 +115,23 @@ export const STOVE_BRANDS: StoveBrandInfo[] = [
   { name: "Black & Decker", country: "US", countryName: "USA" },
   { name: "Haibali", country: "CN", countryName: "China" },
   { name: "Dorfen", country: "DE", countryName: "Germany" },
-  { name: "Konka", country: "CN", countryName: "China" },
   { name: "LG", country: "KR", countryName: "South Korea" },
   { name: "Panasonic", country: "JP", countryName: "Japan" },
   { name: "Paloma", country: "JP", countryName: "Japan" },
   { name: "Prestige", country: "IN", countryName: "India" },
   { name: "Pigeon", country: "IN", countryName: "India" },
+  { name: "Haier", country: "CN", countryName: "China" },
+  { name: "Hisense", country: "CN", countryName: "China" },
+  { name: "Sakura", country: "JP", countryName: "Japan" },
+  { name: "Turbo", country: "TW", countryName: "Taiwan" },
+  { name: "Preethi", country: "IN", countryName: "India" },
+  { name: "Sunflame", country: "IN", countryName: "India" },
+  { name: "Bajaj", country: "IN", countryName: "India" },
+  { name: "Glen", country: "IN", countryName: "India" },
+  { name: "Elica", country: "IT", countryName: "Italy" },
+  { name: "Faber", country: "IT", countryName: "Italy" },
+  { name: "Pensonic", country: "MY", countryName: "Malaysia" },
+  { name: "Khind", country: "MY", countryName: "Malaysia" },
 ];
 
 // ============= REGULATOR BRANDS =============
@@ -94,6 +148,11 @@ export const REGULATOR_BRANDS: RegulatorBrandInfo[] = [
   { name: "Kosan", tier: "premium", origin: "Denmark" },
   { name: "CLESSE", tier: "premium", origin: "France" },
   { name: "Fisher", tier: "premium", origin: "USA" },
+  { name: "GOK", tier: "premium", origin: "Germany" },
+  { name: "Rego", tier: "premium", origin: "USA" },
+  { name: "Comap", tier: "premium", origin: "France" },
+  { name: "Kosangas", tier: "premium", origin: "Denmark" },
+  { name: "Rotarex", tier: "premium", origin: "Luxembourg" },
   // Standard
   { name: "Pamir", tier: "standard", origin: "Bangladesh" },
   { name: "Sena", tier: "standard", origin: "Bangladesh" },
@@ -103,9 +162,117 @@ export const REGULATOR_BRANDS: RegulatorBrandInfo[] = [
   { name: "Ujala", tier: "standard", origin: "Bangladesh" },
   { name: "RFL", tier: "standard", origin: "Bangladesh" },
   { name: "M-Gas", tier: "standard", origin: "Bangladesh" },
+  { name: "HP", tier: "standard", origin: "Bangladesh" },
+  { name: "Supergas", tier: "standard", origin: "India" },
+  { name: "Gas-Flo", tier: "standard", origin: "India" },
+  { name: "Crystal", tier: "standard", origin: "Bangladesh" },
+  { name: "Safe", tier: "standard", origin: "Bangladesh" },
+  { name: "Omera", tier: "standard", origin: "Bangladesh" },
+  { name: "INDEX", tier: "standard", origin: "Bangladesh" },
   // Economy
   { name: "Generic Chinese", tier: "economy", origin: "China" },
   { name: "Local Made", tier: "economy", origin: "Bangladesh" },
+  { name: "Trust", tier: "economy", origin: "China" },
+  { name: "Budget", tier: "economy", origin: "China" },
+];
+
+// ============= SUPPLIER CONSTANTS =============
+export interface SupplierInfo {
+  name: string;
+  type: "lpg" | "stove" | "regulator" | "multi";
+  category: "manufacturer" | "distributor" | "importer";
+}
+
+// LPG Cylinder Suppliers/Distributors
+export const LPG_SUPPLIERS: SupplierInfo[] = [
+  // Major Manufacturers & Distributors
+  { name: "Bashundhara LP Gas Ltd.", type: "lpg", category: "manufacturer" },
+  { name: "Omera Petroleum Ltd.", type: "lpg", category: "manufacturer" },
+  { name: "Jamuna Oil Company Ltd.", type: "lpg", category: "manufacturer" },
+  { name: "Beximco LPG Ltd.", type: "lpg", category: "manufacturer" },
+  { name: "TotalEnergies Bangladesh", type: "lpg", category: "manufacturer" },
+  { name: "Laugfs Gas Bangladesh Ltd.", type: "lpg", category: "manufacturer" },
+  { name: "Petromax LPG Ltd.", type: "lpg", category: "manufacturer" },
+  { name: "BM Energy (BD) Ltd.", type: "lpg", category: "manufacturer" },
+  { name: "INDEX Energy Ltd.", type: "lpg", category: "manufacturer" },
+  { name: "Fresh LPG Ltd.", type: "lpg", category: "manufacturer" },
+  { name: "Navana LPG Ltd.", type: "lpg", category: "manufacturer" },
+  { name: "Akij Gas Ltd.", type: "lpg", category: "manufacturer" },
+  { name: "Orion LPG Ltd.", type: "lpg", category: "manufacturer" },
+  { name: "Delta LPG Ltd.", type: "lpg", category: "manufacturer" },
+  { name: "JMI LPG Ltd.", type: "lpg", category: "manufacturer" },
+  { name: "G-Gas (Energypac)", type: "lpg", category: "manufacturer" },
+  { name: "Runner LPG Ltd.", type: "lpg", category: "manufacturer" },
+  { name: "Meghna LPG Ltd.", type: "lpg", category: "manufacturer" },
+  { name: "Unitex Gas Ltd.", type: "lpg", category: "manufacturer" },
+  { name: "Sena LPG Ltd.", type: "lpg", category: "manufacturer" },
+  { name: "City LPG Ltd.", type: "lpg", category: "manufacturer" },
+  { name: "RP Gas Ltd.", type: "lpg", category: "manufacturer" },
+  { name: "Golden LPG", type: "lpg", category: "manufacturer" },
+  { name: "Padma Energy", type: "lpg", category: "manufacturer" },
+  { name: "Confidence Gas Ltd.", type: "lpg", category: "manufacturer" },
+  { name: "Unique Gas Ltd.", type: "lpg", category: "manufacturer" },
+  { name: "S Alam Gas Ltd.", type: "lpg", category: "manufacturer" },
+  { name: "Universal Gas & Cylinder Ltd.", type: "lpg", category: "manufacturer" },
+  // Regional Distributors
+  { name: "Unigas Bangladesh", type: "lpg", category: "distributor" },
+  { name: "K-Gas Bangladesh", type: "lpg", category: "distributor" },
+  { name: "Local Distributor", type: "lpg", category: "distributor" },
+  { name: "Dhaka Gas Distributor", type: "lpg", category: "distributor" },
+  { name: "Chittagong Gas Supplies", type: "lpg", category: "distributor" },
+  { name: "Sylhet Gas Agency", type: "lpg", category: "distributor" },
+  { name: "Rajshahi Gas Depot", type: "lpg", category: "distributor" },
+  { name: "Khulna Gas Services", type: "lpg", category: "distributor" },
+];
+
+// Stove Suppliers
+export const STOVE_SUPPLIERS: SupplierInfo[] = [
+  // Bangladeshi Manufacturers
+  { name: "Walton Hi-Tech Industries Ltd.", type: "stove", category: "manufacturer" },
+  { name: "RFL Electronics Ltd.", type: "stove", category: "manufacturer" },
+  { name: "Gazi Group", type: "stove", category: "manufacturer" },
+  { name: "Miyako Electronics", type: "stove", category: "manufacturer" },
+  { name: "Vision Electronics", type: "stove", category: "manufacturer" },
+  { name: "Singer Bangladesh Ltd.", type: "stove", category: "manufacturer" },
+  { name: "Minister Hi-Tech Park", type: "stove", category: "manufacturer" },
+  { name: "Jamuna Electronics", type: "stove", category: "manufacturer" },
+  { name: "Navana Home Appliances", type: "stove", category: "manufacturer" },
+  { name: "Kiam Metal Industries", type: "stove", category: "manufacturer" },
+  { name: "Rangs Electronics", type: "stove", category: "manufacturer" },
+  { name: "Electra International", type: "stove", category: "manufacturer" },
+  { name: "Marcel Bangladesh", type: "stove", category: "manufacturer" },
+  { name: "Transtec Ltd.", type: "stove", category: "manufacturer" },
+  // Importers
+  { name: "Butterfly Import House", type: "stove", category: "importer" },
+  { name: "Midea Bangladesh", type: "stove", category: "importer" },
+  { name: "Haier Bangladesh", type: "stove", category: "importer" },
+  { name: "Sharp Bangladesh", type: "stove", category: "importer" },
+  { name: "Prestige Bangladesh", type: "stove", category: "importer" },
+  { name: "Pigeon Distributor BD", type: "stove", category: "importer" },
+  { name: "Local Electronics Importer", type: "stove", category: "importer" },
+  { name: "Asia Electronics Ltd.", type: "stove", category: "importer" },
+  { name: "Fair Electronics Ltd.", type: "stove", category: "importer" },
+];
+
+// Regulator Suppliers
+export const REGULATOR_SUPPLIERS: SupplierInfo[] = [
+  // Premium brands (importers)
+  { name: "IGT Bangladesh", type: "regulator", category: "importer" },
+  { name: "Cavagna Group BD", type: "regulator", category: "importer" },
+  { name: "CLESSE Industries BD", type: "regulator", category: "importer" },
+  { name: "Fisher Controls BD", type: "regulator", category: "importer" },
+  { name: "GOK Regulators BD", type: "regulator", category: "importer" },
+  // Local manufacturers
+  { name: "HP Regulators Bangladesh", type: "regulator", category: "manufacturer" },
+  { name: "Pamir Gas Equipment", type: "regulator", category: "manufacturer" },
+  { name: "Sena Gas Accessories", type: "regulator", category: "manufacturer" },
+  { name: "Bono Gas Equipment", type: "regulator", category: "manufacturer" },
+  { name: "BM Gas Accessories", type: "regulator", category: "manufacturer" },
+  { name: "Navana Gas Accessories", type: "regulator", category: "manufacturer" },
+  { name: "RFL Gas Accessories", type: "regulator", category: "manufacturer" },
+  { name: "DECO Limited", type: "regulator", category: "distributor" },
+  { name: "Local Regulator Supplier", type: "regulator", category: "distributor" },
+  { name: "Gas Equipment Wholesale", type: "regulator", category: "distributor" },
 ];
 
 // ============= HELPER FUNCTIONS =============
@@ -170,6 +337,8 @@ export const getCountryFlag = (country: StoveBrandInfo["country"]): string => {
     DE: "🇩🇪",
     KR: "🇰🇷",
     TW: "🇹🇼",
+    IT: "🇮🇹",
+    MY: "🇲🇾",
   };
   return flags[country] ?? "🌐";
 };
@@ -201,4 +370,74 @@ export const findStoveBrand = (name: string): StoveBrandInfo | undefined => {
 
 export const findRegulatorBrand = (name: string): RegulatorBrandInfo | undefined => {
   return REGULATOR_BRANDS.find(b => b.name.toLowerCase() === name.toLowerCase());
+};
+
+// ============= SUPPLIER HELPER FUNCTIONS =============
+
+/**
+ * Get suppliers by product type
+ */
+export const getSuppliersByType = (type: "lpg" | "stove" | "regulator"): SupplierInfo[] => {
+  switch (type) {
+    case "lpg": return LPG_SUPPLIERS;
+    case "stove": return STOVE_SUPPLIERS;
+    case "regulator": return REGULATOR_SUPPLIERS;
+  }
+};
+
+/**
+ * Get supplier names for dropdown
+ */
+export const getSupplierNames = (type: "lpg" | "stove" | "regulator"): string[] => {
+  return getSuppliersByType(type).map(s => s.name).sort();
+};
+
+/**
+ * Get suppliers grouped by category
+ */
+export const getSuppliersByCategory = (type: "lpg" | "stove" | "regulator"): Record<string, SupplierInfo[]> => {
+  const suppliers = getSuppliersByType(type);
+  return suppliers.reduce((acc, supplier) => {
+    if (!acc[supplier.category]) {
+      acc[supplier.category] = [];
+    }
+    acc[supplier.category].push(supplier);
+    return acc;
+  }, {} as Record<string, SupplierInfo[]>);
+};
+
+/**
+ * Find supplier info by name
+ */
+export const findSupplier = (name: string, type: "lpg" | "stove" | "regulator"): SupplierInfo | undefined => {
+  return getSuppliersByType(type).find(s => s.name.toLowerCase() === name.toLowerCase());
+};
+
+/**
+ * Validate custom brand name
+ */
+export const validateCustomBrand = (name: string): { valid: boolean; error?: string } => {
+  if (!name || name.trim().length < 2) {
+    return { valid: false, error: "Brand name must be at least 2 characters" };
+  }
+  if (name.length > 50) {
+    return { valid: false, error: "Brand name must be less than 50 characters" };
+  }
+  if (!/^[a-zA-Z0-9\s\-&()]+$/.test(name)) {
+    return { valid: false, error: "Brand name contains invalid characters" };
+  }
+  return { valid: true };
+};
+
+/**
+ * Validate custom supplier name
+ */
+export const validateCustomSupplier = (name: string): { valid: boolean; error?: string } => {
+  if (!name || name.trim().length < 3) {
+    return { valid: false, error: "Supplier name must be at least 3 characters" };
+  }
+  if (name.length > 100) {
+    return { valid: false, error: "Supplier name must be less than 100 characters" };
+  }
+  return { valid: true };
 };
