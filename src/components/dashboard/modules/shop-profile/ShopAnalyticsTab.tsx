@@ -1,16 +1,18 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
 import { 
-  TrendingUp, TrendingDown, ShoppingBag, Users, Star, 
-  Loader2, BarChart3, Calendar, RefreshCw, Package,
-  ArrowUpRight, ArrowDownRight
+  TrendingUp, TrendingDown, ShoppingBag, 
+  BarChart3, Calendar, RefreshCw, Package,
+  ArrowUpRight, ArrowDownRight, Clock, CheckCircle
 } from "lucide-react";
-import { format, subDays, startOfDay, endOfDay } from "date-fns";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from "recharts";
+import { format, subDays, startOfDay } from "date-fns";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Area, AreaChart } from "recharts";
+import { PremiumStatCard } from "@/components/shared/PremiumStatCard";
+import { PremiumModuleHeader } from "@/components/shared/PremiumModuleHeader";
 
 interface ShopAnalyticsTabProps {
   shopId: string | null;
@@ -32,7 +34,23 @@ interface OrderItem {
   price: number;
 }
 
-const CHART_COLORS = ['hsl(var(--primary))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
+const CHART_COLORS = {
+  primary: 'hsl(var(--primary))',
+  emerald: '#10b981',
+  amber: '#f59e0b',
+  blue: '#3b82f6',
+  purple: '#8b5cf6',
+  rose: '#f43f5e',
+};
+
+const STATUS_COLORS: Record<string, string> = {
+  Pending: CHART_COLORS.amber,
+  Confirmed: CHART_COLORS.primary,
+  Dispatched: CHART_COLORS.blue,
+  Delivered: CHART_COLORS.emerald,
+  Rejected: CHART_COLORS.rose,
+  Cancelled: '#6b7280',
+};
 
 export const ShopAnalyticsTab = ({ shopId }: ShopAnalyticsTabProps) => {
   const [loading, setLoading] = useState(true);
@@ -40,16 +58,11 @@ export const ShopAnalyticsTab = ({ shopId }: ShopAnalyticsTabProps) => {
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [dateRange, setDateRange] = useState<'7d' | '30d' | 'all'>('7d');
 
-  useEffect(() => {
-    if (shopId) {
-      fetchData();
-    } else {
+  const fetchData = useCallback(async () => {
+    if (!shopId) {
       setLoading(false);
+      return;
     }
-  }, [shopId, dateRange]);
-
-  const fetchData = async () => {
-    if (!shopId) return;
     
     setLoading(true);
     try {
@@ -78,13 +91,19 @@ export const ShopAnalyticsTab = ({ shopId }: ShopAnalyticsTabProps) => {
           .in('order_id', orderIds);
         
         setOrderItems(items || []);
+      } else {
+        setOrderItems([]);
       }
     } catch (error) {
       console.error('Error fetching analytics:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [shopId, dateRange]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   // Calculate analytics
   const analytics = useMemo(() => {
@@ -105,8 +124,8 @@ export const ShopAnalyticsTab = ({ shopId }: ShopAnalyticsTabProps) => {
     const yesterdayOrders = orders.filter(o => new Date(o.created_at).toDateString() === yesterday);
     const yesterdayRevenue = yesterdayOrders.filter(o => o.status === 'delivered').reduce((sum, o) => sum + o.total_amount, 0);
     
-    const revenueChange = yesterdayRevenue > 0 ? ((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100 : 0;
-    const ordersChange = yesterdayOrders.length > 0 ? ((todayOrders.length - yesterdayOrders.length) / yesterdayOrders.length) * 100 : 0;
+    const revenueChange = yesterdayRevenue > 0 ? ((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100 : todayRevenue > 0 ? 100 : 0;
+    const ordersChange = yesterdayOrders.length > 0 ? ((todayOrders.length - yesterdayOrders.length) / yesterdayOrders.length) * 100 : todayOrders.length > 0 ? 100 : 0;
 
     // Customer types
     const retailOrders = orders.filter(o => o.customer_type === 'retail' || !o.customer_type).length;
@@ -127,7 +146,7 @@ export const ShopAnalyticsTab = ({ shopId }: ShopAnalyticsTabProps) => {
     };
   }, [orders]);
 
-  // Revenue chart data (last 7 days)
+  // Revenue chart data with gradient fill
   const revenueChartData = useMemo(() => {
     const days = dateRange === '7d' ? 7 : dateRange === '30d' ? 30 : 14;
     const data = [];
@@ -172,31 +191,38 @@ export const ShopAnalyticsTab = ({ shopId }: ShopAnalyticsTabProps) => {
   const statusDistribution = useMemo(() => {
     const statusCounts: Record<string, number> = {};
     orders.forEach(o => {
-      statusCounts[o.status] = (statusCounts[o.status] || 0) + 1;
+      const status = o.status.charAt(0).toUpperCase() + o.status.slice(1);
+      statusCounts[status] = (statusCounts[status] || 0) + 1;
     });
     
     return Object.entries(statusCounts).map(([status, count]) => ({
-      name: status.charAt(0).toUpperCase() + status.slice(1),
-      value: count
+      name: status,
+      value: count,
+      color: STATUS_COLORS[status] || '#6b7280'
     }));
   }, [orders]);
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center p-8">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="flex items-center justify-center p-12">
+        <div className="text-center space-y-3">
+          <div className="h-10 w-10 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-sm text-muted-foreground">Loading analytics...</p>
+        </div>
       </div>
     );
   }
 
   if (!shopId) {
     return (
-      <Card className="border-dashed">
-        <CardContent className="flex flex-col items-center justify-center py-12">
-          <BarChart3 className="h-12 w-12 text-muted-foreground/40 mb-4" />
+      <Card className="border-dashed border-2">
+        <CardContent className="flex flex-col items-center justify-center py-16">
+          <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mb-4">
+            <BarChart3 className="h-8 w-8 text-muted-foreground/50" />
+          </div>
           <h3 className="text-lg font-semibold mb-2">Create Your Shop First</h3>
-          <p className="text-muted-foreground text-center">
-            Set up your shop profile to view analytics
+          <p className="text-muted-foreground text-center text-sm max-w-md">
+            Set up your shop profile to view analytics and track performance
           </p>
         </CardContent>
       </Card>
@@ -204,210 +230,253 @@ export const ShopAnalyticsTab = ({ shopId }: ShopAnalyticsTabProps) => {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Date Range Selector */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Calendar className="h-5 w-5 text-muted-foreground" />
-          <span className="font-medium">Analytics Overview</span>
+    <div className="space-y-5">
+      {/* Header with Date Range */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-lg bg-primary/15 flex items-center justify-center">
+            <BarChart3 className="h-5 w-5 text-primary" />
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold">Analytics Overview</h2>
+            <p className="text-xs text-muted-foreground">Track your shop performance</p>
+          </div>
         </div>
+        
+        {/* Date Range Pills */}
         <div className="flex items-center gap-2">
-          <Button 
-            variant={dateRange === '7d' ? 'default' : 'outline'} 
-            size="sm" 
-            onClick={() => setDateRange('7d')}
-            className="h-9"
-          >
-            7 Days
-          </Button>
-          <Button 
-            variant={dateRange === '30d' ? 'default' : 'outline'} 
-            size="sm" 
-            onClick={() => setDateRange('30d')}
-            className="h-9"
-          >
-            30 Days
-          </Button>
-          <Button 
-            variant={dateRange === 'all' ? 'default' : 'outline'} 
-            size="sm" 
-            onClick={() => setDateRange('all')}
-            className="h-9"
-          >
-            All Time
-          </Button>
-          <Button variant="ghost" size="icon" onClick={fetchData} className="h-9 w-9">
+          <div className="flex bg-muted/50 rounded-lg p-1">
+            {(['7d', '30d', 'all'] as const).map((range) => (
+              <Button 
+                key={range}
+                variant={dateRange === range ? 'default' : 'ghost'} 
+                size="sm" 
+                onClick={() => setDateRange(range)}
+                className={`h-9 px-4 text-sm ${dateRange === range ? '' : 'hover:bg-transparent'}`}
+              >
+                {range === '7d' ? '7 Days' : range === '30d' ? '30 Days' : 'All Time'}
+              </Button>
+            ))}
+          </div>
+          <Button variant="outline" size="icon" onClick={fetchData} className="h-9 w-9">
             <RefreshCw className="h-4 w-4" />
           </Button>
         </div>
       </div>
 
-      {/* Key Metrics */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="p-4">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">Total Revenue</p>
-              <p className="text-2xl font-bold tabular-nums mt-1">
-                {BANGLADESHI_CURRENCY_SYMBOL}{analytics.totalRevenue.toLocaleString()}
-              </p>
+      {/* Key Metrics - Premium Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <Card className="relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-transparent" />
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-emerald-400" />
+          <CardContent className="relative p-4">
+            <div className="flex items-start justify-between">
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Total Revenue</p>
+                <p className="text-2xl sm:text-3xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
+                  {BANGLADESHI_CURRENCY_SYMBOL}{analytics.totalRevenue.toLocaleString()}
+                </p>
+              </div>
+              <div className="h-10 w-10 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+                <TrendingUp className="h-5 w-5 text-emerald-500" />
+              </div>
             </div>
-            <div className="h-10 w-10 rounded-lg bg-emerald-500/15 flex items-center justify-center">
-              <TrendingUp className="h-5 w-5 text-emerald-500" />
+            <div className="mt-3 flex items-center gap-1.5 text-xs">
+              {analytics.revenueChange >= 0 ? (
+                <>
+                  <ArrowUpRight className="h-3.5 w-3.5 text-emerald-500" />
+                  <span className="text-emerald-600 font-medium">+{analytics.revenueChange.toFixed(1)}%</span>
+                </>
+              ) : (
+                <>
+                  <ArrowDownRight className="h-3.5 w-3.5 text-destructive" />
+                  <span className="text-destructive font-medium">{analytics.revenueChange.toFixed(1)}%</span>
+                </>
+              )}
+              <span className="text-muted-foreground">vs yesterday</span>
             </div>
-          </div>
-          <div className="mt-2 flex items-center gap-1 text-xs">
-            {analytics.revenueChange >= 0 ? (
-              <>
-                <ArrowUpRight className="h-3 w-3 text-emerald-500" />
-                <span className="text-emerald-500">+{analytics.revenueChange.toFixed(1)}%</span>
-              </>
-            ) : (
-              <>
-                <ArrowDownRight className="h-3 w-3 text-destructive" />
-                <span className="text-destructive">{analytics.revenueChange.toFixed(1)}%</span>
-              </>
-            )}
-            <span className="text-muted-foreground">vs yesterday</span>
-          </div>
+          </CardContent>
         </Card>
 
-        <Card className="p-4">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">Total Orders</p>
-              <p className="text-2xl font-bold tabular-nums mt-1">{analytics.totalOrders}</p>
+        <Card className="relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent" />
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary to-primary/80" />
+          <CardContent className="relative p-4">
+            <div className="flex items-start justify-between">
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Total Orders</p>
+                <p className="text-2xl sm:text-3xl font-bold tabular-nums text-primary">
+                  {analytics.totalOrders}
+                </p>
+              </div>
+              <div className="h-10 w-10 rounded-lg bg-primary/20 flex items-center justify-center">
+                <ShoppingBag className="h-5 w-5 text-primary" />
+              </div>
             </div>
-            <div className="h-10 w-10 rounded-lg bg-primary/15 flex items-center justify-center">
-              <ShoppingBag className="h-5 w-5 text-primary" />
+            <div className="mt-3 flex items-center gap-2 text-xs">
+              <Badge variant="secondary" className="text-[10px] bg-primary/10 text-primary">{analytics.todayOrders} today</Badge>
             </div>
-          </div>
-          <div className="mt-2 flex items-center gap-1 text-xs">
-            <span className="text-muted-foreground">{analytics.todayOrders} today</span>
-          </div>
+          </CardContent>
         </Card>
 
-        <Card className="p-4">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">Avg Order Value</p>
-              <p className="text-2xl font-bold tabular-nums mt-1">
-                {BANGLADESHI_CURRENCY_SYMBOL}{analytics.avgOrderValue.toFixed(0)}
-              </p>
+        <Card className="relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-blue-500/5 to-transparent" />
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-blue-400" />
+          <CardContent className="relative p-4">
+            <div className="flex items-start justify-between">
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Avg Order Value</p>
+                <p className="text-2xl sm:text-3xl font-bold tabular-nums text-blue-600 dark:text-blue-400">
+                  {BANGLADESHI_CURRENCY_SYMBOL}{analytics.avgOrderValue.toFixed(0)}
+                </p>
+              </div>
+              <div className="h-10 w-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                <BarChart3 className="h-5 w-5 text-blue-500" />
+              </div>
             </div>
-            <div className="h-10 w-10 rounded-lg bg-blue-500/15 flex items-center justify-center">
-              <BarChart3 className="h-5 w-5 text-blue-500" />
+            <div className="mt-3 flex items-center gap-2 text-xs">
+              <span className="text-muted-foreground">{analytics.deliveredOrders} delivered</span>
             </div>
-          </div>
-          <div className="mt-2 flex items-center gap-1 text-xs">
-            <span className="text-muted-foreground">{analytics.deliveredOrders} delivered</span>
-          </div>
+          </CardContent>
         </Card>
 
-        <Card className="p-4">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">Pending Orders</p>
-              <p className="text-2xl font-bold tabular-nums mt-1">{analytics.pendingOrders}</p>
+        <Card className="relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent" />
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 to-amber-400" />
+          <CardContent className="relative p-4">
+            <div className="flex items-start justify-between">
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Pending Orders</p>
+                <p className="text-2xl sm:text-3xl font-bold tabular-nums text-amber-600 dark:text-amber-400">
+                  {analytics.pendingOrders}
+                </p>
+              </div>
+              <div className="h-10 w-10 rounded-lg bg-amber-500/20 flex items-center justify-center">
+                <Clock className="h-5 w-5 text-amber-500" />
+              </div>
             </div>
-            <div className="h-10 w-10 rounded-lg bg-amber-500/15 flex items-center justify-center">
-              <Package className="h-5 w-5 text-amber-500" />
+            <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs">
+              <Badge variant="outline" className="text-[10px]">{analytics.retailOrders} Retail</Badge>
+              <Badge variant="outline" className="text-[10px]">{analytics.wholesaleOrders} Wholesale</Badge>
             </div>
-          </div>
-          <div className="mt-2 flex items-center gap-2 text-xs">
-            <Badge variant="outline" className="text-[10px]">
-              {analytics.retailOrders} Retail
-            </Badge>
-            <Badge variant="outline" className="text-[10px]">
-              {analytics.wholesaleOrders} Wholesale
-            </Badge>
-          </div>
+          </CardContent>
         </Card>
       </div>
 
       {/* Charts Row */}
-      <div className="grid lg:grid-cols-2 gap-6">
-        {/* Revenue Trend */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Revenue Trend</CardTitle>
-            <CardDescription>Daily revenue over time</CardDescription>
+      <div className="grid lg:grid-cols-2 gap-4">
+        {/* Revenue Trend - Area Chart with Gradient */}
+        <Card className="overflow-hidden">
+          <CardHeader className="pb-2 px-4 sm:px-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-base font-semibold">Revenue Trend</CardTitle>
+                <CardDescription className="text-xs">Daily revenue over time</CardDescription>
+              </div>
+              <Badge variant="secondary" className="text-xs">
+                {dateRange === '7d' ? 'Last 7 Days' : dateRange === '30d' ? 'Last 30 Days' : 'All Time'}
+              </Badge>
+            </div>
           </CardHeader>
-          <CardContent>
-            <div className="h-[250px]">
+          <CardContent className="px-2 sm:px-4 pb-4">
+            <div className="h-[200px] sm:h-[250px]">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={revenueChartData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                <AreaChart data={revenueChartData}>
+                  <defs>
+                    <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
                   <XAxis 
                     dataKey="date" 
-                    tick={{ fontSize: 12 }} 
+                    tick={{ fontSize: 11 }} 
                     tickLine={false}
                     axisLine={false}
+                    interval="preserveStartEnd"
                   />
                   <YAxis 
-                    tick={{ fontSize: 12 }} 
+                    tick={{ fontSize: 11 }} 
                     tickLine={false}
                     axisLine={false}
-                    tickFormatter={(value) => `৳${value}`}
+                    tickFormatter={(value) => `৳${value >= 1000 ? `${(value/1000).toFixed(0)}k` : value}`}
+                    width={45}
                   />
                   <Tooltip 
-                    formatter={(value: number) => [`${BANGLADESHI_CURRENCY_SYMBOL}${value}`, 'Revenue']}
+                    formatter={(value: number) => [`${BANGLADESHI_CURRENCY_SYMBOL}${value.toLocaleString()}`, 'Revenue']}
                     contentStyle={{ 
                       backgroundColor: 'hsl(var(--card))',
                       border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px'
+                      borderRadius: '8px',
+                      fontSize: '12px'
                     }}
                   />
-                  <Line 
+                  <Area 
                     type="monotone" 
                     dataKey="revenue" 
                     stroke="hsl(var(--primary))" 
                     strokeWidth={2}
-                    dot={{ fill: 'hsl(var(--primary))', strokeWidth: 0 }}
+                    fill="url(#revenueGradient)"
                   />
-                </LineChart>
+                </AreaChart>
               </ResponsiveContainer>
             </div>
           </CardContent>
         </Card>
 
-        {/* Top Products */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Top Products</CardTitle>
-            <CardDescription>Best selling products by revenue</CardDescription>
+        {/* Top Products - Horizontal Bar Chart */}
+        <Card className="overflow-hidden">
+          <CardHeader className="pb-2 px-4 sm:px-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-base font-semibold">Top Products</CardTitle>
+                <CardDescription className="text-xs">Best selling by revenue</CardDescription>
+              </div>
+              <Badge variant="secondary" className="text-xs">{topProducts.length} Products</Badge>
+            </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-2 sm:px-4 pb-4">
             {topProducts.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-[250px] text-muted-foreground">
+              <div className="flex flex-col items-center justify-center h-[200px] sm:h-[250px] text-muted-foreground">
                 <Package className="h-10 w-10 mb-2 opacity-50" />
-                <p>No sales data yet</p>
+                <p className="text-sm">No sales data yet</p>
               </div>
             ) : (
-              <div className="h-[250px]">
+              <div className="h-[200px] sm:h-[250px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={topProducts} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                  <BarChart data={topProducts} layout="vertical" margin={{ left: 10, right: 10 }}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" horizontal={false} />
                     <XAxis 
                       type="number" 
-                      tick={{ fontSize: 12 }}
-                      tickFormatter={(value) => `৳${value}`}
+                      tick={{ fontSize: 11 }}
+                      tickFormatter={(value) => `৳${value >= 1000 ? `${(value/1000).toFixed(0)}k` : value}`}
+                      axisLine={false}
+                      tickLine={false}
                     />
                     <YAxis 
                       type="category" 
                       dataKey="name" 
-                      tick={{ fontSize: 11 }}
-                      width={100}
+                      tick={{ fontSize: 10 }}
+                      width={80}
+                      axisLine={false}
+                      tickLine={false}
                     />
                     <Tooltip 
-                      formatter={(value: number) => [`${BANGLADESHI_CURRENCY_SYMBOL}${value}`, 'Revenue']}
+                      formatter={(value: number) => [`${BANGLADESHI_CURRENCY_SYMBOL}${value.toLocaleString()}`, 'Revenue']}
                       contentStyle={{ 
                         backgroundColor: 'hsl(var(--card))',
                         border: '1px solid hsl(var(--border))',
-                        borderRadius: '8px'
+                        borderRadius: '8px',
+                        fontSize: '12px'
                       }}
                     />
-                    <Bar dataKey="revenue" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+                    <Bar 
+                      dataKey="revenue" 
+                      fill="hsl(var(--primary))" 
+                      radius={[0, 4, 4, 0]}
+                      maxBarSize={32}
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -417,14 +486,19 @@ export const ShopAnalyticsTab = ({ shopId }: ShopAnalyticsTabProps) => {
       </div>
 
       {/* Order Status Distribution */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Order Status Distribution</CardTitle>
-          <CardDescription>Breakdown of orders by status</CardDescription>
+      <Card className="overflow-hidden">
+        <CardHeader className="pb-2 px-4 sm:px-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-base font-semibold">Order Status Distribution</CardTitle>
+              <CardDescription className="text-xs">Breakdown of orders by status</CardDescription>
+            </div>
+            <Badge variant="secondary" className="text-xs">{analytics.totalOrders} Total</Badge>
+          </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 sm:px-6 pb-4">
           <div className="flex flex-col sm:flex-row items-center gap-6">
-            <div className="h-[200px] w-[200px]">
+            <div className="h-[180px] w-[180px] sm:h-[200px] sm:w-[200px]">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
@@ -432,32 +506,36 @@ export const ShopAnalyticsTab = ({ shopId }: ShopAnalyticsTabProps) => {
                     cx="50%"
                     cy="50%"
                     innerRadius={50}
-                    outerRadius={80}
-                    paddingAngle={2}
+                    outerRadius={75}
+                    paddingAngle={3}
                     dataKey="value"
                   >
                     {statusDistribution.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                      <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
                   <Tooltip 
                     contentStyle={{ 
                       backgroundColor: 'hsl(var(--card))',
                       border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px'
+                      borderRadius: '8px',
+                      fontSize: '12px'
                     }}
                   />
                 </PieChart>
               </ResponsiveContainer>
             </div>
-            <div className="flex flex-wrap gap-3">
-              {statusDistribution.map((status, index) => (
+            <div className="flex flex-wrap justify-center sm:justify-start gap-x-4 gap-y-2">
+              {statusDistribution.map((status) => (
                 <div key={status.name} className="flex items-center gap-2">
                   <div 
-                    className="h-3 w-3 rounded-full" 
-                    style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }}
+                    className="h-3 w-3 rounded-full shrink-0" 
+                    style={{ backgroundColor: status.color }}
                   />
-                  <span className="text-sm">{status.name}: {status.value}</span>
+                  <span className="text-sm">
+                    <span className="font-medium">{status.name}:</span>{' '}
+                    <span className="text-muted-foreground">{status.value}</span>
+                  </span>
                 </div>
               ))}
             </div>

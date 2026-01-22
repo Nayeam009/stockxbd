@@ -539,16 +539,18 @@ export const ShopProductsTab = ({ shopId }: ShopProductsTabProps) => {
     );
   };
 
-  // Empty State
+  // Empty State - Professional Design
   const EmptyState = ({ type }: { type: string }) => (
-    <Card className="border-dashed">
-      <CardContent className="flex flex-col items-center justify-center py-12">
-        <Package className="h-12 w-12 text-muted-foreground/50 mb-4" />
+    <Card className="border-dashed border-2">
+      <CardContent className="flex flex-col items-center justify-center py-16">
+        <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mb-4">
+          <Package className="h-8 w-8 text-muted-foreground/50" />
+        </div>
         <h3 className="text-lg font-semibold mb-2">No {type} in inventory</h3>
         <p className="text-muted-foreground text-center text-sm max-w-md mb-4">
           Add products to your inventory first to list them in your shop
         </p>
-        <Button variant="outline" onClick={() => navigate('/dashboard')} className="gap-2">
+        <Button variant="outline" onClick={() => navigate('/dashboard')} className="gap-2 h-11">
           <Package className="h-4 w-4" />
           Go to Inventory
         </Button>
@@ -560,19 +562,24 @@ export const ShopProductsTab = ({ shopId }: ShopProductsTabProps) => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center p-8">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="flex items-center justify-center p-12">
+        <div className="text-center space-y-3">
+          <div className="h-10 w-10 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-sm text-muted-foreground">Loading products...</p>
+        </div>
       </div>
     );
   }
 
   if (!shopId) {
     return (
-      <Card className="border-dashed">
-        <CardContent className="flex flex-col items-center justify-center py-12">
-          <AlertCircle className="h-12 w-12 text-amber-500 mb-4" />
+      <Card className="border-dashed border-2">
+        <CardContent className="flex flex-col items-center justify-center py-16">
+          <div className="h-16 w-16 rounded-full bg-amber-500/15 flex items-center justify-center mb-4">
+            <AlertCircle className="h-8 w-8 text-amber-500" />
+          </div>
           <h3 className="text-lg font-semibold mb-2">Create Your Shop First</h3>
-          <p className="text-muted-foreground text-center max-w-md">
+          <p className="text-muted-foreground text-center text-sm max-w-md">
             Set up your shop profile in the "Shop Info" tab before listing products
           </p>
         </CardContent>
@@ -583,28 +590,35 @@ export const ShopProductsTab = ({ shopId }: ShopProductsTabProps) => {
   // ==================== MAIN RENDER ====================
 
   return (
-    <div className="space-y-6">
-      {/* Stats Bar */}
-      <Card className="p-4">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="h-12 w-12 rounded-xl bg-primary/15 flex items-center justify-center">
-              <Package className="h-6 w-6 text-primary" />
+    <div className="space-y-5">
+      {/* Stats Bar - Enhanced Design */}
+      <Card className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-emerald-500/5" />
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary to-emerald-500" />
+        <div className="relative p-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg">
+                <Package className="h-6 w-6 text-primary-foreground" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold tabular-nums">
+                  {stats.listed} <span className="text-muted-foreground text-lg font-normal">/ {stats.total}</span>
+                </p>
+                <p className="text-sm text-muted-foreground">Products Listed in Marketplace</p>
+              </div>
             </div>
-            <div>
-              <p className="text-lg font-bold tabular-nums">{stats.listed} / {stats.total}</p>
-              <p className="text-sm text-muted-foreground">Products Listed</p>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <Button variant="outline" onClick={handleSyncInventory} disabled={syncing} className="gap-2 h-11">
+                <RefreshCcw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">Sync Inventory</span>
+                <span className="sm:hidden">Sync</span>
+              </Button>
+              <Button onClick={handleSaveAll} disabled={saving} className="gap-2 h-11 flex-1 sm:flex-none">
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                Save All
+              </Button>
             </div>
-          </div>
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <Button variant="outline" onClick={handleSyncInventory} disabled={syncing} className="gap-2 h-11">
-              <RefreshCcw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">Sync</span>
-            </Button>
-            <Button onClick={handleSaveAll} disabled={saving} className="gap-2 h-11 flex-1 sm:flex-none">
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              Save All
-            </Button>
           </div>
         </div>
       </Card>
@@ -613,38 +627,38 @@ export const ShopProductsTab = ({ shopId }: ShopProductsTabProps) => {
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search products..."
+          placeholder="Search products by name..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-10 h-11"
+          className="pl-10 h-11 text-base"
         />
       </div>
 
-      {/* Product Tabs */}
+      {/* Product Tabs - Enhanced */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="w-full grid grid-cols-3 h-12">
-          <TabsTrigger value="lpg" className="gap-2 h-10">
+        <TabsList className="w-full grid grid-cols-3 h-12 p-1 bg-muted/50">
+          <TabsTrigger value="lpg" className="gap-2 h-10 data-[state=active]:shadow-sm">
             <Flame className="h-4 w-4" />
             <span className="hidden sm:inline">LPG Refill</span>
             <span className="sm:hidden">LPG</span>
             {lpgProducts.length > 0 && (
-              <Badge variant="secondary" className="ml-1 text-[10px]">{lpgProducts.length}</Badge>
+              <Badge className="ml-1 text-[10px] bg-orange-500/15 text-orange-600 border-orange-500/30">{lpgProducts.length}</Badge>
             )}
           </TabsTrigger>
-          <TabsTrigger value="stove" className="gap-2 h-10">
+          <TabsTrigger value="stove" className="gap-2 h-10 data-[state=active]:shadow-sm">
             <ChefHat className="h-4 w-4" />
             <span className="hidden sm:inline">Gas Stoves</span>
             <span className="sm:hidden">Stoves</span>
             {stoveProducts.length > 0 && (
-              <Badge variant="secondary" className="ml-1 text-[10px]">{stoveProducts.length}</Badge>
+              <Badge className="ml-1 text-[10px] bg-amber-500/15 text-amber-600 border-amber-500/30">{stoveProducts.length}</Badge>
             )}
           </TabsTrigger>
-          <TabsTrigger value="regulator" className="gap-2 h-10">
+          <TabsTrigger value="regulator" className="gap-2 h-10 data-[state=active]:shadow-sm">
             <Gauge className="h-4 w-4" />
             <span className="hidden sm:inline">Regulators</span>
             <span className="sm:hidden">Reg.</span>
             {regulatorProducts.length > 0 && (
-              <Badge variant="secondary" className="ml-1 text-[10px]">{regulatorProducts.length}</Badge>
+              <Badge className="ml-1 text-[10px] bg-purple-500/15 text-purple-600 border-purple-500/30">{regulatorProducts.length}</Badge>
             )}
           </TabsTrigger>
         </TabsList>

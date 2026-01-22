@@ -13,10 +13,11 @@ import { logger } from "@/lib/logger";
 import { 
   ShoppingBag, Package, Clock, CheckCircle, Truck, XCircle, 
   Search, RefreshCw, Phone, MapPin, Calendar, AlertCircle,
-  TrendingUp, TestTube, Building2, User
+  TrendingUp, TestTube, Building2, User, CircleDot
 } from "lucide-react";
 import { format } from "date-fns";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { PremiumStatCard } from "@/components/shared/PremiumStatCard";
 
 interface CommunityOrder {
   id: string;
@@ -61,6 +62,56 @@ interface OrderItem {
 interface ShopOrdersTabProps {
   shopId: string | null;
 }
+
+// Status color bar gradients
+const statusBarColors: Record<string, string> = {
+  pending: 'from-amber-500 to-amber-400',
+  confirmed: 'from-primary to-primary/80',
+  preparing: 'from-blue-400 to-blue-300',
+  dispatched: 'from-blue-500 to-blue-400',
+  delivered: 'from-emerald-500 to-emerald-400',
+  rejected: 'from-destructive to-destructive/80',
+  cancelled: 'from-muted-foreground to-muted-foreground/80'
+};
+
+// Order Timeline Progress Component
+const OrderTimeline = ({ status }: { status: string }) => {
+  const steps = ['pending', 'confirmed', 'dispatched', 'delivered'];
+  const currentIdx = steps.indexOf(status);
+  const isRejected = status === 'rejected' || status === 'cancelled';
+  
+  if (isRejected) return null;
+  
+  return (
+    <div className="flex items-center gap-1 py-2">
+      {steps.map((step, idx) => {
+        const isCompleted = currentIdx >= idx;
+        const isCurrent = currentIdx === idx;
+        
+        return (
+          <div key={step} className="flex items-center gap-1">
+            <div 
+              className={`h-2 w-2 rounded-full transition-all ${
+                isCompleted 
+                  ? isCurrent 
+                    ? 'bg-primary ring-2 ring-primary/30' 
+                    : 'bg-emerald-500' 
+                  : 'bg-muted-foreground/30'
+              }`} 
+            />
+            {idx < steps.length - 1 && (
+              <div 
+                className={`h-0.5 w-4 sm:w-6 ${
+                  currentIdx > idx ? 'bg-emerald-500' : 'bg-muted-foreground/30'
+                }`} 
+              />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
 
 export const ShopOrdersTab = ({ shopId }: ShopOrdersTabProps) => {
   const [orders, setOrders] = useState<CommunityOrder[]>([]);
@@ -234,35 +285,35 @@ export const ShopOrdersTab = ({ shopId }: ShopOrdersTabProps) => {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'pending': return <Clock className="h-4 w-4" />;
-      case 'confirmed': return <CheckCircle className="h-4 w-4" />;
-      case 'preparing': return <Package className="h-4 w-4" />;
-      case 'dispatched': return <Truck className="h-4 w-4" />;
-      case 'delivered': return <CheckCircle className="h-4 w-4" />;
-      case 'rejected': case 'cancelled': return <XCircle className="h-4 w-4" />;
-      default: return <Clock className="h-4 w-4" />;
+      case 'pending': return <Clock className="h-3.5 w-3.5" />;
+      case 'confirmed': return <CheckCircle className="h-3.5 w-3.5" />;
+      case 'preparing': return <Package className="h-3.5 w-3.5" />;
+      case 'dispatched': return <Truck className="h-3.5 w-3.5" />;
+      case 'delivered': return <CheckCircle className="h-3.5 w-3.5" />;
+      case 'rejected': case 'cancelled': return <XCircle className="h-3.5 w-3.5" />;
+      default: return <Clock className="h-3.5 w-3.5" />;
     }
   };
 
   const getOrderTypeBadge = (order: CommunityOrder) => {
     if (order.is_self_order) {
       return (
-        <Badge className="bg-purple-500/15 text-purple-600 border-purple-500/30 gap-1">
+        <Badge className="bg-purple-500/15 text-purple-600 border-purple-500/30 gap-1 text-[10px] sm:text-xs">
           <TestTube className="h-3 w-3" />
-          Test Order
+          Test
         </Badge>
       );
     }
     if (order.customer_type === 'wholesale') {
       return (
-        <Badge className="bg-blue-500/15 text-blue-600 border-blue-500/30 gap-1">
+        <Badge className="bg-blue-500/15 text-blue-600 border-blue-500/30 gap-1 text-[10px] sm:text-xs">
           <Building2 className="h-3 w-3" />
           Wholesale
         </Badge>
       );
     }
     return (
-      <Badge className="bg-emerald-500/15 text-emerald-600 border-emerald-500/30 gap-1">
+      <Badge className="bg-emerald-500/15 text-emerald-600 border-emerald-500/30 gap-1 text-[10px] sm:text-xs">
         <User className="h-3 w-3" />
         Retail
       </Badge>
@@ -271,12 +322,14 @@ export const ShopOrdersTab = ({ shopId }: ShopOrdersTabProps) => {
 
   if (!shopId) {
     return (
-      <Card className="border-dashed">
-        <CardContent className="flex flex-col items-center justify-center py-12">
-          <AlertCircle className="h-12 w-12 text-amber-500 mb-4" />
+      <Card className="border-dashed border-2">
+        <CardContent className="flex flex-col items-center justify-center py-16">
+          <div className="h-16 w-16 rounded-full bg-amber-500/15 flex items-center justify-center mb-4">
+            <AlertCircle className="h-8 w-8 text-amber-500" />
+          </div>
           <h3 className="text-lg font-semibold mb-2">Create Your Shop First</h3>
-          <p className="text-muted-foreground text-center max-w-md">
-            Set up your shop profile to start receiving orders from customers
+          <p className="text-muted-foreground text-center max-w-md text-sm">
+            Set up your shop profile in the "Shop Info" tab to start receiving orders from customers
           </p>
         </CardContent>
       </Card>
@@ -285,60 +338,47 @@ export const ShopOrdersTab = ({ shopId }: ShopOrdersTabProps) => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center p-8">
-        <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      <div className="flex items-center justify-center p-12">
+        <div className="text-center space-y-3">
+          <div className="h-10 w-10 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-sm text-muted-foreground">Loading orders...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Stats Cards */}
+    <div className="space-y-5">
+      {/* Stats Cards - Premium Design */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-amber-500/15 flex items-center justify-center">
-              <Clock className="h-5 w-5 text-amber-500" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold tabular-nums">{analytics.pending}</p>
-              <p className="text-xs text-muted-foreground">Pending</p>
-            </div>
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-blue-500/15 flex items-center justify-center">
-              <Truck className="h-5 w-5 text-blue-500" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold tabular-nums">{analytics.dispatched}</p>
-              <p className="text-xs text-muted-foreground">Dispatched</p>
-            </div>
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-emerald-500/15 flex items-center justify-center">
-              <CheckCircle className="h-5 w-5 text-emerald-500" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold tabular-nums">{analytics.delivered}</p>
-              <p className="text-xs text-muted-foreground">Delivered</p>
-            </div>
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-emerald-500/15 flex items-center justify-center">
-              <TrendingUp className="h-5 w-5 text-emerald-500" />
-            </div>
-            <div>
-              <p className="text-xl font-bold tabular-nums">{BANGLADESHI_CURRENCY_SYMBOL}{analytics.todayRevenue}</p>
-              <p className="text-xs text-muted-foreground">Today</p>
-            </div>
-          </div>
-        </Card>
+        <PremiumStatCard
+          title="Pending"
+          value={analytics.pending}
+          subtitle={`${analytics.confirmed} confirmed`}
+          icon={<Clock className="h-5 w-5 text-amber-500" />}
+          colorScheme="amber"
+        />
+        <PremiumStatCard
+          title="Dispatched"
+          value={analytics.dispatched}
+          subtitle="In transit"
+          icon={<Truck className="h-5 w-5 text-blue-500" />}
+          colorScheme="primary"
+        />
+        <PremiumStatCard
+          title="Delivered"
+          value={analytics.delivered}
+          subtitle="Completed"
+          icon={<CheckCircle className="h-5 w-5 text-emerald-500" />}
+          colorScheme="emerald"
+        />
+        <PremiumStatCard
+          title="Today's Revenue"
+          value={`${BANGLADESHI_CURRENCY_SYMBOL}${analytics.todayRevenue.toLocaleString()}`}
+          subtitle={`${analytics.todayOrders} orders today`}
+          icon={<TrendingUp className="h-5 w-5 text-emerald-500" />}
+          colorScheme="emerald"
+        />
       </div>
 
       {/* Search and Refresh */}
@@ -349,107 +389,142 @@ export const ShopOrdersTab = ({ shopId }: ShopOrdersTabProps) => {
             placeholder="Search orders by number, name, or phone..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 h-11"
+            className="pl-10 h-11 text-base"
           />
         </div>
-        <Button variant="outline" onClick={fetchData} className="gap-2 h-11">
+        <Button variant="outline" onClick={fetchData} className="gap-2 h-11 shrink-0">
           <RefreshCw className="h-4 w-4" />
-          Refresh
+          <span className="hidden sm:inline">Refresh</span>
         </Button>
       </div>
 
-      {/* Tabs */}
+      {/* Tabs - Scrollable on Mobile */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="w-full overflow-x-auto flex justify-start h-11">
-          <TabsTrigger value="all" className="flex-1 sm:flex-none">All ({analytics.total})</TabsTrigger>
-          <TabsTrigger value="pending" className="flex-1 sm:flex-none">Pending ({analytics.pending})</TabsTrigger>
-          <TabsTrigger value="dispatched" className="flex-1 sm:flex-none">Dispatched ({analytics.dispatched})</TabsTrigger>
-          <TabsTrigger value="delivered" className="flex-1 sm:flex-none">Delivered ({analytics.delivered})</TabsTrigger>
-        </TabsList>
+        <ScrollArea className="w-full">
+          <TabsList className="inline-flex h-11 min-w-full sm:min-w-0 p-1 bg-muted/50">
+            <TabsTrigger value="all" className="flex-1 sm:flex-none h-9 px-4 gap-2 data-[state=active]:shadow-sm">
+              All
+              <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">{analytics.total}</Badge>
+            </TabsTrigger>
+            <TabsTrigger value="pending" className="flex-1 sm:flex-none h-9 px-4 gap-2 data-[state=active]:shadow-sm">
+              Pending
+              <Badge className="h-5 px-1.5 text-[10px] bg-amber-500/15 text-amber-600">{analytics.pending}</Badge>
+            </TabsTrigger>
+            <TabsTrigger value="dispatched" className="flex-1 sm:flex-none h-9 px-4 gap-2 data-[state=active]:shadow-sm">
+              Dispatched
+              <Badge className="h-5 px-1.5 text-[10px] bg-blue-500/15 text-blue-600">{analytics.dispatched}</Badge>
+            </TabsTrigger>
+            <TabsTrigger value="delivered" className="flex-1 sm:flex-none h-9 px-4 gap-2 data-[state=active]:shadow-sm">
+              Delivered
+              <Badge className="h-5 px-1.5 text-[10px] bg-emerald-500/15 text-emerald-600">{analytics.delivered}</Badge>
+            </TabsTrigger>
+          </TabsList>
+          <ScrollBar orientation="horizontal" />
+        </ScrollArea>
 
         <TabsContent value={activeTab} className="mt-4">
           {filteredOrders.length === 0 ? (
-            <Card className="border-dashed">
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <ShoppingBag className="h-12 w-12 text-muted-foreground/40 mb-4" />
+            <Card className="border-dashed border-2">
+              <CardContent className="flex flex-col items-center justify-center py-16">
+                <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mb-4">
+                  <ShoppingBag className="h-8 w-8 text-muted-foreground/50" />
+                </div>
                 <h3 className="text-lg font-semibold mb-2">No Orders Found</h3>
-                <p className="text-muted-foreground text-center">
+                <p className="text-muted-foreground text-center text-sm max-w-md">
                   {activeTab === 'all' 
-                    ? "You haven't received any orders yet. Share your shop with customers!"
+                    ? "You haven't received any orders yet. Share your shop with customers to get started!"
                     : `No ${activeTab} orders at the moment.`
                   }
                 </p>
               </CardContent>
             </Card>
           ) : (
-            <ScrollArea className="h-[calc(100vh-450px)] min-h-[400px]">
-              <div className="space-y-3 pr-4">
+            <ScrollArea className="h-[calc(100vh-480px)] min-h-[350px]">
+              <div className="space-y-3 pr-2">
                 {filteredOrders.map((order) => (
-                  <Card key={order.id} className="overflow-hidden">
-                    <CardHeader className="p-4 pb-2">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <CardTitle className="text-base">#{order.order_number}</CardTitle>
-                            <Badge className={`text-xs ${getStatusColor(order.status)}`}>
+                  <Card key={order.id} className="overflow-hidden border shadow-sm hover:shadow-md transition-shadow">
+                    {/* Status Color Bar */}
+                    <div className={`h-1.5 bg-gradient-to-r ${statusBarColors[order.status] || 'from-muted to-muted'}`} />
+                    
+                    <CardHeader className="p-3 sm:p-4 pb-2 sm:pb-3">
+                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
+                        <div className="space-y-2">
+                          {/* Order Number & Badges */}
+                          <div className="flex flex-wrap items-center gap-2">
+                            <CardTitle className="text-sm sm:text-base font-bold">
+                              #{order.order_number}
+                            </CardTitle>
+                            <Badge className={`text-[10px] sm:text-xs ${getStatusColor(order.status)}`}>
                               {getStatusIcon(order.status)}
                               <span className="ml-1 capitalize">{order.status}</span>
                             </Badge>
                             {getOrderTypeBadge(order)}
                           </div>
+                          
+                          {/* Timeline Progress */}
+                          <OrderTimeline status={order.status} />
+                          
+                          {/* Date */}
                           <CardDescription className="text-xs flex items-center gap-2">
-                            <Calendar className="h-3 w-3" />
+                            <Calendar className="h-3.5 w-3.5" />
                             {format(new Date(order.created_at), 'dd MMM yyyy, hh:mm a')}
                           </CardDescription>
                         </div>
-                        <div className="text-right shrink-0">
-                          <p className="text-lg font-bold text-primary tabular-nums">
-                            {BANGLADESHI_CURRENCY_SYMBOL}{order.total_amount}
+                        
+                        {/* Price & Payment */}
+                        <div className="text-left sm:text-right shrink-0 flex sm:flex-col items-center sm:items-end gap-2 sm:gap-1">
+                          <p className="text-lg sm:text-xl font-bold text-primary tabular-nums">
+                            {BANGLADESHI_CURRENCY_SYMBOL}{order.total_amount.toLocaleString()}
                           </p>
-                          <Badge variant="outline" className="text-xs">
-                            {order.payment_method.toUpperCase()}
+                          <Badge variant="outline" className="text-[10px] sm:text-xs uppercase">
+                            {order.payment_method}
                           </Badge>
                         </div>
                       </div>
                     </CardHeader>
 
-                    <CardContent className="p-4 pt-2 space-y-3">
-                      {/* Customer Info */}
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 text-sm">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">{order.customer_name}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <Phone className="h-3 w-3" />
-                          <a href={`tel:${order.customer_phone}`} className="hover:underline">
+                    <CardContent className="p-3 sm:p-4 pt-0 space-y-3">
+                      {/* Customer Info - Card Style */}
+                      <div className="bg-muted/40 rounded-lg p-3 space-y-2">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
+                          <span className="font-semibold text-sm">{order.customer_name}</span>
+                          <a 
+                            href={`tel:${order.customer_phone}`} 
+                            className="flex items-center gap-1.5 text-xs text-primary hover:underline"
+                          >
+                            <Phone className="h-3.5 w-3.5" />
                             {order.customer_phone}
                           </a>
                         </div>
-                      </div>
-
-                      {/* Delivery Address */}
-                      <div className="flex items-start gap-2 text-sm text-muted-foreground">
-                        <MapPin className="h-4 w-4 shrink-0 mt-0.5" />
-                        <span>{order.delivery_address}, {order.thana && `${order.thana}, `}{order.district}, {order.division}</span>
+                        <div className="flex items-start gap-2 text-xs text-muted-foreground">
+                          <MapPin className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                          <span>{order.delivery_address}, {order.thana && `${order.thana}, `}{order.district}, {order.division}</span>
+                        </div>
                       </div>
 
                       {/* Order Items */}
                       {order.items && order.items.length > 0 && (
-                        <div className="bg-muted/30 rounded-lg p-3">
-                          <p className="text-xs font-medium text-muted-foreground mb-2">Order Items</p>
-                          <div className="space-y-1">
+                        <div className="border rounded-lg overflow-hidden">
+                          <div className="bg-muted/30 px-3 py-2 border-b">
+                            <p className="text-xs font-medium text-muted-foreground flex items-center gap-2">
+                              <Package className="h-3.5 w-3.5" />
+                              Order Items ({order.items.length})
+                            </p>
+                          </div>
+                          <div className="p-3 space-y-2">
                             {order.items.map((item, idx) => (
                               <div key={idx} className="flex justify-between text-sm">
-                                <span>
-                                  {item.product_name} {item.weight && `(${item.weight})`} x{item.quantity}
+                                <span className="text-muted-foreground">
+                                  {item.product_name} {item.weight && `(${item.weight})`} 
+                                  <span className="font-medium text-foreground ml-1">×{item.quantity}</span>
                                 </span>
-                                <span className="font-medium tabular-nums">
-                                  {BANGLADESHI_CURRENCY_SYMBOL}{item.price * item.quantity}
+                                <span className="font-semibold tabular-nums">
+                                  {BANGLADESHI_CURRENCY_SYMBOL}{(item.price * item.quantity).toLocaleString()}
                                 </span>
                               </div>
                             ))}
                             {order.delivery_fee > 0 && (
-                              <div className="flex justify-between text-sm text-muted-foreground pt-1 border-t mt-2">
+                              <div className="flex justify-between text-xs text-muted-foreground pt-2 border-t">
                                 <span>Delivery Fee</span>
                                 <span className="tabular-nums">{BANGLADESHI_CURRENCY_SYMBOL}{order.delivery_fee}</span>
                               </div>
@@ -460,58 +535,55 @@ export const ShopOrdersTab = ({ shopId }: ShopOrdersTabProps) => {
 
                       {/* Rejection Reason */}
                       {order.rejection_reason && (
-                        <div className="bg-destructive/10 rounded-lg p-3 text-sm">
-                          <p className="text-xs font-medium text-destructive mb-1">Rejection Reason</p>
-                          <p className="text-destructive">{order.rejection_reason}</p>
+                        <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3">
+                          <p className="text-xs font-semibold text-destructive mb-1 flex items-center gap-1.5">
+                            <XCircle className="h-3.5 w-3.5" />
+                            Rejection Reason
+                          </p>
+                          <p className="text-sm text-destructive">{order.rejection_reason}</p>
                         </div>
                       )}
 
-                      {/* Action Buttons */}
+                      {/* Action Buttons - 48px Height for Mobile */}
                       {(order.status === 'pending' || order.status === 'confirmed' || order.status === 'dispatched') && (
-                        <div className="flex gap-2 pt-2">
+                        <div className="flex gap-2 pt-1">
                           {order.status === 'pending' && (
                             <>
                               <Button 
-                                size="sm" 
                                 onClick={() => updateOrderStatus(order.id, 'confirmed')}
-                                className="flex-1 h-10"
+                                className="flex-1 h-12 text-sm font-semibold gap-2"
                               >
-                                <CheckCircle className="h-4 w-4 mr-2" />
-                                Confirm
+                                <CheckCircle className="h-4 w-4" />
+                                Confirm Order
                               </Button>
                               <Button 
-                                size="sm" 
-                                variant="destructive"
+                                variant="outline"
                                 onClick={() => {
                                   setSelectedOrderId(order.id);
                                   setRejectDialogOpen(true);
                                 }}
-                                className="h-10"
+                                className="h-12 px-4 border-destructive/30 text-destructive hover:bg-destructive/10"
                               >
-                                <XCircle className="h-4 w-4 mr-2" />
-                                Reject
+                                <XCircle className="h-4 w-4" />
                               </Button>
                             </>
                           )}
                           {order.status === 'confirmed' && (
                             <Button 
-                              size="sm"
                               onClick={() => updateOrderStatus(order.id, 'dispatched')}
-                              className="flex-1 h-10"
+                              className="flex-1 h-12 text-sm font-semibold gap-2 bg-blue-600 hover:bg-blue-700"
                             >
-                              <Truck className="h-4 w-4 mr-2" />
-                              Mark Dispatched
+                              <Truck className="h-4 w-4" />
+                              Mark as Dispatched
                             </Button>
                           )}
                           {order.status === 'dispatched' && (
                             <Button 
-                              size="sm"
-                              variant="default"
                               onClick={() => updateOrderStatus(order.id, 'delivered')}
-                              className="flex-1 h-10 bg-emerald-600 hover:bg-emerald-700"
+                              className="flex-1 h-12 text-sm font-semibold gap-2 bg-emerald-600 hover:bg-emerald-700"
                             >
-                              <CheckCircle className="h-4 w-4 mr-2" />
-                              Mark Delivered
+                              <CheckCircle className="h-4 w-4" />
+                              Mark as Delivered
                             </Button>
                           )}
                         </div>
@@ -527,7 +599,7 @@ export const ShopOrdersTab = ({ shopId }: ShopOrdersTabProps) => {
 
       {/* Reject Dialog */}
       <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Reject Order</DialogTitle>
             <DialogDescription>
@@ -538,13 +610,18 @@ export const ShopOrdersTab = ({ shopId }: ShopOrdersTabProps) => {
             placeholder="e.g., Out of stock, Delivery area not covered, etc."
             value={rejectionReason}
             onChange={(e) => setRejectionReason(e.target.value)}
-            className="min-h-[100px]"
+            className="min-h-[100px] text-base"
           />
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setRejectDialogOpen(false)}>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setRejectDialogOpen(false)} className="h-11">
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handleReject} disabled={!rejectionReason.trim()}>
+            <Button 
+              variant="destructive" 
+              onClick={handleReject} 
+              disabled={!rejectionReason.trim()}
+              className="h-11"
+            >
               Reject Order
             </Button>
           </DialogFooter>
