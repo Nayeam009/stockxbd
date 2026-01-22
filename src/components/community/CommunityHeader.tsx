@@ -58,7 +58,7 @@ export const CommunityHeader = ({
 
   const NavLinks = () => (
     <>
-      <Link to="/community">
+      <Link to="/community/profile">
         <Button variant="ghost" size="sm">
           <Store className="h-4 w-4 mr-2" />
           Shop Profile
