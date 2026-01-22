@@ -2,7 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar, SidebarHeader, SidebarFooter } from "@/components/ui/sidebar";
-import { BarChart3, ChefHat, Users, Banknote, Truck, Search, Home, Receipt, Wrench, RefreshCw, Tag, Settings, LogOut, Flame, ChevronRight, CircleDot, PackagePlus } from "lucide-react";
+import { BarChart3, ChefHat, Users, Banknote, Truck, Search, Home, Receipt, Wrench, RefreshCw, Tag, Settings, LogOut, Flame, ChevronRight, CircleDot, PackagePlus, Store } from "lucide-react";
 import stockXLogo from "@/assets/stock-x-logo.png";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -66,9 +66,9 @@ export const AppSidebar = ({
     roles: ['owner', 'manager']
   }];
   const marketplaceItems = [{
-    id: 'marketplace-orders',
-    titleKey: 'shop_orders',
-    icon: PackagePlus,
+    id: 'community',
+    titleKey: 'lpg_marketplace',
+    icon: Store,
     roles: ['owner', 'manager'],
     badge: analytics.activeOrders > 0 ? analytics.activeOrders : null
   }];
@@ -89,11 +89,6 @@ export const AppSidebar = ({
     roles: ['owner', 'manager']
   }];
   const otherItems = [{
-    id: 'community',
-    titleKey: 'community',
-    icon: Users,
-    roles: ['owner', 'manager', 'driver']
-  }, {
     id: 'analysis-search',
     titleKey: 'analysis_search',
     icon: Search,
