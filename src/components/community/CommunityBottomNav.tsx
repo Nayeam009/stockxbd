@@ -1,17 +1,51 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import { Home, Search, ShoppingCart, User, Package } from "lucide-react";
+import { Home, ShoppingCart, User, Package, LayoutDashboard } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 interface CommunityBottomNavProps {
   cartItemCount?: number;
+  userRole?: string | null;
 }
 
-export const CommunityBottomNav = ({ cartItemCount = 0 }: CommunityBottomNavProps) => {
+export const CommunityBottomNav = ({ 
+  cartItemCount = 0,
+  userRole 
+}: CommunityBottomNavProps) => {
   const navigate = useNavigate();
   const location = useLocation();
+  
+  const isOwnerOrManager = userRole === 'owner' || userRole === 'manager';
 
-  const navItems = [
+  // Different nav items for owners/managers vs regular customers
+  const navItems = isOwnerOrManager ? [
+    {
+      id: 'home',
+      label: 'Home',
+      icon: Home,
+      path: '/community'
+    },
+    {
+      id: 'orders',
+      label: 'Orders',
+      icon: Package,
+      path: '/community/orders'
+    },
+    {
+      id: 'cart',
+      label: 'Cart',
+      icon: ShoppingCart,
+      path: '/community/cart',
+      badge: cartItemCount
+    },
+    {
+      id: 'dashboard',
+      label: 'Dashboard',
+      icon: LayoutDashboard,
+      path: '/dashboard',
+      highlight: true
+    }
+  ] : [
     {
       id: 'home',
       label: 'Home',
@@ -43,6 +77,9 @@ export const CommunityBottomNav = ({ cartItemCount = 0 }: CommunityBottomNavProp
     if (path === '/community') {
       return location.pathname === '/community' || location.pathname.startsWith('/community/shop/');
     }
+    if (path === '/dashboard') {
+      return location.pathname.startsWith('/dashboard');
+    }
     return location.pathname === path;
   };
 
@@ -52,6 +89,7 @@ export const CommunityBottomNav = ({ cartItemCount = 0 }: CommunityBottomNavProp
         {navItems.map((item) => {
           const active = isActive(item.path);
           const Icon = item.icon;
+          const isHighlight = 'highlight' in item && item.highlight;
           
           return (
             <button
@@ -60,13 +98,15 @@ export const CommunityBottomNav = ({ cartItemCount = 0 }: CommunityBottomNavProp
               className={cn(
                 "flex flex-col items-center justify-center gap-1 transition-colors relative",
                 active 
-                  ? "text-primary" 
-                  : "text-muted-foreground hover:text-foreground"
+                  ? isHighlight ? "text-blue-600" : "text-primary"
+                  : isHighlight 
+                    ? "text-blue-500/70 hover:text-blue-600" 
+                    : "text-muted-foreground hover:text-foreground"
               )}
             >
               <div className="relative">
                 <Icon className={cn("h-5 w-5", active && "stroke-[2.5px]")} />
-                {item.badge !== undefined && item.badge > 0 && (
+                {'badge' in item && item.badge !== undefined && item.badge > 0 && (
                   <Badge 
                     className="absolute -top-2 -right-2 h-4 min-w-4 flex items-center justify-center p-0 text-[10px] bg-primary"
                   >
@@ -83,7 +123,10 @@ export const CommunityBottomNav = ({ cartItemCount = 0 }: CommunityBottomNavProp
               
               {/* Active indicator */}
               {active && (
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-primary rounded-full" />
+                <div className={cn(
+                  "absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full",
+                  isHighlight ? "bg-blue-600" : "bg-primary"
+                )} />
               )}
             </button>
           );

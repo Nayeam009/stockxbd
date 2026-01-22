@@ -255,7 +255,7 @@ const CustomerCart = () => {
         )}
       </main>
 
-      <CommunityBottomNav cartItemCount={cart.length} />
+      <CommunityBottomNav cartItemCount={cart.length} userRole={userRole} />
     </div>
   );
 };

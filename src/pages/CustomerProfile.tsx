@@ -206,7 +206,18 @@ const CustomerProfile = () => {
               </Avatar>
               <div className="flex-1 text-center sm:text-left">
                 <h2 className="text-xl font-bold text-foreground">{fullName || email}</h2>
-                <Badge variant="secondary" className="mt-1">Customer</Badge>
+                <div className="flex items-center gap-2 justify-center sm:justify-start mt-1">
+                  {/* Show different badges based on role */}
+                  {userRole === 'owner' || userRole === 'manager' ? (
+                    <Badge className="bg-blue-500/15 text-blue-600 border-blue-500/30">
+                      Wholesale Customer
+                    </Badge>
+                  ) : (
+                    <Badge variant="secondary">
+                      Retail Customer
+                    </Badge>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -415,7 +426,7 @@ const CustomerProfile = () => {
         </Tabs>
       </main>
 
-      <CommunityBottomNav cartItemCount={cart.length} />
+      <CommunityBottomNav cartItemCount={cart.length} userRole={userRole} />
     </div>
   );
 };

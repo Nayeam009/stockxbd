@@ -139,7 +139,7 @@ const CustomerOrders = () => {
         </Tabs>
       </main>
 
-      <CommunityBottomNav />
+      <CommunityBottomNav userRole={userRole} />
     </div>
   );
 };
