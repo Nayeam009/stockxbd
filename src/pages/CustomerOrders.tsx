@@ -12,6 +12,7 @@ import {
   RefreshCcw
 } from "lucide-react";
 import { CommunityHeader } from "@/components/community/CommunityHeader";
+import { CommunityBottomNav } from "@/components/community/CommunityBottomNav";
 import { OrderCard } from "@/components/community/OrderCard";
 import { useCommunityData, CommunityOrder } from "@/hooks/useCommunityData";
 
@@ -57,7 +58,7 @@ const CustomerOrders = () => {
   const cancelledCount = orders.filter(o => ['cancelled', 'rejected'].includes(o.status)).length;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-20 sm:pb-0">
       <CommunityHeader 
         userRole={userRole}
         userName={currentUser?.email}
@@ -137,6 +138,8 @@ const CustomerOrders = () => {
           )}
         </Tabs>
       </main>
+
+      <CommunityBottomNav />
     </div>
   );
 };

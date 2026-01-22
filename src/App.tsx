@@ -19,6 +19,7 @@ const ShopProfile = lazy(() => import("./pages/ShopProfile"));
 const CustomerCart = lazy(() => import("./pages/CustomerCart"));
 const CustomerCheckout = lazy(() => import("./pages/CustomerCheckout"));
 const CustomerOrders = lazy(() => import("./pages/CustomerOrders"));
+const CustomerProfile = lazy(() => import("./pages/CustomerProfile"));
 
 const queryClient = new QueryClient();
 
@@ -53,6 +54,7 @@ const App = () => (
                 <Route path="/community/cart" element={<CustomerCart />} />
                 <Route path="/community/checkout" element={<CustomerCheckout />} />
                 <Route path="/community/orders" element={<CustomerOrders />} />
+                <Route path="/community/profile" element={<CustomerProfile />} />
                 
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />

@@ -172,7 +172,7 @@ const CustomerCheckout = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-20 sm:pb-0">
       <CommunityHeader 
         cartItemCount={cart.length} 
         userRole={userRole}

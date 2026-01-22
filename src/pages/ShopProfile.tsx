@@ -17,6 +17,7 @@ import {
   Loader2
 } from "lucide-react";
 import { CommunityHeader } from "@/components/community/CommunityHeader";
+import { CommunityBottomNav } from "@/components/community/CommunityBottomNav";
 import { ProductCard } from "@/components/community/ProductCard";
 import { useCommunityData, Shop, ShopProduct, CartItem } from "@/hooks/useCommunityData";
 import { toast } from "@/hooks/use-toast";
@@ -130,7 +131,7 @@ const ShopProfile = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-20 sm:pb-0">
       <CommunityHeader 
         cartItemCount={cart.length} 
         userRole={userRole}
@@ -332,9 +333,9 @@ const ShopProfile = () => {
         </Tabs>
       </div>
 
-      {/* Floating Cart Button (Mobile) */}
+      {/* Floating Cart Button (Mobile) - above bottom nav */}
       {cart.length > 0 && (
-        <div className="fixed bottom-4 left-4 right-4 sm:hidden z-50">
+        <div className="fixed bottom-20 left-4 right-4 sm:hidden z-40">
           <Button 
             className="w-full h-14 text-lg bg-gradient-primary shadow-lg"
             onClick={() => navigate('/community/cart')}
@@ -343,6 +344,8 @@ const ShopProfile = () => {
           </Button>
         </div>
       )}
+
+      <CommunityBottomNav cartItemCount={cart.length} />
     </div>
   );
 };
