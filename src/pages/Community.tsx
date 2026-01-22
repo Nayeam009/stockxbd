@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { CommunityHeader } from "@/components/community/CommunityHeader";
+import { CommunityBottomNav } from "@/components/community/CommunityBottomNav";
 import { ShopCard } from "@/components/community/ShopCard";
 import { useCommunityData, Shop, CartItem } from "@/hooks/useCommunityData";
 import { DIVISIONS, getDistricts } from "@/lib/bangladeshConstants";
@@ -103,7 +104,7 @@ const Community = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-20 sm:pb-0">
       <CommunityHeader 
         cartItemCount={cart.length}
         userRole={userRole}
@@ -243,6 +244,8 @@ const Community = () => {
           </Card>
         )}
       </main>
+
+      <CommunityBottomNav cartItemCount={cart.length} />
     </div>
   );
 };

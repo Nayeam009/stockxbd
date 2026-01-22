@@ -1,10 +1,13 @@
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { UniversalNotificationCenter } from "@/components/notifications/UniversalNotificationCenter";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useTheme } from "@/contexts/ThemeContext";
-import { Search, Settings, Command } from "lucide-react";
+import { Search, Settings, Command, Store } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 
 interface DashboardHeaderProps {
   searchQuery: string;
@@ -25,6 +28,30 @@ export const DashboardHeader = ({
 }: DashboardHeaderProps) => {
   const { t, language } = useLanguage();
   const { theme, toggleTheme } = useTheme();
+  const navigate = useNavigate();
+  const [shopId, setShopId] = useState<string | null>(null);
+
+  // Fetch shop ID for owner
+  useEffect(() => {
+    const fetchShopId = async () => {
+      if (userRole !== 'owner') return;
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data } = await supabase
+        .from('shop_profiles')
+        .select('id')
+        .eq('owner_id', user.id)
+        .maybeSingle();
+
+      if (data) {
+        setShopId(data.id);
+      }
+    };
+
+    fetchShopId();
+  }, [userRole]);
 
   const getRoleColor = (role: string) => {
     switch (role) {
@@ -103,6 +130,19 @@ export const DashboardHeader = ({
 
           {/* Notifications */}
           <UniversalNotificationCenter userRole={userRole} />
+
+          {/* View Shop Button - Owner only */}
+          {userRole === 'owner' && (
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => navigate(shopId ? `/community/shop/${shopId}` : '/community')}
+              className="hidden sm:flex h-8 w-8 sm:h-9 sm:w-9 rounded-lg sm:rounded-xl hover:bg-primary/10 hover:text-primary transition-all duration-300"
+              title="View My Shop"
+            >
+              <Store className="h-4 w-4" />
+            </Button>
+          )}
 
           {/* Settings - Hidden on mobile */}
           <Button 

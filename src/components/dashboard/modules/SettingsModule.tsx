@@ -24,6 +24,7 @@ import {
   Calendar,
   AlertTriangle,
   UserX,
+  Store,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -51,6 +52,8 @@ import { ProfileSharingCard } from "@/components/settings/ProfileSharingCard";
 import { BackupRestoreCard } from "@/components/settings/BackupRestoreCard";
 import { PushNotificationCard } from "@/components/settings/PushNotificationCard";
 import { TeamManagementCard } from "@/components/settings/TeamManagementCard";
+import { ShopProfileCard } from "@/components/settings/ShopProfileCard";
+import { ShopProductsCard } from "@/components/settings/ShopProductsCard";
 
 export const SettingsModule = () => {
   const { theme, setTheme } = useTheme();
@@ -423,6 +426,22 @@ export const SettingsModule = () => {
           <ProfileSharingCard />
           <TeamManagementCard />
         </div>
+      )}
+
+      {/* LPG Community Marketplace Section - Owner Only */}
+      {userRole === 'owner' && (
+        <>
+          <div className="pt-4">
+            <div className="flex items-center gap-2 mb-4">
+              <Store className="h-5 w-5 text-primary" />
+              <h3 className="text-lg font-semibold text-foreground">LPG Community Marketplace</h3>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+              <ShopProfileCard />
+              <ShopProductsCard />
+            </div>
+          </div>
+        </>
       )}
 
       {/* Main Settings Grid */}

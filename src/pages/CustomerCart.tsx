@@ -14,6 +14,7 @@ import {
   Store
 } from "lucide-react";
 import { CommunityHeader } from "@/components/community/CommunityHeader";
+import { CommunityBottomNav } from "@/components/community/CommunityBottomNav";
 import { CartItem, useCommunityData } from "@/hooks/useCommunityData";
 import { toast } from "@/hooks/use-toast";
 
@@ -69,7 +70,7 @@ const CustomerCart = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-20 sm:pb-0">
       <CommunityHeader 
         cartItemCount={cart.length} 
         userRole={userRole}
@@ -253,6 +254,8 @@ const CustomerCart = () => {
           </div>
         )}
       </main>
+
+      <CommunityBottomNav cartItemCount={cart.length} />
     </div>
   );
 };
