@@ -36,8 +36,8 @@ const moreItems = [{
   labelKey: 'business_diary',
   roles: ['owner', 'manager']
 }, {
-  id: 'marketplace-orders',
-  labelKey: 'shop_orders',
+  id: 'community',
+  labelKey: 'lpg_marketplace',
   roles: ['owner', 'manager']
 }, {
   id: 'analysis-search',
@@ -55,10 +55,6 @@ const moreItems = [{
   id: 'vehicle-cost',
   labelKey: 'vehicle_cost',
   roles: ['owner', 'manager']
-}, {
-  id: 'community',
-  labelKey: 'community',
-  roles: ['owner', 'manager', 'driver']
 }, {
   id: 'settings',
   labelKey: 'settings',
