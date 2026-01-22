@@ -10,7 +10,8 @@ import {
   Settings,
   Loader2,
   ExternalLink,
-  Globe
+  Globe,
+  Sparkles
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,6 +22,7 @@ import { ShopOrdersTab } from "./shop-profile/ShopOrdersTab";
 import { ShopAnalyticsTab } from "./shop-profile/ShopAnalyticsTab";
 import { ShopSettingsTab } from "./shop-profile/ShopSettingsTab";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { PremiumModuleHeader } from "@/components/shared/PremiumModuleHeader";
 
 const DEFAULT_SHOP_PROFILE: ShopProfile = {
   shop_name: '',
@@ -181,7 +183,7 @@ export const MyShopProfileModule = () => {
     return (
       <div className="min-h-[400px] flex items-center justify-center">
         <div className="text-center space-y-4">
-          <Loader2 className="h-10 w-10 animate-spin text-primary mx-auto" />
+          <div className="h-12 w-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
           <p className="text-muted-foreground">Loading shop profile...</p>
         </div>
       </div>
@@ -189,78 +191,100 @@ export const MyShopProfileModule = () => {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="h-12 w-12 rounded-xl bg-primary/15 flex items-center justify-center">
-            <Store className="h-6 w-6 text-primary" />
+    <div className="space-y-5">
+      {/* Premium Header */}
+      <div className="relative">
+        <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-secondary/5 rounded-xl -z-10" />
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-1">
+          <div className="flex items-center gap-3">
+            <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg">
+              <Store className="h-6 w-6 text-primary-foreground" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl sm:text-2xl font-bold tracking-tight">
+                  {shopProfile.shop_name || 'My Shop Profile'}
+                </h1>
+                {shopProfile.id && (
+                  <Badge className={`${shopProfile.is_open ? 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30' : 'bg-muted text-muted-foreground'}`}>
+                    {shopProfile.is_open ? '● Open' : '○ Closed'}
+                  </Badge>
+                )}
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Manage your shop, products, orders & analytics
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold">My Shop Profile</h1>
-            <p className="text-sm text-muted-foreground">
-              Manage your shop, products, orders & analytics
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
+          
+          {/* Quick Actions */}
           {shopProfile.id && (
-            <>
-              <Badge className={`${shopProfile.is_open ? 'bg-emerald-500/15 text-emerald-600' : 'bg-muted'}`}>
-                {shopProfile.is_open ? 'Shop Open' : 'Shop Closed'}
-              </Badge>
+            <div className="flex items-center gap-2">
               <Button 
                 variant="outline" 
                 size="sm" 
                 onClick={() => navigate(`/community/shop/${shopProfile.id}`)}
-                className="gap-2 h-10"
+                className="h-10 gap-2 text-sm"
               >
                 <ExternalLink className="h-4 w-4" />
-                View Shop
+                <span className="hidden sm:inline">View Shop</span>
               </Button>
               <Button 
                 size="sm" 
                 onClick={() => navigate('/community')}
-                className="gap-2 h-10"
+                className="h-10 gap-2 text-sm"
               >
                 <Globe className="h-4 w-4" />
-                Marketplace
+                <span className="hidden sm:inline">Marketplace</span>
               </Button>
-            </>
+            </div>
           )}
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* Professional Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <ScrollArea className="w-full pb-2">
-          <TabsList className="inline-flex h-12 w-full sm:w-auto">
-            <TabsTrigger value="info" className="gap-2 h-10 px-4">
+        <ScrollArea className="w-full">
+          <TabsList className="inline-flex h-12 min-w-full sm:min-w-0 p-1 bg-muted/50 rounded-lg">
+            <TabsTrigger 
+              value="info" 
+              className="h-10 px-4 gap-2 data-[state=active]:shadow-sm data-[state=active]:bg-background rounded-md transition-all"
+            >
               <Store className="h-4 w-4" />
               <span className="hidden sm:inline">Shop Info</span>
               <span className="sm:hidden">Info</span>
             </TabsTrigger>
-            <TabsTrigger value="products" className="gap-2 h-10 px-4">
+            <TabsTrigger 
+              value="products" 
+              className="h-10 px-4 gap-2 data-[state=active]:shadow-sm data-[state=active]:bg-background rounded-md transition-all"
+            >
               <Package className="h-4 w-4" />
-              <span className="hidden sm:inline">Products</span>
-              <span className="sm:hidden">Products</span>
+              <span>Products</span>
             </TabsTrigger>
-            <TabsTrigger value="orders" className="gap-2 h-10 px-4 relative">
+            <TabsTrigger 
+              value="orders" 
+              className="h-10 px-4 gap-2 data-[state=active]:shadow-sm data-[state=active]:bg-background rounded-md transition-all relative"
+            >
               <ShoppingBag className="h-4 w-4" />
-              <span className="hidden sm:inline">Orders</span>
-              <span className="sm:hidden">Orders</span>
+              <span>Orders</span>
               {pendingOrdersCount > 0 && (
-                <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center bg-destructive text-destructive-foreground text-[10px]">
-                  {pendingOrdersCount}
+                <Badge className="absolute -top-1 -right-1 h-5 min-w-5 p-0 flex items-center justify-center bg-destructive text-destructive-foreground text-[10px] animate-pulse">
+                  {pendingOrdersCount > 9 ? '9+' : pendingOrdersCount}
                 </Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="analytics" className="gap-2 h-10 px-4">
+            <TabsTrigger 
+              value="analytics" 
+              className="h-10 px-4 gap-2 data-[state=active]:shadow-sm data-[state=active]:bg-background rounded-md transition-all"
+            >
               <BarChart3 className="h-4 w-4" />
               <span className="hidden sm:inline">Analytics</span>
               <span className="sm:hidden">Stats</span>
             </TabsTrigger>
-            <TabsTrigger value="settings" className="gap-2 h-10 px-4">
+            <TabsTrigger 
+              value="settings" 
+              className="h-10 px-4 gap-2 data-[state=active]:shadow-sm data-[state=active]:bg-background rounded-md transition-all"
+            >
               <Settings className="h-4 w-4" />
               <span className="hidden sm:inline">Settings</span>
               <span className="sm:hidden">Config</span>
@@ -269,7 +293,7 @@ export const MyShopProfileModule = () => {
           <ScrollBar orientation="horizontal" />
         </ScrollArea>
 
-        <TabsContent value="info" className="mt-6">
+        <TabsContent value="info" className="mt-5">
           <ShopInfoTab 
             shopProfile={shopProfile}
             setShopProfile={setShopProfile}
@@ -279,19 +303,19 @@ export const MyShopProfileModule = () => {
           />
         </TabsContent>
 
-        <TabsContent value="products" className="mt-6">
+        <TabsContent value="products" className="mt-5">
           <ShopProductsTab shopId={shopProfile.id || null} />
         </TabsContent>
 
-        <TabsContent value="orders" className="mt-6">
+        <TabsContent value="orders" className="mt-5">
           <ShopOrdersTab shopId={shopProfile.id || null} />
         </TabsContent>
 
-        <TabsContent value="analytics" className="mt-6">
+        <TabsContent value="analytics" className="mt-5">
           <ShopAnalyticsTab shopId={shopProfile.id || null} />
         </TabsContent>
 
-        <TabsContent value="settings" className="mt-6">
+        <TabsContent value="settings" className="mt-5">
           <ShopSettingsTab shopId={shopProfile.id || null} />
         </TabsContent>
       </Tabs>
