@@ -129,37 +129,37 @@ export const AppSidebar = ({
     const Icon = item.icon;
     const isActive = activeModule === item.id;
     const displayTitle = t(item.titleKey) + (item.titleSuffix || '');
-    const button = <SidebarMenuButton onClick={() => handleModuleChange(item.id)} isActive={isActive} className={`relative group transition-all duration-200 ${isCollapsed ? 'justify-center px-0' : ''} ${isActive ? 'bg-primary text-primary-foreground shadow-md shadow-primary/20' : 'hover:bg-muted text-muted-foreground hover:text-foreground'}`}>
-        <div className={`flex items-center justify-center h-8 w-8 rounded-lg shrink-0 transition-all duration-200 ${isActive ? 'bg-white/20' : 'bg-transparent group-hover:bg-primary/10'}`}>
+    const button = <SidebarMenuButton onClick={() => handleModuleChange(item.id)} isActive={isActive} className={`relative group transition-all duration-200 h-9 ${isCollapsed ? 'justify-center px-0' : 'px-2'} ${isActive ? 'bg-primary text-primary-foreground shadow-sm' : 'hover:bg-muted text-muted-foreground hover:text-foreground'}`}>
+        <div className={`flex items-center justify-center h-7 w-7 rounded-md shrink-0 transition-all duration-200 ${isActive ? 'bg-white/20' : 'bg-transparent group-hover:bg-primary/10'}`}>
           <Icon className={`h-4 w-4 transition-colors ${isActive ? 'text-primary-foreground' : 'text-muted-foreground group-hover:text-primary'}`} />
         </div>
-        {!isCollapsed && <div className="flex items-center justify-between w-full ml-2 overflow-hidden">
+        {!isCollapsed && <div className="flex items-center justify-between w-full ml-1.5 overflow-hidden">
             <span className="text-sm font-medium truncate">{displayTitle}</span>
-            <div className="flex items-center gap-1.5 shrink-0">
-              {item.badge && <Badge variant="secondary" className="h-5 min-w-5 px-1.5 text-[10px] font-bold bg-destructive text-destructive-foreground border-0 animate-pulse">
+            <div className="flex items-center gap-1 shrink-0">
+              {item.badge && <Badge variant="secondary" className="h-4 min-w-4 px-1 text-[9px] font-bold bg-destructive text-destructive-foreground border-0">
                   {item.badge}
                 </Badge>}
-              {isActive && <ChevronRight className="h-4 w-4 opacity-70" />}
+              {isActive && <ChevronRight className="h-3.5 w-3.5 opacity-70" />}
             </div>
           </div>}
-        {isCollapsed && item.badge && <Badge className="absolute -top-1 -right-1 h-4 min-w-4 p-0 flex items-center justify-center text-[9px] font-bold bg-destructive text-destructive-foreground border-0">
+        {isCollapsed && item.badge && <Badge className="absolute -top-0.5 -right-0.5 h-3.5 min-w-3.5 p-0 flex items-center justify-center text-[8px] font-bold bg-destructive text-destructive-foreground border-0">
             {item.badge}
           </Badge>}
       </SidebarMenuButton>;
     if (isCollapsed) {
       return <Tooltip key={item.id}>
           <TooltipTrigger asChild>
-            <SidebarMenuItem>{button}</SidebarMenuItem>
+            <SidebarMenuItem className="py-0">{button}</SidebarMenuItem>
           </TooltipTrigger>
           <TooltipContent side="right" className="flex items-center gap-2">
             {displayTitle}
-            {item.badge && <Badge className="h-5 min-w-5 px-1.5 text-[10px] font-bold bg-destructive text-destructive-foreground border-0">
+            {item.badge && <Badge className="h-4 min-w-4 px-1 text-[9px] font-bold bg-destructive text-destructive-foreground border-0">
                 {item.badge}
               </Badge>}
           </TooltipContent>
         </Tooltip>;
     }
-    return <SidebarMenuItem key={item.id}>{button}</SidebarMenuItem>;
+    return <SidebarMenuItem key={item.id} className="py-0">{button}</SidebarMenuItem>;
   };
   const renderNavGroup = (items: {
     id: string;
@@ -171,13 +171,13 @@ export const AppSidebar = ({
   }[], label?: string) => {
     const filteredItems = items.filter(item => item.roles.includes(userRole));
     if (filteredItems.length === 0) return null;
-    return <SidebarGroup className="py-1">
-        {label && !isCollapsed && <SidebarGroupLabel className="text-[10px] uppercase tracking-wider text-muted-foreground/60 font-semibold px-3 py-2 flex items-center gap-2">
-            <CircleDot className="h-1.5 w-1.5 text-primary/60" />
+    return <SidebarGroup className="py-0.5">
+        {label && !isCollapsed && <SidebarGroupLabel className="text-[9px] uppercase tracking-wider text-muted-foreground/70 font-semibold px-3 py-1 flex items-center gap-1.5 h-6">
+            <CircleDot className="h-1 w-1 text-primary/60" />
             {label}
           </SidebarGroupLabel>}
         <SidebarGroupContent>
-          <SidebarMenu className={`space-y-0.5 ${isCollapsed ? 'px-1' : 'px-2'}`}>
+          <SidebarMenu className={`gap-0 ${isCollapsed ? 'px-1' : 'px-1.5'}`}>
             {filteredItems.map(renderMenuItem)}
           </SidebarMenu>
         </SidebarGroupContent>
@@ -222,19 +222,19 @@ export const AppSidebar = ({
         </div>
       )}
 
-      <SidebarContent className="py-2 overflow-x-hidden transition-all duration-300">
+      <SidebarContent className="py-1 overflow-x-hidden transition-all duration-300">
         {renderNavGroup(mainNavItems)}
         
-        <div className={`mx-4 h-px bg-border/50 transition-all duration-300 ${isCollapsed ? 'opacity-0 my-0' : 'opacity-100 my-2'}`} />
+        <div className={`mx-3 h-px bg-border/40 transition-all duration-300 ${isCollapsed ? 'opacity-0 my-0' : 'opacity-100 my-1'}`} />
         {renderNavGroup(businessItems, 'Business')}
         
-        <div className={`mx-4 h-px bg-border/50 transition-all duration-300 ${isCollapsed ? 'opacity-0 my-0' : 'opacity-100 my-2'}`} />
+        <div className={`mx-3 h-px bg-border/40 transition-all duration-300 ${isCollapsed ? 'opacity-0 my-0' : 'opacity-100 my-1'}`} />
         {renderNavGroup(inventoryItems, 'Inventory')}
         
-        <div className={`mx-4 h-px bg-border/50 transition-all duration-300 ${isCollapsed ? 'opacity-0 my-0' : 'opacity-100 my-2'}`} />
+        <div className={`mx-3 h-px bg-border/40 transition-all duration-300 ${isCollapsed ? 'opacity-0 my-0' : 'opacity-100 my-1'}`} />
         {renderNavGroup(managementItems, 'Management')}
         
-        <div className={`mx-4 h-px bg-border/50 transition-all duration-300 ${isCollapsed ? 'opacity-0 my-0' : 'opacity-100 my-2'}`} />
+        <div className={`mx-3 h-px bg-border/40 transition-all duration-300 ${isCollapsed ? 'opacity-0 my-0' : 'opacity-100 my-1'}`} />
         {renderNavGroup(otherItems)}
       </SidebarContent>
 
