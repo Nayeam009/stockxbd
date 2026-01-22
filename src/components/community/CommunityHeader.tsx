@@ -60,8 +60,8 @@ export const CommunityHeader = ({
     <>
       <Link to="/community">
         <Button variant="ghost" size="sm">
-          <Home className="h-4 w-4 mr-2" />
-          Home
+          <Store className="h-4 w-4 mr-2" />
+          Shop Profile
         </Button>
       </Link>
       <Link to="/community/orders">
