@@ -4,15 +4,15 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { 
   Users, Banknote, TrendingUp, TrendingDown, Truck, Receipt, Wallet, 
-  ClipboardList, ChefHat, Wrench, RefreshCw, Tag, BarChart3, Settings, 
-  Package, AlertTriangle, Cylinder, Eye, EyeOff, Fuel, MessageSquare
+  ClipboardList, Settings, Package, AlertTriangle, Cylinder, Store, BarChart3
 } from "lucide-react";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Driver, DashboardAnalytics, CylinderStock } from "@/hooks/useDashboardData";
 import { Progress } from "@/components/ui/progress";
-import { useState, useEffect } from "react";
-
+import { useState, useEffect, useMemo } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { startOfDay, endOfDay, format } from "date-fns";
 interface DashboardOverviewProps {
   analytics: DashboardAnalytics;
   drivers: Driver[];
@@ -31,10 +31,58 @@ export const DashboardOverview = ({
   onRefresh
 }: DashboardOverviewProps) => {
   const { t } = useLanguage();
-  const [showRevenueDetails, setShowRevenueDetails] = useState(false);
+  const [todaySales, setTodaySales] = useState(0);
+  const [todayExpenses, setTodayExpenses] = useState(0);
   
   const isOwnerOrManager = userRole === 'owner' || userRole === 'manager';
   const isOwner = userRole === 'owner';
+
+  // Fetch today's sale and expense totals
+  useEffect(() => {
+    const fetchTodayData = async () => {
+      const today = new Date();
+      const todayStart = format(startOfDay(today), "yyyy-MM-dd");
+      const todayEnd = format(endOfDay(today), "yyyy-MM-dd'T'23:59:59");
+      
+      // Fetch today's sales from pos_transactions
+      const { data: salesData } = await supabase
+        .from('pos_transactions')
+        .select('total')
+        .gte('created_at', todayStart)
+        .lte('created_at', todayEnd);
+      
+      const totalSales = salesData?.reduce((sum, t) => sum + Number(t.total || 0), 0) || 0;
+      setTodaySales(totalSales);
+      
+      // Fetch today's expenses from daily_expenses
+      const { data: expenseData } = await supabase
+        .from('daily_expenses')
+        .select('amount')
+        .eq('expense_date', todayStart);
+      
+      const totalExpenses = expenseData?.reduce((sum, e) => sum + Number(e.amount || 0), 0) || 0;
+      setTodayExpenses(totalExpenses);
+    };
+    
+    fetchTodayData();
+    
+    // Real-time subscription
+    const channels = [
+      supabase.channel('dashboard-pos-realtime').on('postgres_changes',
+        { event: '*', schema: 'public', table: 'pos_transactions' },
+        () => fetchTodayData()
+      ).subscribe(),
+      supabase.channel('dashboard-expenses-realtime').on('postgres_changes',
+        { event: '*', schema: 'public', table: 'daily_expenses' },
+        () => fetchTodayData()
+      ).subscribe(),
+    ];
+    
+    return () => channels.forEach(ch => supabase.removeChannel(ch));
+  }, []);
+
+  const todayProfit = todaySales - todayExpenses;
+  const profitMargin = todaySales > 0 ? Math.round((todayProfit / todaySales) * 100) : 0;
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -44,10 +92,10 @@ export const DashboardOverview = ({
         setActiveModule?.('pos');
       } else if (e.key === 'F2') {
         e.preventDefault();
-        setActiveModule?.('daily-sales');
+        setActiveModule?.('business-diary');
       } else if (e.key === 'F3') {
         e.preventDefault();
-        setActiveModule?.('lpg-stock');
+        setActiveModule?.('inventory');
       }
     };
 
@@ -71,36 +119,47 @@ export const DashboardOverview = ({
     return isNaN(result) ? 0 : result;
   };
 
-  // KPI Cards - Only show financial data to owner/manager
+  // KPI Cards - Redesigned with Total Sale / Expense / Profit
   const getKpiCards = () => {
     const cards = [];
     
     if (isOwnerOrManager) {
-      // Today's Revenue Card with cash/due breakdown
+      // Total Sale (Today)
       cards.push({
-        id: 'today-revenue',
-        title: "Today's Revenue",
-        value: formatCurrency(analytics.todayRevenue),
-        subtitle: showRevenueDetails 
-          ? `Cash: ${formatCurrency(analytics.todayCashRevenue)} | Due: ${formatCurrency(analytics.todayDueRevenue)}`
-          : "Cash received today",
-        change: "+12%",
-        changeType: "positive" as const,
+        id: 'total-sale',
+        title: t('total_sale'),
+        value: formatCurrency(todaySales),
+        subtitle: "Today's POS transactions",
+        change: todaySales > 0 ? "Active" : "No sales yet",
+        changeType: todaySales > 0 ? "positive" as const : "warning" as const,
         icon: Banknote,
-        showToggle: true,
-        onClick: () => setShowRevenueDetails(!showRevenueDetails)
+        clickable: true,
+        onClick: () => setActiveModule?.('business-diary')
       });
 
-      // Monthly Revenue
+      // Total Expense (Today)
       cards.push({
-        id: 'monthly-revenue',
-        title: "Monthly Revenue",
-        value: formatCurrency(analytics.monthlyRevenue),
-        subtitle: "1st to today",
-        change: `${(analytics.monthlyGrowthPercent || 0) >= 0 ? '+' : ''}${analytics.monthlyGrowthPercent || 0}%`,
-        changeType: (analytics.monthlyGrowthPercent || 0) >= 0 ? "positive" as const : "negative" as const,
-        icon: TrendingUp,
-        warning: (analytics.monthlyGrowthPercent || 0) < 0
+        id: 'total-expense',
+        title: t('total_expense'),
+        value: formatCurrency(todayExpenses),
+        subtitle: "Staff, Vehicle, POB costs",
+        change: todayExpenses > 0 ? "Recorded" : "None recorded",
+        changeType: todayExpenses > 0 ? "negative" as const : "positive" as const,
+        icon: Wallet,
+        clickable: true,
+        onClick: () => setActiveModule?.('business-diary')
+      });
+
+      // Today's Profit
+      cards.push({
+        id: 'todays-profit',
+        title: t('todays_profit'),
+        value: formatCurrency(todayProfit),
+        subtitle: `Margin: ${profitMargin}%`,
+        change: todayProfit >= 0 ? `+${profitMargin}%` : `${profitMargin}%`,
+        changeType: todayProfit >= 0 ? "positive" as const : "negative" as const,
+        icon: todayProfit >= 0 ? TrendingUp : TrendingDown,
+        warning: todayProfit < 0
       });
     }
 
@@ -114,46 +173,30 @@ export const DashboardOverview = ({
       changeType: (analytics.activeOrders || 0) > 0 ? "warning" as const : "positive" as const,
       icon: ClipboardList,
       clickable: true,
-      onClick: () => setActiveModule?.('deliveries')
-    });
-
-    // Total Customers with active/lost
-    const customerPercentage = safePercentage(analytics.activeCustomers || 0, analytics.totalCustomers || 0);
-    cards.push({
-      id: 'customers',
-      title: "Total Customers",
-      value: formatNumber(analytics.totalCustomers),
-      subtitle: `${formatNumber(analytics.activeCustomers)} active, ${formatNumber(analytics.lostCustomers)} inactive`,
-      change: `${customerPercentage}% active`,
-      changeType: (analytics.activeCustomers || 0) > (analytics.lostCustomers || 0) ? "positive" as const : "warning" as const,
-      icon: Users,
-      clickable: true,
-      onClick: () => setActiveModule?.('customers')
+      onClick: () => setActiveModule?.('community')
     });
 
     return cards;
   };
 
-  // Quick Actions - Organized by category
+  // Quick Actions - Reorganized by new structure
   const salesActions = [
     { title: "POS", icon: Receipt, module: "pos", hotkey: "F1", description: "Point of Sale" },
     { title: "Business Diary", icon: BarChart3, module: "business-diary", hotkey: "F2" },
-    { title: "Shop Orders", icon: ClipboardList, module: "marketplace-orders" },
+  ];
+
+  const marketplaceActions = [
+    { title: "LPG Marketplace", icon: Store, module: "community" },
+    { title: "Customers", icon: Users, module: "customers" },
   ];
 
   const inventoryActions = [
     { title: "Inventory", icon: Package, module: "inventory", hotkey: "F3" },
-    { title: "Product Pricing", icon: Tag, module: "product-pricing" },
-  ];
-
-  const operationActions = [
-    { title: "Customers", icon: Users, module: "customers" },
-    { title: "Vehicle Cost", icon: Fuel, module: "vehicle-cost" },
-    { title: "Staff Salary", icon: Banknote, module: "staff-salary" },
+    { title: "Product Pricing", icon: Banknote, module: "product-pricing" },
   ];
 
   const adminActions = [
-    { title: "LPG Marketplace", icon: MessageSquare, module: "community" },
+    { title: "Utility Expense", icon: Wallet, module: "utility-expense" },
     { title: "Analytics", icon: BarChart3, module: "analysis-search" },
     { title: "Settings", icon: Settings, module: "settings", ownerOnly: true },
   ];
@@ -207,14 +250,6 @@ export const DashboardOverview = ({
               <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-4 pb-1 sm:pb-2">
                 <CardTitle className="text-[10px] sm:text-xs font-medium text-muted-foreground truncate pr-2 flex items-center gap-1">
                   {card.title}
-                  {card.showToggle && (
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); card.onClick?.(); }}
-                      className="ml-1 hover:text-primary transition-colors"
-                    >
-                      {showRevenueDetails ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-                    </button>
-                  )}
                 </CardTitle>
                 <div className={`h-9 w-9 sm:h-11 sm:w-11 rounded-xl flex items-center justify-center shadow-md flex-shrink-0 ${
                   isNegative ? 'bg-gradient-to-br from-destructive to-destructive/80' :
@@ -400,14 +435,14 @@ export const DashboardOverview = ({
             </div>
           </div>
 
-          {/* Operations Group */}
+          {/* Marketplace Group */}
           <div>
             <h4 className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider flex items-center gap-2">
-              <Truck className="h-3 w-3" />
-              Operations
+              <Store className="h-3 w-3" />
+              Marketplace
             </h4>
             <div className="grid grid-cols-3 gap-2 sm:gap-3">
-              {operationActions.map((action) => {
+              {marketplaceActions.map((action) => {
                 const Icon = action.icon;
                 return (
                   <button 

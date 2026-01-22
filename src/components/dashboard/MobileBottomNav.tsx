@@ -1,4 +1,4 @@
-import { Home, Receipt, Flame, Tag, Menu } from "lucide-react";
+import { Home, Receipt, BarChart3, Store, Menu, Package, Tag, Users, Wallet, Search, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -10,54 +10,59 @@ interface MobileBottomNavProps {
   userRole: 'owner' | 'manager' | 'driver';
 }
 
+// Primary bottom nav items - most accessed modules
 const navItems = [{
   id: 'overview',
   labelKey: 'overview',
   icon: Home,
   roles: ['owner', 'manager', 'driver']
 }, {
+  id: 'business-diary',
+  labelKey: 'business_diary',
+  icon: BarChart3,
+  roles: ['owner', 'manager']
+}, {
   id: 'pos',
   labelKey: 'pos',
   icon: Receipt,
   roles: ['owner', 'manager', 'driver']
 }, {
+  id: 'community',
+  labelKey: 'lpg_marketplace',
+  icon: Store,
+  roles: ['owner', 'manager']
+}];
+
+// More menu items - secondary access
+const moreItems = [{
   id: 'inventory',
   labelKey: 'inventory',
-  icon: Flame,
+  icon: Package,
   roles: ['owner', 'manager']
 }, {
   id: 'product-pricing',
   labelKey: 'product_pricing',
   icon: Tag,
   roles: ['owner', 'manager']
-}];
-const moreItems = [{
-  id: 'business-diary',
-  labelKey: 'business_diary',
+}, {
+  id: 'customers',
+  labelKey: 'customers',
+  icon: Users,
   roles: ['owner', 'manager']
 }, {
-  id: 'community',
-  labelKey: 'lpg_marketplace',
+  id: 'utility-expense',
+  labelKey: 'utility_expense',
+  icon: Wallet,
   roles: ['owner', 'manager']
 }, {
   id: 'analysis-search',
   labelKey: 'analysis_search',
-  roles: ['owner', 'manager']
-}, {
-  id: 'customers',
-  labelKey: 'customers',
-  roles: ['owner', 'manager']
-}, {
-  id: 'staff-salary',
-  labelKey: 'staff_salary',
-  roles: ['owner', 'manager']
-}, {
-  id: 'vehicle-cost',
-  labelKey: 'vehicle_cost',
+  icon: Search,
   roles: ['owner', 'manager']
 }, {
   id: 'settings',
   labelKey: 'settings',
+  icon: Settings,
   roles: ['owner', 'manager']
 }];
 export const MobileBottomNav = ({

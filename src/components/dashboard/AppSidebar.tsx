@@ -2,12 +2,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar, SidebarHeader, SidebarFooter } from "@/components/ui/sidebar";
-import { BarChart3, ChefHat, Users, Banknote, Truck, Search, Home, Receipt, Wrench, RefreshCw, Tag, Settings, LogOut, Flame, ChevronRight, CircleDot, PackagePlus, Store } from "lucide-react";
+import { BarChart3, Users, Search, Home, Receipt, Tag, Settings, LogOut, Package, ChevronRight, CircleDot, Store, Wallet } from "lucide-react";
 import stockXLogo from "@/assets/stock-x-logo.png";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+
 interface AppSidebarProps {
   activeModule: string;
   setActiveModule: (module: string) => void;
@@ -18,6 +19,7 @@ interface AppSidebarProps {
     activeOrders: number;
   };
 }
+
 export const AppSidebar = ({
   activeModule,
   setActiveModule,
@@ -25,38 +27,44 @@ export const AppSidebar = ({
   userName,
   analytics
 }: AppSidebarProps) => {
-  const {
-    state,
-    isMobile,
-    setOpenMobile
-  } = useSidebar();
-  const {
-    t
-  } = useLanguage();
+  const { state, isMobile, setOpenMobile } = useSidebar();
+  const { t } = useLanguage();
 
   // Collapsed means icon-only mode on desktop
   const isCollapsed = state === "collapsed" && !isMobile;
+  
+  // Primary navigation - Dashboard only
   const mainNavItems = [{
     id: 'overview',
     titleKey: 'overview',
     icon: Home,
     roles: ['owner', 'manager', 'driver']
+  }];
+
+  // Business Operations - Core workflows in new order
+  const businessItems = [{
+    id: 'business-diary',
+    titleKey: 'business_diary',
+    icon: BarChart3,
+    roles: ['owner', 'manager']
   }, {
     id: 'pos',
     titleKey: 'pos',
     icon: Receipt,
     roles: ['owner', 'manager', 'driver']
+  }, {
+    id: 'community',
+    titleKey: 'lpg_marketplace',
+    icon: Store,
+    roles: ['owner', 'manager'],
+    badge: analytics.activeOrders > 0 ? analytics.activeOrders : null
   }];
-  const salesItems = [{
-    id: 'business-diary',
-    titleKey: 'business_diary',
-    icon: BarChart3,
-    roles: ['owner', 'manager']
-  }];
+
+  // Inventory Management
   const inventoryItems = [{
     id: 'inventory',
     titleKey: 'inventory',
-    icon: Flame,
+    icon: Package,
     roles: ['owner', 'manager'],
     badge: analytics.lowStockItems.length > 0 ? analytics.lowStockItems.length : null
   }, {
@@ -65,29 +73,21 @@ export const AppSidebar = ({
     icon: Tag,
     roles: ['owner', 'manager']
   }];
-  const marketplaceItems = [{
-    id: 'community',
-    titleKey: 'lpg_marketplace',
-    icon: Store,
-    roles: ['owner', 'manager'],
-    badge: analytics.activeOrders > 0 ? analytics.activeOrders : null
-  }];
+
+  // Customer & Utility Management
   const managementItems = [{
     id: 'customers',
     titleKey: 'customers',
     icon: Users,
     roles: ['owner', 'manager']
   }, {
-    id: 'staff-salary',
-    titleKey: 'staff_salary',
-    icon: Banknote,
-    roles: ['owner', 'manager']
-  }, {
-    id: 'vehicle-cost',
-    titleKey: 'vehicle_cost',
-    icon: Truck,
+    id: 'utility-expense',
+    titleKey: 'utility_expense',
+    icon: Wallet,
     roles: ['owner', 'manager']
   }];
+
+  // Analytics & Settings
   const otherItems = [{
     id: 'analysis-search',
     titleKey: 'analysis_search',
@@ -97,7 +97,7 @@ export const AppSidebar = ({
     id: 'settings',
     titleKey: 'settings',
     icon: Settings,
-    roles: ['owner', 'manager']
+    roles: ['owner']
   }];
   const handleModuleChange = (moduleId: string) => {
     setActiveModule(moduleId);
@@ -226,16 +226,13 @@ export const AppSidebar = ({
         {renderNavGroup(mainNavItems)}
         
         <div className={`mx-4 h-px bg-border/50 transition-all duration-300 ${isCollapsed ? 'opacity-0 my-0' : 'opacity-100 my-2'}`} />
-        {renderNavGroup(salesItems, 'Sales')}
+        {renderNavGroup(businessItems, 'Business')}
         
         <div className={`mx-4 h-px bg-border/50 transition-all duration-300 ${isCollapsed ? 'opacity-0 my-0' : 'opacity-100 my-2'}`} />
         {renderNavGroup(inventoryItems, 'Inventory')}
         
         <div className={`mx-4 h-px bg-border/50 transition-all duration-300 ${isCollapsed ? 'opacity-0 my-0' : 'opacity-100 my-2'}`} />
-        {renderNavGroup(marketplaceItems, 'Marketplace')}
-        
-        <div className={`mx-4 h-px bg-border/50 transition-all duration-300 ${isCollapsed ? 'opacity-0 my-0' : 'opacity-100 my-2'}`} />
-        {renderNavGroup(managementItems, 'Manage')}
+        {renderNavGroup(managementItems, 'Management')}
         
         <div className={`mx-4 h-px bg-border/50 transition-all duration-300 ${isCollapsed ? 'opacity-0 my-0' : 'opacity-100 my-2'}`} />
         {renderNavGroup(otherItems)}
