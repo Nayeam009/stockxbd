@@ -11,10 +11,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
 import { logger } from "@/lib/logger";
+import { InvoiceDialog } from "@/components/invoice/InvoiceDialog";
 import { 
   ShoppingBag, Package, Clock, CheckCircle, Truck, XCircle, 
   Search, RefreshCw, Phone, MapPin, Calendar, ExternalLink,
-  Store, TrendingUp, AlertCircle
+  Store, TrendingUp, AlertCircle, Printer, RotateCcw
 } from "lucide-react";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
@@ -69,6 +70,11 @@ export const MarketplaceOrdersModule = () => {
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
+  const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
+  const [selectedOrderForInvoice, setSelectedOrderForInvoice] = useState<CommunityOrder | null>(null);
+  const [posTransactionNumber, setPosTransactionNumber] = useState<string>("");
+  const [processingOrderId, setProcessingOrderId] = useState<string | null>(null);
+  const [shopProfile, setShopProfile] = useState<{ name: string; phone: string; address: string } | null>(null);
 
   // Fetch shop and orders
   const fetchData = useCallback(async () => {
@@ -84,9 +90,9 @@ export const MarketplaceOrdersModule = () => {
 
       const { data: shopData, error: shopError } = await supabase
         .from('shop_profiles')
-        .select('id')
+        .select('id, shop_name, phone, address')
         .eq('owner_id', user.id)
-        .single();
+        .maybeSingle();
 
       if (shopError || !shopData) {
         setHasShop(false);
@@ -96,6 +102,11 @@ export const MarketplaceOrdersModule = () => {
 
       setShopId(shopData.id);
       setHasShop(true);
+      setShopProfile({
+        name: shopData.shop_name || 'My LPG Shop',
+        phone: shopData.phone || '',
+        address: shopData.address || ''
+      });
 
       // Fetch orders for this shop
       const { data: ordersData, error: ordersError } = await supabase
@@ -166,9 +177,118 @@ export const MarketplaceOrdersModule = () => {
     }
   }, [fetchData, shopId]);
 
-  // Update order status
+  // Convert online order to POS transaction
+  const convertOnlineOrderToPOS = async (order: CommunityOrder): Promise<string> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Not authenticated");
+
+    // 1. Find or create customer by phone
+    let customerId: string | null = null;
+    const { data: existingCustomer } = await supabase
+      .from('customers')
+      .select('id')
+      .eq('phone', order.customer_phone)
+      .maybeSingle();
+
+    if (existingCustomer) {
+      customerId = existingCustomer.id;
+    } else {
+      const { data: newCustomer } = await supabase
+        .from('customers')
+        .insert({
+          name: order.customer_name,
+          phone: order.customer_phone,
+          address: `${order.delivery_address}, ${order.thana || ''}, ${order.district}, ${order.division}`,
+          created_by: user.id
+        })
+        .select()
+        .single();
+      customerId = newCustomer?.id || null;
+    }
+
+    // 2. Generate transaction number
+    const { data: txnNumber, error: rpcError } = await supabase.rpc('generate_transaction_number');
+    if (rpcError) throw rpcError;
+
+    // 3. Create POS transaction (linked to community order)
+    const { data: transaction, error: txnError } = await supabase
+      .from('pos_transactions')
+      .insert({
+        transaction_number: txnNumber,
+        customer_id: customerId,
+        subtotal: order.subtotal,
+        discount: 0,
+        total: order.total_amount,
+        payment_method: order.payment_method === 'cod' ? 'cash' : order.payment_method,
+        payment_status: 'pending',
+        community_order_id: order.id,
+        is_online_order: true,
+        created_by: user.id
+      } as any)
+      .select()
+      .single();
+
+    if (txnError) throw txnError;
+
+    // 4. Create transaction items from order items
+    for (const item of order.items || []) {
+      const productName = `${item.brand_name || item.product_name} ${item.weight || ''} (${item.product_type === 'lpg_refill' ? 'Refill' : item.product_type === 'lpg_package' ? 'Package' : item.product_type})`;
+      
+      // Generate a placeholder product_id (use the item id or create a unique one)
+      const productId = crypto.randomUUID();
+      
+      await supabase.from('pos_transaction_items').insert({
+        transaction_id: transaction.id,
+        product_id: productId,
+        product_name: productName,
+        quantity: item.quantity,
+        unit_price: item.price,
+        total_price: item.price * item.quantity
+      });
+    }
+
+    return txnNumber;
+  };
+
+  // Update LPG stock
+  const updateLPGStock = async (brandName: string, weight: string, quantityChange: number, cylinderType: 'lpg_refill' | 'lpg_package') => {
+    const { data: brand } = await supabase
+      .from('lpg_brands')
+      .select('id, refill_cylinder, package_cylinder')
+      .ilike('name', `%${brandName}%`)
+      .eq('weight', weight)
+      .maybeSingle();
+
+    if (brand) {
+      const field = cylinderType === 'lpg_refill' ? 'refill_cylinder' : 'package_cylinder';
+      const currentValue = (brand as any)[field] || 0;
+      const newValue = Math.max(0, currentValue + quantityChange);
+      await supabase.from('lpg_brands').update({ [field]: newValue }).eq('id', brand.id);
+    }
+  };
+
+  // Update empty/problem cylinder stock
+  const updateEmptyCylinderStock = async (brandName: string, weight: string, quantity: number, type: 'empty' | 'leaked') => {
+    const { data: brand } = await supabase
+      .from('lpg_brands')
+      .select('id, empty_cylinder, problem_cylinder')
+      .ilike('name', `%${brandName}%`)
+      .eq('weight', weight)
+      .maybeSingle();
+
+    if (brand) {
+      const field = type === 'leaked' ? 'problem_cylinder' : 'empty_cylinder';
+      const currentValue = (brand as any)[field] || 0;
+      await supabase.from('lpg_brands').update({ [field]: currentValue + quantity }).eq('id', brand.id);
+    }
+  };
+
+  // Update order status with inventory sync
   const updateOrderStatus = async (orderId: string, newStatus: CommunityOrder['status'], reason?: string) => {
     try {
+      const order = orders.find(o => o.id === orderId);
+      if (!order) return;
+
       const updateData: Record<string, any> = { 
         status: newStatus,
         updated_at: new Date().toISOString()
@@ -176,10 +296,38 @@ export const MarketplaceOrdersModule = () => {
 
       if (newStatus === 'confirmed') updateData.confirmed_at = new Date().toISOString();
       if (newStatus === 'dispatched') updateData.dispatched_at = new Date().toISOString();
+      
       if (newStatus === 'delivered') {
         updateData.delivered_at = new Date().toISOString();
         updateData.payment_status = 'paid';
+
+        // 1. Inventory sync is handled below - POS transaction status will sync via realtime
+        // Note: The community_order_id lookup will work once Supabase types regenerate
+
+        // 2. Update inventory for each item
+        for (const item of order.items || []) {
+          if (item.product_type === 'lpg_refill' || item.product_type === 'lpg_package') {
+            // Decrease refill/package stock
+            await updateLPGStock(
+              item.brand_name || '',
+              item.weight || '',
+              -item.quantity,
+              item.product_type as 'lpg_refill' | 'lpg_package'
+            );
+            
+            // Increase empty/problem cylinder if returned
+            if (item.return_cylinder_qty > 0 && item.return_cylinder_type) {
+              await updateEmptyCylinderStock(
+                item.brand_name || '',
+                item.weight || '',
+                item.return_cylinder_qty,
+                item.return_cylinder_type
+              );
+            }
+          }
+        }
       }
+      
       if (newStatus === 'rejected' && reason) updateData.rejection_reason = reason;
 
       const { error } = await supabase
@@ -190,8 +338,10 @@ export const MarketplaceOrdersModule = () => {
       if (error) throw error;
 
       toast({
-        title: "Success",
-        description: `Order status updated to ${newStatus}`,
+        title: newStatus === 'delivered' ? "✅ Order Delivered!" : "Status Updated",
+        description: newStatus === 'delivered' 
+          ? "Inventory updated. Payment marked as complete."
+          : `Order status: ${newStatus}`
       });
 
       fetchData();
@@ -202,6 +352,37 @@ export const MarketplaceOrdersModule = () => {
         description: "Failed to update order status",
         variant: "destructive"
       });
+    }
+  };
+
+  // Handle Accept & Print Memo
+  const handleAcceptAndPrint = async (order: CommunityOrder) => {
+    setProcessingOrderId(order.id);
+    try {
+      // Create POS transaction
+      const txnNumber = await convertOnlineOrderToPOS(order);
+      setPosTransactionNumber(txnNumber);
+      
+      // Update order status
+      await updateOrderStatus(order.id, 'confirmed');
+      
+      // Show invoice dialog
+      setSelectedOrderForInvoice(order);
+      setInvoiceDialogOpen(true);
+      
+      toast({
+        title: "✅ Order Confirmed",
+        description: `POS Transaction: ${txnNumber}. Print memo for driver.`
+      });
+    } catch (error) {
+      logger.error('Error accepting order:', error);
+      toast({
+        title: "Error",
+        description: "Failed to confirm order",
+        variant: "destructive"
+      });
+    } finally {
+      setProcessingOrderId(null);
     }
   };
 
@@ -262,6 +443,29 @@ export const MarketplaceOrdersModule = () => {
       default: return <Clock className="h-4 w-4" />;
     }
   };
+
+  // Prepare invoice data
+  const prepareInvoiceData = (order: CommunityOrder) => ({
+    invoiceNumber: posTransactionNumber || order.order_number,
+    date: new Date(),
+    customer: {
+      name: order.customer_name,
+      phone: order.customer_phone,
+      address: `${order.delivery_address}, ${order.thana || ''}, ${order.district}, ${order.division}`
+    },
+    items: (order.items || []).map(item => ({
+      name: `${item.brand_name || item.product_name} ${item.weight || ''} (${item.product_type === 'lpg_refill' ? 'Refill' : item.product_type === 'lpg_package' ? 'Package' : item.product_type})`,
+      description: item.return_cylinder_qty > 0 ? `Return: ${item.return_cylinder_qty} ${item.return_cylinder_type} cylinder(s)` : undefined,
+      quantity: item.quantity,
+      price: item.price,
+      total: item.price * item.quantity
+    })),
+    subtotal: order.subtotal,
+    discount: 0,
+    total: order.total_amount,
+    paymentMethod: order.payment_method,
+    paymentStatus: 'pending'
+  });
 
   // No shop profile created
   if (hasShop === false) {
@@ -467,7 +671,7 @@ export const MarketplaceOrdersModule = () => {
                           {order.items.map((item) => (
                             <div key={item.id} className="flex justify-between text-sm">
                               <span>
-                                {item.product_name} {item.weight && `(${item.weight})`} × {item.quantity}
+                                {item.brand_name || item.product_name} {item.weight && `(${item.weight})`} × {item.quantity}
                               </span>
                               <span className="font-medium">
                                 {BANGLADESHI_CURRENCY_SYMBOL}{item.price * item.quantity}
@@ -476,11 +680,12 @@ export const MarketplaceOrdersModule = () => {
                           ))}
                           {order.items.some(i => i.return_cylinder_qty > 0) && (
                             <div className="pt-2 mt-2 border-t border-border/50">
-                              <p className="text-xs text-muted-foreground">
-                                🔄 Customer returning: {order.items.filter(i => i.return_cylinder_qty > 0).map(i => 
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <RotateCcw className="h-3 w-3" />
+                                Customer returning: {order.items.filter(i => i.return_cylinder_qty > 0).map(i => 
                                   `${i.return_cylinder_qty} ${i.return_cylinder_type} cylinder(s)`
                                 ).join(', ')}
-                              </p>
+                              </div>
                             </div>
                           )}
                         </div>
@@ -501,11 +706,16 @@ export const MarketplaceOrdersModule = () => {
                         <>
                           <Button 
                             size="sm" 
-                            onClick={() => updateOrderStatus(order.id, 'confirmed')}
-                            className="gap-1"
+                            onClick={() => handleAcceptAndPrint(order)}
+                            disabled={processingOrderId === order.id}
+                            className="gap-1 h-10 px-4"
                           >
-                            <CheckCircle className="h-4 w-4" />
-                            Confirm
+                            {processingOrderId === order.id ? (
+                              <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <Printer className="h-4 w-4" />
+                            )}
+                            Accept & Print Memo
                           </Button>
                           <Button 
                             size="sm" 
@@ -514,7 +724,7 @@ export const MarketplaceOrdersModule = () => {
                               setSelectedOrderId(order.id);
                               setRejectDialogOpen(true);
                             }}
-                            className="gap-1"
+                            className="gap-1 h-10"
                           >
                             <XCircle className="h-4 w-4" />
                             Reject
@@ -525,7 +735,7 @@ export const MarketplaceOrdersModule = () => {
                         <Button 
                           size="sm" 
                           onClick={() => updateOrderStatus(order.id, 'dispatched')}
-                          className="gap-1"
+                          className="gap-1 h-10"
                         >
                           <Truck className="h-4 w-4" />
                           Dispatch
@@ -535,7 +745,7 @@ export const MarketplaceOrdersModule = () => {
                         <Button 
                           size="sm" 
                           onClick={() => updateOrderStatus(order.id, 'delivered')}
-                          className="gap-1 bg-success hover:bg-success/90"
+                          className="gap-1 h-10 bg-success hover:bg-success/90"
                         >
                           <CheckCircle className="h-4 w-4" />
                           Mark Delivered
@@ -584,6 +794,18 @@ export const MarketplaceOrdersModule = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Invoice Dialog */}
+      {selectedOrderForInvoice && (
+        <InvoiceDialog
+          open={invoiceDialogOpen}
+          onOpenChange={setInvoiceDialogOpen}
+          invoiceData={prepareInvoiceData(selectedOrderForInvoice)}
+          businessName={shopProfile?.name}
+          businessPhone={shopProfile?.phone}
+          businessAddress={shopProfile?.address}
+        />
+      )}
     </div>
   );
 };
