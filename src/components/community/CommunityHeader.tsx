@@ -28,6 +28,11 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface CommunityHeaderProps {
   cartItemCount?: number;
@@ -95,6 +100,26 @@ export const CommunityHeader = ({
 
         {/* Right Actions */}
         <div className="flex items-center space-x-2">
+          {/* Dashboard Button - Owner/Manager only */}
+          {isOwnerOrManager && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="default" 
+                  size="sm"
+                  onClick={() => navigate('/dashboard')}
+                  className="hidden sm:flex items-center gap-2 bg-primary hover:bg-primary/90"
+                >
+                  <Store className="h-4 w-4" />
+                  <span className="hidden md:inline">My Shop</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Go to Shop Dashboard</p>
+              </TooltipContent>
+            </Tooltip>
+          )}
+
           {/* Cart Button */}
           <Button 
             variant="outline" 

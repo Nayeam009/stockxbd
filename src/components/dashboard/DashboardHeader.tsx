@@ -5,9 +5,14 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { UniversalNotificationCenter } from "@/components/notifications/UniversalNotificationCenter";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useTheme } from "@/contexts/ThemeContext";
-import { Search, Settings, Command, Store } from "lucide-react";
+import { Search, Settings, Command, Store, Globe } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface DashboardHeaderProps {
   searchQuery: string;
@@ -131,17 +136,41 @@ export const DashboardHeader = ({
           {/* Notifications */}
           <UniversalNotificationCenter userRole={userRole} />
 
-          {/* View Shop Button - Owner only */}
+          {/* Marketplace Button - Owner only */}
           {userRole === 'owner' && (
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => navigate(shopId ? `/community/shop/${shopId}` : '/community')}
-              className="hidden sm:flex h-8 w-8 sm:h-9 sm:w-9 rounded-lg sm:rounded-xl hover:bg-primary/10 hover:text-primary transition-all duration-300"
-              title="View My Shop"
-            >
-              <Store className="h-4 w-4" />
-            </Button>
+            <>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    onClick={() => navigate('/community')}
+                    className="hidden sm:flex h-8 w-8 sm:h-9 sm:w-9 rounded-lg sm:rounded-xl hover:bg-secondary/20 hover:text-secondary transition-all duration-300"
+                  >
+                    <Globe className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Browse Marketplace</p>
+                </TooltipContent>
+              </Tooltip>
+              
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    onClick={() => navigate(shopId ? `/community/shop/${shopId}` : '/community')}
+                    className="hidden sm:flex h-8 w-8 sm:h-9 sm:w-9 rounded-lg sm:rounded-xl hover:bg-primary/10 hover:text-primary transition-all duration-300"
+                  >
+                    <Store className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>View My Shop</p>
+                </TooltipContent>
+              </Tooltip>
+            </>
           )}
 
           {/* Settings - Hidden on mobile */}

@@ -225,12 +225,18 @@ export const useCommunityData = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return { success: false, error: 'Not authenticated' };
 
+      // Detect if this is a self-order (owner ordering from their own shop)
+      const isSelfOrder = userShop?.id === shopId;
+      
+      // Detect customer type (wholesale for owners, retail for regular customers)
+      const customerType = userRole === 'owner' ? 'wholesale' : 'retail';
+
       // Calculate totals
       const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-      const deliveryFee = 50;
+      const deliveryFee = isSelfOrder ? 0 : 50; // No delivery fee for self-orders
       const totalAmount = subtotal + deliveryFee;
 
-      // Create order - using type assertion since types may not be regenerated yet
+      // Create order with customer_type and is_self_order
       const { data: orderData, error: orderError } = await supabase
         .from('community_orders')
         .insert([{
@@ -242,13 +248,15 @@ export const useCommunityData = () => {
           division: customerInfo.division,
           district: customerInfo.district,
           thana: customerInfo.thana || null,
-          order_notes: customerInfo.notes || null,
+          order_notes: isSelfOrder ? `[TEST ORDER] ${customerInfo.notes || ''}`.trim() : (customerInfo.notes || null),
           subtotal,
           delivery_fee: deliveryFee,
           total_amount: totalAmount,
           status: 'pending',
           payment_method: 'cod',
-          payment_status: 'pending'
+          payment_status: 'pending',
+          customer_type: customerType,
+          is_self_order: isSelfOrder
         }] as any)
         .select()
         .single();
@@ -280,7 +288,7 @@ export const useCommunityData = () => {
       logger.error('Error placing order:', error);
       return { success: false, error: error.message };
     }
-  }, []);
+  }, [userShop, userRole]);
 
   // Update order status (for shop owners)
   const updateOrderStatus = useCallback(async (
