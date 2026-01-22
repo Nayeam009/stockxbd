@@ -63,8 +63,6 @@ import { ProfileSharingCard } from "@/components/settings/ProfileSharingCard";
 import { BackupRestoreCard } from "@/components/settings/BackupRestoreCard";
 import { PushNotificationCard } from "@/components/settings/PushNotificationCard";
 import { TeamManagementCard } from "@/components/settings/TeamManagementCard";
-import { ShopProfileCard } from "@/components/settings/ShopProfileCard";
-import { ShopProductsCard } from "@/components/settings/ShopProductsCard";
 
 interface SettingsSectionProps {
   icon: React.ReactNode;
@@ -348,7 +346,6 @@ export const SettingsModule = () => {
     { id: 'appearance', icon: <Palette className="h-4 w-4" />, title: 'Appearance', description: 'Theme & language' },
     { id: 'business', icon: <Building2 className="h-4 w-4" />, title: 'Business', description: 'Company details' },
     ...(isOwner ? [
-      { id: 'marketplace', icon: <Store className="h-4 w-4" />, title: 'Marketplace', description: 'Shop settings' },
       { id: 'team', icon: <Users className="h-4 w-4" />, title: 'Team', description: 'Manage members' },
     ] : []),
     { id: 'notifications', icon: <Bell className="h-4 w-4" />, title: 'Notifications', description: 'Alerts & updates' },
@@ -548,23 +545,6 @@ export const SettingsModule = () => {
               </Button>
             </CardContent>
           </Card>
-        );
-
-      case 'marketplace':
-        return (
-          <div className="space-y-6">
-            <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-secondary/10 to-accent/10 rounded-xl border border-secondary/20">
-              <div className="p-3 bg-secondary/20 rounded-lg">
-                <ShoppingBag className="h-6 w-6 text-secondary" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-foreground">LPG Community Marketplace</h3>
-                <p className="text-sm text-muted-foreground">Manage your online shop presence and products</p>
-              </div>
-            </div>
-            <ShopProfileCard />
-            <ShopProductsCard />
-          </div>
         );
 
       case 'team':

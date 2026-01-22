@@ -48,7 +48,7 @@ export const getModuleNavigationOrder = (userRole: 'owner' | 'manager' | 'driver
     { id: 'overview', roles: ['owner', 'manager', 'driver'] },
     { id: 'business-diary', roles: ['owner', 'manager'] },
     { id: 'pos', roles: ['owner', 'manager', 'driver'] },
-    { id: 'community', roles: ['owner', 'manager'] },
+    { id: 'my-shop', roles: ['owner', 'manager'] },
     { id: 'inventory', roles: ['owner', 'manager'] },
     { id: 'product-pricing', roles: ['owner', 'manager'] },
     { id: 'customers', roles: ['owner', 'manager'] },
