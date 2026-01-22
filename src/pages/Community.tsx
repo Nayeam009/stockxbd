@@ -12,7 +12,8 @@ import {
   Store,
   Users,
   Star,
-  TrendingUp
+  TrendingUp,
+  X
 } from "lucide-react";
 import {
   Select,
@@ -24,16 +25,19 @@ import {
 import { CommunityHeader } from "@/components/community/CommunityHeader";
 import { CommunityBottomNav } from "@/components/community/CommunityBottomNav";
 import { ShopCard } from "@/components/community/ShopCard";
+import { LocationSearchCombobox } from "@/components/community/LocationSearchCombobox";
 import { useCommunityData, Shop, CartItem } from "@/hooks/useCommunityData";
-import { DIVISIONS, getDistricts } from "@/lib/bangladeshConstants";
+import { DIVISIONS, getDistricts, getThanas, POPULAR_LOCATIONS } from "@/lib/bangladeshConstants";
 
 const Community = () => {
   const navigate = useNavigate();
   const { shops, loading, currentUser, userRole } = useCommunityData();
   
   const [searchQuery, setSearchQuery] = useState("");
+  const [locationSearch, setLocationSearch] = useState("");
   const [selectedDivision, setSelectedDivision] = useState<string>("all");
   const [selectedDistrict, setSelectedDistrict] = useState<string>("all");
+  const [selectedThana, setSelectedThana] = useState<string>("all");
   const [cart, setCart] = useState<CartItem[]>([]);
 
   // Load cart from localStorage
@@ -47,13 +51,19 @@ const Community = () => {
   // Filter shops
   const filteredShops = useMemo(() => {
     return shops.filter(shop => {
-      // Search filter
+      // Text search filter (shop name, address)
       const searchLower = searchQuery.toLowerCase();
       const matchesSearch = !searchQuery || 
         shop.shop_name.toLowerCase().includes(searchLower) ||
-        shop.district.toLowerCase().includes(searchLower) ||
-        shop.division.toLowerCase().includes(searchLower) ||
         shop.address.toLowerCase().includes(searchLower);
+
+      // Location search filter (division, district, thana)
+      const locationLower = locationSearch.toLowerCase();
+      const matchesLocationSearch = !locationSearch ||
+        shop.district.toLowerCase().includes(locationLower) ||
+        shop.division.toLowerCase().includes(locationLower) ||
+        shop.thana?.toLowerCase().includes(locationLower) ||
+        shop.address.toLowerCase().includes(locationLower);
 
       // Division filter
       const matchesDivision = selectedDivision === "all" || shop.division === selectedDivision;
@@ -61,9 +71,14 @@ const Community = () => {
       // District filter
       const matchesDistrict = selectedDistrict === "all" || shop.district === selectedDistrict;
 
-      return matchesSearch && matchesDivision && matchesDistrict;
+      // Thana filter
+      const matchesThana = selectedThana === "all" || 
+        shop.thana?.toLowerCase() === selectedThana.toLowerCase() ||
+        shop.address.toLowerCase().includes(selectedThana.toLowerCase());
+
+      return matchesSearch && matchesLocationSearch && matchesDivision && matchesDistrict && matchesThana;
     });
-  }, [shops, searchQuery, selectedDivision, selectedDistrict]);
+  }, [shops, searchQuery, locationSearch, selectedDivision, selectedDistrict, selectedThana]);
 
   // Analytics
   const analytics = useMemo(() => ({
@@ -87,10 +102,37 @@ const Community = () => {
     ? getDistricts(selectedDivision)
     : [];
 
+  // Get thanas based on selected district
+  const availableThanas = selectedDistrict !== "all"
+    ? getThanas(selectedDistrict)
+    : [];
+
   // Reset district when division changes
   useEffect(() => {
     setSelectedDistrict("all");
+    setSelectedThana("all");
   }, [selectedDivision]);
+
+  // Reset thana when district changes
+  useEffect(() => {
+    setSelectedThana("all");
+  }, [selectedDistrict]);
+
+  // Handle popular location click
+  const handlePopularLocationClick = (location: string) => {
+    setLocationSearch(location);
+  };
+
+  // Clear all filters
+  const clearAllFilters = () => {
+    setSearchQuery("");
+    setLocationSearch("");
+    setSelectedDivision("all");
+    setSelectedDistrict("all");
+    setSelectedThana("all");
+  };
+
+  const hasActiveFilters = searchQuery || locationSearch || selectedDivision !== "all";
 
   if (loading) {
     return (
@@ -155,21 +197,48 @@ const Community = () => {
         {/* Search and Filters */}
         <Card className="border-border">
           <CardContent className="p-4 space-y-4">
-            {/* Search */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search shops, locations..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
+            {/* Search Row */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Shop Name Search */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search shop name..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 h-11"
+                />
+              </div>
+
+              {/* Location Search Combobox */}
+              <LocationSearchCombobox
+                value={locationSearch}
+                onValueChange={setLocationSearch}
+                placeholder="Search location..."
               />
             </div>
 
-            {/* Location Filters */}
-            <div className="flex flex-col sm:flex-row gap-3">
+            {/* Popular Location Chips */}
+            <div className="flex flex-wrap gap-2">
+              <span className="text-xs text-muted-foreground mr-1 self-center">Popular:</span>
+              {POPULAR_LOCATIONS.map(location => (
+                <Badge 
+                  key={location}
+                  variant={locationSearch === location ? "default" : "outline"}
+                  className="cursor-pointer transition-colors hover:bg-accent"
+                  onClick={() => handlePopularLocationClick(location)}
+                >
+                  <MapPin className="h-3 w-3 mr-1" />
+                  {location}
+                </Badge>
+              ))}
+            </div>
+
+            {/* Three-Tier Location Filters */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Division Filter */}
               <Select value={selectedDivision} onValueChange={setSelectedDivision}>
-                <SelectTrigger className="flex-1">
+                <SelectTrigger className="h-11">
                   <Filter className="h-4 w-4 mr-2" />
                   <SelectValue placeholder="All Divisions" />
                 </SelectTrigger>
@@ -181,12 +250,13 @@ const Community = () => {
                 </SelectContent>
               </Select>
 
+              {/* District Filter */}
               <Select 
                 value={selectedDistrict} 
                 onValueChange={setSelectedDistrict}
                 disabled={selectedDivision === "all"}
               >
-                <SelectTrigger className="flex-1">
+                <SelectTrigger className="h-11">
                   <MapPin className="h-4 w-4 mr-2" />
                   <SelectValue placeholder="All Districts" />
                 </SelectTrigger>
@@ -194,6 +264,24 @@ const Community = () => {
                   <SelectItem value="all">All Districts</SelectItem>
                   {availableDistricts.map(district => (
                     <SelectItem key={district} value={district}>{district}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Thana Filter */}
+              <Select 
+                value={selectedThana} 
+                onValueChange={setSelectedThana}
+                disabled={selectedDistrict === "all"}
+              >
+                <SelectTrigger className="h-11">
+                  <MapPin className="h-4 w-4 mr-2" />
+                  <SelectValue placeholder="All Thanas" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Thanas</SelectItem>
+                  {availableThanas.map(thana => (
+                    <SelectItem key={thana} value={thana}>{thana}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -206,16 +294,14 @@ const Community = () => {
           <p className="text-muted-foreground">
             Showing <span className="font-medium text-foreground">{filteredShops.length}</span> shops
           </p>
-          {(selectedDivision !== "all" || searchQuery) && (
+          {hasActiveFilters && (
             <Button 
               variant="ghost" 
               size="sm"
-              onClick={() => {
-                setSearchQuery("");
-                setSelectedDivision("all");
-                setSelectedDistrict("all");
-              }}
+              onClick={clearAllFilters}
+              className="text-destructive hover:text-destructive"
             >
+              <X className="h-4 w-4 mr-1" />
               Clear Filters
             </Button>
           )}
