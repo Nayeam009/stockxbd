@@ -6,8 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   Plus, 
@@ -19,22 +18,23 @@ import {
   Cylinder,
   CheckCircle2,
   Building2,
-  Undo2,
   Calculator,
-  Sparkles,
   Save,
   CircleDot,
   CircleDashed,
   Flame,
   ChefHat,
-  Gauge
+  Gauge,
+  Info
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
-import { LPG_BRANDS, STOVE_BRANDS, REGULATOR_BRANDS, getLpgBrandColor } from "@/lib/brandConstants";
+import { getLpgBrandColor, validateCustomBrand } from "@/lib/brandConstants";
 import { supabase } from "@/integrations/supabase/client";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { logger } from "@/lib/logger";
+import { BrandSelect } from "@/components/shared/BrandSelect";
+import { SupplierSelect } from "@/components/shared/SupplierSelect";
 
 // Interfaces
 interface LPGBrand {
@@ -85,8 +85,6 @@ interface PurchaseItem {
   regulatorType?: string;
 }
 
-// RecentPurchase interface removed - void system disabled
-
 interface InventoryPOBDrawerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -97,21 +95,6 @@ interface InventoryPOBDrawerProps {
 // Weight options
 const WEIGHT_OPTIONS_22MM = ["5.5kg", "12kg", "12.5kg", "25kg", "35kg", "45kg"];
 const WEIGHT_OPTIONS_20MM = ["5kg", "10kg", "12kg", "15kg", "21kg", "35kg"];
-
-// Common supplier names
-const SUPPLIERS = [
-  "Bashundhara LP Gas Ltd.",
-  "Omera Petroleum Ltd.",
-  "Jamuna Oil Company",
-  "TotalEnergies Bangladesh",
-  "Petromax LPG Ltd.",
-  "Laugfs Gas Bangladesh",
-  "Beximco LPG",
-  "INDEX LPG",
-  "BM Energy",
-  "Fresh LPG",
-  "Navana LPG"
-];
 
 export const InventoryPOBDrawer = ({ 
   open, 
@@ -157,9 +140,7 @@ export const InventoryPOBDrawer = ({
   const [purchaseItems, setPurchaseItems] = useState<PurchaseItem[]>([]);
   
   // Supplier
-  const [supplierName, setSupplierName] = useState("Bashundhara LP Gas Ltd.");
-  
-  // Void system removed - purchases are permanent
+  const [supplierName, setSupplierName] = useState("");
 
   // Computed totals
   const lpgTotalQty = lpgQty22mm + lpgQty20mm;
@@ -177,8 +158,6 @@ export const InventoryPOBDrawer = ({
     if (brandsRes.data) setLpgBrands(brandsRes.data);
     if (stovesRes.data) setStoves(stovesRes.data);
     if (regulatorsRes.data) setRegulators(regulatorsRes.data);
-
-    // Void system removed - no recent transactions tracking needed
   }, []);
 
   useEffect(() => {
@@ -242,13 +221,6 @@ export const InventoryPOBDrawer = ({
   const subtotal = purchaseItems.reduce((sum, item) => sum + item.companyPrice * item.quantity, 0);
   const total = subtotal;
   const purchaseItemsCount = purchaseItems.reduce((s, i) => s + i.quantity, 0);
-
-  // Brand options
-  const lpgBrandOptions = useMemo(() => {
-    const allBrands = new Set<string>();
-    LPG_BRANDS.forEach(b => allBrands.add(b.name));
-    return Array.from(allBrands);
-  }, []);
 
   // Update product pricing
   const updateProductPricing = async (
@@ -388,6 +360,13 @@ export const InventoryPOBDrawer = ({
       return;
     }
 
+    // Validate custom brand name if needed
+    const validation = validateCustomBrand(lpgBrandName);
+    if (!validation.valid) {
+      toast({ title: validation.error, variant: "destructive" });
+      return;
+    }
+
     const companyPrice = lpgCompanyPrice;
     const brandColor = getLpgBrandColor(lpgBrandName);
     const itemsToAdd: PurchaseItem[] = [];
@@ -406,6 +385,7 @@ export const InventoryPOBDrawer = ({
       if (existingBrand) {
         brandId = existingBrand.id;
       } else {
+        // Create new brand
         const { data: newBrand, error } = await supabase
           .from('lpg_brands')
           .insert({
@@ -422,10 +402,23 @@ export const InventoryPOBDrawer = ({
           .single();
 
         if (error) {
-          toast({ title: `Error creating brand for ${valveSize}`, variant: "destructive" });
-          continue;
+          // Handle duplicate - fetch existing
+          if (error.code === '23505') {
+            const { data: existing } = await supabase
+              .from('lpg_brands')
+              .select('id')
+              .eq('name', lpgBrandName)
+              .eq('size', valveSize)
+              .eq('weight', lpgWeight)
+              .maybeSingle();
+            if (existing) brandId = existing.id;
+          } else {
+            toast({ title: `Error creating brand for ${valveSize}`, variant: "destructive" });
+            continue;
+          }
+        } else {
+          brandId = newBrand.id;
         }
-        brandId = newBrand.id;
       }
 
       await updateProductPricing('lpg', lpgBrandName, companyPrice, {
@@ -500,10 +493,22 @@ export const InventoryPOBDrawer = ({
           .single();
 
         if (error) {
-          toast({ title: `Error creating stove`, variant: "destructive" });
-          continue;
+          if (error.code === '23505') {
+            const { data: existing } = await supabase
+              .from('stoves')
+              .select('id')
+              .eq('brand', stoveBrand)
+              .eq('model', stoveModel)
+              .eq('burners', burners)
+              .maybeSingle();
+            if (existing) stoveId = existing.id;
+          } else {
+            toast({ title: `Error creating stove`, variant: "destructive" });
+            continue;
+          }
+        } else {
+          stoveId = newStove.id;
         }
-        stoveId = newStove.id;
       }
 
       await updateProductPricing('stove', `${stoveBrand} ${stoveModel}`, companyPrice, { burnerType });
@@ -567,10 +572,21 @@ export const InventoryPOBDrawer = ({
           .single();
 
         if (error) {
-          toast({ title: `Error creating regulator`, variant: "destructive" });
-          continue;
+          if (error.code === '23505') {
+            const { data: existing } = await supabase
+              .from('regulators')
+              .select('id')
+              .eq('brand', regulatorBrand)
+              .eq('type', valveType)
+              .maybeSingle();
+            if (existing) regId = existing.id;
+          } else {
+            toast({ title: `Error creating regulator`, variant: "destructive" });
+            continue;
+          }
+        } else {
+          regId = newReg.id;
         }
-        regId = newReg.id;
       }
 
       await updateProductPricing('regulator', regulatorBrand, companyPrice, { regulatorType: valveType });
@@ -643,6 +659,10 @@ export const InventoryPOBDrawer = ({
     setProcessing(true);
 
     try {
+      // Get current user for created_by tracking
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData.user?.id || null;
+
       const today = new Date();
       const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
       const { count } = await supabase
@@ -651,21 +671,24 @@ export const InventoryPOBDrawer = ({
         .gte('created_at', today.toISOString().slice(0, 10));
       const txnNumber = `POB-${dateStr}-${String((count || 0) + 1).padStart(4, '0')}`;
 
+      // Create transaction with created_by tracking
       const { data: txnData, error: txnError } = await supabase
         .from('pob_transactions')
         .insert({
           transaction_number: txnNumber,
-          supplier_name: supplierName,
+          supplier_name: supplierName || 'Unknown Supplier',
           subtotal: subtotal,
           total: total,
           payment_method: 'cash',
-          payment_status: paymentStatus
+          payment_status: paymentStatus,
+          created_by: userId
         })
         .select()
         .single();
 
       if (txnError) throw txnError;
 
+      // Create transaction items with created_by
       const items = purchaseItems.map(item => ({
         transaction_id: txnData.id,
         product_type: item.type,
@@ -676,7 +699,8 @@ export const InventoryPOBDrawer = ({
         total_price: item.companyPrice * item.quantity,
         cylinder_type: item.cylinderType || null,
         weight: item.weight || null,
-        size: item.valveSize || item.regulatorType || (item.burnerType ? `${item.burnerType === 'single' ? 'Single' : 'Double'} Burner` : null)
+        size: item.valveSize || item.regulatorType || (item.burnerType ? `${item.burnerType === 'single' ? 'Single' : 'Double'} Burner` : null),
+        created_by: userId
       }));
 
       await supabase.from('pob_transaction_items').insert(items);
@@ -712,15 +736,16 @@ export const InventoryPOBDrawer = ({
         }
       }
 
-      // Create expense entry
+      // Create expense entry with created_by
       const expenseCategory = purchaseItems.some(i => i.type === 'lpg') ? 'LPG Purchase' : 'Inventory Purchase';
       const itemNames = purchaseItems.map(i => `${i.quantity}x ${i.name}`).join(', ');
       
       await supabase.from('daily_expenses').insert({
         category: expenseCategory,
         amount: total,
-        description: `${txnNumber}: ${supplierName} - ${itemNames}`,
-        expense_date: today.toISOString().slice(0, 10)
+        description: `${txnNumber}: ${supplierName || 'Unknown Supplier'} - ${itemNames}`,
+        expense_date: today.toISOString().slice(0, 10),
+        created_by: userId
       });
 
       toast({
@@ -739,8 +764,6 @@ export const InventoryPOBDrawer = ({
       setProcessing(false);
     }
   };
-
-  // Void system removed - purchases are permanent
 
   // Valve Size Quantity Card - Compact for mobile
   const ValveSizeQuantityCard = ({ 
@@ -776,17 +799,17 @@ export const InventoryPOBDrawer = ({
           <Input
             type="number"
             inputMode="numeric"
-            value={value}
+            value={value || ""}
             onChange={(e) => onChange(Math.max(0, parseInt(e.target.value) || 0))}
             className={`w-full h-12 text-center text-xl font-extrabold border-2 ${borderColor} ${textColor}`}
             placeholder="0"
           />
           <div className="grid grid-cols-2 gap-1.5">
-            <Button type="button" variant="outline" className="h-9 font-bold text-xs" onClick={() => onChange(Math.max(0, value - 10))}>
-              -10
+            <Button type="button" variant="outline" className="h-10 font-bold text-xs" onClick={() => onChange(Math.max(0, value - 10))}>
+              <Minus className="h-3 w-3 mr-1" />10
             </Button>
-            <Button type="button" variant="outline" className="h-9 font-bold text-xs" onClick={() => onChange(value + 10)}>
-              +10
+            <Button type="button" variant="outline" className="h-10 font-bold text-xs" onClick={() => onChange(value + 10)}>
+              <Plus className="h-3 w-3 mr-1" />10
             </Button>
           </div>
         </CardContent>
@@ -829,17 +852,17 @@ export const InventoryPOBDrawer = ({
           <Input
             type="number"
             inputMode="numeric"
-            value={value}
+            value={value || ""}
             onChange={(e) => onChange(Math.max(0, parseInt(e.target.value) || 0))}
             className={`w-full h-12 text-center text-xl font-extrabold border-2 ${borderColor} ${textColor}`}
             placeholder="0"
           />
           <div className="grid grid-cols-2 gap-1.5">
-            <Button type="button" variant="outline" className="h-9 font-bold text-xs" onClick={() => onChange(Math.max(0, value - 10))}>
-              -10
+            <Button type="button" variant="outline" className="h-10 font-bold text-xs" onClick={() => onChange(Math.max(0, value - 5))}>
+              <Minus className="h-3 w-3 mr-1" />5
             </Button>
-            <Button type="button" variant="outline" className="h-9 font-bold text-xs" onClick={() => onChange(value + 10)}>
-              +10
+            <Button type="button" variant="outline" className="h-10 font-bold text-xs" onClick={() => onChange(value + 5)}>
+              <Plus className="h-3 w-3 mr-1" />5
             </Button>
           </div>
         </CardContent>
@@ -849,6 +872,8 @@ export const InventoryPOBDrawer = ({
 
   // Product form based on type
   const renderProductForm = () => {
+    const isBuyMode = pobMode === 'buy';
+
     if (productType === 'lpg') {
       return (
         <div className="space-y-3">
@@ -859,7 +884,7 @@ export const InventoryPOBDrawer = ({
               <button
                 type="button"
                 onClick={() => setLpgCylinderType("refill")}
-                className={`flex-1 h-9 px-2 rounded-full font-semibold text-xs transition-all ${
+                className={`flex-1 h-10 px-2 rounded-full font-semibold text-xs transition-all ${
                   lpgCylinderType === 'refill' 
                     ? 'bg-primary text-primary-foreground shadow-md' 
                     : 'text-muted-foreground hover:text-foreground'
@@ -870,7 +895,7 @@ export const InventoryPOBDrawer = ({
               <button
                 type="button"
                 onClick={() => setLpgCylinderType("package")}
-                className={`flex-1 h-9 px-2 rounded-full font-semibold text-xs transition-all ${
+                className={`flex-1 h-10 px-2 rounded-full font-semibold text-xs transition-all ${
                   lpgCylinderType === 'package' 
                     ? 'bg-secondary text-secondary-foreground shadow-md' 
                     : 'text-muted-foreground hover:text-foreground'
@@ -882,7 +907,7 @@ export const InventoryPOBDrawer = ({
             
             {/* Weight Dropdown */}
             <Select value={lpgWeight} onValueChange={setLpgWeight}>
-              <SelectTrigger className="h-9 w-24 text-xs"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-10 w-24 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {[...new Set([...WEIGHT_OPTIONS_22MM, ...WEIGHT_OPTIONS_20MM])].sort((a, b) => parseFloat(a) - parseFloat(b)).map(w => (
                   <SelectItem key={w} value={w}>{w}</SelectItem>
@@ -891,17 +916,16 @@ export const InventoryPOBDrawer = ({
             </Select>
           </div>
 
-          {/* Brand */}
+          {/* Brand - Using BrandSelect */}
           <div className="space-y-1.5">
             <Label className="text-xs font-medium">Brand Name</Label>
-            <Select value={lpgBrandName} onValueChange={setLpgBrandName}>
-              <SelectTrigger className="h-10"><SelectValue placeholder="Select brand..." /></SelectTrigger>
-              <SelectContent>
-                {lpgBrandOptions.map(brand => (
-                  <SelectItem key={brand} value={brand}>{brand}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <BrandSelect
+              type="lpg"
+              value={lpgBrandName}
+              onChange={(value) => setLpgBrandName(value)}
+              allowCustom={true}
+              className="h-12"
+            />
           </div>
 
           {/* Quantity by Valve Size */}
@@ -914,6 +938,12 @@ export const InventoryPOBDrawer = ({
               <ValveSizeQuantityCard value={lpgQty22mm} onChange={setLpgQty22mm} valveSize="22mm" stockLabel={`${valveSizeStats["22mm"].refill}R + ${valveSizeStats["22mm"].package}P`} />
               <ValveSizeQuantityCard value={lpgQty20mm} onChange={setLpgQty20mm} valveSize="20mm" stockLabel={`${valveSizeStats["20mm"].refill}R + ${valveSizeStats["20mm"].package}P`} />
             </div>
+            {/* Legend */}
+            <div className="flex items-center justify-center gap-3 text-[10px] text-muted-foreground bg-muted/50 rounded-md py-1.5 px-2">
+              <Info className="h-3 w-3" />
+              <span><strong>R</strong> = Refill Cylinder</span>
+              <span><strong>P</strong> = Package Cylinder</span>
+            </div>
             {lpgTotalQty > 0 && (
               <div className="flex items-center justify-between p-2 bg-primary/10 rounded-lg border border-primary/20">
                 <span className="font-medium text-sm">Total: {lpgTotalQty} cylinders</span>
@@ -925,27 +955,43 @@ export const InventoryPOBDrawer = ({
             )}
           </div>
 
-          <Separator />
+          {/* Total D.O. - Only in Buy Mode */}
+          {isBuyMode && (
+            <>
+              <Separator />
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium">Total D.O. Amount ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
+                <Input 
+                  type="number" 
+                  inputMode="numeric" 
+                  placeholder="Enter total amount..." 
+                  value={lpgTotalDO || ""} 
+                  onChange={(e) => setLpgTotalDO(parseInt(e.target.value) || 0)} 
+                  className="h-12 text-lg font-semibold" 
+                />
+              </div>
 
-          {/* Total D.O. */}
-          <div className="space-y-1.5">
-            <Label className="text-xs font-medium">Total D.O. Amount ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
-            <Input type="number" inputMode="numeric" placeholder="Enter total amount..." value={lpgTotalDO || ""} onChange={(e) => setLpgTotalDO(parseInt(e.target.value) || 0)} className="h-12 text-lg font-semibold" />
-          </div>
+              {/* Unit Price */}
+              <div className="flex items-center justify-between p-3 bg-primary/10 rounded-xl border border-primary/20">
+                <div className="flex items-center gap-2">
+                  <Calculator className="h-4 w-4 text-primary" />
+                  <span className="font-medium text-sm">Unit Price</span>
+                </div>
+                <span className="text-xl font-extrabold text-primary">{BANGLADESHI_CURRENCY_SYMBOL}{lpgCompanyPrice.toLocaleString()}</span>
+              </div>
 
-          {/* Unit Price */}
-          <div className="flex items-center justify-between p-3 bg-primary/10 rounded-xl border border-primary/20">
-            <div className="flex items-center gap-2">
-              <Calculator className="h-4 w-4 text-primary" />
-              <span className="font-medium text-sm">Unit Price</span>
-            </div>
-            <span className="text-xl font-extrabold text-primary">{BANGLADESHI_CURRENCY_SYMBOL}{lpgCompanyPrice.toLocaleString()}</span>
-          </div>
-
-          {/* Add to Cart */}
-          <Button type="button" size="lg" className="w-full h-12 font-semibold" onClick={addLPGToCart} disabled={!lpgBrandName || lpgTotalQty <= 0 || lpgTotalDO <= 0}>
-            <Plus className="h-5 w-5 mr-2" />Add to Cart
-          </Button>
+              {/* Add to Cart */}
+              <Button 
+                type="button" 
+                size="lg" 
+                className="w-full h-12 font-semibold" 
+                onClick={addLPGToCart} 
+                disabled={!lpgBrandName || lpgTotalQty <= 0 || lpgTotalDO <= 0}
+              >
+                <Plus className="h-5 w-5 mr-2" />Add to Cart
+              </Button>
+            </>
+          )}
         </div>
       );
     }
@@ -953,23 +999,27 @@ export const InventoryPOBDrawer = ({
     if (productType === 'stove') {
       return (
         <div className="space-y-4">
-          {/* Brand */}
+          {/* Brand - Using BrandSelect */}
           <div className="space-y-2">
             <Label className="text-sm font-medium">Brand Name</Label>
-            <Select value={stoveBrand} onValueChange={setStoveBrand}>
-              <SelectTrigger className="h-12"><SelectValue placeholder="Select brand..." /></SelectTrigger>
-              <SelectContent>
-                {STOVE_BRANDS.map(brand => (
-                  <SelectItem key={brand.name} value={brand.name}>{brand.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <BrandSelect
+              type="stove"
+              value={stoveBrand}
+              onChange={(value) => setStoveBrand(value)}
+              allowCustom={true}
+              className="h-12"
+            />
           </div>
 
           {/* Model */}
           <div className="space-y-2">
             <Label className="text-sm font-medium">Model Number</Label>
-            <Input value={stoveModel} onChange={(e) => setStoveModel(e.target.value)} placeholder="e.g., GS-102" className="h-12" />
+            <Input 
+              placeholder="e.g., GS-102, RFL-200..." 
+              value={stoveModel} 
+              onChange={(e) => setStoveModel(e.target.value)} 
+              className="h-12" 
+            />
           </div>
 
           {/* Quantity by Burner Type */}
@@ -979,8 +1029,8 @@ export const InventoryPOBDrawer = ({
               <Label className="text-base font-bold">Quantity (By Burner Type)</Label>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <BurnerTypeQuantityCard value={stoveQtySingle} onChange={setStoveQtySingle} burnerType="single" stockLabel={`${stoveBurnerStats.single}`} />
-              <BurnerTypeQuantityCard value={stoveQtyDouble} onChange={setStoveQtyDouble} burnerType="double" stockLabel={`${stoveBurnerStats.double}`} />
+              <BurnerTypeQuantityCard value={stoveQtySingle} onChange={setStoveQtySingle} burnerType="single" stockLabel={`${stoveBurnerStats.single} pcs`} />
+              <BurnerTypeQuantityCard value={stoveQtyDouble} onChange={setStoveQtyDouble} burnerType="double" stockLabel={`${stoveBurnerStats.double} pcs`} />
             </div>
             {stoveTotalQty > 0 && (
               <div className="flex items-center justify-between p-3 bg-warning/10 rounded-lg border border-warning/20">
@@ -989,27 +1039,43 @@ export const InventoryPOBDrawer = ({
             )}
           </div>
 
-          <Separator />
+          {/* Total Amount - Only in Buy Mode */}
+          {isBuyMode && (
+            <>
+              <Separator />
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Total D.O. Amount ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
+                <Input 
+                  type="number" 
+                  inputMode="numeric" 
+                  placeholder="Enter total amount..." 
+                  value={stoveTotalAmount || ""} 
+                  onChange={(e) => setStoveTotalAmount(parseInt(e.target.value) || 0)} 
+                  className="h-14 text-lg font-semibold" 
+                />
+              </div>
 
-          {/* Total Amount */}
-          <div className="space-y-2">
-            <Label className="text-sm font-medium">Total D.O. Amount ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
-            <Input type="number" inputMode="numeric" placeholder="Enter total amount..." value={stoveTotalAmount || ""} onChange={(e) => setStoveTotalAmount(parseInt(e.target.value) || 0)} className="h-14 text-lg font-semibold" />
-          </div>
+              {/* Unit Price */}
+              <div className="flex items-center justify-between p-4 bg-warning/10 rounded-xl border border-warning/20">
+                <div className="flex items-center gap-2">
+                  <Calculator className="h-5 w-5 text-warning" />
+                  <span className="font-medium">Unit Price</span>
+                </div>
+                <span className="text-2xl font-extrabold text-warning">{BANGLADESHI_CURRENCY_SYMBOL}{stoveCompanyPrice.toLocaleString()}</span>
+              </div>
 
-          {/* Unit Price */}
-          <div className="flex items-center justify-between p-4 bg-warning/10 rounded-xl border border-warning/20">
-            <div className="flex items-center gap-2">
-              <Calculator className="h-5 w-5 text-warning" />
-              <span className="font-medium">Unit Price</span>
-            </div>
-            <span className="text-2xl font-extrabold text-warning">{BANGLADESHI_CURRENCY_SYMBOL}{stoveCompanyPrice.toLocaleString()}</span>
-          </div>
-
-          {/* Add to Cart */}
-          <Button type="button" size="lg" className="w-full h-14 font-semibold bg-gradient-to-r from-warning to-orange-500 text-white" onClick={addStoveToCart} disabled={!stoveBrand || !stoveModel || stoveTotalQty <= 0 || stoveTotalAmount <= 0}>
-            <Plus className="h-5 w-5 mr-2" />Add to Cart
-          </Button>
+              {/* Add to Cart */}
+              <Button 
+                type="button" 
+                size="lg" 
+                className="w-full h-14 font-semibold bg-gradient-to-r from-warning to-orange-500 text-white" 
+                onClick={addStoveToCart} 
+                disabled={!stoveBrand || !stoveModel || stoveTotalQty <= 0 || stoveTotalAmount <= 0}
+              >
+                <Plus className="h-5 w-5 mr-2" />Add to Cart
+              </Button>
+            </>
+          )}
         </div>
       );
     }
@@ -1017,17 +1083,16 @@ export const InventoryPOBDrawer = ({
     if (productType === 'regulator') {
       return (
         <div className="space-y-4">
-          {/* Brand */}
+          {/* Brand - Using BrandSelect */}
           <div className="space-y-2">
             <Label className="text-sm font-medium">Brand Name</Label>
-            <Select value={regulatorBrand} onValueChange={setRegulatorBrand}>
-              <SelectTrigger className="h-12"><SelectValue placeholder="Select brand..." /></SelectTrigger>
-              <SelectContent>
-                {REGULATOR_BRANDS.map(brand => (
-                  <SelectItem key={brand.name} value={brand.name}>{brand.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <BrandSelect
+              type="regulator"
+              value={regulatorBrand}
+              onChange={(value) => setRegulatorBrand(value)}
+              allowCustom={true}
+              className="h-12"
+            />
           </div>
 
           {/* Quantity by Valve Type */}
@@ -1047,27 +1112,43 @@ export const InventoryPOBDrawer = ({
             )}
           </div>
 
-          <Separator />
+          {/* Total Amount - Only in Buy Mode */}
+          {isBuyMode && (
+            <>
+              <Separator />
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Total D.O. Amount ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
+                <Input 
+                  type="number" 
+                  inputMode="numeric" 
+                  placeholder="Enter total amount..." 
+                  value={regulatorTotalAmount || ""} 
+                  onChange={(e) => setRegulatorTotalAmount(parseInt(e.target.value) || 0)} 
+                  className="h-14 text-lg font-semibold" 
+                />
+              </div>
 
-          {/* Total Amount */}
-          <div className="space-y-2">
-            <Label className="text-sm font-medium">Total D.O. Amount ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
-            <Input type="number" inputMode="numeric" placeholder="Enter total amount..." value={regulatorTotalAmount || ""} onChange={(e) => setRegulatorTotalAmount(parseInt(e.target.value) || 0)} className="h-14 text-lg font-semibold" />
-          </div>
+              {/* Unit Price */}
+              <div className="flex items-center justify-between p-4 bg-info/10 rounded-xl border border-info/20">
+                <div className="flex items-center gap-2">
+                  <Calculator className="h-5 w-5 text-info" />
+                  <span className="font-medium">Unit Price</span>
+                </div>
+                <span className="text-2xl font-extrabold text-info">{BANGLADESHI_CURRENCY_SYMBOL}{regulatorCompanyPrice.toLocaleString()}</span>
+              </div>
 
-          {/* Unit Price */}
-          <div className="flex items-center justify-between p-4 bg-info/10 rounded-xl border border-info/20">
-            <div className="flex items-center gap-2">
-              <Calculator className="h-5 w-5 text-info" />
-              <span className="font-medium">Unit Price</span>
-            </div>
-            <span className="text-2xl font-extrabold text-info">{BANGLADESHI_CURRENCY_SYMBOL}{regulatorCompanyPrice.toLocaleString()}</span>
-          </div>
-
-          {/* Add to Cart */}
-          <Button type="button" size="lg" className="w-full h-14 font-semibold bg-gradient-to-r from-info to-cyan-500 text-white" onClick={addRegulatorToCart} disabled={!regulatorBrand || regTotalQty <= 0 || regulatorTotalAmount <= 0}>
-            <Plus className="h-5 w-5 mr-2" />Add to Cart
-          </Button>
+              {/* Add to Cart */}
+              <Button 
+                type="button" 
+                size="lg" 
+                className="w-full h-14 font-semibold bg-gradient-to-r from-info to-cyan-500 text-white" 
+                onClick={addRegulatorToCart} 
+                disabled={!regulatorBrand || regTotalQty <= 0 || regulatorTotalAmount <= 0}
+              >
+                <Plus className="h-5 w-5 mr-2" />Add to Cart
+              </Button>
+            </>
+          )}
         </div>
       );
     }
@@ -1144,7 +1225,7 @@ export const InventoryPOBDrawer = ({
   // Checkout view (optimized for mobile)
   const renderCheckout = () => (
     <div className="space-y-4">
-      {/* Supplier */}
+      {/* Supplier - Using SupplierSelect */}
       <Card>
         <CardHeader className="py-3 px-4 border-b">
           <CardTitle className="flex items-center gap-2 text-base">
@@ -1152,12 +1233,13 @@ export const InventoryPOBDrawer = ({
           </CardTitle>
         </CardHeader>
         <CardContent className="p-4">
-          <Select value={supplierName} onValueChange={setSupplierName}>
-            <SelectTrigger className="h-12"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {SUPPLIERS.map(s => (<SelectItem key={s} value={s}>{s}</SelectItem>))}
-            </SelectContent>
-          </Select>
+          <SupplierSelect
+            type={productType}
+            value={supplierName}
+            onChange={setSupplierName}
+            allowCustom={true}
+            className="h-12"
+          />
         </CardContent>
       </Card>
 
@@ -1201,8 +1283,6 @@ export const InventoryPOBDrawer = ({
           </div>
         </CardContent>
       </Card>
-
-      {/* Recent Purchases section removed - void system disabled */}
     </div>
   );
 
@@ -1293,6 +1373,15 @@ export const InventoryPOBDrawer = ({
       if (productType === 'lpg') {
         if (!lpgBrandName || lpgTotalQty <= 0) {
           toast({ title: "Please select brand and enter quantity", variant: "destructive" });
+          setProcessing(false);
+          return;
+        }
+
+        // Validate brand name
+        const validation = validateCustomBrand(lpgBrandName);
+        if (!validation.valid) {
+          toast({ title: validation.error, variant: "destructive" });
+          setProcessing(false);
           return;
         }
 
@@ -1332,35 +1421,43 @@ export const InventoryPOBDrawer = ({
       } else if (productType === 'stove') {
         if (!stoveBrand || !stoveModel || stoveTotalQty <= 0) {
           toast({ title: "Please fill brand, model and quantity", variant: "destructive" });
+          setProcessing(false);
           return;
         }
 
-        const existingStove = stoves.find(s => 
-          s.brand.toLowerCase() === stoveBrand.toLowerCase() && 
-          s.model.toLowerCase() === stoveModel.toLowerCase()
-        );
+        for (const burnerType of ['single', 'double'] as const) {
+          const qty = burnerType === 'single' ? stoveQtySingle : stoveQtyDouble;
+          if (qty <= 0) continue;
 
-        if (existingStove) {
-          await supabase
-            .from('stoves')
-            .update({ quantity: existingStove.quantity + stoveTotalQty })
-            .eq('id', existingStove.id);
-        } else {
-          const burners = stoveQtySingle > 0 ? 1 : 2;
-          await supabase
-            .from('stoves')
-            .insert({
-              brand: stoveBrand,
-              model: stoveModel,
-              burners,
-              quantity: stoveTotalQty,
-              price: 0
-            });
+          const burners = burnerType === 'single' ? 1 : 2;
+          const existingStove = stoves.find(s => 
+            s.brand.toLowerCase() === stoveBrand.toLowerCase() && 
+            s.model.toLowerCase() === stoveModel.toLowerCase() &&
+            s.burners === burners
+          );
+
+          if (existingStove) {
+            await supabase
+              .from('stoves')
+              .update({ quantity: existingStove.quantity + qty })
+              .eq('id', existingStove.id);
+          } else {
+            await supabase
+              .from('stoves')
+              .insert({
+                brand: stoveBrand,
+                model: stoveModel,
+                burners,
+                quantity: qty,
+                price: 0
+              });
+          }
         }
         toast({ title: "Stock Added!", description: `${stoveTotalQty} ${stoveBrand} stoves added` });
       } else if (productType === 'regulator') {
         if (!regulatorBrand || regTotalQty <= 0) {
           toast({ title: "Please select brand and enter quantity", variant: "destructive" });
+          setProcessing(false);
           return;
         }
 
@@ -1421,169 +1518,166 @@ export const InventoryPOBDrawer = ({
     setPurchaseItems([]);
     setMobileStep('product');
     setPobMode('buy');
+    setSupplierName("");
   };
 
   return (
-    <>
-      <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent 
-          side={isMobile ? "bottom" : "right"} 
-          className={isMobile 
-            ? "h-[95vh] rounded-t-2xl flex flex-col overflow-hidden p-0" 
-            : "w-full sm:max-w-xl flex flex-col p-0"
-          }
-        >
-          {/* Compact Fixed Header */}
-          <div className="flex-shrink-0 px-4 pt-4 pb-3 border-b bg-background">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <div className={`h-9 w-9 rounded-xl flex items-center justify-center ${
-                  productType === 'lpg' ? 'bg-primary/10 text-primary' :
-                  productType === 'stove' ? 'bg-orange-500/10 text-orange-500' :
-                  'bg-violet-500/10 text-violet-500'
-                }`}>
-                  {getIcon()}
-                </div>
-                <div>
-                  <h2 className="font-bold text-base leading-tight">{getTitle()}</h2>
-                  <p className="text-[11px] text-muted-foreground">Buy from company or add existing stock</p>
-                </div>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent 
+        side={isMobile ? "bottom" : "right"} 
+        className={isMobile 
+          ? "h-[95vh] rounded-t-2xl flex flex-col overflow-hidden p-0" 
+          : "w-full sm:max-w-xl flex flex-col p-0"
+        }
+      >
+        {/* Compact Fixed Header */}
+        <div className="flex-shrink-0 px-4 pt-4 pb-3 border-b bg-background">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <div className={`h-9 w-9 rounded-xl flex items-center justify-center ${
+                productType === 'lpg' ? 'bg-primary/10 text-primary' :
+                productType === 'stove' ? 'bg-orange-500/10 text-orange-500' :
+                'bg-violet-500/10 text-violet-500'
+              }`}>
+                {getIcon()}
               </div>
-              {purchaseItemsCount > 0 && pobMode === 'buy' && (
-                <Badge className="bg-primary text-primary-foreground">{purchaseItemsCount}</Badge>
-              )}
+              <div>
+                <h2 className="font-bold text-base leading-tight">{getTitle()}</h2>
+                <p className="text-[11px] text-muted-foreground">Buy from company or add existing stock</p>
+              </div>
             </div>
-            
-            {/* Mode Toggle */}
-            <div className="flex bg-muted/50 rounded-lg p-1 mt-3">
-              <Button 
-                type="button"
-                variant={pobMode === 'buy' ? 'default' : 'ghost'} 
-                size="sm" 
-                className="flex-1 h-9 text-xs font-medium gap-1.5" 
-                onClick={() => setPobMode('buy')}
-              >
-                <ShoppingCart className="h-3.5 w-3.5" />
-                Buy from Company
-              </Button>
-              <Button 
-                type="button"
-                variant={pobMode === 'add' ? 'secondary' : 'ghost'} 
-                size="sm" 
-                className="flex-1 h-9 text-xs font-medium gap-1.5" 
-                onClick={() => setPobMode('add')}
-              >
-                <Plus className="h-3.5 w-3.5" />
-                Add Existing Stock
-              </Button>
-            </div>
+            {purchaseItemsCount > 0 && pobMode === 'buy' && (
+              <Badge className="bg-primary text-primary-foreground">{purchaseItemsCount}</Badge>
+            )}
           </div>
+          
+          {/* Mode Toggle */}
+          <div className="flex bg-muted/50 rounded-lg p-1 mt-3">
+            <Button 
+              type="button"
+              variant={pobMode === 'buy' ? 'default' : 'ghost'} 
+              size="sm" 
+              className="flex-1 h-10 text-xs font-medium gap-1.5" 
+              onClick={() => setPobMode('buy')}
+            >
+              <ShoppingCart className="h-3.5 w-3.5" />
+              Buy from Company
+            </Button>
+            <Button 
+              type="button"
+              variant={pobMode === 'add' ? 'secondary' : 'ghost'} 
+              size="sm" 
+              className="flex-1 h-10 text-xs font-medium gap-1.5" 
+              onClick={() => setPobMode('add')}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add Existing Stock
+            </Button>
+          </div>
+        </div>
 
-          {loading ? (
-            <div className="flex items-center justify-center h-64 flex-shrink-0">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        {loading ? (
+          <div className="flex items-center justify-center h-64 flex-shrink-0">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : pobMode === 'add' ? (
+          /* Quick Add Mode - Simplified Form */
+          <ScrollArea className="flex-1 min-h-0">
+            <div className="p-4 pb-8 space-y-4">
+              {renderProductForm()}
+              
+              {/* Quick Add Button */}
+              <Button 
+                type="button" 
+                size="lg" 
+                className="w-full h-14 font-bold bg-gradient-to-r from-success to-emerald-600 hover:from-success/90 hover:to-emerald-600/90" 
+                onClick={quickAddToStock}
+                disabled={processing || (productType === 'lpg' && (!lpgBrandName || lpgTotalQty <= 0)) || 
+                  (productType === 'stove' && (!stoveBrand || !stoveModel || stoveTotalQty <= 0)) ||
+                  (productType === 'regulator' && (!regulatorBrand || regTotalQty <= 0))}
+              >
+                {processing ? (
+                  <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                ) : (
+                  <Plus className="h-5 w-5 mr-2" />
+                )}
+                Add to Inventory
+              </Button>
             </div>
-          ) : pobMode === 'add' ? (
-            /* Quick Add Mode - Simplified Form */
-            <ScrollArea className="flex-1 min-h-0">
-              <div className="p-4 pb-8 space-y-4">
-                {renderProductForm()}
-                
-                {/* Quick Add Button */}
+          </ScrollArea>
+        ) : (
+          /* Buy Mode - Full Cart/Checkout Flow */
+          <>
+            {/* Mobile Step Navigation - Compact */}
+            {isMobile && (
+              <div className="flex items-center bg-muted/30 p-1 mx-3 mt-2 rounded-lg flex-shrink-0">
                 <Button 
-                  type="button" 
-                  size="lg" 
-                  className="w-full h-14 font-bold bg-gradient-to-r from-success to-emerald-600 hover:from-success/90 hover:to-emerald-600/90" 
-                  onClick={quickAddToStock}
-                  disabled={processing || (productType === 'lpg' && (!lpgBrandName || lpgTotalQty <= 0)) || 
-                    (productType === 'stove' && (!stoveBrand || !stoveModel || stoveTotalQty <= 0)) ||
-                    (productType === 'regulator' && (!regulatorBrand || regTotalQty <= 0))}
+                  type="button"
+                  variant={mobileStep === 'product' ? 'default' : 'ghost'} 
+                  size="sm" 
+                  className="flex-1 h-10 text-xs font-medium" 
+                  onClick={() => setMobileStep('product')}
                 >
-                  {processing ? (
-                    <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                  ) : (
-                    <Plus className="h-5 w-5 mr-2" />
+                  1. Product
+                </Button>
+                <Button 
+                  type="button"
+                  variant={mobileStep === 'cart' ? 'default' : 'ghost'} 
+                  size="sm" 
+                  className="flex-1 h-10 relative text-xs font-medium" 
+                  onClick={() => setMobileStep('cart')}
+                >
+                  2. Cart
+                  {purchaseItemsCount > 0 && (
+                    <Badge className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center text-[9px]">{purchaseItemsCount}</Badge>
                   )}
-                  Add to Inventory
+                </Button>
+                <Button 
+                  type="button"
+                  variant={mobileStep === 'checkout' ? 'default' : 'ghost'} 
+                  size="sm" 
+                  className="flex-1 h-10 text-xs font-medium" 
+                  onClick={() => setMobileStep('checkout')}
+                >
+                  3. Pay
                 </Button>
               </div>
-            </ScrollArea>
-          ) : (
-            /* Buy Mode - Full Cart/Checkout Flow */
-            <>
-              {/* Mobile Step Navigation - Compact */}
-              {isMobile && (
-                <div className="flex items-center bg-muted/30 p-1 mx-3 mt-2 rounded-lg flex-shrink-0">
-                  <Button 
-                    type="button"
-                    variant={mobileStep === 'product' ? 'default' : 'ghost'} 
-                    size="sm" 
-                    className="flex-1 h-9 text-xs font-medium" 
-                    onClick={() => setMobileStep('product')}
-                  >
-                    1. Product
-                  </Button>
-                  <Button 
-                    type="button"
-                    variant={mobileStep === 'cart' ? 'default' : 'ghost'} 
-                    size="sm" 
-                    className="flex-1 h-9 relative text-xs font-medium" 
-                    onClick={() => setMobileStep('cart')}
-                  >
-                    2. Cart
-                    {purchaseItemsCount > 0 && (
-                      <Badge className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center text-[9px]">{purchaseItemsCount}</Badge>
-                    )}
-                  </Button>
-                  <Button 
-                    type="button"
-                    variant={mobileStep === 'checkout' ? 'default' : 'ghost'} 
-                    size="sm" 
-                    className="flex-1 h-9 text-xs font-medium" 
-                    onClick={() => setMobileStep('checkout')}
-                  >
-                    3. Pay
-                  </Button>
-                </div>
-              )}
+            )}
 
-              {/* Mobile: Scrollable Content Area */}
-              {isMobile ? (
-                <ScrollArea className="flex-1 min-h-0">
-                  <div className="px-4 pb-8 pt-3">
-                    {mobileStep === 'product' && (
-                      <div className="space-y-4">
-                        {renderProductForm()}
-                      </div>
-                    )}
-                    {mobileStep === 'cart' && renderCartMobile()}
-                    {mobileStep === 'checkout' && (
-                      <div>
-                        {renderCheckout()}
-                      </div>
-                    )}
-                  </div>
-                </ScrollArea>
-              ) : (
-                /* Desktop: Side-by-side scrollable */
-                <div className="flex flex-col flex-1 min-h-0">
-                  <ScrollArea className="flex-1">
-                    <div className="p-4 space-y-4">
+            {/* Mobile: Scrollable Content Area */}
+            {isMobile ? (
+              <ScrollArea className="flex-1 min-h-0">
+                <div className="px-4 pb-8 pt-3">
+                  {mobileStep === 'product' && (
+                    <div className="space-y-4">
                       {renderProductForm()}
-                      <Separator className="my-4" />
-                      {renderCart()}
-                      <Separator className="my-4" />
+                    </div>
+                  )}
+                  {mobileStep === 'cart' && renderCartMobile()}
+                  {mobileStep === 'checkout' && (
+                    <div>
                       {renderCheckout()}
                     </div>
-                  </ScrollArea>
+                  )}
                 </div>
-              )}
-            </>
-          )}
-        </SheetContent>
-      </Sheet>
-
-      {/* Void Dialog removed - void system disabled */}
-    </>
+              </ScrollArea>
+            ) : (
+              /* Desktop: Side-by-side scrollable */
+              <div className="flex flex-col flex-1 min-h-0">
+                <ScrollArea className="flex-1">
+                  <div className="p-4 space-y-4">
+                    {renderProductForm()}
+                    <Separator className="my-4" />
+                    {renderCart()}
+                    <Separator className="my-4" />
+                    {renderCheckout()}
+                  </div>
+                </ScrollArea>
+              </div>
+            )}
+          </>
+        )}
+      </SheetContent>
+    </Sheet>
   );
 };
