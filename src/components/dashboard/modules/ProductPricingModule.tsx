@@ -136,15 +136,65 @@ export const ProductPricingModule = () => {
     return () => channels.forEach(ch => supabase.removeChannel(ch));
   }, [fetchData]);
 
-  // Filter brands by size and weight for LPG with useMemo
+  // Normalize brand name for grouping similar names (e.g., "Bashundhara" and "Basundhora")
+  const normalizeBrandName = useCallback((name: string): string => {
+    return name
+      .toLowerCase()
+      .replace(/[\s-_]+/g, '') // Remove spaces, hyphens, underscores
+      .replace(/lp\s*gas/gi, '') // Remove "LP Gas" suffix
+      .replace(/h$/i, '') // "basundhora" vs "bashundhara" -> both normalize
+      .replace(/o/g, 'u') // "basundhora" -> "basundhura"
+      .trim();
+  }, []);
+
+  // Group brands by normalized name - merge duplicates into one entry
+  interface GroupedBrand {
+    name: string; // Display name (first occurrence)
+    color: string;
+    weight: string;
+    brandIds: string[]; // All brand IDs with this normalized name
+  }
+
+  // Filter and group brands by size and weight for LPG with useMemo
   const getFilteredBrands = useMemo(() => {
-    return lpgBrands.filter(brand => 
+    const filtered = lpgBrands.filter(brand => 
       brand.size === sizeTab && 
       brand.weight === selectedWeight
     );
-  }, [lpgBrands, sizeTab, selectedWeight]);
+    
+    // Group by normalized name
+    const groupMap = new Map<string, GroupedBrand>();
+    
+    filtered.forEach(brand => {
+      const normalizedName = normalizeBrandName(brand.name);
+      
+      if (groupMap.has(normalizedName)) {
+        // Add this brand ID to existing group
+        groupMap.get(normalizedName)!.brandIds.push(brand.id);
+      } else {
+        // Create new group with this brand as the primary
+        groupMap.set(normalizedName, {
+          name: brand.name.charAt(0).toUpperCase() + brand.name.slice(1), // Capitalize first letter
+          color: brand.color,
+          weight: brand.weight || selectedWeight,
+          brandIds: [brand.id]
+        });
+      }
+    });
+    
+    return Array.from(groupMap.values());
+  }, [lpgBrands, sizeTab, selectedWeight, normalizeBrandName]);
 
-  // Get products for a specific brand and variant with useCallback
+  // Get products for a group of brands (merged by normalized name)
+  const getProductsForBrandGroup = useCallback((brandIds: string[]) => {
+    return products.filter(p => 
+      p.product_type === "lpg" && 
+      brandIds.includes(p.brand_id || '') &&
+      p.product_name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [products, searchQuery]);
+
+  // Legacy function for single brand lookup (kept for compatibility)
   const getProductsForBrand = useCallback((brandId: string) => {
     return products.filter(p => 
       p.product_type === "lpg" && 
@@ -321,9 +371,9 @@ export const ProductPricingModule = () => {
     );
   };
 
-  // Brand Price Card Component - Unified Refill & Package display
-  const BrandPriceCard = ({ brand }: { brand: LpgBrand }) => {
-    const brandProducts = getProductsForBrand(brand.id);
+  // Brand Price Card Component - Unified Refill & Package display (grouped by normalized name)
+  const BrandPriceCard = ({ brand }: { brand: GroupedBrand }) => {
+    const brandProducts = getProductsForBrandGroup(brand.brandIds);
     const refillProduct = brandProducts.find(p => p.variant === "Refill");
     const packageProduct = brandProducts.find(p => p.variant === "Package");
 
@@ -342,7 +392,7 @@ export const ProductPricingModule = () => {
           <CardContent className="pt-0">
             <div className="flex items-center gap-2 text-muted-foreground text-xs sm:text-sm">
               <AlertTriangle className="h-4 w-4" />
-              <span>No pricing set for {selectedWeight}</span>
+              <span>No pricing set for {brand.weight}</span>
             </div>
           </CardContent>
         </Card>
@@ -1103,7 +1153,7 @@ export const ProductPricingModule = () => {
           {/* Brand Cards Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
             {getFilteredBrands.map(brand => (
-              <BrandPriceCard key={brand.id} brand={brand} />
+              <BrandPriceCard key={brand.name} brand={brand} />
             ))}
           </div>
 
