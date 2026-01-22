@@ -6,7 +6,7 @@ import { GlobalCommandPalette } from "@/components/dashboard/GlobalCommandPalett
 import { DashboardOverview } from "@/components/dashboard/modules/DashboardOverview";
 import { BusinessDiaryModule } from "@/components/dashboard/modules/BusinessDiaryModule";
 import { InventoryModule } from "@/components/dashboard/modules/InventoryModule";
-import { OnlineDeliveryModule } from "@/components/dashboard/modules/OnlineDeliveryModule";
+import { MarketplaceOrdersModule } from "@/components/dashboard/modules/MarketplaceOrdersModule";
 import { AnalysisSearchReportModule } from "@/components/dashboard/modules/AnalysisSearchReportModule";
 import { POSModule } from "@/components/dashboard/modules/POSModule";
 
@@ -17,11 +17,9 @@ import { StaffSalaryModule } from "@/components/dashboard/modules/StaffSalaryMod
 import { CustomerManagementModule } from "@/components/dashboard/modules/CustomerManagementModule";
 import { SettingsModule } from "@/components/dashboard/modules/SettingsModule";
 import { ProfileModule } from "@/components/dashboard/modules/ProfileModule";
-import { ExchangeModule } from "@/components/dashboard/modules/ExchangeModule";
 import { MobileBottomNav } from "@/components/dashboard/MobileBottomNav";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { getNextModule } from "@/hooks/useSwipeNavigation";
-import { supabase } from "@/integrations/supabase/client";
 import { useIsMobile } from "@/hooks/use-mobile";
 const Dashboard = () => {
   const [activeModule, setActiveModule] = useState("overview");
@@ -126,21 +124,11 @@ const Dashboard = () => {
         );
       case "pos":
         return <POSModule userRole={userRole} userName={userName} />;
+      case "inventory":
       case "pob":
         return <InventoryModule />;
-      case "orders":
-        return (
-          <OnlineDeliveryModule
-            orders={orders}
-            setOrders={setOrders}
-            drivers={drivers}
-            userRole={userRole}
-          />
-        );
-      case "inventory":
-        return <InventoryModule />;
-      case "exchange":
-        return <ExchangeModule />;
+      case "marketplace-orders":
+        return <MarketplaceOrdersModule />;
       case "profile":
         return <ProfileModule />;
       case "customers":
@@ -161,16 +149,6 @@ const Dashboard = () => {
         return <StaffSalaryModule />;
       case "vehicle-cost":
         return <VehicleCostModule />;
-      case "deliveries":
-      case "online-delivery":
-        return (
-          <OnlineDeliveryModule
-            orders={orders}
-            setOrders={setOrders}
-            drivers={drivers}
-            userRole={userRole}
-          />
-        );
       case "search":
       case "analysis-search":
         return (

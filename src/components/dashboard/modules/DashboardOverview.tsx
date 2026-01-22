@@ -137,29 +137,25 @@ export const DashboardOverview = ({
   // Quick Actions - Organized by category
   const salesActions = [
     { title: "POS", icon: Receipt, module: "pos", hotkey: "F1", description: "Point of Sale" },
-    { title: "Daily Sales", icon: BarChart3, module: "daily-sales", hotkey: "F2" },
-    { title: "Orders", icon: ClipboardList, module: "orders" },
+    { title: "Business Diary", icon: BarChart3, module: "business-diary", hotkey: "F2" },
+    { title: "Shop Orders", icon: ClipboardList, module: "marketplace-orders" },
   ];
 
   const inventoryActions = [
-    { title: "LPG Stock", icon: Package, module: "lpg-stock", hotkey: "F3" },
-    { title: "Gas Stove", icon: ChefHat, module: "stove-stock" },
-    { title: "Regulators", icon: Wrench, module: "regulators" },
+    { title: "Inventory", icon: Package, module: "inventory", hotkey: "F3" },
+    { title: "Product Pricing", icon: Tag, module: "product-pricing" },
   ];
 
   const operationActions = [
-    { title: "Exchange", icon: RefreshCw, module: "exchange" },
-    { title: "Deliveries", icon: Truck, module: "deliveries" },
+    { title: "Customers", icon: Users, module: "customers" },
     { title: "Vehicle Cost", icon: Fuel, module: "vehicle-cost" },
+    { title: "Staff Salary", icon: Banknote, module: "staff-salary" },
   ];
 
   const adminActions = [
-    { title: "Staff Salary", icon: Banknote, module: "staff-salary" },
-    { title: "Product Pricing", icon: Tag, module: "product-pricing", ownerOnly: true },
-    { title: "Analytics", icon: BarChart3, module: "analytics" },
-    { title: "Customers", icon: Users, module: "customers" },
-    { title: "Daily Expenses", icon: Wallet, module: "daily-expenses" },
-    { title: "Community", icon: MessageSquare, module: "community" },
+    { title: "LPG Marketplace", icon: MessageSquare, module: "community" },
+    { title: "Analytics", icon: BarChart3, module: "analysis-search" },
+    { title: "Settings", icon: Settings, module: "settings", ownerOnly: true },
   ];
 
   const handleQuickAction = (module: string) => {
