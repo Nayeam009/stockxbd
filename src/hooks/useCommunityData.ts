@@ -230,10 +230,10 @@ export const useCommunityData = () => {
       const deliveryFee = 50;
       const totalAmount = subtotal + deliveryFee;
 
-      // Create order
+      // Create order - using type assertion since types may not be regenerated yet
       const { data: orderData, error: orderError } = await supabase
         .from('community_orders')
-        .insert({
+        .insert([{
           shop_id: shopId,
           customer_id: user.id,
           customer_name: customerInfo.name,
@@ -249,7 +249,7 @@ export const useCommunityData = () => {
           status: 'pending',
           payment_method: 'cod',
           payment_status: 'pending'
-        })
+        }] as any)
         .select()
         .single();
 
