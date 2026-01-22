@@ -5,15 +5,68 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Shield, Truck, Loader2, Users, Crown, AlertCircle, UserPlus, LogIn, ShoppingCart } from "lucide-react";
+import { ArrowLeft, Shield, Truck, Loader2, Users, Crown, AlertCircle, UserPlus, LogIn, ShoppingCart, Package, Globe, CheckCircle2 } from "lucide-react";
 import stockXLogo from "@/assets/stock-x-logo.png";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type AuthMode = 'signin' | 'signup' | 'invite';
 type UserRole = 'owner' | 'manager' | 'driver' | 'customer';
+
+interface RoleOption {
+  id: UserRole;
+  label: string;
+  description: string;
+  icon: React.ElementType;
+  color: string;
+  bgColor: string;
+  borderColor: string;
+  features: string[];
+}
+
+const roleOptions: RoleOption[] = [
+  {
+    id: 'customer',
+    label: 'Customer',
+    description: 'Order LPG online',
+    icon: ShoppingCart,
+    color: 'text-emerald-600',
+    bgColor: 'bg-emerald-50 dark:bg-emerald-950/30',
+    borderColor: 'border-emerald-500',
+    features: ['Browse nearby LPG shops', 'Place orders online', 'Real-time delivery tracking']
+  },
+  {
+    id: 'owner',
+    label: 'Owner',
+    description: 'Full business control',
+    icon: Crown,
+    color: 'text-amber-600',
+    bgColor: 'bg-amber-50 dark:bg-amber-950/30',
+    borderColor: 'border-amber-500',
+    features: ['Complete inventory management', 'Team & staff management', 'Business analytics & reports']
+  },
+  {
+    id: 'manager',
+    label: 'Manager',
+    description: 'Inventory & sales',
+    icon: Users,
+    color: 'text-primary',
+    bgColor: 'bg-primary/5',
+    borderColor: 'border-primary',
+    features: ['Inventory management', 'Sales & POS access', 'Customer management']
+  },
+  {
+    id: 'driver',
+    label: 'Driver',
+    description: 'Delivery access',
+    icon: Truck,
+    color: 'text-slate-600',
+    bgColor: 'bg-slate-50 dark:bg-slate-950/30',
+    borderColor: 'border-slate-500',
+    features: ['Delivery tracking', 'Customer updates', 'Route management']
+  }
+];
 
 const Auth = () => {
   const [searchParams] = useSearchParams();
@@ -25,7 +78,7 @@ const Auth = () => {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [fullName, setFullName] = useState("");
-  const [selectedRole, setSelectedRole] = useState<UserRole>('owner');
+  const [selectedRole, setSelectedRole] = useState<UserRole>('customer');
   const [loading, setLoading] = useState(false);
   const [checkingSystem, setCheckingSystem] = useState(true);
   const [ownersExist, setOwnersExist] = useState(true);
@@ -75,7 +128,18 @@ const Auth = () => {
           if (inviteCode) {
             await processInviteForExistingUser(session.user.id, session.user.email || '');
           } else {
-            navigate('/dashboard');
+            // Check user role and redirect accordingly
+            const { data: roleData } = await supabase
+              .from('user_roles')
+              .select('role')
+              .eq('user_id', session.user.id)
+              .single();
+            
+            if (roleData?.role === 'customer') {
+              navigate('/community');
+            } else {
+              navigate('/dashboard');
+            }
             return;
           }
         }
@@ -223,11 +287,23 @@ const Auth = () => {
           title: "Welcome to the Team!", 
           description: `You've joined as ${getRoleLabel(inviteRole)}` 
         });
-      } else {
+        navigate('/dashboard');
+      } else if (data.user) {
         toast({ title: "Welcome back!", description: "Successfully signed in" });
+        
+        // Check user role and redirect accordingly
+        const { data: roleData } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', data.user.id)
+          .single();
+        
+        if (roleData?.role === 'customer') {
+          navigate('/community');
+        } else {
+          navigate('/dashboard');
+        }
       }
-      
-      navigate('/dashboard');
     } catch (error: any) {
       toast({ 
         title: "Sign In Failed", 
@@ -244,7 +320,7 @@ const Auth = () => {
     try {
       const redirectUrl = inviteCode 
         ? `${window.location.origin}/auth?invite=${inviteCode}&role=${inviteRoleParam || inviteRole}`
-        : `${window.location.origin}/dashboard`;
+        : `${window.location.origin}/auth`;
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -294,497 +370,440 @@ const Auth = () => {
   };
 
   const isSignUpMode = authMode === 'signup' || authMode === 'invite';
+  const selectedRoleData = roleOptions.find(r => r.id === selectedRole);
 
   if (checkingSystem) {
     return (
-      <div className="min-h-screen bg-gradient-surface flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-hero flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-          <p className="mt-2 text-muted-foreground">Loading...</p>
+          <Loader2 className="h-8 w-8 animate-spin mx-auto text-white" />
+          <p className="mt-2 text-white/80">Loading...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-surface flex items-center justify-center">
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <Link to="/" className="flex items-center space-x-2 text-muted-foreground hover:text-primary transition-colors">
-            <ArrowLeft className="h-4 w-4" />
-            <span>Back to Home</span>
-          </Link>
-          <div className="flex items-center space-x-3">
-            <img src={stockXLogo} alt="Stock-X Logo" className="h-8 w-8" />
-            <span className="text-xl font-bold text-primary">Stock-X</span>
+    <div className="min-h-screen flex flex-col lg:flex-row">
+      {/* Left Side - Hero Branding (Hidden on Mobile) */}
+      <div className="hidden lg:flex lg:w-1/2 bg-gradient-hero flex-col justify-center p-12 relative overflow-hidden">
+        {/* Background Pattern */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute top-20 left-10 w-32 h-32 border-2 border-white rounded-full" />
+          <div className="absolute bottom-40 right-20 w-48 h-48 border-2 border-white rounded-full" />
+          <div className="absolute top-1/2 left-1/3 w-24 h-24 border-2 border-white rounded-full" />
+        </div>
+        
+        <div className="relative z-10">
+          <div className="flex items-center gap-3 mb-8">
+            <img src={stockXLogo} alt="Stock-X" className="h-14 w-14" />
+            <span className="text-3xl font-bold text-white">Stock-X</span>
+          </div>
+          
+          <h1 className="text-4xl xl:text-5xl font-bold text-white mb-4 leading-tight">
+            L.P.G Inventory &
+            <br />
+            <span className="text-secondary">Online Delivery Platform</span>
+          </h1>
+          
+          <p className="text-white/80 text-lg mb-10 max-w-md">
+            Complete business management for LPG distributors with real-time tracking and analytics.
+          </p>
+          
+          {/* Feature Highlights */}
+          <div className="space-y-4 mb-10">
+            <div className="flex items-center gap-3 text-white/90">
+              <div className="h-10 w-10 rounded-lg bg-white/10 flex items-center justify-center">
+                <Package className="h-5 w-5" />
+              </div>
+              <span>Real-time Inventory Management</span>
+            </div>
+            <div className="flex items-center gap-3 text-white/90">
+              <div className="h-10 w-10 rounded-lg bg-white/10 flex items-center justify-center">
+                <Globe className="h-5 w-5" />
+              </div>
+              <span>Online Marketplace & Delivery</span>
+            </div>
+            <div className="flex items-center gap-3 text-white/90">
+              <div className="h-10 w-10 rounded-lg bg-white/10 flex items-center justify-center">
+                <Shield className="h-5 w-5" />
+              </div>
+              <span>Secure Role-Based Access</span>
+            </div>
+          </div>
+          
+          {/* Trust Indicators */}
+          <div className="flex gap-8 text-white/90">
+            <div>
+              <span className="text-3xl font-bold block">500+</span>
+              <span className="text-sm text-white/70">Businesses</span>
+            </div>
+            <div>
+              <span className="text-3xl font-bold block">50K+</span>
+              <span className="text-sm text-white/70">Deliveries</span>
+            </div>
+            <div>
+              <span className="text-3xl font-bold block">99.9%</span>
+              <span className="text-sm text-white/70">Uptime</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Right Side - Auth Form */}
+      <div className="flex-1 flex flex-col">
+        {/* Mobile Header */}
+        <div className="lg:hidden bg-gradient-hero p-6">
+          <div className="flex items-center justify-between">
+            <Link to="/" className="flex items-center gap-2 text-white/80 hover:text-white transition-colors">
+              <ArrowLeft className="h-5 w-5" />
+              <span>Back</span>
+            </Link>
+            <div className="flex items-center gap-2">
+              <img src={stockXLogo} alt="Stock-X" className="h-10 w-10" />
+              <span className="text-xl font-bold text-white">Stock-X</span>
+            </div>
           </div>
         </div>
 
-        <div className="max-w-4xl mx-auto">
-          {/* Title Section */}
-          <div className="text-center space-y-6 mb-12">
-            <div className="space-y-2">
+        {/* Desktop Back Button */}
+        <div className="hidden lg:block p-6">
+          <Link to="/" className="inline-flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors">
+            <ArrowLeft className="h-4 w-4" />
+            <span>Back to Home</span>
+          </Link>
+        </div>
+
+        {/* Auth Form Container */}
+        <div className="flex-1 flex items-center justify-center p-4 sm:p-8">
+          <Card className="w-full max-w-md border-0 shadow-xl">
+            <CardHeader className="text-center pb-4">
               {authMode === 'invite' && inviteValid ? (
                 <>
-                  <Badge variant="secondary" className="px-4 py-2 bg-primary/10 text-primary">
+                  <Badge variant="secondary" className="w-fit mx-auto mb-2 px-4 py-2 bg-primary/10 text-primary">
                     <UserPlus className="h-3 w-3 mr-1" />
                     Team Invitation
                   </Badge>
-                  <h1 className="text-3xl font-bold text-primary">Join the Team</h1>
-                  <p className="text-muted-foreground">
+                  <CardTitle className="text-2xl">Join the Team</CardTitle>
+                  <CardDescription>
                     You've been invited to join as {getRoleLabel(inviteRole)}
-                  </p>
+                  </CardDescription>
                 </>
               ) : !ownersExist ? (
                 <>
-                  <Badge variant="secondary" className="px-4 py-2 bg-amber-500/10 text-amber-600">
+                  <Badge variant="secondary" className="w-fit mx-auto mb-2 px-4 py-2 bg-amber-500/10 text-amber-600">
                     <Crown className="h-3 w-3 mr-1" />
                     First Time Setup
                   </Badge>
-                  <h1 className="text-3xl font-bold text-primary">Create Your Account</h1>
-                  <p className="text-muted-foreground">
-                    Set up your business by creating the first owner account
-                  </p>
+                  <CardTitle className="text-2xl">Create Your Account</CardTitle>
+                  <CardDescription>
+                    Set up the first owner account for your business
+                  </CardDescription>
                 </>
               ) : authMode === 'signup' ? (
                 <>
-                  <Badge variant="secondary" className="px-4 py-2 bg-primary/10 text-primary">
-                    <UserPlus className="h-3 w-3 mr-1" />
-                    New Account
-                  </Badge>
-                  <h1 className="text-3xl font-bold text-primary">Sign Up</h1>
-                  <p className="text-muted-foreground">
-                    Create your account to start managing your LPG business
-                  </p>
+                  <CardTitle className="text-2xl">Create Account</CardTitle>
+                  <CardDescription>
+                    Select your role and sign up to get started
+                  </CardDescription>
                 </>
               ) : (
                 <>
-                  <Badge variant="secondary" className="px-4 py-2">
-                    <LogIn className="h-3 w-3 mr-1" />
-                    Welcome Back
-                  </Badge>
-                  <h1 className="text-3xl font-bold text-primary">Sign In</h1>
-                  <p className="text-muted-foreground">
-                    Enter your credentials to access your dashboard
-                  </p>
+                  <CardTitle className="text-2xl">Welcome Back</CardTitle>
+                  <CardDescription>
+                    Sign in to access your dashboard
+                  </CardDescription>
                 </>
               )}
-            </div>
-          </div>
+            </CardHeader>
+            
+            <CardContent>
+              {/* Invalid Invite Alert */}
+              {inviteCode && inviteValid === false && (
+                <Alert variant="destructive" className="mb-4">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    This invite link is invalid or expired. Please request a new one.
+                  </AlertDescription>
+                </Alert>
+              )}
 
-          <div className="grid lg:grid-cols-2 gap-8">
-            {/* Information Card */}
-            <Card className="border-0 shadow-elegant">
-              <CardHeader>
-                <CardTitle className="text-primary">
-                  {authMode === 'invite' 
-                    ? 'Your Role' 
-                    : isSignUpMode 
-                      ? 'What You Get'
-                      : 'Access Your Business'
-                  }
-                </CardTitle>
-                <CardDescription>
-                  {authMode === 'invite' 
-                    ? `You'll be joining as ${getRoleLabel(inviteRole)}`
-                    : isSignUpMode
-                      ? 'Full access to all Stock-X features'
-                      : 'Sign in to manage your inventory and sales'
-                  }
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Invite Role Display */}
-                {authMode === 'invite' && inviteValid && (
-                  <div className="p-4 border rounded-lg bg-primary/5 border-primary/20">
-                    <div className="flex items-start space-x-3">
-                      {(() => {
-                        const RoleIcon = getRoleIcon(inviteRole);
-                        return <RoleIcon className="h-6 w-6 text-primary mt-1" />;
-                      })()}
-                      <div className="flex-1 space-y-2">
-                        <h3 className="font-semibold text-primary">{getRoleLabel(inviteRole)} Role</h3>
-                        <p className="text-sm text-muted-foreground">
-                          {inviteRole === 'manager' 
-                            ? 'Full access to inventory, sales, and team management'
-                            : 'Access to deliveries, customer updates, and sales recording'
-                          }
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* First Owner Setup */}
-                {!ownersExist && authMode === 'signup' && (
-                  <div className="p-4 border rounded-lg bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800">
-                    <div className="flex items-start space-x-3">
-                      <Crown className="h-6 w-6 text-amber-600 mt-1" />
-                      <div className="flex-1 space-y-2">
-                        <h3 className="font-semibold text-amber-800 dark:text-amber-200">Owner Access</h3>
-                        <p className="text-sm text-amber-700 dark:text-amber-300">
-                          Full control over business settings, team management, and all features
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* New Shop Owner Signup */}
-                {authMode === 'signup' && ownersExist && !inviteCode && (
-                  <div className="p-4 border rounded-lg bg-primary/5 border-primary/20">
-                    <div className="flex items-start space-x-3">
-                      <Crown className="h-6 w-6 text-primary mt-1" />
-                      <div className="flex-1 space-y-2">
-                        <h3 className="font-semibold text-primary">Shop Owner Account</h3>
-                        <p className="text-sm text-muted-foreground">
-                          Create your own independent shop with full owner access to all features
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Invalid Invite Alert */}
-                {inviteCode && !inviteValid && (
-                  <Alert variant="destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>
-                      This invite link is invalid or has expired. Please request a new invite from your team owner.
-                    </AlertDescription>
-                  </Alert>
-                )}
-
-                {/* Sign In Info */}
-                {authMode === 'signin' && !inviteCode && (
-                  <div className="space-y-4">
-                    <div className="space-y-3 p-4 border rounded-lg border-border bg-muted/30">
-                      <div className="flex items-center space-x-2">
-                        <Shield className="h-5 w-5 text-primary" />
-                        <h4 className="font-medium text-foreground">Secure Access</h4>
-                      </div>
+              {/* Invite Role Display */}
+              {authMode === 'invite' && inviteValid && (
+                <div className="p-4 mb-4 rounded-xl border-2 border-primary/20 bg-primary/5">
+                  <div className="flex items-center gap-3">
+                    {(() => {
+                      const RoleIcon = getRoleIcon(inviteRole);
+                      return <RoleIcon className="h-8 w-8 text-primary" />;
+                    })()}
+                    <div>
+                      <h3 className="font-semibold text-primary">{getRoleLabel(inviteRole)} Role</h3>
                       <p className="text-sm text-muted-foreground">
-                        Your data is protected with industry-standard encryption and secure authentication.
-                      </p>
-                    </div>
-
-                    <div className="space-y-3 p-4 border rounded-lg border-border bg-muted/30">
-                      <div className="flex items-center space-x-2">
-                        <Users className="h-5 w-5 text-primary" />
-                        <h4 className="font-medium text-foreground">Team Members</h4>
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        Joining as a team member? Ask your shop owner for an invite link or QR code.
+                        {inviteRole === 'manager' 
+                          ? 'Access to inventory, sales, and team coordination'
+                          : inviteRole === 'driver'
+                            ? 'Access to deliveries and customer updates'
+                            : 'Full access to all features'
+                        }
                       </p>
                     </div>
                   </div>
-                )}
+                </div>
+              )}
 
-                {/* Sign Up Features */}
-                {isSignUpMode && !inviteCode && (
-                  <div className="space-y-3">
-                    <h4 className="font-medium text-foreground">What's included:</h4>
-                    <ul className="space-y-2 text-sm text-muted-foreground">
-                      <li className="flex items-center space-x-2">
-                        <div className="w-1.5 h-1.5 bg-primary rounded-full" />
-                        <span>Inventory & Stock Management</span>
-                      </li>
-                      <li className="flex items-center space-x-2">
-                        <div className="w-1.5 h-1.5 bg-primary rounded-full" />
-                        <span>Point of Sale (POS) System</span>
-                      </li>
-                      <li className="flex items-center space-x-2">
-                        <div className="w-1.5 h-1.5 bg-primary rounded-full" />
-                        <span>Customer Management</span>
-                      </li>
-                      <li className="flex items-center space-x-2">
-                        <div className="w-1.5 h-1.5 bg-primary rounded-full" />
-                        <span>Team & Staff Management</span>
-                      </li>
-                      <li className="flex items-center space-x-2">
-                        <div className="w-1.5 h-1.5 bg-primary rounded-full" />
-                        <span>Analytics & Reports</span>
-                      </li>
-                    </ul>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Auth Form */}
-            <Card className="border-0 shadow-elegant">
-              <CardHeader>
-                <CardTitle className="text-primary">
-                  {authMode === 'signin' ? 'Sign In' : 'Sign Up'}
-                </CardTitle>
-                <CardDescription>
-                  {authMode === 'invite' 
-                    ? 'Create an account to accept the team invitation'
-                    : authMode === 'signup'
-                      ? 'Fill in your details to create your account'
-                      : 'Enter your email and password to continue'
-                  }
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  {/* Full Name - Only for Sign Up */}
-                  {isSignUpMode && (
-                    <div className="space-y-2">
-                      <Label htmlFor="fullName">Full Name (Optional)</Label>
-                      <Input 
-                        id="fullName" 
-                        type="text" 
-                        placeholder="Enter your full name"
-                        value={fullName}
-                        onChange={(e) => setFullName(e.target.value)}
-                        disabled={loading}
-                      />
-                    </div>
-                  )}
-
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email Address</Label>
-                    <Input 
-                      id="email" 
-                      type="email" 
-                      placeholder="your@email.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                      disabled={loading}
-                    />
+              {/* Visual Role Selection Cards - Only for Sign Up without invite */}
+              {authMode === 'signup' && !inviteCode && ownersExist && (
+                <div className="mb-6">
+                  <Label className="mb-3 block">Select Your Role</Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {roleOptions.map((role) => {
+                      const Icon = role.icon;
+                      const isSelected = selectedRole === role.id;
+                      return (
+                        <button
+                          key={role.id}
+                          type="button"
+                          onClick={() => setSelectedRole(role.id)}
+                          disabled={loading}
+                          className={`p-4 rounded-xl border-2 transition-all text-left ${
+                            isSelected 
+                              ? `${role.borderColor} ${role.bgColor}` 
+                              : 'border-border hover:border-muted-foreground/50'
+                          }`}
+                        >
+                          <Icon className={`h-7 w-7 mx-auto mb-2 ${role.color}`} />
+                          <span className="font-semibold text-sm block text-center">{role.label}</span>
+                          <span className="text-xs text-muted-foreground block text-center">{role.description}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                   
-                  <div className="space-y-2">
-                    <Label htmlFor="password">Password</Label>
-                    <Input 
-                      id="password" 
-                      type="password" 
-                      placeholder={isSignUpMode ? "Create a password (min 6 characters)" : "Enter your password"}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      disabled={loading}
-                    />
-                  </div>
-
-                  {/* Confirm Password - Only for Sign Up */}
-                  {isSignUpMode && (
-                    <div className="space-y-2">
-                      <Label htmlFor="confirmPassword">Confirm Password</Label>
-                      <Input 
-                        id="confirmPassword" 
-                        type="password" 
-                        placeholder="Re-enter your password"
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        required
-                        disabled={loading}
-                      />
+                  {/* Selected Role Features */}
+                  {selectedRoleData && (
+                    <div className="mt-4 p-3 rounded-lg bg-muted/50">
+                      <p className="text-xs font-medium text-muted-foreground mb-2">What you'll get:</p>
+                      <ul className="space-y-1">
+                        {selectedRoleData.features.map((feature, i) => (
+                          <li key={i} className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <CheckCircle2 className={`h-3 w-3 ${selectedRoleData.color}`} />
+                            {feature}
+                          </li>
+                        ))}
+                      </ul>
                     </div>
                   )}
+                </div>
+              )}
 
-                  {/* Role Selection - Only for Sign Up without invite */}
-                  {authMode === 'signup' && !inviteCode && (
-                    <div className="space-y-2">
-                      <Label htmlFor="role">Select Your Role</Label>
-                      <Select 
-                        value={selectedRole} 
-                        onValueChange={(value: UserRole) => setSelectedRole(value)}
-                        disabled={loading}
-                      >
-                        <SelectTrigger id="role" className="w-full">
-                          <SelectValue placeholder="Select a role" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="customer">
-                            <div className="flex items-center space-x-2">
-                              <ShoppingCart className="h-4 w-4 text-emerald-600" />
-                              <span>Customer - Order LPG online</span>
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="owner">
-                            <div className="flex items-center space-x-2">
-                              <Crown className="h-4 w-4 text-amber-600" />
-                              <span>Owner - Full business control</span>
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="manager">
-                            <div className="flex items-center space-x-2">
-                              <Users className="h-4 w-4 text-primary" />
-                              <span>Manager - Inventory & sales access</span>
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="driver">
-                            <div className="flex items-center space-x-2">
-                              <Truck className="h-4 w-4 text-muted-foreground" />
-                              <span>Driver - Delivery access</span>
-                            </div>
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <p className="text-xs text-muted-foreground">
-                        {selectedRole === 'customer' && 'Browse shops and order LPG products for home delivery'}
-                        {selectedRole === 'owner' && 'Full control over business settings, team, and all features'}
-                        {selectedRole === 'manager' && 'Access to inventory, sales, customers, and team coordination'}
-                        {selectedRole === 'driver' && 'Access to deliveries, customer updates, and sales recording'}
+              {/* First Owner Badge */}
+              {!ownersExist && authMode === 'signup' && (
+                <div className="p-4 mb-4 rounded-xl border-2 border-amber-500 bg-amber-50 dark:bg-amber-950/30">
+                  <div className="flex items-center gap-3">
+                    <Crown className="h-8 w-8 text-amber-600" />
+                    <div>
+                      <h3 className="font-semibold text-amber-800 dark:text-amber-200">Owner Account</h3>
+                      <p className="text-sm text-amber-700 dark:text-amber-300">
+                        Full control over all business features
                       </p>
                     </div>
+                  </div>
+                </div>
+              )}
+
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {/* Full Name - Only for Sign Up */}
+                {isSignUpMode && (
+                  <div className="space-y-2">
+                    <Label htmlFor="fullName">Full Name (Optional)</Label>
+                    <Input 
+                      id="fullName" 
+                      type="text" 
+                      placeholder="Enter your full name"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      disabled={loading}
+                      className="h-12"
+                    />
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email Address</Label>
+                  <Input 
+                    id="email" 
+                    type="email" 
+                    placeholder="your@email.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    disabled={loading}
+                    className="h-12"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <Input 
+                    id="password" 
+                    type="password" 
+                    placeholder={isSignUpMode ? "Create a password (min 6 characters)" : "Enter your password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    disabled={loading}
+                    className="h-12"
+                  />
+                </div>
+
+                {/* Confirm Password - Only for Sign Up */}
+                {isSignUpMode && (
+                  <div className="space-y-2">
+                    <Label htmlFor="confirmPassword">Confirm Password</Label>
+                    <Input 
+                      id="confirmPassword" 
+                      type="password" 
+                      placeholder="Re-enter your password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      required
+                      disabled={loading}
+                      className="h-12"
+                    />
+                  </div>
+                )}
+
+                <Button 
+                  type="submit" 
+                  className="w-full h-12 bg-gradient-primary hover:opacity-90 transition-opacity text-base"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      {authMode === 'signin' ? 'Signing In...' : 'Creating Account...'}
+                    </>
+                  ) : (
+                    <>
+                      {authMode === 'signin' ? (
+                        <>
+                          <LogIn className="mr-2 h-5 w-5" />
+                          Sign In
+                        </>
+                      ) : (
+                        <>
+                          <UserPlus className="mr-2 h-5 w-5" />
+                          Create Account
+                        </>
+                      )}
+                    </>
                   )}
+                </Button>
 
-                  <Button 
-                    type="submit" 
-                    className="w-full bg-gradient-primary hover:opacity-90 transition-opacity"
-                    size="lg"
-                    disabled={loading}
-                  >
-                    {loading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        {authMode === 'signin' ? 'Signing In...' : 'Creating Account...'}
-                      </>
-                    ) : (
-                      <>
-                        {authMode === 'signin' ? (
-                          <>
-                            <LogIn className="mr-2 h-4 w-4" />
-                            Sign In
-                          </>
-                        ) : (
-                          <>
-                            <UserPlus className="mr-2 h-4 w-4" />
-                            Sign Up
-                          </>
-                        )}
-                      </>
-                    )}
-                  </Button>
-
-                  {/* Divider */}
-                  <div className="relative my-4">
-                    <div className="absolute inset-0 flex items-center">
-                      <span className="w-full border-t border-border" />
-                    </div>
-                    <div className="relative flex justify-center text-xs uppercase">
-                      <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
-                    </div>
+                {/* Divider */}
+                <div className="relative my-4">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t border-border" />
                   </div>
-
-                  {/* Google OAuth */}
-                  <Button 
-                    type="button"
-                    variant="outline"
-                    className="w-full"
-                    size="lg"
-                    onClick={handleGoogleAuth}
-                    disabled={loading}
-                  >
-                    <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
-                      <path
-                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                        fill="#4285F4"
-                      />
-                      <path
-                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                        fill="#34A853"
-                      />
-                      <path
-                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                        fill="#FBBC05"
-                      />
-                      <path
-                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                        fill="#EA4335"
-                      />
-                    </svg>
-                    Continue with Google
-                  </Button>
-
-                  {/* Toggle Between Sign In and Sign Up */}
-                  <div className="pt-4 border-t border-border">
-                    {authMode === 'invite' ? (
-                      <div className="text-center space-y-2">
-                        <p className="text-sm text-muted-foreground">
-                          Already have an account?
-                        </p>
-                        <Button 
-                          variant="outline" 
-                          className="w-full"
-                          onClick={() => setAuthMode('signin')}
-                          type="button"
-                          disabled={loading}
-                        >
-                          <LogIn className="mr-2 h-4 w-4" />
-                          Sign In Instead
-                        </Button>
-                      </div>
-                    ) : authMode === 'signin' ? (
-                      <div className="text-center space-y-3">
-                        <p className="text-sm text-muted-foreground">
-                          Don't have an account yet?
-                        </p>
-                        <Button 
-                          variant="outline" 
-                          className="w-full"
-                          onClick={() => setAuthMode('signup')}
-                          type="button"
-                          disabled={loading}
-                        >
-                          <UserPlus className="mr-2 h-4 w-4" />
-                          Create New Account
-                        </Button>
-                        <p className="text-xs text-muted-foreground">
-                          Team members? Ask your owner for an invite link
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="text-center space-y-3">
-                        <p className="text-sm text-muted-foreground">
-                          Already have an account?
-                        </p>
-                        <Button 
-                          variant="outline" 
-                          className="w-full"
-                          onClick={() => setAuthMode('signin')}
-                          type="button"
-                          disabled={loading}
-                        >
-                          <LogIn className="mr-2 h-4 w-4" />
-                          Sign In Instead
-                        </Button>
-                      </div>
-                    )}
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
                   </div>
-                </form>
-              </CardContent>
-            </Card>
-          </div>
+                </div>
 
-          {/* Info Footer */}
-          <Card className="mt-8 border-0 bg-gradient-hero shadow-elegant">
-            <CardContent className="p-6">
-              <div className="text-center space-y-2">
-                <h3 className="text-lg font-semibold text-primary-foreground">
-                  {authMode === 'invite' 
-                    ? 'Joining a Team'
-                    : isSignUpMode
-                      ? 'Getting Started'
-                      : 'Need Help?'
-                  }
-                </h3>
-                <p className="text-primary-foreground/80 text-sm">
-                  {authMode === 'invite' 
-                    ? 'After joining, your team owner can manage your access level from Settings.'
-                    : isSignUpMode
-                      ? 'After signing up, you can invite team members from the Settings page.'
-                      : 'Contact your shop owner if you need an invite link or have forgotten your password.'
-                  }
-                </p>
-              </div>
+                {/* Google OAuth */}
+                <Button 
+                  type="button"
+                  variant="outline"
+                  className="w-full h-12"
+                  onClick={handleGoogleAuth}
+                  disabled={loading}
+                >
+                  <svg className="mr-2 h-5 w-5" viewBox="0 0 24 24">
+                    <path
+                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                      fill="#4285F4"
+                    />
+                    <path
+                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                      fill="#34A853"
+                    />
+                    <path
+                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                      fill="#FBBC05"
+                    />
+                    <path
+                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                      fill="#EA4335"
+                    />
+                  </svg>
+                  Continue with Google
+                </Button>
+
+                {/* Toggle Between Sign In and Sign Up */}
+                <div className="pt-4 border-t border-border">
+                  {authMode === 'invite' ? (
+                    <div className="text-center space-y-2">
+                      <p className="text-sm text-muted-foreground">
+                        Already have an account?
+                      </p>
+                      <Button 
+                        variant="outline" 
+                        className="w-full h-11"
+                        onClick={() => setAuthMode('signin')}
+                        type="button"
+                        disabled={loading}
+                      >
+                        <LogIn className="mr-2 h-4 w-4" />
+                        Sign In Instead
+                      </Button>
+                    </div>
+                  ) : authMode === 'signin' ? (
+                    <div className="text-center space-y-3">
+                      <p className="text-sm text-muted-foreground">
+                        Don't have an account yet?
+                      </p>
+                      <Button 
+                        variant="outline" 
+                        className="w-full h-11"
+                        onClick={() => setAuthMode('signup')}
+                        type="button"
+                        disabled={loading}
+                      >
+                        <UserPlus className="mr-2 h-4 w-4" />
+                        Create New Account
+                      </Button>
+                      <p className="text-xs text-muted-foreground">
+                        Team member? Ask your owner for an invite link
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="text-center space-y-3">
+                      <p className="text-sm text-muted-foreground">
+                        Already have an account?
+                      </p>
+                      <Button 
+                        variant="outline" 
+                        className="w-full h-11"
+                        onClick={() => setAuthMode('signin')}
+                        type="button"
+                        disabled={loading}
+                      >
+                        <LogIn className="mr-2 h-4 w-4" />
+                        Sign In Instead
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </form>
             </CardContent>
           </Card>
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 text-center">
+          <p className="text-xs text-muted-foreground">
+            By continuing, you agree to our Terms of Service and Privacy Policy
+          </p>
         </div>
       </div>
     </div>
