@@ -41,7 +41,9 @@ import {
   CheckCircle2,
   RotateCcw,
   UserCircle,
-  Sparkles
+  Sparkles,
+  Users,
+  AlertTriangle
 } from "lucide-react";
 import { BarcodeScanner } from "@/components/pos/BarcodeScanner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
@@ -223,6 +225,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
   const [discount, setDiscount] = useState("0");
   const [showAddCustomerDialog, setShowAddCustomerDialog] = useState(false);
   const [customerSearch, setCustomerSearch] = useState("");
+  const [showCustomerListDialog, setShowCustomerListDialog] = useState(false);
   
   // ===== PAYMENT MODAL STATE =====
   const [showPaymentDrawer, setShowPaymentDrawer] = useState(false);
@@ -419,6 +422,28 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
   const hasRefillInCart = refillCylindersCount > 0;
   // Wholesale condition: more than 1 product in cart allows "Due" payment (cylinder credit)
   const isWholesaleEligible = saleItemsCount > 1;
+
+  // ============= STOCK PREVIEW CALCULATIONS =============
+  // Calculate pending stock changes for real-time visual feedback
+  const getPendingStock = useCallback((brandId: string, cylType: 'refill' | 'package') => {
+    return saleItems
+      .filter(i => i.type === 'lpg' && i.brandId === brandId && i.cylinderType === cylType)
+      .reduce((sum, i) => sum + i.quantity, 0);
+  }, [saleItems]);
+
+  // Calculate pending return cylinders for a brand
+  const getPendingReturns = useCallback((brandId: string) => {
+    return returnItems
+      .filter(r => r.brandId === brandId && !r.isLeaked)
+      .reduce((sum, r) => sum + r.quantity, 0);
+  }, [returnItems]);
+
+  // Calculate pending problem cylinders for a brand
+  const getPendingProblem = useCallback((brandId: string) => {
+    return returnItems
+      .filter(r => r.brandId === brandId && r.isLeaked)
+      .reduce((sum, r) => sum + r.quantity, 0);
+  }, [returnItems]);
 
   const subtotal = saleItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const discountAmount = parsePositiveNumber(discount, 10000000);
@@ -1566,16 +1591,23 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                 <div className="mb-3">
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
                     {displayBrands.map(brand => {
-                      const stock = cylinderType === 'refill' ? brand.refill_cylinder : brand.package_cylinder;
+                      const baseStock = cylinderType === 'refill' ? brand.refill_cylinder : brand.package_cylinder;
+                      const pendingQty = getPendingStock(brand.id, cylinderType);
+                      const displayStock = baseStock - pendingQty;
                       const price = getLPGPrice(brand.id, weight, cylinderType, saleType);
+                      
+                      // Return mode: show empty cylinder preview
+                      const pendingReturns = getPendingReturns(brand.id);
+                      const pendingProblem = getPendingProblem(brand.id);
+                      const previewEmpty = brand.empty_cylinder + pendingReturns;
                       
                       return (
                         <button
                           key={brand.id}
                           onClick={() => isSaleMode ? addLPGToCart(brand) : addReturnCylinder(brand)}
-                          disabled={isSaleMode && stock === 0}
+                          disabled={isSaleMode && displayStock <= 0}
                           className={`p-2.5 rounded-lg text-left transition-all hover:shadow-md relative overflow-hidden ${
-                            isSaleMode && stock === 0 
+                            isSaleMode && displayStock <= 0 
                               ? 'opacity-50 cursor-not-allowed border border-muted' 
                               : isSaleMode 
                                 ? 'border border-transparent hover:border-emerald-500/50 bg-card' 
@@ -1595,12 +1627,31 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                               >
                                 <Cylinder className="h-4 w-4 text-white" />
                               </div>
-                              <Badge 
-                                variant={stock > 5 ? "secondary" : stock > 0 ? "outline" : "destructive"} 
-                                className="text-[9px] px-1.5 h-5"
-                              >
-                                {stock > 0 ? stock : 'Out'}
-                              </Badge>
+                              {isSaleMode ? (
+                                <Badge 
+                                  variant={displayStock > 5 ? "secondary" : displayStock > 0 ? "outline" : "destructive"} 
+                                  className="text-[9px] px-1.5 h-5"
+                                >
+                                  {displayStock > 0 ? (
+                                    <span className="flex items-center gap-0.5">
+                                      {displayStock}
+                                      {pendingQty > 0 && (
+                                        <span className="text-amber-600 dark:text-amber-400">(-{pendingQty})</span>
+                                      )}
+                                    </span>
+                                  ) : 'Out'}
+                                </Badge>
+                              ) : (
+                                <Badge 
+                                  variant="secondary"
+                                  className="text-[9px] px-1.5 h-5 bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                                >
+                                  Empty: {previewEmpty}
+                                  {pendingReturns > 0 && (
+                                    <span className="text-emerald-600 dark:text-emerald-400">(+{pendingReturns})</span>
+                                  )}
+                                </Badge>
+                              )}
                             </div>
                             <div className="mt-1.5">
                               <p className="font-semibold text-xs truncate">{brand.name}</p>
@@ -1609,7 +1660,12 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                             {isSaleMode ? (
                               <p className="font-bold text-sm text-emerald-600 mt-1.5">{BANGLADESHI_CURRENCY_SYMBOL}{price}</p>
                             ) : (
-                              <p className="text-[10px] text-amber-600 font-medium mt-1.5">Tap to add</p>
+                              <div className="mt-1.5">
+                                <p className="text-[10px] text-amber-600 font-medium">Tap to add return</p>
+                                {pendingProblem > 0 && (
+                                  <p className="text-[9px] text-rose-500">Leaked: +{pendingProblem}</p>
+                                )}
+                              </div>
                             )}
                           </div>
                         </button>
@@ -1754,39 +1810,79 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
         {/* ===== CUSTOMER SECTION (Always Visible Fields) ===== */}
         <Card className="border-border/50">
           <CardContent className="p-3 space-y-3">
-            {/* Row 1: Walk-in / By Phone Toggle */}
+            {/* Row 1: Customer Action Buttons */}
             <div className="flex items-center gap-2">
-              <button
+              <Button
+                variant={!isWalkin ? "default" : "outline"}
+                size="sm"
+                className="flex-1 h-11 min-w-0"
                 onClick={() => {
-                  setIsWalkin(true);
-                  setPhoneQuery("");
-                  setCustomerStatus('idle');
-                  setFoundCustomer(null);
-                  setSelectedCustomerId("walkin");
-                  setSelectedCustomer(null);
-                  setNewCustomerName("");
-                  setNewCustomerAddress("");
+                  setIsWalkin(false);
+                  // Focus the phone input
+                  setTimeout(() => {
+                    const phoneInput = document.querySelector('input[placeholder="01XXXXXXXXX"]') as HTMLInputElement;
+                    if (phoneInput) phoneInput.focus();
+                  }, 100);
                 }}
-                className={`flex items-center gap-2 h-10 px-4 rounded-lg text-sm font-medium transition-all ${
-                  isWalkin 
-                    ? 'bg-muted text-foreground border border-border' 
-                    : 'text-muted-foreground hover:bg-muted/50 border border-transparent'
-                }`}
               >
-                <User className="h-4 w-4" />
-                Walk-in
-              </button>
-              <button
-                onClick={() => setIsWalkin(false)}
-                className={`flex items-center gap-2 h-10 px-4 rounded-lg text-sm font-medium transition-all ${
-                  !isWalkin 
-                    ? 'bg-primary text-primary-foreground' 
-                    : 'text-muted-foreground hover:bg-muted/50 border border-transparent'
-                }`}
+                <Phone className="h-4 w-4 mr-1.5" />
+                <span className="hidden sm:inline">Lookup</span>
+                <span className="sm:hidden">Phone</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1 h-11 min-w-0"
+                onClick={() => setShowAddCustomerDialog(true)}
               >
-                <Phone className="h-4 w-4" />
-                By Phone
-              </button>
+                <UserPlus className="h-4 w-4 mr-1.5" />
+                <span className="hidden sm:inline">Add New</span>
+                <span className="sm:hidden">New</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1 h-11 min-w-0"
+                onClick={() => setShowCustomerListDialog(true)}
+              >
+                <Users className="h-4 w-4 mr-1.5" />
+                <span className="hidden sm:inline">Browse</span>
+                <span className="sm:hidden">List</span>
+              </Button>
+            </div>
+
+            {/* Customer Status Badge */}
+            <div className="flex items-center gap-2">
+              {isWalkin && (
+                <Badge variant="secondary" className="bg-muted text-muted-foreground">
+                  <User className="h-3 w-3 mr-1" />
+                  Walk-in Customer
+                </Badge>
+              )}
+              {customerStatus === 'searching' && (
+                <Badge variant="secondary" className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                  Searching...
+                </Badge>
+              )}
+              {customerStatus === 'found' && foundCustomer && (
+                <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                  Found: {foundCustomer.name}
+                </Badge>
+              )}
+              {customerStatus === 'new' && (
+                <Badge variant="secondary" className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                  <UserPlus className="h-3 w-3 mr-1" />
+                  New Customer
+                </Badge>
+              )}
+              {foundCustomer && (foundCustomer.total_due || 0) > 0 && (
+                <Badge variant="destructive" className="bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400">
+                  <AlertTriangle className="h-3 w-3 mr-1" />
+                  Due: {BANGLADESHI_CURRENCY_SYMBOL}{(foundCustomer.total_due || 0).toLocaleString()}
+                </Badge>
+              )}
             </div>
 
             {/* Row 2: Customer Details Form - Always Visible */}
@@ -2067,6 +2163,94 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowAddCustomerDialog(false)}>Cancel</Button>
               <Button onClick={handleAddCustomer}>Add Customer</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Customer List Dialog (Browse) */}
+        <Dialog open={showCustomerListDialog} onOpenChange={setShowCustomerListDialog}>
+          <DialogContent className="max-w-md max-h-[80vh] flex flex-col">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5 text-primary" />
+                Browse Customers
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 flex-1 overflow-hidden flex flex-col">
+              {/* Search */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={customerSearch}
+                  onChange={(e) => setCustomerSearch(e.target.value)}
+                  placeholder="Search by name or phone..."
+                  className="h-11 pl-9"
+                />
+              </div>
+              
+              {/* Customer List */}
+              <ScrollArea className="flex-1 h-[300px] pr-2">
+                <div className="space-y-2">
+                  {filteredCustomers.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Users className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                      <p className="text-sm">No customers found</p>
+                    </div>
+                  ) : (
+                    filteredCustomers.map(customer => (
+                      <button
+                        key={customer.id}
+                        onClick={() => {
+                          setIsWalkin(false);
+                          setPhoneQuery(customer.phone || "");
+                          setCustomerStatus('found');
+                          setFoundCustomer(customer);
+                          setSelectedCustomerId(customer.id);
+                          setSelectedCustomer(customer);
+                          setCustomerName(customer.name);
+                          setCustomerPhone(customer.phone || "");
+                          setCustomerAddress(customer.address || "");
+                          setShowCustomerListDialog(false);
+                          toast({ title: "Customer selected", description: customer.name });
+                        }}
+                        className="w-full p-3 rounded-lg border bg-card hover:bg-muted/50 text-left transition-all"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                            <span className="text-sm font-bold text-primary">
+                              {customer.name.charAt(0).toUpperCase()}
+                            </span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm truncate">{customer.name}</p>
+                            <p className="text-xs text-muted-foreground truncate">
+                              {customer.phone || 'No phone'} • {customer.address || 'No address'}
+                            </p>
+                          </div>
+                          {(customer.total_due || 0) > 0 && (
+                            <Badge variant="destructive" className="flex-shrink-0 text-xs">
+                              Due: {BANGLADESHI_CURRENCY_SYMBOL}{(customer.total_due || 0).toLocaleString()}
+                            </Badge>
+                          )}
+                        </div>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </ScrollArea>
+            </div>
+            <DialogFooter className="border-t pt-3">
+              <Button 
+                variant="outline" 
+                className="w-full"
+                onClick={() => {
+                  setShowCustomerListDialog(false);
+                  setShowAddCustomerDialog(true);
+                }}
+              >
+                <UserPlus className="h-4 w-4 mr-2" />
+                Add New Customer
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
