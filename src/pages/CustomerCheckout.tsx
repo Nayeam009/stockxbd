@@ -14,7 +14,10 @@ import {
   Wallet,
   CheckCircle2,
   Loader2,
-  MapPin
+  MapPin,
+  Bookmark,
+  X,
+  Sparkles
 } from "lucide-react";
 import {
   Select,
@@ -24,18 +27,29 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { CommunityHeader } from "@/components/community/CommunityHeader";
+import { CommunityBottomNav } from "@/components/community/CommunityBottomNav";
 import { CartItem, useCommunityData } from "@/hooks/useCommunityData";
+import { useCustomerData } from "@/hooks/useCustomerData";
 import { DIVISIONS, getDistricts, getThanas } from "@/lib/bangladeshConstants";
 import { toast } from "@/hooks/use-toast";
 
 const CustomerCheckout = () => {
   const navigate = useNavigate();
   const { placeOrder, currentUser, userRole } = useCommunityData();
+  const { 
+    profile: savedProfile, 
+    defaultAddress: savedAddress, 
+    hasSavedData,
+    saveCustomerData,
+    isLoaded: customerDataLoaded 
+  } = useCustomerData();
   
   const [cart, setCart] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [orderPlaced, setOrderPlaced] = useState(false);
   const [orderId, setOrderId] = useState<string | null>(null);
+  const [useSavedAddress, setUseSavedAddress] = useState(true);
+  const [isAutoFilled, setIsAutoFilled] = useState(false);
 
   // Form state
   const [name, setName] = useState("");
@@ -61,18 +75,57 @@ const CustomerCheckout = () => {
     }
   }, [navigate]);
 
+  // Auto-fill from saved customer data
+  useEffect(() => {
+    if (customerDataLoaded && hasSavedData && useSavedAddress) {
+      // Only auto-fill if fields are empty (first load)
+      if (!name && savedProfile.name) {
+        setName(savedProfile.name);
+        setIsAutoFilled(true);
+      }
+      if (!phone && savedProfile.phone) {
+        setPhone(savedProfile.phone);
+        setIsAutoFilled(true);
+      }
+      if (!division && savedAddress.division) {
+        setDivision(savedAddress.division);
+        setIsAutoFilled(true);
+      }
+      if (!district && savedAddress.district) {
+        setDistrict(savedAddress.district);
+        setIsAutoFilled(true);
+      }
+      if (!thana && savedAddress.thana) {
+        setThana(savedAddress.thana);
+        setIsAutoFilled(true);
+      }
+      if (!address && savedAddress.streetAddress) {
+        setAddress(savedAddress.streetAddress);
+        setIsAutoFilled(true);
+      }
+    }
+  }, [customerDataLoaded, hasSavedData, useSavedAddress, savedProfile, savedAddress]);
+
   // Get available districts and thanas
   const availableDistricts = division ? getDistricts(division) : [];
   const availableThanas = district ? getThanas(district) : [];
 
   // Reset dependent fields
   useEffect(() => {
-    setDistrict("");
-    setThana("");
+    if (!customerDataLoaded) return;
+    // Only reset if user manually changed division
+    if (division !== savedAddress.division) {
+      setDistrict("");
+      setThana("");
+    }
   }, [division]);
 
   useEffect(() => {
-    setThana("");
+    if (!customerDataLoaded) return;
+    // Only reset if user manually changed district
+    if (district !== savedAddress.district) {
+      setThana("");
+    }
   }, [district]);
 
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
@@ -80,6 +133,17 @@ const CustomerCheckout = () => {
   const total = subtotal + deliveryFee;
 
   const shopId = cart.length > 0 ? cart[0].shop_id : null;
+
+  const handleClearAutoFill = () => {
+    setUseSavedAddress(false);
+    setIsAutoFilled(false);
+    setName("");
+    setPhone("");
+    setAddress("");
+    setDivision("");
+    setDistrict("");
+    setThana("");
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,6 +173,12 @@ const CustomerCheckout = () => {
     setLoading(false);
 
     if (result.success) {
+      // Save customer data for next time
+      saveCustomerData({
+        profile: { name, phone, email: savedProfile.email || currentUser?.email || '' },
+        defaultAddress: { division, district, thana, streetAddress: address }
+      }, true);
+
       setOrderPlaced(true);
       setOrderId(result.orderId || null);
       // Clear cart
@@ -129,10 +199,10 @@ const CustomerCheckout = () => {
       <div className="min-h-screen bg-background">
         <CommunityHeader userRole={userRole} userName={currentUser?.email} />
         
-        <main className="container mx-auto px-4 py-12 max-w-lg text-center">
-          <Card className="border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-900/20">
-            <CardContent className="p-8 space-y-6">
-              <div className="w-20 h-20 mx-auto rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center">
+        <main className="container mx-auto px-4 py-8 sm:py-12 max-w-lg text-center">
+          <Card className="border-emerald-200 dark:border-emerald-800 bg-gradient-to-br from-emerald-50 to-emerald-100/50 dark:from-emerald-900/20 dark:to-emerald-900/10">
+            <CardContent className="p-6 sm:p-8 space-y-6">
+              <div className="w-20 h-20 mx-auto rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center animate-in zoom-in duration-300">
                 <CheckCircle2 className="h-10 w-10 text-emerald-600" />
               </div>
               
@@ -144,21 +214,22 @@ const CustomerCheckout = () => {
               </div>
 
               {orderId && (
-                <p className="font-mono text-sm text-muted-foreground">
-                  Order reference will be visible in your orders
-                </p>
+                <div className="p-3 rounded-lg bg-background/80 border">
+                  <p className="text-xs text-muted-foreground mb-1">Order Reference</p>
+                  <p className="font-mono font-semibold">{orderId.slice(0, 8).toUpperCase()}</p>
+                </div>
               )}
 
               <div className="space-y-3 pt-4">
                 <Button 
-                  className="w-full"
+                  className="w-full h-12 text-base"
                   onClick={() => navigate('/community/orders')}
                 >
                   Track My Orders
                 </Button>
                 <Button 
                   variant="outline"
-                  className="w-full"
+                  className="w-full h-12 text-base"
                   onClick={() => navigate('/community')}
                 >
                   Continue Shopping
@@ -167,90 +238,134 @@ const CustomerCheckout = () => {
             </CardContent>
           </Card>
         </main>
+
+        <CommunityBottomNav userRole={userRole} />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20 sm:pb-0">
+    <div className="min-h-screen bg-background pb-24 sm:pb-0">
       <CommunityHeader 
         cartItemCount={cart.length} 
         userRole={userRole}
         userName={currentUser?.email}
       />
 
-      <main className="container mx-auto px-4 py-6 max-w-4xl">
+      <main className="container mx-auto px-4 py-4 sm:py-6 max-w-4xl">
         {/* Progress Steps */}
-        <div className="flex items-center justify-center gap-2 mb-8">
-          <Badge variant="secondary">1. Cart</Badge>
-          <div className="h-px w-8 bg-primary" />
-          <Badge className="bg-primary">2. Checkout</Badge>
-          <div className="h-px w-8 bg-muted" />
-          <Badge variant="outline">3. Done</Badge>
+        <div className="flex items-center justify-center gap-2 mb-6 sm:mb-8">
+          <div className="flex items-center gap-1 text-sm">
+            <div className="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs font-medium">
+              <CheckCircle2 className="h-4 w-4" />
+            </div>
+            <span className="text-muted-foreground hidden sm:inline">Cart</span>
+          </div>
+          <div className="h-px w-6 sm:w-10 bg-primary" />
+          <div className="flex items-center gap-1 text-sm">
+            <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">
+              2
+            </div>
+            <span className="font-medium hidden sm:inline">Checkout</span>
+          </div>
+          <div className="h-px w-6 sm:w-10 bg-muted" />
+          <div className="flex items-center gap-1 text-sm">
+            <div className="w-6 h-6 rounded-full bg-muted text-muted-foreground flex items-center justify-center text-xs font-medium">
+              3
+            </div>
+            <span className="text-muted-foreground hidden sm:inline">Done</span>
+          </div>
         </div>
 
         {/* Header */}
         <div className="flex items-center gap-4 mb-6">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/community/cart')}>
+          <Button variant="ghost" size="icon" className="h-10 w-10" onClick={() => navigate('/community/cart')}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Checkout</h1>
-            <p className="text-muted-foreground">Complete your order</p>
+            <h1 className="text-xl sm:text-2xl font-bold text-foreground">Checkout</h1>
+            <p className="text-sm text-muted-foreground">Complete your order</p>
           </div>
         </div>
 
         <form onSubmit={handleSubmit}>
-          <div className="grid lg:grid-cols-3 gap-6">
+          <div className="grid lg:grid-cols-3 gap-4 sm:gap-6">
             {/* Shipping Form */}
-            <div className="lg:col-span-2 space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <MapPin className="h-5 w-5 text-primary" />
-                    Shipping Information
-                  </CardTitle>
+            <div className="lg:col-span-2 space-y-4 sm:space-y-6">
+              <Card className="border-border overflow-hidden">
+                <CardHeader className="bg-gradient-to-r from-primary/5 to-transparent pb-4">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                      <MapPin className="h-5 w-5 text-primary" />
+                      Shipping Information
+                    </CardTitle>
+                    {isAutoFilled && (
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 gap-1">
+                          <Bookmark className="h-3 w-3" />
+                          <span className="hidden sm:inline">Saved Address</span>
+                          <span className="sm:hidden">Saved</span>
+                        </Badge>
+                        <Button 
+                          type="button"
+                          variant="ghost" 
+                          size="sm"
+                          className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
+                          onClick={handleClearAutoFill}
+                        >
+                          <X className="h-3 w-3 mr-1" />
+                          Clear
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-4 pt-4">
                   <div className="grid sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="name">Full Name *</Label>
+                      <Label htmlFor="name" className="text-sm font-medium">Full Name *</Label>
                       <Input
                         id="name"
                         placeholder="Enter your full name"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         required
+                        autoComplete="name"
+                        className="h-12 text-base"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="phone">Phone Number *</Label>
+                      <Label htmlFor="phone" className="text-sm font-medium">Phone Number *</Label>
                       <Input
                         id="phone"
                         placeholder="01XXXXXXXXX"
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
                         required
+                        autoComplete="tel"
+                        className="h-12 text-base"
                       />
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="address">Street Address *</Label>
+                    <Label htmlFor="address" className="text-sm font-medium">Street Address *</Label>
                     <Textarea
                       id="address"
                       placeholder="House no, Road no, Area"
                       value={address}
                       onChange={(e) => setAddress(e.target.value)}
                       required
+                      autoComplete="street-address"
+                      className="min-h-[80px] text-base resize-none"
                     />
                   </div>
 
-                  <div className="grid sm:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div className="space-y-2">
-                      <Label>Division *</Label>
+                      <Label className="text-sm font-medium">Division *</Label>
                       <Select value={division} onValueChange={setDivision}>
-                        <SelectTrigger>
+                        <SelectTrigger className="h-12 text-base">
                           <SelectValue placeholder="Select" />
                         </SelectTrigger>
                         <SelectContent>
@@ -261,9 +376,9 @@ const CustomerCheckout = () => {
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label>District *</Label>
+                      <Label className="text-sm font-medium">District *</Label>
                       <Select value={district} onValueChange={setDistrict} disabled={!division}>
-                        <SelectTrigger>
+                        <SelectTrigger className="h-12 text-base">
                           <SelectValue placeholder="Select" />
                         </SelectTrigger>
                         <SelectContent>
@@ -274,9 +389,9 @@ const CustomerCheckout = () => {
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label>Thana</Label>
+                      <Label className="text-sm font-medium">Thana</Label>
                       <Select value={thana} onValueChange={setThana} disabled={!district}>
-                        <SelectTrigger>
+                        <SelectTrigger className="h-12 text-base">
                           <SelectValue placeholder="Select" />
                         </SelectTrigger>
                         <SelectContent>
@@ -289,40 +404,41 @@ const CustomerCheckout = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="notes">Order Notes (Optional)</Label>
+                    <Label htmlFor="notes" className="text-sm font-medium">Order Notes (Optional)</Label>
                     <Textarea
                       id="notes"
                       placeholder="Special instructions for delivery..."
                       value={notes}
                       onChange={(e) => setNotes(e.target.value)}
+                      className="min-h-[60px] text-base resize-none"
                     />
                   </div>
                 </CardContent>
               </Card>
 
               {/* Payment Method */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
+              <Card className="border-border overflow-hidden">
+                <CardHeader className="bg-gradient-to-r from-primary/5 to-transparent pb-4">
+                  <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
                     <Wallet className="h-5 w-5 text-primary" />
                     Payment Method
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="p-4 rounded-lg border-2 border-primary bg-primary/5 flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                      <Truck className="h-5 w-5 text-primary" />
+                <CardContent className="space-y-3 pt-4">
+                  <div className="p-4 rounded-xl border-2 border-primary bg-primary/5 flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <Truck className="h-6 w-6 text-primary" />
                     </div>
                     <div className="flex-1">
-                      <p className="font-medium">Cash on Delivery</p>
-                      <p className="text-sm text-muted-foreground">Pay when you receive</p>
+                      <p className="font-semibold">Cash on Delivery</p>
+                      <p className="text-sm text-muted-foreground">Pay when you receive your order</p>
                     </div>
-                    <CheckCircle2 className="h-5 w-5 text-primary" />
+                    <CheckCircle2 className="h-6 w-6 text-primary flex-shrink-0" />
                   </div>
 
-                  <div className="p-4 rounded-lg border border-muted flex items-center gap-3 opacity-50">
-                    <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
-                      <CreditCard className="h-5 w-5 text-muted-foreground" />
+                  <div className="p-4 rounded-xl border border-muted flex items-center gap-3 opacity-50">
+                    <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                      <CreditCard className="h-6 w-6 text-muted-foreground" />
                     </div>
                     <div className="flex-1">
                       <p className="font-medium text-muted-foreground">bKash / Nagad</p>
@@ -333,21 +449,21 @@ const CustomerCheckout = () => {
               </Card>
             </div>
 
-            {/* Order Summary */}
+            {/* Order Summary - Sticky on desktop, fixed on mobile */}
             <div className="lg:col-span-1">
-              <Card className="sticky top-24">
-                <CardHeader>
-                  <CardTitle>Order Summary</CardTitle>
+              <Card className="lg:sticky lg:top-24 border-border">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base sm:text-lg">Order Summary</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {/* Cart Items Summary */}
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                  <div className="space-y-2 max-h-40 overflow-y-auto">
                     {cart.map((item, index) => (
                       <div key={index} className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">
-                          {item.brand_name} {item.weight} x{item.quantity}
+                        <span className="text-muted-foreground truncate mr-2">
+                          {item.brand_name} {item.weight} ×{item.quantity}
                         </span>
-                        <span>৳{(item.price * item.quantity).toLocaleString()}</span>
+                        <span className="font-medium tabular-nums">৳{(item.price * item.quantity).toLocaleString()}</span>
                       </div>
                     ))}
                   </div>
@@ -357,27 +473,27 @@ const CustomerCheckout = () => {
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Subtotal</span>
-                      <span>৳{subtotal.toLocaleString()}</span>
+                      <span className="tabular-nums">৳{subtotal.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground flex items-center">
                         <Truck className="h-4 w-4 mr-1" />
                         Delivery Fee
                       </span>
-                      <span>৳{deliveryFee}</span>
+                      <span className="tabular-nums">৳{deliveryFee}</span>
                     </div>
                   </div>
 
                   <Separator />
 
-                  <div className="flex justify-between font-semibold text-lg">
+                  <div className="flex justify-between font-bold text-lg">
                     <span>Total</span>
-                    <span className="text-primary">৳{total.toLocaleString()}</span>
+                    <span className="text-primary tabular-nums">৳{total.toLocaleString()}</span>
                   </div>
 
                   <Button 
                     type="submit"
-                    className="w-full h-12 text-lg bg-gradient-primary"
+                    className="w-full h-12 sm:h-14 text-base sm:text-lg font-semibold bg-gradient-primary"
                     disabled={loading}
                   >
                     {loading ? (
@@ -386,7 +502,10 @@ const CustomerCheckout = () => {
                         Placing Order...
                       </>
                     ) : (
-                      `Place Order • ৳${total.toLocaleString()}`
+                      <>
+                        <Sparkles className="h-5 w-5 mr-2" />
+                        Place Order • ৳{total.toLocaleString()}
+                      </>
                     )}
                   </Button>
 
@@ -399,6 +518,8 @@ const CustomerCheckout = () => {
           </div>
         </form>
       </main>
+
+      <CommunityBottomNav userRole={userRole} />
     </div>
   );
 };
