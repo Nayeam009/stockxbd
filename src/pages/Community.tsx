@@ -10,10 +10,10 @@ import {
   Filter,
   Loader2,
   Store,
-  Users,
   Star,
   TrendingUp,
-  X
+  X,
+  Flame
 } from "lucide-react";
 import {
   Select,
@@ -39,6 +39,7 @@ const Community = () => {
   const [selectedDistrict, setSelectedDistrict] = useState<string>("all");
   const [selectedThana, setSelectedThana] = useState<string>("all");
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [showFilters, setShowFilters] = useState(false);
 
   // Load cart from localStorage
   useEffect(() => {
@@ -138,7 +139,9 @@ const Community = () => {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center space-y-4">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+          <div className="w-16 h-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
           <p className="text-muted-foreground">Loading shops...</p>
         </div>
       </div>
@@ -154,51 +157,51 @@ const Community = () => {
         onCartClick={handleCartClick}
       />
 
-      <main className="container mx-auto px-4 py-6 space-y-6">
-        {/* Hero Section */}
-        <div className="text-center space-y-4 py-8">
-          <Badge variant="secondary" className="px-4 py-1">
-            <MapPin className="h-3 w-3 mr-1" />
+      <main className="container mx-auto px-4 py-4 sm:py-6 space-y-4 sm:space-y-6">
+        {/* Hero Section - Compact on mobile */}
+        <div className="text-center space-y-3 py-4 sm:py-8">
+          <Badge variant="secondary" className="px-3 py-1 text-xs sm:text-sm">
+            <Flame className="h-3 w-3 mr-1 text-orange-500" />
             LPG Shops Near You
           </Badge>
-          <h1 className="text-3xl sm:text-4xl font-bold text-foreground">
+          <h1 className="text-2xl sm:text-4xl font-bold text-foreground">
             Find Your <span className="text-primary">LPG Shop</span>
           </h1>
-          <p className="text-muted-foreground max-w-md mx-auto">
-            Order LPG refills, packages, stoves and more from verified shops in Bangladesh
+          <p className="text-sm sm:text-base text-muted-foreground max-w-md mx-auto">
+            Order refills, packages, stoves and more from verified shops
           </p>
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-3 gap-2 sm:gap-4">
           <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
-            <CardContent className="p-4 text-center">
-              <Store className="h-6 w-6 mx-auto text-primary mb-2" />
-              <p className="text-2xl font-bold text-foreground">{analytics.totalShops}</p>
-              <p className="text-xs text-muted-foreground">Active Shops</p>
+            <CardContent className="p-3 sm:p-4 text-center">
+              <Store className="h-5 w-5 sm:h-6 sm:w-6 mx-auto text-primary mb-1 sm:mb-2" />
+              <p className="text-xl sm:text-2xl font-bold text-foreground tabular-nums">{analytics.totalShops}</p>
+              <p className="text-[10px] sm:text-xs text-muted-foreground">Active Shops</p>
             </CardContent>
           </Card>
           <Card className="bg-gradient-to-br from-amber-500/10 to-amber-500/5 border-amber-500/20">
-            <CardContent className="p-4 text-center">
-              <Star className="h-6 w-6 mx-auto text-amber-500 mb-2" />
-              <p className="text-2xl font-bold text-foreground">{analytics.avgRating}</p>
-              <p className="text-xs text-muted-foreground">Avg Rating</p>
+            <CardContent className="p-3 sm:p-4 text-center">
+              <Star className="h-5 w-5 sm:h-6 sm:w-6 mx-auto text-amber-500 mb-1 sm:mb-2" />
+              <p className="text-xl sm:text-2xl font-bold text-foreground tabular-nums">{analytics.avgRating}</p>
+              <p className="text-[10px] sm:text-xs text-muted-foreground">Avg Rating</p>
             </CardContent>
           </Card>
           <Card className="bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-emerald-500/20">
-            <CardContent className="p-4 text-center">
-              <TrendingUp className="h-6 w-6 mx-auto text-emerald-500 mb-2" />
-              <p className="text-2xl font-bold text-foreground">{analytics.totalOrders}</p>
-              <p className="text-xs text-muted-foreground">Total Orders</p>
+            <CardContent className="p-3 sm:p-4 text-center">
+              <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 mx-auto text-emerald-500 mb-1 sm:mb-2" />
+              <p className="text-xl sm:text-2xl font-bold text-foreground tabular-nums">{analytics.totalOrders}</p>
+              <p className="text-[10px] sm:text-xs text-muted-foreground">Total Orders</p>
             </CardContent>
           </Card>
         </div>
 
         {/* Search and Filters */}
-        <Card className="border-border">
-          <CardContent className="p-4 space-y-4">
+        <Card className="border-border overflow-hidden">
+          <CardContent className="p-3 sm:p-4 space-y-3 sm:space-y-4">
             {/* Search Row */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
               {/* Shop Name Search */}
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -206,7 +209,7 @@ const Community = () => {
                   placeholder="Search shop name..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 h-11"
+                  className="pl-10 h-11 sm:h-12 text-base"
                 />
               </div>
 
@@ -218,14 +221,14 @@ const Community = () => {
               />
             </div>
 
-            {/* Popular Location Chips */}
-            <div className="flex flex-wrap gap-2">
-              <span className="text-xs text-muted-foreground mr-1 self-center">Popular:</span>
-              {POPULAR_LOCATIONS.map(location => (
+            {/* Popular Location Chips - Scrollable on mobile */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
+              <span className="text-xs text-muted-foreground whitespace-nowrap">Popular:</span>
+              {POPULAR_LOCATIONS.slice(0, 5).map(location => (
                 <Badge 
                   key={location}
                   variant={locationSearch === location ? "default" : "outline"}
-                  className="cursor-pointer transition-colors hover:bg-accent"
+                  className="cursor-pointer transition-colors hover:bg-accent whitespace-nowrap flex-shrink-0"
                   onClick={() => handlePopularLocationClick(location)}
                 >
                   <MapPin className="h-3 w-3 mr-1" />
@@ -234,82 +237,97 @@ const Community = () => {
               ))}
             </div>
 
-            {/* Three-Tier Location Filters */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {/* Division Filter */}
-              <Select value={selectedDivision} onValueChange={setSelectedDivision}>
-                <SelectTrigger className="h-11">
-                  <Filter className="h-4 w-4 mr-2" />
-                  <SelectValue placeholder="All Divisions" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Divisions</SelectItem>
-                  {DIVISIONS.map(division => (
-                    <SelectItem key={division} value={division}>{division}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              {/* District Filter */}
-              <Select 
-                value={selectedDistrict} 
-                onValueChange={setSelectedDistrict}
-                disabled={selectedDivision === "all"}
+            {/* Collapsible Filters */}
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9"
+                onClick={() => setShowFilters(!showFilters)}
               >
-                <SelectTrigger className="h-11">
-                  <MapPin className="h-4 w-4 mr-2" />
-                  <SelectValue placeholder="All Districts" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Districts</SelectItem>
-                  {availableDistricts.map(district => (
-                    <SelectItem key={district} value={district}>{district}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              {/* Thana Filter */}
-              <Select 
-                value={selectedThana} 
-                onValueChange={setSelectedThana}
-                disabled={selectedDistrict === "all"}
-              >
-                <SelectTrigger className="h-11">
-                  <MapPin className="h-4 w-4 mr-2" />
-                  <SelectValue placeholder="All Thanas" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Thanas</SelectItem>
-                  {availableThanas.map(thana => (
-                    <SelectItem key={thana} value={thana}>{thana}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                <Filter className="h-4 w-4 mr-1" />
+                Filters
+                {hasActiveFilters && (
+                  <span className="ml-1 w-2 h-2 rounded-full bg-primary" />
+                )}
+              </Button>
+              {hasActiveFilters && (
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  className="h-9 text-destructive hover:text-destructive"
+                  onClick={clearAllFilters}
+                >
+                  <X className="h-4 w-4 mr-1" />
+                  Clear
+                </Button>
+              )}
             </div>
+
+            {/* Three-Tier Location Filters - Collapsible */}
+            {showFilters && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 pt-2 border-t">
+                {/* Division Filter */}
+                <Select value={selectedDivision} onValueChange={setSelectedDivision}>
+                  <SelectTrigger className="h-11 sm:h-12 text-base">
+                    <SelectValue placeholder="All Divisions" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Divisions</SelectItem>
+                    {DIVISIONS.map(division => (
+                      <SelectItem key={division} value={division}>{division}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {/* District Filter */}
+                <Select 
+                  value={selectedDistrict} 
+                  onValueChange={setSelectedDistrict}
+                  disabled={selectedDivision === "all"}
+                >
+                  <SelectTrigger className="h-11 sm:h-12 text-base">
+                    <SelectValue placeholder="All Districts" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Districts</SelectItem>
+                    {availableDistricts.map(district => (
+                      <SelectItem key={district} value={district}>{district}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {/* Thana Filter */}
+                <Select 
+                  value={selectedThana} 
+                  onValueChange={setSelectedThana}
+                  disabled={selectedDistrict === "all"}
+                >
+                  <SelectTrigger className="h-11 sm:h-12 text-base">
+                    <SelectValue placeholder="All Thanas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Thanas</SelectItem>
+                    {availableThanas.map(thana => (
+                      <SelectItem key={thana} value={thana}>{thana}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </CardContent>
         </Card>
 
         {/* Results Header */}
-        <div className="flex items-center justify-between">
-          <p className="text-muted-foreground">
+        <div className="flex items-center justify-between px-1">
+          <p className="text-sm text-muted-foreground">
             Showing <span className="font-medium text-foreground">{filteredShops.length}</span> shops
           </p>
-          {hasActiveFilters && (
-            <Button 
-              variant="ghost" 
-              size="sm"
-              onClick={clearAllFilters}
-              className="text-destructive hover:text-destructive"
-            >
-              <X className="h-4 w-4 mr-1" />
-              Clear Filters
-            </Button>
-          )}
         </div>
 
         {/* Shop Grid */}
         {filteredShops.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             {filteredShops.map(shop => (
               <ShopCard 
                 key={shop.id} 
@@ -320,12 +338,19 @@ const Community = () => {
           </div>
         ) : (
           <Card className="border-dashed">
-            <CardContent className="p-12 text-center">
-              <Store className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+            <CardContent className="p-8 sm:p-12 text-center">
+              <div className="w-16 h-16 mx-auto rounded-full bg-muted/50 flex items-center justify-center mb-4">
+                <Store className="h-8 w-8 text-muted-foreground" />
+              </div>
               <h3 className="font-semibold text-lg mb-2">No shops found</h3>
-              <p className="text-muted-foreground">
-                Try adjusting your search or filters to find shops
+              <p className="text-muted-foreground mb-4">
+                Try adjusting your search or filters
               </p>
+              {hasActiveFilters && (
+                <Button variant="outline" onClick={clearAllFilters}>
+                  Clear All Filters
+                </Button>
+              )}
             </CardContent>
           </Card>
         )}

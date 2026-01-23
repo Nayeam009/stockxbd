@@ -9,7 +9,9 @@ import {
   Clock,
   CheckCircle2,
   Loader2,
-  RefreshCcw
+  RefreshCcw,
+  XCircle,
+  Truck
 } from "lucide-react";
 import { CommunityHeader } from "@/components/community/CommunityHeader";
 import { CommunityBottomNav } from "@/components/community/CommunityBottomNav";
@@ -65,62 +67,108 @@ const CustomerOrders = () => {
         onCartClick={() => navigate('/community/cart')}
       />
 
-      <main className="container mx-auto px-4 py-6 max-w-4xl">
+      <main className="container mx-auto px-4 py-4 sm:py-6 max-w-4xl">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/community')}>
+        <div className="flex items-center justify-between mb-4 sm:mb-6">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" className="h-10 w-10" onClick={() => navigate('/community')}>
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div>
-              <h1 className="text-2xl font-bold text-foreground">My Orders</h1>
-              <p className="text-muted-foreground">{orders.length} total orders</p>
+              <h1 className="text-xl sm:text-2xl font-bold text-foreground">My Orders</h1>
+              <p className="text-sm text-muted-foreground">{orders.length} total order{orders.length !== 1 ? 's' : ''}</p>
             </div>
           </div>
-          <Button variant="outline" size="icon" onClick={loadOrders} disabled={loading}>
+          <Button 
+            variant="outline" 
+            size="icon" 
+            className="h-10 w-10"
+            onClick={loadOrders} 
+            disabled={loading}
+          >
             <RefreshCcw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           </Button>
         </div>
 
         {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid grid-cols-5 w-full">
-            <TabsTrigger value="all">
-              All ({orders.length})
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
+          <TabsList className="w-full h-auto flex-wrap gap-1 p-1 bg-muted/50">
+            <TabsTrigger 
+              value="all" 
+              className="flex-1 min-w-[60px] h-10 text-xs sm:text-sm data-[state=active]:bg-background"
+            >
+              All
+              <span className="hidden sm:inline ml-1">({orders.length})</span>
             </TabsTrigger>
-            <TabsTrigger value="pending" className="data-[state=active]:text-amber-600">
-              <Clock className="h-4 w-4 mr-1 hidden sm:inline" />
-              Pending ({pendingCount})
+            <TabsTrigger 
+              value="pending" 
+              className="flex-1 min-w-[60px] h-10 text-xs sm:text-sm data-[state=active]:bg-background data-[state=active]:text-amber-600"
+            >
+              <Clock className="h-3.5 w-3.5 sm:mr-1" />
+              <span className="hidden sm:inline">Pending</span>
+              {pendingCount > 0 && (
+                <span className="ml-1 text-[10px] sm:text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-600 px-1.5 rounded-full">
+                  {pendingCount}
+                </span>
+              )}
             </TabsTrigger>
-            <TabsTrigger value="active" className="data-[state=active]:text-blue-600">
-              <Package className="h-4 w-4 mr-1 hidden sm:inline" />
-              Active ({activeCount})
+            <TabsTrigger 
+              value="active" 
+              className="flex-1 min-w-[60px] h-10 text-xs sm:text-sm data-[state=active]:bg-background data-[state=active]:text-blue-600"
+            >
+              <Truck className="h-3.5 w-3.5 sm:mr-1" />
+              <span className="hidden sm:inline">Active</span>
+              {activeCount > 0 && (
+                <span className="ml-1 text-[10px] sm:text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-600 px-1.5 rounded-full">
+                  {activeCount}
+                </span>
+              )}
             </TabsTrigger>
-            <TabsTrigger value="completed" className="data-[state=active]:text-emerald-600">
-              <CheckCircle2 className="h-4 w-4 mr-1 hidden sm:inline" />
-              Done ({completedCount})
+            <TabsTrigger 
+              value="completed" 
+              className="flex-1 min-w-[60px] h-10 text-xs sm:text-sm data-[state=active]:bg-background data-[state=active]:text-emerald-600"
+            >
+              <CheckCircle2 className="h-3.5 w-3.5 sm:mr-1" />
+              <span className="hidden sm:inline">Done</span>
+              {completedCount > 0 && (
+                <span className="ml-1 text-[10px] sm:text-xs bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 px-1.5 rounded-full">
+                  {completedCount}
+                </span>
+              )}
             </TabsTrigger>
-            <TabsTrigger value="cancelled" className="data-[state=active]:text-red-600">
-              Cancelled ({cancelledCount})
+            <TabsTrigger 
+              value="cancelled" 
+              className="flex-1 min-w-[60px] h-10 text-xs sm:text-sm data-[state=active]:bg-background data-[state=active]:text-red-600"
+            >
+              <XCircle className="h-3.5 w-3.5 sm:mr-1" />
+              <span className="hidden sm:inline">Cancelled</span>
+              {cancelledCount > 0 && (
+                <span className="ml-1 text-[10px] sm:text-xs bg-red-100 dark:bg-red-900/30 text-red-600 px-1.5 rounded-full">
+                  {cancelledCount}
+                </span>
+              )}
             </TabsTrigger>
           </TabsList>
 
           {loading ? (
-            <div className="flex items-center justify-center py-12">
+            <div className="flex flex-col items-center justify-center py-12 gap-3">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="text-sm text-muted-foreground">Loading orders...</p>
             </div>
           ) : filteredOrders.length === 0 ? (
             <Card className="border-dashed">
-              <CardContent className="p-12 text-center">
-                <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <CardContent className="p-8 sm:p-12 text-center">
+                <div className="w-16 h-16 mx-auto rounded-full bg-muted/50 flex items-center justify-center mb-4">
+                  <Package className="h-8 w-8 text-muted-foreground" />
+                </div>
                 <h3 className="font-semibold text-lg mb-2">No orders found</h3>
-                <p className="text-muted-foreground mb-4">
+                <p className="text-muted-foreground mb-6">
                   {activeTab === 'all' 
                     ? "You haven't placed any orders yet"
                     : `No ${activeTab} orders`
                   }
                 </p>
-                <Button onClick={() => navigate('/community')}>
+                <Button onClick={() => navigate('/community')} className="h-12">
                   Browse Shops
                 </Button>
               </CardContent>
