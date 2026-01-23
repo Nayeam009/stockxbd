@@ -15,15 +15,13 @@ import {
   Flame,
   Package,
   Loader2,
-  ChefHat,
-  Gauge,
   Edit,
   Sparkles,
   RefreshCcw
 } from "lucide-react";
 import { CommunityHeader } from "@/components/community/CommunityHeader";
 import { CommunityBottomNav } from "@/components/community/CommunityBottomNav";
-import { ProductCard } from "@/components/community/ProductCard";
+import { OnlineProductSelector } from "@/components/community/OnlineProductSelector";
 import { CylinderExchangeRequestCard } from "@/components/community/CylinderExchangeRequestCard";
 import { useCommunityData, Shop, ShopProduct, CartItem } from "@/hooks/useCommunityData";
 import { toast } from "@/hooks/use-toast";
@@ -76,6 +74,22 @@ const ShopProfile = () => {
     loadData();
   }, [shopId, fetchShopById, fetchShopProducts]);
 
+  // Handle checkout from POS-style selector
+  const handleCheckout = (items: CartItem[]) => {
+    if (!shop) return;
+    
+    // Add shop info to all items
+    const itemsWithShop = items.map(item => ({ ...item, shop }));
+    setCart(itemsWithShop);
+    
+    toast({
+      title: "Cart Updated",
+      description: `${items.length} item(s) ready for checkout`,
+    });
+    
+    navigate('/community/cart');
+  };
+
   const handleAddToCart = (item: CartItem) => {
     // Check if adding from different shop
     if (cart.length > 0 && cart[0].shop_id !== item.shop_id) {
@@ -110,37 +124,7 @@ const ShopProfile = () => {
     navigate('/community/cart');
   };
 
-  // Group products by type
-  const groupedProducts = products.reduce((acc, product) => {
-    const type = product.product_type;
-    if (!acc[type]) acc[type] = [];
-    acc[type].push(product);
-    return acc;
-  }, {} as Record<string, ShopProduct[]>);
-
-  const getProductTypeIcon = (type: string) => {
-    switch (type) {
-      case 'lpg_refill':
-      case 'lpg_package':
-        return <Flame className="h-5 w-5 text-orange-500" />;
-      case 'stove':
-        return <ChefHat className="h-5 w-5 text-amber-600" />;
-      case 'regulator':
-        return <Gauge className="h-5 w-5 text-blue-500" />;
-      default:
-        return <Package className="h-5 w-5 text-primary" />;
-    }
-  };
-
-  const getProductTypeLabel = (type: string) => {
-    switch (type) {
-      case 'lpg_refill': return 'LPG Refill Cylinders';
-      case 'lpg_package': return 'New LPG Packages';
-      case 'stove': return 'Gas Stoves';
-      case 'regulator': return 'Regulators';
-      default: return type.replace('_', ' ');
-    }
-  };
+  // No longer needed - OnlineProductSelector handles grouping internally
 
   if (loading) {
     return (
@@ -318,7 +302,7 @@ const ShopProfile = () => {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="products" className="mt-6 space-y-6">
+          <TabsContent value="products" className="mt-6">
             {products.length === 0 ? (
               <Card className="border-dashed">
                 <CardContent className="p-12 text-center">
@@ -337,25 +321,11 @@ const ShopProfile = () => {
                 </CardContent>
               </Card>
             ) : (
-              Object.entries(groupedProducts).map(([type, prods]) => (
-                <div key={type} className="space-y-4">
-                  <h3 className="font-semibold text-lg flex items-center gap-2">
-                    {getProductTypeIcon(type)}
-                    {getProductTypeLabel(type)}
-                    <Badge variant="secondary">{prods.length}</Badge>
-                  </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {prods.map(product => (
-                      <ProductCard 
-                        key={product.id}
-                        product={product}
-                        onAddToCart={handleAddToCart}
-                        cartItem={cart.find(c => c.id === product.id)}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ))
+              <OnlineProductSelector
+                products={products}
+                onCheckout={handleCheckout}
+                isWholesale={isWholesaleCustomer}
+              />
             )}
           </TabsContent>
 
@@ -421,17 +391,7 @@ const ShopProfile = () => {
         </Tabs>
       </div>
 
-      {/* Floating Cart Button (Mobile) - above bottom nav */}
-      {cart.length > 0 && (
-        <div className="fixed bottom-20 left-4 right-4 sm:hidden z-40">
-          <Button 
-            className="w-full h-14 text-lg bg-gradient-primary shadow-lg"
-            onClick={() => navigate('/community/cart')}
-          >
-            View Cart ({cart.length}) • ৳{cart.reduce((sum, item) => sum + (item.price * item.quantity), 0).toLocaleString()}
-          </Button>
-        </div>
-      )}
+      {/* Floating cart removed - OnlineProductSelector has built-in checkout */}
 
       <CommunityBottomNav cartItemCount={cart.length} userRole={userRole} />
     </div>
