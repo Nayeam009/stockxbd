@@ -505,8 +505,8 @@ export const UtilityExpenseModule = () => {
                     </div>
                     <div className="flex gap-2">
                       <Button size="sm" className="flex-1 h-10" onClick={() => { setSelectedStaff(staff); setPayAmount(staff.remaining); setPayDialogOpen(true); }} disabled={staff.status === "Paid"}>Pay Salary</Button>
-                      <Button variant="outline" size="sm" className="h-10" onClick={() => { setSelectedStaff(staff); setBonusDialogOpen(true); }}><Gift className="h-4 w-4" /></Button>
-                      <Button variant="ghost" size="sm" className="h-10" onClick={() => { setSelectedStaff(staff); setHistoryDialogOpen(true); }}><History className="h-4 w-4" /></Button>
+                      <Button variant="outline" size="sm" className="h-10" onClick={() => { setSelectedStaff(staff); setBonusDialogOpen(true); }} aria-label={`Add bonus for ${staff.name}`}><Gift className="h-4 w-4" aria-hidden="true" /></Button>
+                      <Button variant="ghost" size="sm" className="h-10" onClick={() => { setSelectedStaff(staff); setHistoryDialogOpen(true); }} aria-label={`View payment history for ${staff.name}`}><History className="h-4 w-4" aria-hidden="true" /></Button>
                     </div>
                   </div>
                 ))}
@@ -544,10 +544,10 @@ export const UtilityExpenseModule = () => {
                         <TableCell className="text-center">{getStatusBadge(staff.status)}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1">
-                            <Button size="sm" variant="ghost" onClick={() => { setSelectedStaff(staff); setPayAmount(staff.remaining); setPayDialogOpen(true); }} disabled={staff.status === "Paid"}><Banknote className="h-4 w-4" /></Button>
-                            <Button size="sm" variant="ghost" onClick={() => { setSelectedStaff(staff); setBonusDialogOpen(true); }}><Gift className="h-4 w-4" /></Button>
-                            <Button size="sm" variant="ghost" onClick={() => { setSelectedStaff(staff); setHistoryDialogOpen(true); }}><History className="h-4 w-4" /></Button>
-                            <Button size="sm" variant="ghost" className="text-destructive" onClick={() => handleDeleteStaff(staff.id)}><Trash2 className="h-4 w-4" /></Button>
+                            <Button size="sm" variant="ghost" onClick={() => { setSelectedStaff(staff); setPayAmount(staff.remaining); setPayDialogOpen(true); }} disabled={staff.status === "Paid"} aria-label={`Pay salary to ${staff.name}`}><Banknote className="h-4 w-4" aria-hidden="true" /></Button>
+                            <Button size="sm" variant="ghost" onClick={() => { setSelectedStaff(staff); setBonusDialogOpen(true); }} aria-label={`Add bonus for ${staff.name}`}><Gift className="h-4 w-4" aria-hidden="true" /></Button>
+                            <Button size="sm" variant="ghost" onClick={() => { setSelectedStaff(staff); setHistoryDialogOpen(true); }} aria-label={`View payment history for ${staff.name}`}><History className="h-4 w-4" aria-hidden="true" /></Button>
+                            <Button size="sm" variant="ghost" className="text-destructive" onClick={() => handleDeleteStaff(staff.id)} aria-label={`Delete ${staff.name}`}><Trash2 className="h-4 w-4" aria-hidden="true" /></Button>
                           </div>
                         </TableCell>
                       </TableRow>
