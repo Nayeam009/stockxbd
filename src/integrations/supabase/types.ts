@@ -167,6 +167,13 @@ export type Database = {
             referencedRelation: "shop_profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "community_orders_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shop_profiles_public"
+            referencedColumns: ["id"]
+          },
         ]
       }
       community_post_comments: {
@@ -422,10 +429,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "cylinder_exchange_requests_requester_shop_id_fkey"
+            columns: ["requester_shop_id"]
+            isOneToOne: false
+            referencedRelation: "shop_profiles_public"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "cylinder_exchange_requests_target_shop_id_fkey"
             columns: ["target_shop_id"]
             isOneToOne: false
             referencedRelation: "shop_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cylinder_exchange_requests_target_shop_id_fkey"
+            columns: ["target_shop_id"]
+            isOneToOne: false
+            referencedRelation: "shop_profiles_public"
             referencedColumns: ["id"]
           },
         ]
@@ -1088,6 +1109,33 @@ export type Database = {
         }
         Relationships: []
       }
+      rate_limit_attempts: {
+        Row: {
+          action: string
+          attempted_at: string
+          email: string | null
+          id: string
+          ip_address: string
+          success: boolean | null
+        }
+        Insert: {
+          action: string
+          attempted_at?: string
+          email?: string | null
+          id?: string
+          ip_address: string
+          success?: boolean | null
+        }
+        Update: {
+          action?: string
+          attempted_at?: string
+          email?: string | null
+          id?: string
+          ip_address?: string
+          success?: boolean | null
+        }
+        Relationships: []
+      }
       regulators: {
         Row: {
           brand: string
@@ -1182,6 +1230,13 @@ export type Database = {
             columns: ["shop_id"]
             isOneToOne: false
             referencedRelation: "shop_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shop_products_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shop_profiles_public"
             referencedColumns: ["id"]
           },
         ]
@@ -1302,6 +1357,13 @@ export type Database = {
             columns: ["shop_id"]
             isOneToOne: false
             referencedRelation: "shop_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shop_reviews_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shop_profiles_public"
             referencedColumns: ["id"]
           },
         ]
@@ -1679,9 +1741,89 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      shop_profiles_public: {
+        Row: {
+          address: string | null
+          cover_image_url: string | null
+          created_at: string | null
+          delivery_fee: number | null
+          description: string | null
+          district: string | null
+          division: string | null
+          id: string | null
+          is_open: boolean | null
+          is_verified: boolean | null
+          latitude: number | null
+          logo_url: string | null
+          longitude: number | null
+          phone: string | null
+          rating: number | null
+          shop_name: string | null
+          thana: string | null
+          total_orders: number | null
+          total_reviews: number | null
+          updated_at: string | null
+          whatsapp: string | null
+        }
+        Insert: {
+          address?: string | null
+          cover_image_url?: string | null
+          created_at?: string | null
+          delivery_fee?: number | null
+          description?: string | null
+          district?: string | null
+          division?: string | null
+          id?: string | null
+          is_open?: boolean | null
+          is_verified?: boolean | null
+          latitude?: number | null
+          logo_url?: string | null
+          longitude?: number | null
+          phone?: string | null
+          rating?: number | null
+          shop_name?: string | null
+          thana?: string | null
+          total_orders?: number | null
+          total_reviews?: number | null
+          updated_at?: string | null
+          whatsapp?: string | null
+        }
+        Update: {
+          address?: string | null
+          cover_image_url?: string | null
+          created_at?: string | null
+          delivery_fee?: number | null
+          description?: string | null
+          district?: string | null
+          division?: string | null
+          id?: string | null
+          is_open?: boolean | null
+          is_verified?: boolean | null
+          latitude?: number | null
+          logo_url?: string | null
+          longitude?: number | null
+          phone?: string | null
+          rating?: number | null
+          shop_name?: string | null
+          thana?: string | null
+          total_orders?: number | null
+          total_reviews?: number | null
+          updated_at?: string | null
+          whatsapp?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
+      check_rate_limit: {
+        Args: {
+          _action: string
+          _ip_address: string
+          _max_attempts?: number
+          _window_minutes?: number
+        }
+        Returns: boolean
+      }
       count_demo_data: { Args: never; Returns: number }
       delete_demo_data: { Args: never; Returns: undefined }
       generate_order_number: { Args: never; Returns: string }
@@ -1702,6 +1844,15 @@ export type Database = {
         Returns: string
       }
       owners_exist: { Args: never; Returns: boolean }
+      record_rate_limit_attempt: {
+        Args: {
+          _action: string
+          _email?: string
+          _ip_address: string
+          _success?: boolean
+        }
+        Returns: undefined
+      }
       remove_team_member: {
         Args: { _member_id: string; _owner_id: string }
         Returns: boolean
