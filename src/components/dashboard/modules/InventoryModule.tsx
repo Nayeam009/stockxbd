@@ -392,8 +392,8 @@ export const InventoryModule = () => {
             </CardTitle>
             <div className="flex items-center gap-2 flex-shrink-0">
               <Badge className={`${status.color} text-white text-[10px] sm:text-xs border-0`}>{status.label}</Badge>
-              <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={() => handleDeleteLpg(brand.id)}>
-                <Trash2 className="h-3 w-3" />
+              <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={() => handleDeleteLpg(brand.id)} aria-label={`Delete ${brand.name} brand`}>
+                <Trash2 className="h-3 w-3" aria-hidden="true" />
               </Button>
             </div>
           </div>
@@ -475,8 +475,9 @@ export const InventoryModule = () => {
               className="h-10 w-10 shrink-0"
               onClick={() => handleQuickAdjust(-1)}
               disabled={stove.quantity <= 0}
+              aria-label="Decrease stove quantity"
             >
-              <Minus className="h-4 w-4" />
+              <Minus className="h-4 w-4" aria-hidden="true" />
             </Button>
             <div
               onClick={() => setEditingCell({ id: stove.id, field: "quantity", type: "stove" })}
@@ -489,8 +490,9 @@ export const InventoryModule = () => {
               size="icon" 
               className="h-10 w-10 shrink-0"
               onClick={() => handleQuickAdjust(1)}
+              aria-label="Increase stove quantity"
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-4 w-4" aria-hidden="true" />
             </Button>
           </div>
 
@@ -511,8 +513,9 @@ export const InventoryModule = () => {
               size="icon" 
               className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10" 
               onClick={() => handleDeleteStove(stove.id)}
+              aria-label={`Delete ${stove.brand} stove`}
             >
-              <Trash2 className="h-4 w-4" />
+              <Trash2 className="h-4 w-4" aria-hidden="true" />
             </Button>
           </div>
         </CardContent>
@@ -583,8 +586,9 @@ export const InventoryModule = () => {
               className="h-10 w-10 shrink-0"
               onClick={() => handleQuickAdjust(-1)}
               disabled={regulator.quantity <= 0}
+              aria-label="Decrease regulator quantity"
             >
-              <Minus className="h-4 w-4" />
+              <Minus className="h-4 w-4" aria-hidden="true" />
             </Button>
             <div
               onClick={() => setEditingCell({ id: regulator.id, field: "quantity", type: "regulator" })}
@@ -597,8 +601,9 @@ export const InventoryModule = () => {
               size="icon" 
               className="h-10 w-10 shrink-0"
               onClick={() => handleQuickAdjust(1)}
+              aria-label="Increase regulator quantity"
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-4 w-4" aria-hidden="true" />
             </Button>
           </div>
 
@@ -619,8 +624,9 @@ export const InventoryModule = () => {
               size="icon" 
               className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10" 
               onClick={() => handleDeleteRegulator(regulator.id)}
+              aria-label={`Delete ${regulator.brand} regulator`}
             >
-              <Trash2 className="h-4 w-4" />
+              <Trash2 className="h-4 w-4" aria-hidden="true" />
             </Button>
           </div>
         </CardContent>

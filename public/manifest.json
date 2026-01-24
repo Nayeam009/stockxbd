@@ -1,0 +1,18 @@
+{
+  "name": "Stock-X LPG Management",
+  "short_name": "Stock-X",
+  "description": "Complete LPG Business Management Platform for Bangladesh - Track inventory, manage customers, and deliver online.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1e3a5f",
+  "theme_color": "#1e3a5f",
+  "orientation": "portrait-primary",
+  "categories": ["business", "productivity"],
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64",
+      "type": "image/x-icon"
+    }
+  ]
+}
