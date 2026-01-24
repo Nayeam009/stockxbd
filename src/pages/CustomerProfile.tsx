@@ -233,8 +233,11 @@ const CustomerProfile = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="min-h-screen bg-background flex items-center justify-center" role="status" aria-live="polite">
+        <div className="text-center space-y-3">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" aria-hidden="true" />
+          <p className="text-muted-foreground">Loading profile...</p>
+        </div>
       </div>
     );
   }
@@ -334,7 +337,7 @@ const CustomerProfile = () => {
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="fullName" className="text-sm font-medium flex items-center gap-1">
-                      <User className="h-3 w-3" /> Full Name
+                      <User className="h-3 w-3" aria-hidden="true" /> Full Name
                     </Label>
                     <Input
                       id="fullName"
@@ -342,12 +345,12 @@ const CustomerProfile = () => {
                       onChange={(e) => setFullName(e.target.value)}
                       placeholder="Enter your name"
                       autoComplete="name"
-                      className="h-12 text-base"
+                      className="h-12 text-base input-accessible"
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="phone" className="text-sm font-medium flex items-center gap-1">
-                      <Phone className="h-3 w-3" /> Phone
+                      <Phone className="h-3 w-3" aria-hidden="true" /> Phone
                     </Label>
                     <Input
                       id="phone"
@@ -355,7 +358,8 @@ const CustomerProfile = () => {
                       onChange={(e) => setPhone(e.target.value)}
                       placeholder="01XXXXXXXXX"
                       autoComplete="tel"
-                      className="h-12 text-base"
+                      inputMode="tel"
+                      className="h-12 text-base input-accessible"
                     />
                   </div>
                 </div>

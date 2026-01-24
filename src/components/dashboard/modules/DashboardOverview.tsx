@@ -215,17 +215,21 @@ export const DashboardOverview = ({
     <div className="space-y-4 sm:space-y-6 px-1 sm:px-2 md:px-0">
       {/* Critical Alert Banner */}
       {analytics.cylinderStockHealth === 'critical' && (
-        <div className="bg-destructive/10 border border-destructive/30 rounded-xl p-3 sm:p-4 flex items-center gap-3">
-          <AlertTriangle className="h-5 w-5 sm:h-6 sm:w-6 text-destructive flex-shrink-0" />
-          <div className="min-w-0">
+        <div 
+          className="bg-destructive/10 border border-destructive/30 rounded-xl p-3 sm:p-4 flex items-center gap-3 animate-pulse"
+          role="alert"
+          aria-live="assertive"
+        >
+          <AlertTriangle className="h-5 w-5 sm:h-6 sm:w-6 text-destructive flex-shrink-0" aria-hidden="true" />
+          <div className="min-w-0 flex-1">
             <p className="font-semibold text-destructive text-sm sm:text-base">Critical: Low Gas Stock!</p>
             <p className="text-xs sm:text-sm text-destructive/80">Empty cylinders ({analytics.totalEmptyCylinders}) exceed full cylinders ({analytics.totalFullCylinders}). Send truck to refill immediately.</p>
           </div>
           <Button 
             size="sm" 
             variant="destructive" 
-            className="flex-shrink-0 ml-auto"
-            onClick={() => setActiveModule?.('lpg-stock')}
+            className="flex-shrink-0 ml-auto h-10 touch-target"
+            onClick={() => setActiveModule?.('inventory')}
           >
             View Stock
           </Button>
@@ -233,7 +237,11 @@ export const DashboardOverview = ({
       )}
 
       {/* KPI Cards Grid */}
-      <div className={`grid gap-3 sm:gap-4 ${kpiCards.length === 4 ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-2 lg:grid-cols-3'}`}>
+      <div 
+        className={`grid gap-3 sm:gap-4 ${kpiCards.length === 4 ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-2 lg:grid-cols-3'}`}
+        role="region"
+        aria-label="Key performance indicators"
+      >
         {kpiCards.map((card) => {
           const Icon = card.icon;
           const isNegative = card.changeType === 'negative';
@@ -242,10 +250,14 @@ export const DashboardOverview = ({
           return (
             <Card 
               key={card.id} 
-              className={`group relative overflow-hidden border border-border/40 shadow-md hover:shadow-xl transition-all duration-300 bg-card ${card.clickable ? 'cursor-pointer hover:-translate-y-1' : ''} ${card.warning ? 'border-destructive/30' : ''}`}
+              className={`group relative overflow-hidden border border-border/40 shadow-md hover:shadow-xl transition-all duration-300 bg-card min-h-[120px] ${card.clickable ? 'cursor-pointer hover:-translate-y-1 focus-visible:ring-2 focus-visible:ring-primary' : ''} ${card.warning ? 'border-destructive/30' : ''}`}
               onClick={card.clickable ? card.onClick : undefined}
+              tabIndex={card.clickable ? 0 : undefined}
+              onKeyDown={card.clickable ? (e) => e.key === 'Enter' && card.onClick?.() : undefined}
+              role={card.clickable ? 'button' : undefined}
+              aria-label={card.clickable ? `${card.title}: ${card.value}. Click to view details.` : undefined}
             >
-              <div className="absolute top-0 right-0 h-20 w-20 bg-gradient-to-bl from-primary/5 to-transparent rounded-bl-full" />
+              <div className="absolute top-0 right-0 h-20 w-20 bg-gradient-to-bl from-primary/5 to-transparent rounded-bl-full" aria-hidden="true" />
               
               <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-4 pb-1 sm:pb-2">
                 <CardTitle className="text-[10px] sm:text-xs font-medium text-muted-foreground truncate pr-2 flex items-center gap-1">
@@ -255,14 +267,14 @@ export const DashboardOverview = ({
                   isNegative ? 'bg-gradient-to-br from-destructive to-destructive/80' :
                   isWarning ? 'bg-gradient-to-br from-warning to-warning/80' :
                   'bg-gradient-to-br from-primary to-primary-light'
-                }`}>
+                }`} aria-hidden="true">
                   <Icon className="h-4 w-4 sm:h-5 sm:w-5 text-primary-foreground" />
                 </div>
               </CardHeader>
               
               <CardContent className="p-3 sm:p-4 pt-0">
                 <div className="space-y-1">
-                  <div className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-foreground truncate">
+                  <div className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-foreground truncate tabular-nums">
                     {card.value}
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
@@ -271,7 +283,7 @@ export const DashboardOverview = ({
                       isWarning ? 'bg-warning/15 text-warning border-warning/30' :
                       'bg-success/15 text-success border-success/30'
                     }`}>
-                      {isNegative ? <TrendingDown className="h-2.5 w-2.5 mr-0.5" /> : <TrendingUp className="h-2.5 w-2.5 mr-0.5" />}
+                      {isNegative ? <TrendingDown className="h-2.5 w-2.5 mr-0.5" aria-hidden="true" /> : <TrendingUp className="h-2.5 w-2.5 mr-0.5" aria-hidden="true" />}
                       {card.change}
                     </Badge>
                   </div>
@@ -336,22 +348,24 @@ export const DashboardOverview = ({
                 </p>
               </div>
 
-              {/* Brand-wise breakdown */}
+              {/* Brand-wise breakdown - Horizontally scrollable on mobile */}
               {cylinderStock.length > 0 && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
-                  {cylinderStock.slice(0, 4).map((stock) => (
-                    <div 
-                      key={stock.id} 
-                      className="p-2 sm:p-3 bg-muted/30 rounded-lg border border-border/40"
-                    >
-                      <p className="font-semibold text-xs sm:text-sm truncate">{stock.brand}</p>
-                      <p className="text-[10px] sm:text-xs text-muted-foreground">{stock.weight}</p>
-                      <div className="flex justify-between mt-1 text-xs">
-                        <span className="text-success">F: {stock.fullCylinders}</span>
-                        <span className="text-destructive">E: {stock.emptyCylinders}</span>
+                <div className="overflow-x-auto -mx-3 sm:mx-0 px-3 sm:px-0 pb-2">
+                  <div className="flex sm:grid sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 min-w-max sm:min-w-0">
+                    {cylinderStock.slice(0, 4).map((stock) => (
+                      <div 
+                        key={stock.id} 
+                        className="p-2 sm:p-3 bg-muted/30 rounded-lg border border-border/40 min-w-[120px] sm:min-w-0"
+                      >
+                        <p className="font-semibold text-xs sm:text-sm truncate">{stock.brand}</p>
+                        <p className="text-[10px] sm:text-xs text-muted-foreground">{stock.weight}</p>
+                        <div className="flex justify-between mt-1 text-xs tabular-nums">
+                          <span className="text-success">F: {stock.fullCylinders}</span>
+                          <span className="text-destructive">E: {stock.emptyCylinders}</span>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -381,21 +395,22 @@ export const DashboardOverview = ({
               <Receipt className="h-3 w-3" />
               Sales
             </h4>
-            <div className="grid grid-cols-3 gap-2 sm:gap-3">
+            <div className="grid grid-cols-3 gap-2 sm:gap-3" role="group" aria-label="Sales quick actions">
               {salesActions.map((action) => {
                 const Icon = action.icon;
                 return (
                   <button 
                     key={action.module}
                     onClick={() => handleQuickAction(action.module)}
-                    className="group relative flex flex-col items-center justify-center p-2.5 sm:p-4 rounded-xl border border-border/40 bg-card hover:bg-primary/10 hover:border-primary/40 hover:shadow-lg transition-all duration-200 min-h-[72px] sm:min-h-[88px] active:scale-95 touch-target"
+                    aria-label={action.description || action.title}
+                    className="group relative flex flex-col items-center justify-center p-2.5 sm:p-4 rounded-xl border border-border/40 bg-card hover:bg-primary/10 hover:border-primary/40 hover:shadow-lg transition-all duration-200 min-h-[72px] sm:min-h-[88px] active:scale-95 touch-target focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                   >
                     {action.hotkey && (
-                      <span className="absolute top-1 right-1 text-[8px] sm:text-[10px] font-mono text-muted-foreground bg-muted/50 px-1 rounded hidden sm:block">
+                      <span className="absolute top-1 right-1 text-[8px] sm:text-[10px] font-mono text-muted-foreground bg-muted/50 px-1 rounded hidden sm:block" aria-hidden="true">
                         {action.hotkey}
                       </span>
                     )}
-                    <div className="h-9 w-9 sm:h-11 sm:w-11 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 group-hover:from-primary group-hover:to-primary-light flex items-center justify-center mb-1.5 transition-all duration-200 group-hover:scale-110 group-hover:shadow-md">
+                    <div className="h-9 w-9 sm:h-11 sm:w-11 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 group-hover:from-primary group-hover:to-primary-light flex items-center justify-center mb-1.5 transition-all duration-200 group-hover:scale-110 group-hover:shadow-md" aria-hidden="true">
                       <Icon className="h-4 w-4 sm:h-5 sm:w-5 text-primary group-hover:text-primary-foreground transition-colors" />
                     </div>
                     <span className="text-[10px] sm:text-xs font-medium text-center leading-tight">{action.title}</span>

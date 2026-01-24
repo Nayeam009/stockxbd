@@ -12,21 +12,26 @@ interface ShopCardProps {
 export const ShopCard = ({ shop, onViewDetails }: ShopCardProps) => {
   return (
     <Card 
-      className="group overflow-hidden border-border bg-card hover:shadow-lg transition-all duration-300 cursor-pointer"
+      className="group overflow-hidden border-border bg-card hover:shadow-lg transition-all duration-300 cursor-pointer focus-visible:ring-2 focus-visible:ring-primary active:scale-[0.98]"
       onClick={() => onViewDetails(shop)}
+      tabIndex={0}
+      onKeyDown={(e) => e.key === 'Enter' && onViewDetails(shop)}
+      role="article"
+      aria-label={`${shop.shop_name} - ${shop.is_open ? 'Open' : 'Closed'} - Rating: ${shop.rating?.toFixed(1) || '0.0'}`}
     >
       {/* Cover Image */}
       <div className="relative h-32 bg-gradient-to-br from-primary/20 to-primary/5 overflow-hidden">
         {shop.cover_image_url ? (
           <img 
             src={shop.cover_image_url} 
-            alt={shop.shop_name}
+            alt=""
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            loading="lazy"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
             <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-              <span className="text-2xl font-bold text-primary">
+              <span className="text-2xl font-bold text-primary" aria-hidden="true">
                 {shop.shop_name.charAt(0).toUpperCase()}
               </span>
             </div>
@@ -90,14 +95,14 @@ export const ShopCard = ({ shop, onViewDetails }: ShopCardProps) => {
 
         {/* Stats */}
         <div className="flex items-center justify-between pt-2 border-t border-border">
-          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          <div className="flex items-center gap-3 text-xs text-muted-foreground tabular-nums">
             <span>{shop.total_orders} orders</span>
-            <span>•</span>
+            <span aria-hidden="true">•</span>
             <span>{shop.total_reviews} reviews</span>
           </div>
-          <Button size="sm" variant="ghost" className="text-primary hover:text-primary">
+          <Button size="sm" variant="ghost" className="text-primary hover:text-primary h-9 touch-target" aria-label={`View ${shop.shop_name} details`}>
             View
-            <ChevronRight className="h-4 w-4 ml-1" />
+            <ChevronRight className="h-4 w-4 ml-1" aria-hidden="true" />
           </Button>
         </div>
       </CardContent>

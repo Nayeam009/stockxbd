@@ -331,7 +331,7 @@ const CustomerCheckout = () => {
                         onChange={(e) => setName(e.target.value)}
                         required
                         autoComplete="name"
-                        className="h-12 text-base"
+                        className="h-12 text-base input-accessible"
                       />
                     </div>
                     <div className="space-y-2">
@@ -343,7 +343,8 @@ const CustomerCheckout = () => {
                         onChange={(e) => setPhone(e.target.value)}
                         required
                         autoComplete="tel"
-                        className="h-12 text-base"
+                        inputMode="tel"
+                        className="h-12 text-base input-accessible"
                       />
                     </div>
                   </div>
