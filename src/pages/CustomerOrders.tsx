@@ -71,22 +71,29 @@ const CustomerOrders = () => {
         {/* Header */}
         <div className="flex items-center justify-between mb-4 sm:mb-6">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" className="h-10 w-10" onClick={() => navigate('/community')}>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-10 w-10 touch-target" 
+              onClick={() => navigate('/community')}
+              aria-label="Go back to marketplace"
+            >
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div>
               <h1 className="text-xl sm:text-2xl font-bold text-foreground">My Orders</h1>
-              <p className="text-sm text-muted-foreground">{orders.length} total order{orders.length !== 1 ? 's' : ''}</p>
+              <p className="text-sm text-muted-foreground tabular-nums">{orders.length} total order{orders.length !== 1 ? 's' : ''}</p>
             </div>
           </div>
           <Button 
             variant="outline" 
             size="icon" 
-            className="h-10 w-10"
+            className="h-10 w-10 touch-target"
             onClick={loadOrders} 
             disabled={loading}
+            aria-label="Refresh orders"
           >
-            <RefreshCcw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCcw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} aria-hidden="true" />
           </Button>
         </div>
 
@@ -158,17 +165,21 @@ const CustomerOrders = () => {
           ) : filteredOrders.length === 0 ? (
             <Card className="border-dashed">
               <CardContent className="p-8 sm:p-12 text-center">
-                <div className="w-16 h-16 mx-auto rounded-full bg-muted/50 flex items-center justify-center mb-4">
-                  <Package className="h-8 w-8 text-muted-foreground" />
+                {/* Enhanced Empty Orders Illustration */}
+                <div className="w-24 h-24 mx-auto rounded-full bg-gradient-to-br from-muted/50 to-muted/30 flex items-center justify-center mb-4 relative">
+                  <Package className="h-10 w-10 text-muted-foreground" aria-hidden="true" />
+                  <div className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                  </div>
                 </div>
                 <h3 className="font-semibold text-lg mb-2">No orders found</h3>
-                <p className="text-muted-foreground mb-6">
+                <p className="text-muted-foreground mb-6 max-w-xs mx-auto">
                   {activeTab === 'all' 
-                    ? "You haven't placed any orders yet"
-                    : `No ${activeTab} orders`
+                    ? "You haven't placed any orders yet. Browse shops to get started!"
+                    : `No ${activeTab} orders at the moment`
                   }
                 </p>
-                <Button onClick={() => navigate('/community')} className="h-12">
+                <Button onClick={() => navigate('/community')} className="h-12 touch-target">
                   Browse Shops
                 </Button>
               </CardContent>

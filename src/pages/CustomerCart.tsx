@@ -135,14 +135,19 @@ const CustomerCart = () => {
         {cart.length === 0 ? (
           <Card className="border-dashed">
             <CardContent className="p-8 sm:p-12 text-center">
-              <div className="w-20 h-20 mx-auto rounded-full bg-muted/50 flex items-center justify-center mb-4">
-                <ShoppingCart className="h-10 w-10 text-muted-foreground" />
+              {/* Enhanced Empty Cart Illustration */}
+              <div className="w-24 h-24 mx-auto rounded-full bg-gradient-to-br from-muted/50 to-muted/30 flex items-center justify-center mb-4 relative animate-pulse">
+                <ShoppingCart className="h-12 w-12 text-muted-foreground" aria-hidden="true" />
+                <div className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center">
+                  <span className="text-xs font-bold text-primary">0</span>
+                </div>
               </div>
               <h3 className="text-xl font-semibold mb-2">Your cart is empty</h3>
-              <p className="text-muted-foreground mb-6">
-                Browse shops and add products to your cart
+              <p className="text-muted-foreground mb-6 max-w-xs mx-auto">
+                Browse shops and add LPG cylinders, stoves, or regulators to your cart
               </p>
-              <Button onClick={() => navigate('/community')} className="h-12 px-6">
+              <Button onClick={() => navigate('/community')} className="h-12 px-6 touch-target">
+                <Store className="h-5 w-5 mr-2" />
                 Browse Shops
               </Button>
             </CardContent>
@@ -218,21 +223,24 @@ const CustomerCart = () => {
 
                         {/* Quantity & Price */}
                         <div className="flex items-center justify-between mt-3">
-                          <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-1" role="group" aria-label="Quantity controls">
                             <Button 
                               variant="outline" 
                               size="icon" 
-                              className="h-9 w-9"
+                              className="h-10 w-10 touch-target transition-transform active:scale-90"
                               onClick={() => updateQuantity(index, item.quantity - 1)}
+                              disabled={item.quantity <= 1}
+                              aria-label="Decrease quantity"
                             >
                               <Minus className="h-4 w-4" />
                             </Button>
-                            <span className="w-10 text-center font-semibold tabular-nums">{item.quantity}</span>
+                            <span className="w-12 text-center font-semibold tabular-nums text-lg">{item.quantity}</span>
                             <Button 
                               variant="outline" 
                               size="icon" 
-                              className="h-9 w-9"
+                              className="h-10 w-10 touch-target transition-transform active:scale-90"
                               onClick={() => updateQuantity(index, item.quantity + 1)}
+                              aria-label="Increase quantity"
                             >
                               <Plus className="h-4 w-4" />
                             </Button>

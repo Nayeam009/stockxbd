@@ -128,8 +128,11 @@ const ShopProfile = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="min-h-screen bg-background flex items-center justify-center" role="status" aria-live="polite">
+        <div className="text-center space-y-3">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" aria-hidden="true" />
+          <p className="text-muted-foreground">Loading shop...</p>
+        </div>
       </div>
     );
   }
@@ -139,8 +142,12 @@ const ShopProfile = () => {
       <div className="min-h-screen bg-background">
         <CommunityHeader cartItemCount={cart.length} userRole={userRole} onCartClick={handleCartClick} />
         <div className="container mx-auto px-4 py-12 text-center">
+          <div className="w-20 h-20 mx-auto rounded-full bg-muted/50 flex items-center justify-center mb-4">
+            <Package className="h-10 w-10 text-muted-foreground" />
+          </div>
           <h2 className="text-xl font-semibold mb-2">Shop not found</h2>
-          <Button onClick={() => navigate('/community')}>
+          <p className="text-muted-foreground mb-4">This shop may have been removed or doesn't exist</p>
+          <Button onClick={() => navigate('/community')} className="h-11 touch-target">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Shops
           </Button>
@@ -160,7 +167,13 @@ const ShopProfile = () => {
 
       {/* Back Button */}
       <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-        <Button variant="ghost" size="sm" onClick={() => navigate('/community')}>
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={() => navigate('/community')}
+          className="h-10 touch-target"
+          aria-label="Go back to marketplace"
+        >
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Shops
         </Button>
@@ -196,11 +209,12 @@ const ShopProfile = () => {
         {shop.cover_image_url ? (
           <img 
             src={shop.cover_image_url} 
-            alt={shop.shop_name}
+            alt=""
             className="w-full h-full object-cover"
+            loading="lazy"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center">
+          <div className="w-full h-full flex items-center justify-center" aria-hidden="true">
             <Flame className="h-24 w-24 text-primary/20" />
           </div>
         )}

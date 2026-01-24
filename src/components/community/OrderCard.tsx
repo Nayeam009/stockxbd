@@ -73,20 +73,61 @@ export const OrderCard = ({ order, onViewDetails, onUpdateStatus, isShopOwner }:
   const statusConfig = getStatusConfig(order.status);
   const StatusIcon = statusConfig.icon;
 
+  // Status timeline for visual progress
+  const getStatusProgress = () => {
+    const stages = ['pending', 'confirmed', 'dispatched', 'delivered'];
+    const currentIndex = stages.indexOf(order.status);
+    return { stages, currentIndex };
+  };
+
+  const { stages, currentIndex } = getStatusProgress();
+  const showTimeline = !['cancelled', 'rejected'].includes(order.status);
+
   return (
     <Card className="overflow-hidden border-border bg-card hover:shadow-md transition-shadow">
+      {/* Status color bar at top */}
+      <div className={`h-1 ${statusConfig.color.replace('text-', 'bg-').split(' ')[0]}`} aria-hidden="true" />
+      
       <CardContent className="p-4 space-y-3">
         {/* Header */}
         <div className="flex items-start justify-between">
           <div>
             <p className="text-xs text-muted-foreground">Order</p>
-            <p className="font-mono font-semibold text-foreground">{order.order_number}</p>
+            <p className="font-mono font-semibold text-foreground tabular-nums">{order.order_number}</p>
           </div>
           <Badge className={`${statusConfig.color} border-0`}>
-            <StatusIcon className="h-3 w-3 mr-1" />
+            <StatusIcon className="h-3 w-3 mr-1" aria-hidden="true" />
             {statusConfig.label}
           </Badge>
         </div>
+        
+        {/* Visual Timeline */}
+        {showTimeline && (
+          <div className="flex items-center gap-1 py-2" aria-label={`Order progress: ${statusConfig.label}`}>
+            {stages.map((stage, index) => (
+              <div key={stage} className="flex items-center flex-1">
+                <div 
+                  className={`w-3 h-3 rounded-full flex-shrink-0 transition-colors ${
+                    index <= currentIndex 
+                      ? 'bg-primary' 
+                      : 'bg-muted'
+                  }`}
+                  aria-hidden="true"
+                />
+                {index < stages.length - 1 && (
+                  <div 
+                    className={`flex-1 h-0.5 mx-1 transition-colors ${
+                      index < currentIndex 
+                        ? 'bg-primary' 
+                        : 'bg-muted'
+                    }`}
+                    aria-hidden="true"
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Shop or Customer Info */}
         {isShopOwner ? (
@@ -156,19 +197,19 @@ export const OrderCard = ({ order, onViewDetails, onUpdateStatus, isShopOwner }:
             <>
               <Button 
                 size="sm" 
-                className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+                className="flex-1 h-11 bg-emerald-600 hover:bg-emerald-700 touch-target"
                 onClick={() => onUpdateStatus(order.id, 'confirmed')}
               >
-                <CheckCircle2 className="h-4 w-4 mr-1" />
+                <CheckCircle2 className="h-4 w-4 mr-1" aria-hidden="true" />
                 Accept
               </Button>
               <Button 
                 size="sm" 
                 variant="destructive"
-                className="flex-1"
+                className="flex-1 h-11 touch-target"
                 onClick={() => onUpdateStatus(order.id, 'rejected')}
               >
-                <XCircle className="h-4 w-4 mr-1" />
+                <XCircle className="h-4 w-4 mr-1" aria-hidden="true" />
                 Reject
               </Button>
             </>
@@ -177,10 +218,10 @@ export const OrderCard = ({ order, onViewDetails, onUpdateStatus, isShopOwner }:
           {isShopOwner && order.status === 'confirmed' && onUpdateStatus && (
             <Button 
               size="sm" 
-              className="w-full"
+              className="w-full h-11 touch-target"
               onClick={() => onUpdateStatus(order.id, 'dispatched')}
             >
-              <Truck className="h-4 w-4 mr-1" />
+              <Truck className="h-4 w-4 mr-1" aria-hidden="true" />
               Mark as Dispatched
             </Button>
           )}
@@ -188,10 +229,10 @@ export const OrderCard = ({ order, onViewDetails, onUpdateStatus, isShopOwner }:
           {isShopOwner && order.status === 'dispatched' && onUpdateStatus && (
             <Button 
               size="sm" 
-              className="w-full bg-emerald-600 hover:bg-emerald-700"
+              className="w-full h-11 bg-emerald-600 hover:bg-emerald-700 touch-target"
               onClick={() => onUpdateStatus(order.id, 'delivered')}
             >
-              <CheckCircle2 className="h-4 w-4 mr-1" />
+              <CheckCircle2 className="h-4 w-4 mr-1" aria-hidden="true" />
               Mark as Delivered
             </Button>
           )}
@@ -200,11 +241,11 @@ export const OrderCard = ({ order, onViewDetails, onUpdateStatus, isShopOwner }:
             <Button 
               size="sm" 
               variant="outline"
-              className="w-full"
+              className="w-full h-11 touch-target"
               onClick={() => onViewDetails(order)}
             >
               View Details
-              <ChevronRight className="h-4 w-4 ml-1" />
+              <ChevronRight className="h-4 w-4 ml-1" aria-hidden="true" />
             </Button>
           )}
         </div>

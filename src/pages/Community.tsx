@@ -12,6 +12,7 @@ import {
   Store,
   Star,
   TrendingUp,
+  ShoppingBag,
   X,
   Flame
 } from "lucide-react";
@@ -137,10 +138,10 @@ const Community = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center" role="status" aria-live="polite">
         <div className="text-center space-y-4">
           <div className="w-16 h-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <Loader2 className="h-8 w-8 animate-spin text-primary" aria-hidden="true" />
           </div>
           <p className="text-muted-foreground">Loading shops...</p>
         </div>
@@ -204,12 +205,14 @@ const Community = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
               {/* Shop Name Search */}
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
                 <Input
                   placeholder="Search shop name..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 h-11 sm:h-12 text-base"
+                  className="pl-10 h-12 text-base input-accessible"
+                  aria-label="Search shops by name"
+                  autoComplete="off"
                 />
               </div>
 
@@ -221,20 +224,27 @@ const Community = () => {
               />
             </div>
 
-            {/* Popular Location Chips - Scrollable on mobile */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
-              <span className="text-xs text-muted-foreground whitespace-nowrap">Popular:</span>
-              {POPULAR_LOCATIONS.slice(0, 5).map(location => (
-                <Badge 
-                  key={location}
-                  variant={locationSearch === location ? "default" : "outline"}
-                  className="cursor-pointer transition-colors hover:bg-accent whitespace-nowrap flex-shrink-0"
-                  onClick={() => handlePopularLocationClick(location)}
-                >
-                  <MapPin className="h-3 w-3 mr-1" />
-                  {location}
-                </Badge>
-              ))}
+            {/* Popular Location Chips - Scrollable on mobile with fade edges */}
+            <div className="relative">
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide scroll-smooth" role="group" aria-label="Popular locations">
+                <span className="text-xs text-muted-foreground whitespace-nowrap flex-shrink-0">Popular:</span>
+                {POPULAR_LOCATIONS.slice(0, 5).map(location => (
+                  <Badge 
+                    key={location}
+                    variant={locationSearch === location ? "default" : "outline"}
+                    className="cursor-pointer transition-all hover:bg-accent whitespace-nowrap flex-shrink-0 h-8 touch-target active:scale-95"
+                    onClick={() => handlePopularLocationClick(location)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => e.key === 'Enter' && handlePopularLocationClick(location)}
+                  >
+                    <MapPin className="h-3 w-3 mr-1" aria-hidden="true" />
+                    {location}
+                  </Badge>
+                ))}
+              </div>
+              {/* Fade edge indicator */}
+              <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-card to-transparent pointer-events-none sm:hidden" aria-hidden="true" />
             </div>
 
             {/* Collapsible Filters */}
@@ -339,15 +349,23 @@ const Community = () => {
         ) : (
           <Card className="border-dashed">
             <CardContent className="p-8 sm:p-12 text-center">
-              <div className="w-16 h-16 mx-auto rounded-full bg-muted/50 flex items-center justify-center mb-4">
-                <Store className="h-8 w-8 text-muted-foreground" />
+              {/* Empty State Illustration */}
+              <div className="w-24 h-24 mx-auto rounded-full bg-gradient-to-br from-muted/50 to-muted/30 flex items-center justify-center mb-4 relative">
+                <Store className="h-10 w-10 text-muted-foreground" aria-hidden="true" />
+                <div className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+                  <ShoppingBag className="h-4 w-4 text-muted-foreground" />
+                </div>
               </div>
               <h3 className="font-semibold text-lg mb-2">No shops found</h3>
-              <p className="text-muted-foreground mb-4">
-                Try adjusting your search or filters
+              <p className="text-muted-foreground mb-4 max-w-xs mx-auto">
+                {hasActiveFilters 
+                  ? "Try adjusting your search or filters to find more shops"
+                  : "There are no shops listed in this area yet"
+                }
               </p>
               {hasActiveFilters && (
-                <Button variant="outline" onClick={clearAllFilters}>
+                <Button variant="outline" onClick={clearAllFilters} className="h-11 touch-target">
+                  <X className="h-4 w-4 mr-2" />
                   Clear All Filters
                 </Button>
               )}
