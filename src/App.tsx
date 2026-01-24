@@ -12,6 +12,7 @@ import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
 import { Loader2 } from "lucide-react";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 // Lazy load community pages for better performance
 const Community = lazy(() => import("./pages/Community"));
@@ -31,40 +32,44 @@ const PageLoader = () => (
 );
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <ThemeProvider>
-      <LanguageProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <Suspense fallback={<PageLoader />}>
-              <Routes>
-                <Route path="/" element={<Welcome />} />
-                <Route path="/auth" element={<Auth />} />
-                <Route path="/dashboard" element={
-                  <ProtectedRoute>
-                    <Dashboard />
-                  </ProtectedRoute>
-                } />
-                
-                {/* LPG Community E-Commerce Routes */}
-                <Route path="/community" element={<Community />} />
-                <Route path="/community/shop/:shopId" element={<ShopProfile />} />
-                <Route path="/community/cart" element={<CustomerCart />} />
-                <Route path="/community/checkout" element={<CustomerCheckout />} />
-                <Route path="/community/orders" element={<CustomerOrders />} />
-                <Route path="/community/profile" element={<CustomerProfile />} />
-                
-                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </Suspense>
-          </BrowserRouter>
-        </TooltipProvider>
-      </LanguageProvider>
-    </ThemeProvider>
-  </QueryClientProvider>
+  <ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
+        <LanguageProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <ErrorBoundary>
+                <Suspense fallback={<PageLoader />}>
+                  <Routes>
+                    <Route path="/" element={<Welcome />} />
+                    <Route path="/auth" element={<Auth />} />
+                    <Route path="/dashboard" element={
+                      <ProtectedRoute>
+                        <Dashboard />
+                      </ProtectedRoute>
+                    } />
+                    
+                    {/* LPG Community E-Commerce Routes */}
+                    <Route path="/community" element={<Community />} />
+                    <Route path="/community/shop/:shopId" element={<ShopProfile />} />
+                    <Route path="/community/cart" element={<CustomerCart />} />
+                    <Route path="/community/checkout" element={<CustomerCheckout />} />
+                    <Route path="/community/orders" element={<CustomerOrders />} />
+                    <Route path="/community/profile" element={<CustomerProfile />} />
+                    
+                    {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                    <Route path="*" element={<NotFound />} />
+                  </Routes>
+                </Suspense>
+              </ErrorBoundary>
+            </BrowserRouter>
+          </TooltipProvider>
+        </LanguageProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;
