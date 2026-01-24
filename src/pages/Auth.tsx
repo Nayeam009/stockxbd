@@ -1,11 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Shield, Truck, Loader2, Users, Crown, AlertCircle, UserPlus, LogIn, ShoppingCart, Package, Globe, CheckCircle2, Building2, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Shield, Truck, Loader2, Users, Crown, AlertCircle, UserPlus, LogIn, ShoppingCart, Package, Globe, CheckCircle2, Building2, Eye, EyeOff, RefreshCcw } from "lucide-react";
 import stockXLogo from "@/assets/stock-x-logo.png";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -17,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { validateBDPhone, getPhoneValidationError } from "@/lib/phoneValidation";
 
 type AuthMode = 'signin' | 'signup' | 'invite' | 'team-signup';
 type UserRole = 'owner' | 'manager' | 'driver' | 'customer' | 'staff';
@@ -141,6 +142,7 @@ const Auth = () => {
   const [inviteRole, setInviteRole] = useState<string>('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   
   // Team member specific fields
   const [ownerEmail, setOwnerEmail] = useState("");
@@ -150,17 +152,27 @@ const Auth = () => {
   const [ownerShopName, setOwnerShopName] = useState("");
   
   const navigate = useNavigate();
+  
+  // Retry handler for loading failures
+  const handleRetry = useCallback(() => {
+    setLoadError(null);
+    setCheckingSystem(true);
+    window.location.reload();
+  }, []);
 
-  // Check system state on mount
+  // Check system state on mount with timeout
   useEffect(() => {
-    const processInviteForExistingUser = async (userId: string, email: string) => {
+    let timeoutId: NodeJS.Timeout;
+    let mounted = true;
+    
+    const processInviteForExistingUser = async (userId: string, userEmail: string) => {
       if (!inviteCode) return;
       
       try {
         const { data, error } = await supabase.rpc('mark_invite_used', {
           _code: inviteCode,
           _user_id: userId,
-          _email: email
+          _email: userEmail
         });
         
         if (error || !data) {
@@ -183,7 +195,14 @@ const Auth = () => {
     };
 
     const checkSystemState = async () => {
-      setCheckingSystem(true);
+      if (!mounted) return;
+      
+      // Set a timeout to show error if loading takes too long
+      timeoutId = setTimeout(() => {
+        if (mounted) {
+          setLoadError('Connection is slow. Please check your internet and try again.');
+        }
+      }, 15000); // 15 second timeout
       
       try {
         // Check if user is already logged in
@@ -214,14 +233,16 @@ const Auth = () => {
           const { data: inviteData, error } = await supabase.rpc('validate_invite', { _code: inviteCode });
           
           if (error || !inviteData || inviteData.length === 0) {
-            setInviteValid(false);
-            setAuthMode('signin');
-            toast({
-              title: "Invalid Invite",
-              description: "This invite link is invalid or expired",
-              variant: "destructive"
-            });
-          } else {
+            if (mounted) {
+              setInviteValid(false);
+              setAuthMode('signin');
+              toast({
+                title: "Invalid Invite",
+                description: "This invite link is invalid or expired",
+                variant: "destructive"
+              });
+            }
+          } else if (mounted) {
             setInviteValid(true);
             setInviteRole(inviteData[0].role);
             setAuthMode('invite');
@@ -232,8 +253,8 @@ const Auth = () => {
           
           if (error) {
             console.error('Error checking owners:', error);
-            setOwnersExist(true);
-          } else {
+            if (mounted) setOwnersExist(true);
+          } else if (mounted) {
             setOwnersExist(hasOwners || false);
             // If no owners exist, default to signup for first user
             setAuthMode(hasOwners ? 'signin' : 'signup');
@@ -241,12 +262,23 @@ const Auth = () => {
         }
       } catch (err) {
         console.error('Error checking system state:', err);
+        if (mounted) {
+          setLoadError('Failed to connect to server. Please try again.');
+        }
+      } finally {
+        if (mounted) {
+          clearTimeout(timeoutId);
+          setCheckingSystem(false);
+        }
       }
-      
-      setCheckingSystem(false);
     };
 
     checkSystemState();
+    
+    return () => {
+      mounted = false;
+      clearTimeout(timeoutId);
+    };
   }, [inviteCode, navigate, inviteRoleParam]);
 
   // Verify owner email
@@ -558,10 +590,35 @@ const Auth = () => {
 
   if (checkingSystem) {
     return (
-      <div className="min-h-screen bg-gradient-hero flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto text-white" />
-          <p className="mt-2 text-white/80">Loading...</p>
+      <div className="min-h-screen bg-gradient-hero flex items-center justify-center p-4">
+        <div className="text-center space-y-4">
+          <div className="relative">
+            <div className="absolute inset-0 bg-white/20 rounded-full blur-xl animate-pulse" />
+            <img 
+              src={stockXLogo} 
+              alt="Stock-X" 
+              className="relative h-16 w-16 mx-auto rounded-xl shadow-lg"
+            />
+          </div>
+          <div>
+            <Loader2 className="h-8 w-8 animate-spin mx-auto text-white" />
+            <p className="mt-3 text-white/90 font-medium">Loading Stock-X...</p>
+            <p className="mt-1 text-white/60 text-sm">Please wait while we set things up</p>
+          </div>
+          {loadError && (
+            <div className="mt-6 p-4 bg-white/10 rounded-xl border border-white/20">
+              <p className="text-white/90 text-sm mb-3">{loadError}</p>
+              <Button 
+                variant="secondary" 
+                size="sm" 
+                onClick={handleRetry}
+                className="h-10 px-6"
+              >
+                <RefreshCcw className="mr-2 h-4 w-4" />
+                Try Again
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     );

@@ -252,7 +252,6 @@ const Welcome = () => {
                   className="relative w-full h-auto rounded-2xl sm:rounded-3xl shadow-2xl border-4 border-white/10"
                   loading="eager"
                   decoding="async"
-                  fetchPriority="high"
                   width="600"
                   height="400"
                 />

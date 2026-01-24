@@ -355,10 +355,26 @@
     border-radius: 2px;
   }
 
-  /* Touch-Friendly Tap Target */
+  /* Touch-Friendly Tap Target - 48px minimum for mobile */
   .touch-target {
+    min-height: 48px;
+    min-width: 48px;
+  }
+  
+  .touch-target-44 {
     min-height: 44px;
     min-width: 44px;
+  }
+  
+  /* Accessible Input Sizing - prevents iOS zoom */
+  .input-accessible {
+    font-size: 16px !important;
+  }
+  
+  @media (min-width: 768px) {
+    .input-accessible {
+      font-size: 14px !important;
+    }
   }
 
   /* Hide Scrollbar but Keep Scroll */
