@@ -20,6 +20,26 @@ serve(async (req) => {
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
     const supabasePublic = createClient(supabaseUrl, supabaseAnonKey);
 
+    // Get client IP for rate limiting
+    const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 
+                     req.headers.get('x-real-ip') || 
+                     'unknown';
+
+    // Check rate limit for registration attempts (5 attempts per hour per IP)
+    const { data: rateLimitOk } = await supabaseAdmin.rpc('check_rate_limit', {
+      _ip_address: clientIp,
+      _action: 'register_team_member',
+      _max_attempts: 5,
+      _window_minutes: 60
+    });
+
+    if (!rateLimitOk) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Too many registration attempts. Please try again later.' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 429 }
+      );
+    }
+
     const { 
       owner_email, 
       owner_password, 
@@ -45,6 +65,29 @@ serve(async (req) => {
       );
     }
 
+    // Record the attempt before authentication
+    await supabaseAdmin.rpc('record_rate_limit_attempt', {
+      _ip_address: clientIp,
+      _action: 'register_team_member',
+      _email: owner_email
+    });
+
+    // Check for brute force on specific email (3 failed attempts per hour)
+    const { data: emailAttempts } = await supabaseAdmin
+      .from('rate_limit_attempts')
+      .select('id', { count: 'exact', head: true })
+      .eq('email', owner_email)
+      .eq('action', 'register_team_member')
+      .eq('success', false)
+      .gte('attempted_at', new Date(Date.now() - 3600000).toISOString());
+
+    if (emailAttempts && (emailAttempts as unknown as number) >= 3) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Account temporarily locked. Please try again later.' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 429 }
+      );
+    }
+
     // Step 1: Verify owner credentials by attempting sign-in
     const { data: signInData, error: signInError } = await supabasePublic.auth.signInWithPassword({
       email: owner_email,
@@ -52,8 +95,16 @@ serve(async (req) => {
     });
 
     if (signInError || !signInData.user) {
+      // Record failed auth attempt
+      await supabaseAdmin.rpc('record_rate_limit_attempt', {
+        _ip_address: clientIp,
+        _action: 'register_team_member_auth_fail',
+        _email: owner_email,
+        _success: false
+      });
+
       return new Response(
-        JSON.stringify({ success: false, error: 'Invalid owner credentials' }),
+        JSON.stringify({ success: false, error: 'Invalid credentials' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
       );
     }
@@ -164,6 +215,14 @@ serve(async (req) => {
       .select('shop_name')
       .eq('owner_id', ownerId)
       .maybeSingle();
+
+    // Record successful registration
+    await supabaseAdmin.rpc('record_rate_limit_attempt', {
+      _ip_address: clientIp,
+      _action: 'register_team_member',
+      _email: owner_email,
+      _success: true
+    });
 
     return new Response(
       JSON.stringify({

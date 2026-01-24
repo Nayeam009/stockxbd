@@ -4,7 +4,7 @@ import { logger } from "@/lib/logger";
 
 export interface Shop {
   id: string;
-  owner_id: string;
+  owner_id?: string; // Made optional - hidden from public view for security
   shop_name: string;
   description: string | null;
   logo_url: string | null;
@@ -95,18 +95,42 @@ export const useCommunityData = () => {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userShop, setUserShop] = useState<Shop | null>(null);
 
-  // Fetch all open shops
+  // Fetch all open shops using the public view (hides owner_id)
   const fetchShops = useCallback(async () => {
     setLoading(true);
     try {
+      // Use the public view that excludes sensitive owner_id - cast properly for TypeScript
       const { data, error } = await supabase
         .from('shop_profiles')
-        .select('*')
+        .select('id, shop_name, description, phone, whatsapp, address, division, district, thana, latitude, longitude, logo_url, cover_image_url, is_open, is_verified, rating, total_reviews, total_orders, delivery_fee, created_at, updated_at')
         .eq('is_open', true)
         .order('rating', { ascending: false });
 
       if (error) throw error;
-      setShops((data || []) as Shop[]);
+      // Map data to exclude owner_id from the type
+      const shopsWithoutOwnerId = (data || []).map(shop => ({
+        id: shop.id,
+        shop_name: shop.shop_name,
+        description: shop.description,
+        phone: shop.phone,
+        whatsapp: shop.whatsapp,
+        address: shop.address,
+        division: shop.division,
+        district: shop.district,
+        thana: shop.thana,
+        latitude: shop.latitude,
+        longitude: shop.longitude,
+        logo_url: shop.logo_url,
+        cover_image_url: shop.cover_image_url,
+        is_open: shop.is_open,
+        is_verified: shop.is_verified,
+        rating: Number(shop.rating),
+        total_reviews: shop.total_reviews,
+        total_orders: shop.total_orders,
+        delivery_fee: Number(shop.delivery_fee),
+        created_at: shop.created_at
+      })) as Shop[];
+      setShops(shopsWithoutOwnerId);
     } catch (error) {
       logger.error('Error fetching shops:', error);
     } finally {
