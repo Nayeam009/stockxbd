@@ -97,13 +97,18 @@ export type Database = {
           order_number: string
           payment_method: string | null
           payment_status: string | null
+          payment_trx_id: string | null
           rejection_reason: string | null
+          reserved_at: string | null
+          return_cylinder_verified: boolean | null
           shop_id: string
           status: string | null
           subtotal: number
           thana: string | null
           total_amount: number
           updated_at: string | null
+          verified_at: string | null
+          verified_by: string | null
         }
         Insert: {
           confirmed_at?: string | null
@@ -124,13 +129,18 @@ export type Database = {
           order_number: string
           payment_method?: string | null
           payment_status?: string | null
+          payment_trx_id?: string | null
           rejection_reason?: string | null
+          reserved_at?: string | null
+          return_cylinder_verified?: boolean | null
           shop_id: string
           status?: string | null
           subtotal: number
           thana?: string | null
           total_amount: number
           updated_at?: string | null
+          verified_at?: string | null
+          verified_by?: string | null
         }
         Update: {
           confirmed_at?: string | null
@@ -151,13 +161,18 @@ export type Database = {
           order_number?: string
           payment_method?: string | null
           payment_status?: string | null
+          payment_trx_id?: string | null
           rejection_reason?: string | null
+          reserved_at?: string | null
+          return_cylinder_verified?: boolean | null
           shop_id?: string
           status?: string | null
           subtotal?: number
           thana?: string | null
           total_amount?: number
           updated_at?: string | null
+          verified_at?: string | null
+          verified_by?: string | null
         }
         Relationships: [
           {
@@ -276,6 +291,42 @@ export type Database = {
           title?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      customer_cylinder_profiles: {
+        Row: {
+          brand_name: string
+          created_at: string | null
+          cylinder_photo_url: string | null
+          id: string
+          is_verified: boolean | null
+          updated_at: string | null
+          user_id: string
+          valve_size: string
+          weight: string
+        }
+        Insert: {
+          brand_name: string
+          created_at?: string | null
+          cylinder_photo_url?: string | null
+          id?: string
+          is_verified?: boolean | null
+          updated_at?: string | null
+          user_id: string
+          valve_size?: string
+          weight?: string
+        }
+        Update: {
+          brand_name?: string
+          created_at?: string | null
+          cylinder_photo_url?: string | null
+          id?: string
+          is_verified?: boolean | null
+          updated_at?: string | null
+          user_id?: string
+          valve_size?: string
+          weight?: string
         }
         Relationships: []
       }
@@ -1191,6 +1242,7 @@ export type Database = {
           is_available: boolean | null
           price: number
           product_type: string
+          reserved_stock: number | null
           shop_id: string
           updated_at: string | null
           valve_size: string | null
@@ -1205,6 +1257,7 @@ export type Database = {
           is_available?: boolean | null
           price: number
           product_type: string
+          reserved_stock?: number | null
           shop_id: string
           updated_at?: string | null
           valve_size?: string | null
@@ -1219,6 +1272,7 @@ export type Database = {
           is_available?: boolean | null
           price?: number
           product_type?: string
+          reserved_stock?: number | null
           shop_id?: string
           updated_at?: string | null
           valve_size?: string | null
@@ -1244,6 +1298,7 @@ export type Database = {
       shop_profiles: {
         Row: {
           address: string
+          bkash_number: string | null
           cover_image_url: string | null
           created_at: string | null
           delivery_fee: number | null
@@ -1256,9 +1311,12 @@ export type Database = {
           latitude: number | null
           logo_url: string | null
           longitude: number | null
+          nagad_number: string | null
+          online_payment_only: boolean | null
           owner_id: string
           phone: string
           rating: number | null
+          rocket_number: string | null
           shop_name: string
           thana: string | null
           total_orders: number | null
@@ -1268,6 +1326,7 @@ export type Database = {
         }
         Insert: {
           address: string
+          bkash_number?: string | null
           cover_image_url?: string | null
           created_at?: string | null
           delivery_fee?: number | null
@@ -1280,9 +1339,12 @@ export type Database = {
           latitude?: number | null
           logo_url?: string | null
           longitude?: number | null
+          nagad_number?: string | null
+          online_payment_only?: boolean | null
           owner_id: string
           phone: string
           rating?: number | null
+          rocket_number?: string | null
           shop_name: string
           thana?: string | null
           total_orders?: number | null
@@ -1292,6 +1354,7 @@ export type Database = {
         }
         Update: {
           address?: string
+          bkash_number?: string | null
           cover_image_url?: string | null
           created_at?: string | null
           delivery_fee?: number | null
@@ -1304,9 +1367,12 @@ export type Database = {
           latitude?: number | null
           logo_url?: string | null
           longitude?: number | null
+          nagad_number?: string | null
+          online_payment_only?: boolean | null
           owner_id?: string
           phone?: string
           rating?: number | null
+          rocket_number?: string | null
           shop_name?: string
           thana?: string | null
           total_orders?: number | null

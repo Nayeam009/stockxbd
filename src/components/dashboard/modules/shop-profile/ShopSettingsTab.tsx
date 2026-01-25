@@ -39,6 +39,11 @@ interface ShopSettings {
   notify_new_orders: boolean;
   notify_low_stock: boolean;
   is_listed: boolean;
+  // Online payment numbers
+  bkash_number: string;
+  nagad_number: string;
+  rocket_number: string;
+  online_payment_only: boolean;
 }
 
 interface ShopSettingsTabProps {
@@ -49,6 +54,7 @@ const PAYMENT_METHODS = [
   { id: 'cod', label: 'Cash on Delivery', icon: '💵' },
   { id: 'bkash', label: 'bKash', icon: '🔴' },
   { id: 'nagad', label: 'Nagad', icon: '🟠' },
+  { id: 'rocket', label: 'Rocket', icon: '🟣' },
   { id: 'card', label: 'Card Payment', icon: '💳' }
 ];
 
@@ -60,7 +66,11 @@ const DEFAULT_SETTINGS: ShopSettings = {
   payment_methods: ['cod'],
   notify_new_orders: true,
   notify_low_stock: true,
-  is_listed: true
+  is_listed: true,
+  bkash_number: '',
+  nagad_number: '',
+  rocket_number: '',
+  online_payment_only: false
 };
 
 export const ShopSettingsTab = ({ shopId }: ShopSettingsTabProps) => {
@@ -83,7 +93,24 @@ export const ShopSettingsTab = ({ shopId }: ShopSettingsTabProps) => {
       // Load from localStorage for now (can be migrated to database later)
       const savedSettings = localStorage.getItem(`shop_settings_${shopId}`);
       if (savedSettings) {
-        setSettings(JSON.parse(savedSettings));
+        setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(savedSettings) });
+      }
+
+      // Also fetch payment numbers from database
+      const { data: shopData } = await supabase
+        .from('shop_profiles')
+        .select('bkash_number, nagad_number, rocket_number, online_payment_only')
+        .eq('id', shopId)
+        .single();
+
+      if (shopData) {
+        setSettings(prev => ({
+          ...prev,
+          bkash_number: shopData.bkash_number || '',
+          nagad_number: shopData.nagad_number || '',
+          rocket_number: shopData.rocket_number || '',
+          online_payment_only: shopData.online_payment_only || false
+        }));
       }
     } catch (error) {
       console.error('Error loading settings:', error);
@@ -100,11 +127,19 @@ export const ShopSettingsTab = ({ shopId }: ShopSettingsTabProps) => {
       // Save to localStorage (can be migrated to database)
       localStorage.setItem(`shop_settings_${shopId}`, JSON.stringify(settings));
       
-      // Update is_listed status in database
-      await supabase
+      // Update shop profile in database with payment numbers and visibility
+      const { error } = await supabase
         .from('shop_profiles')
-        .update({ is_open: settings.is_listed })
+        .update({ 
+          is_open: settings.is_listed,
+          bkash_number: settings.bkash_number || null,
+          nagad_number: settings.nagad_number || null,
+          rocket_number: settings.rocket_number || null,
+          online_payment_only: settings.online_payment_only
+        })
         .eq('id', shopId);
+
+      if (error) throw error;
       
       toast({ title: "Settings saved successfully!" });
     } catch (error: any) {
@@ -298,7 +333,8 @@ export const ShopSettingsTab = ({ shopId }: ShopSettingsTabProps) => {
           </CardTitle>
           <CardDescription>Accept these payment options</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-6">
+          {/* Payment Method Checkboxes */}
           <div className="grid sm:grid-cols-2 gap-3">
             {PAYMENT_METHODS.map(method => (
               <div 
@@ -320,10 +356,73 @@ export const ShopSettingsTab = ({ shopId }: ShopSettingsTabProps) => {
             ))}
           </div>
           {settings.payment_methods.length === 0 && (
-            <p className="text-sm text-destructive mt-3">
+            <p className="text-sm text-destructive">
               ⚠️ Please select at least one payment method
             </p>
           )}
+
+          {/* Online Payment Numbers */}
+          <div className="border-t pt-6">
+            <h4 className="font-medium mb-4 flex items-center gap-2">
+              💰 Online Payment Numbers
+              <Badge variant="secondary" className="text-xs">For Online Orders</Badge>
+            </h4>
+            <p className="text-sm text-muted-foreground mb-4">
+              Customers will see these numbers when placing online orders
+            </p>
+            <div className="grid sm:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <span className="text-lg">🔴</span> bKash Number
+                </Label>
+                <Input
+                  value={settings.bkash_number}
+                  onChange={(e) => setSettings(prev => ({ ...prev, bkash_number: e.target.value }))}
+                  placeholder="01XXXXXXXXX"
+                  className="h-11"
+                  inputMode="tel"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <span className="text-lg">🟠</span> Nagad Number
+                </Label>
+                <Input
+                  value={settings.nagad_number}
+                  onChange={(e) => setSettings(prev => ({ ...prev, nagad_number: e.target.value }))}
+                  placeholder="01XXXXXXXXX"
+                  className="h-11"
+                  inputMode="tel"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <span className="text-lg">🟣</span> Rocket Number
+                </Label>
+                <Input
+                  value={settings.rocket_number}
+                  onChange={(e) => setSettings(prev => ({ ...prev, rocket_number: e.target.value }))}
+                  placeholder="01XXXXXXXXX"
+                  className="h-11"
+                  inputMode="tel"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Require Online Payment Toggle */}
+          <div className="flex items-center justify-between p-4 rounded-lg border bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800">
+            <div>
+              <p className="font-medium text-amber-800 dark:text-amber-200">Require Online Payment</p>
+              <p className="text-sm text-amber-600 dark:text-amber-400">
+                Disable Cash on Delivery for online orders (recommended)
+              </p>
+            </div>
+            <Switch
+              checked={settings.online_payment_only}
+              onCheckedChange={(checked) => setSettings(prev => ({ ...prev, online_payment_only: checked }))}
+            />
+          </div>
         </CardContent>
       </Card>
 

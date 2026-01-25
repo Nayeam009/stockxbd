@@ -15,11 +15,18 @@ import { InvoiceDialog } from "@/components/invoice/InvoiceDialog";
 import { 
   ShoppingBag, Package, Clock, CheckCircle, Truck, XCircle, 
   Search, RefreshCw, Phone, MapPin, Calendar, ExternalLink,
-  Store, TrendingUp, AlertCircle, Printer, RotateCcw
+  Store, TrendingUp, AlertCircle, Printer, RotateCcw, ImageIcon,
+  ZoomIn, ShieldCheck, Cylinder
 } from "lucide-react";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
-
+import {
+  Dialog as ZoomDialog,
+  DialogContent as ZoomDialogContent,
+  DialogHeader as ZoomDialogHeader,
+  DialogTitle as ZoomDialogTitle,
+  DialogTrigger as ZoomDialogTrigger,
+} from "@/components/ui/dialog";
 interface CommunityOrder {
   id: string;
   order_number: string;
@@ -44,6 +51,11 @@ interface CommunityOrder {
   delivered_at: string | null;
   created_at: string;
   items?: OrderItem[];
+  // New fields
+  payment_trx_id?: string;
+  return_cylinder_verified?: boolean;
+  verified_at?: string;
+  customer_cylinder_photo?: string | null;
 }
 
 interface OrderItem {
@@ -75,6 +87,9 @@ export const MarketplaceOrdersModule = () => {
   const [posTransactionNumber, setPosTransactionNumber] = useState<string>("");
   const [processingOrderId, setProcessingOrderId] = useState<string | null>(null);
   const [shopProfile, setShopProfile] = useState<{ name: string; phone: string; address: string } | null>(null);
+  const [verifyDialogOpen, setVerifyDialogOpen] = useState(false);
+  const [selectedOrderForVerify, setSelectedOrderForVerify] = useState<CommunityOrder | null>(null);
+  const [verifyReturnType, setVerifyReturnType] = useState<'empty' | 'leaked'>('empty');
 
   // Fetch shop and orders
   const fetchData = useCallback(async () => {
@@ -117,14 +132,26 @@ export const MarketplaceOrdersModule = () => {
 
       if (ordersError) throw ordersError;
 
-      // Fetch order items for each order
+      // Fetch order items and customer cylinder photos for each order
       const ordersWithItems = await Promise.all(
         (ordersData || []).map(async (order) => {
           const { data: items } = await supabase
             .from('community_order_items')
             .select('*')
             .eq('order_id', order.id);
-          return { ...order, items: items || [] } as CommunityOrder;
+          
+          // Fetch customer cylinder photo
+          const { data: cylinderProfile } = await supabase
+            .from('customer_cylinder_profiles')
+            .select('cylinder_photo_url')
+            .eq('user_id', order.customer_id)
+            .maybeSingle();
+
+          return { 
+            ...order, 
+            items: items || [],
+            customer_cylinder_photo: cylinderProfile?.cylinder_photo_url || null
+          } as CommunityOrder;
         })
       );
 
@@ -300,11 +327,16 @@ export const MarketplaceOrdersModule = () => {
       if (newStatus === 'delivered') {
         updateData.delivered_at = new Date().toISOString();
         updateData.payment_status = 'paid';
+        updateData.return_cylinder_verified = true;
+        updateData.verified_at = new Date().toISOString();
 
-        // 1. Inventory sync is handled below - POS transaction status will sync via realtime
-        // Note: The community_order_id lookup will work once Supabase types regenerate
+        // Get current user for verified_by
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          updateData.verified_by = user.id;
+        }
 
-        // 2. Update inventory for each item
+        // 1. Update inventory for each item
         for (const item of order.items || []) {
           if (item.product_type === 'lpg_refill' || item.product_type === 'lpg_package') {
             // Decrease refill/package stock
@@ -393,6 +425,28 @@ export const MarketplaceOrdersModule = () => {
       setRejectionReason("");
       setSelectedOrderId(null);
     }
+  };
+
+  // Handle verify return - updates return type and marks as delivered
+  const handleVerifyReturn = async () => {
+    if (!selectedOrderForVerify) return;
+    
+    // Update return cylinder type in order items if needed
+    for (const item of selectedOrderForVerify.items || []) {
+      if (item.return_cylinder_qty > 0) {
+        await supabase
+          .from('community_order_items')
+          .update({ return_cylinder_type: verifyReturnType })
+          .eq('id', item.id);
+      }
+    }
+    
+    // Mark as delivered (this triggers inventory update)
+    await updateOrderStatus(selectedOrderForVerify.id, 'delivered');
+    
+    setVerifyDialogOpen(false);
+    setSelectedOrderForVerify(null);
+    setVerifyReturnType('empty');
   };
 
   // Filter orders
@@ -692,6 +746,53 @@ export const MarketplaceOrdersModule = () => {
                       </div>
                     )}
 
+                    {/* Customer Cylinder Photo (for verification) */}
+                    {order.customer_cylinder_photo && order.status === 'pending' && (
+                      <div className="bg-primary/5 rounded-lg p-3 border border-primary/20">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-xs font-medium flex items-center gap-1">
+                            <Cylinder className="h-3 w-3 text-primary" />
+                            Customer's Cylinder Photo
+                          </p>
+                          <Badge variant="secondary" className="text-xs">For Verification</Badge>
+                        </div>
+                        <div className="flex items-start gap-3">
+                          <ZoomDialog>
+                            <ZoomDialogTrigger asChild>
+                              <div className="relative w-16 h-16 rounded-lg overflow-hidden cursor-pointer hover:opacity-80 transition-opacity border">
+                                <img 
+                                  src={order.customer_cylinder_photo} 
+                                  alt="Customer cylinder" 
+                                  className="w-full h-full object-cover"
+                                />
+                                <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
+                                  <ZoomIn className="h-4 w-4 text-white" />
+                                </div>
+                              </div>
+                            </ZoomDialogTrigger>
+                            <ZoomDialogContent className="max-w-lg p-2">
+                              <ZoomDialogHeader className="sr-only">
+                                <ZoomDialogTitle>Customer Cylinder Photo</ZoomDialogTitle>
+                              </ZoomDialogHeader>
+                              <img 
+                                src={order.customer_cylinder_photo} 
+                                alt="Customer cylinder full view" 
+                                className="w-full h-auto rounded-lg"
+                              />
+                            </ZoomDialogContent>
+                          </ZoomDialog>
+                          <div className="text-xs text-muted-foreground">
+                            <p>Tap to zoom. Check if cylinder:</p>
+                            <ul className="mt-1 space-y-0.5">
+                              <li>• Is the correct brand</li>
+                              <li>• Is not rusted/damaged</li>
+                              <li>• Has valid company markings</li>
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Order Notes */}
                     {order.order_notes && (
                       <div className="flex items-start gap-2 text-sm bg-warning/10 p-2 rounded-lg">
@@ -744,11 +845,14 @@ export const MarketplaceOrdersModule = () => {
                       {order.status === 'dispatched' && (
                         <Button 
                           size="sm" 
-                          onClick={() => updateOrderStatus(order.id, 'delivered')}
+                          onClick={() => {
+                            setSelectedOrderForVerify(order);
+                            setVerifyDialogOpen(true);
+                          }}
                           className="gap-1 h-10 bg-success hover:bg-success/90"
                         >
-                          <CheckCircle className="h-4 w-4" />
-                          Mark Delivered
+                          <ShieldCheck className="h-4 w-4" />
+                          Verify Empty Return
                         </Button>
                       )}
                       {(order.status === 'rejected' || order.status === 'cancelled') && order.rejection_reason && (
@@ -806,6 +910,88 @@ export const MarketplaceOrdersModule = () => {
           businessAddress={shopProfile?.address}
         />
       )}
+
+      {/* Verify Return Dialog */}
+      <Dialog open={verifyDialogOpen} onOpenChange={setVerifyDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5 text-success" />
+              Verify Empty Cylinder Return
+            </DialogTitle>
+            <DialogDescription>
+              Confirm the driver has returned with the empty cylinder from the customer.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedOrderForVerify && (
+            <div className="space-y-4 py-2">
+              {/* Order summary */}
+              <div className="bg-muted/50 rounded-lg p-3">
+                <p className="font-medium text-sm">Order #{selectedOrderForVerify.order_number}</p>
+                <p className="text-sm text-muted-foreground">{selectedOrderForVerify.customer_name}</p>
+              </div>
+
+              {/* Return items */}
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Return Cylinders:</p>
+                {(selectedOrderForVerify.items || []).filter(i => i.return_cylinder_qty > 0).map(item => (
+                  <div key={item.id} className="flex items-center justify-between p-2 border rounded-lg">
+                    <span className="text-sm">
+                      {item.brand_name} {item.weight} × {item.return_cylinder_qty}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Cylinder condition */}
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Cylinder Condition:</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    type="button"
+                    variant={verifyReturnType === 'empty' ? 'default' : 'outline'}
+                    className="h-12"
+                    onClick={() => setVerifyReturnType('empty')}
+                  >
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Empty (Good)
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={verifyReturnType === 'leaked' ? 'destructive' : 'outline'}
+                    className="h-12"
+                    onClick={() => setVerifyReturnType('leaked')}
+                  >
+                    <AlertCircle className="h-4 w-4 mr-2" />
+                    Leaked/Problem
+                  </Button>
+                </div>
+              </div>
+
+              <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+                <p className="text-xs text-amber-700 dark:text-amber-300">
+                  <strong>⚠️ Important:</strong> Inventory will be updated only after you confirm. 
+                  This ensures accurate stock tracking.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setVerifyDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleVerifyReturn}
+              className="bg-success hover:bg-success/90"
+            >
+              <ShieldCheck className="h-4 w-4 mr-2" />
+              Confirm & Complete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
