@@ -9,6 +9,16 @@ export default {
 		"./app/**/*.{ts,tsx}",
 		"./src/**/*.{ts,tsx}",
 	],
+	// Safelist for dynamically generated classes (brand colors, status badges)
+	safelist: [
+		// Brand color classes - generated dynamically from brandConstants
+		{ pattern: /bg-(red|green|blue|yellow|orange|pink|purple|teal|amber|emerald|indigo|cyan|lime|rose|fuchsia|violet|sky)-(100|200|300|400|500|600|700|800|900)/ },
+		{ pattern: /text-(red|green|blue|yellow|orange|pink|purple|teal|amber|emerald|indigo|cyan|lime|rose|fuchsia|violet|sky)-(100|200|300|400|500|600|700|800|900)/ },
+		{ pattern: /border-(red|green|blue|yellow|orange|pink|purple|teal|amber|emerald|indigo|cyan|lime|rose|fuchsia|violet|sky)-(100|200|300|400|500|600|700|800|900)/ },
+		// Status badge colors
+		'bg-success', 'bg-warning', 'bg-destructive', 'bg-info',
+		'text-success', 'text-warning', 'text-destructive', 'text-info',
+	],
 	prefix: "",
 	theme: {
 		container: {

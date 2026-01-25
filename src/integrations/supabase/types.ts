@@ -580,6 +580,48 @@ export type Database = {
         }
         Relationships: []
       }
+      inventory_summary: {
+        Row: {
+          brand_name: string
+          count_empty: number
+          count_package: number
+          count_problem: number
+          count_refill: number
+          id: string
+          last_updated_at: string
+          owner_id: string
+          total_full: number | null
+          valve_size: string
+          weight: string
+        }
+        Insert: {
+          brand_name: string
+          count_empty?: number
+          count_package?: number
+          count_problem?: number
+          count_refill?: number
+          id?: string
+          last_updated_at?: string
+          owner_id: string
+          total_full?: number | null
+          valve_size?: string
+          weight?: string
+        }
+        Update: {
+          brand_name?: string
+          count_empty?: number
+          count_package?: number
+          count_problem?: number
+          count_refill?: number
+          id?: string
+          last_updated_at?: string
+          owner_id?: string
+          total_full?: number | null
+          valve_size?: string
+          weight?: string
+        }
+        Relationships: []
+      }
       invite_validation_attempts: {
         Row: {
           attempted_at: string | null
@@ -1895,7 +1937,43 @@ export type Database = {
       generate_order_number: { Args: never; Returns: string }
       generate_pob_number: { Args: never; Returns: string }
       generate_transaction_number: { Args: never; Returns: string }
+      get_active_orders_count: {
+        Args: never
+        Returns: {
+          dispatched_count: number
+          pending_count: number
+          total_active: number
+        }[]
+      }
+      get_customer_stats: {
+        Args: never
+        Returns: {
+          customers_with_due: number
+          total_customers: number
+          total_due_amount: number
+        }[]
+      }
+      get_inventory_totals: {
+        Args: never
+        Returns: {
+          total_empty: number
+          total_full: number
+          total_package: number
+          total_problem: number
+          total_refill: number
+        }[]
+      }
+      get_monthly_revenue_stats: {
+        Args: never
+        Returns: {
+          current_month: number
+          growth_percent: number
+          last_month: number
+        }[]
+      }
       get_owner_id: { Args: never; Returns: string }
+      get_today_expenses_total: { Args: never; Returns: number }
+      get_today_sales_total: { Args: never; Returns: number }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
