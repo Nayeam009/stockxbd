@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useNavigate } from "react-router-dom";
 
 interface AppSidebarProps {
   activeModule: string;
@@ -29,6 +30,7 @@ export const AppSidebar = ({
 }: AppSidebarProps) => {
   const { state, isMobile, setOpenMobile } = useSidebar();
   const { t } = useLanguage();
+  const navigate = useNavigate();
 
   // Collapsed means icon-only mode on desktop
   const isCollapsed = state === "collapsed" && !isMobile;
@@ -163,11 +165,10 @@ export const AppSidebar = ({
       <SidebarFooter className={`border-t border-border/40 transition-all duration-300 ${isCollapsed ? 'p-2' : 'p-3'}`}>
         <div className={`transition-all duration-300 ease-out overflow-hidden ${isCollapsed ? 'max-h-0 opacity-0' : 'max-h-20 opacity-100'}`}>
           <Button variant="ghost" size="sm" className="w-full justify-start h-10 px-3 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all duration-200 rounded-xl" onClick={async () => {
-          await supabase.auth.signOut();
-          toast({
-            title: t("logout")
-          });
-        }}>
+            await supabase.auth.signOut();
+            toast({ title: t("logout") });
+            navigate('/auth');
+          }}>
             <LogOut className="h-4 w-4" />
             <span className="ml-2 text-sm font-medium">{t("logout")}</span>
           </Button>
@@ -176,11 +177,10 @@ export const AppSidebar = ({
           <Tooltip>
             <TooltipTrigger asChild>
               <Button variant="ghost" size="icon" className="w-8 h-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all duration-200 rounded-lg" onClick={async () => {
-              await supabase.auth.signOut();
-              toast({
-                title: t("logout")
-              });
-            }}>
+                await supabase.auth.signOut();
+                toast({ title: t("logout") });
+                navigate('/auth');
+              }}>
                 <LogOut className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
