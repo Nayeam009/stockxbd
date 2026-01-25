@@ -51,19 +51,28 @@ const staffRoleConfig: Record<string, { icon: React.ComponentType<any>; color: s
 };
 
 export const SaleEntryCard = ({ entry, onViewDetails }: SaleEntryCardProps) => {
+  // Safely get payment config with fallback
   const paymentConfig = paymentMethodConfig[entry.paymentMethod] || paymentMethodConfig.cash;
   const PaymentIcon = paymentConfig.icon;
-  const statusConf = statusConfig[entry.paymentStatus] || statusConfig.paid;
+  
+  // Normalize payment status - handle 'completed' from database
+  const normalizedStatus = (entry.paymentStatus === 'paid' || (entry as any).paymentStatus === 'completed') 
+    ? 'paid' 
+    : entry.paymentStatus === 'partial' 
+      ? 'partial' 
+      : 'due';
+  
+  const statusConf = statusConfig[normalizedStatus] || statusConfig.paid;
   const roleConf = staffRoleConfig[entry.staffRole] || staffRoleConfig.unknown;
   const RoleIcon = roleConf.icon;
   
   const isPayment = entry.type === 'payment';
   const hasReturnCylinders = entry.returnCylinders && entry.returnCylinders.length > 0;
 
-  // Get status bar color
+  // Get status bar color based on normalized status
   const getStatusBarColor = () => {
-    if (entry.paymentStatus === 'paid') return 'bg-emerald-400';
-    if (entry.paymentStatus === 'due') return 'bg-rose-400';
+    if (normalizedStatus === 'paid') return 'bg-emerald-400';
+    if (normalizedStatus === 'due') return 'bg-rose-400';
     return 'bg-amber-400';
   };
 
@@ -101,7 +110,7 @@ export const SaleEntryCard = ({ entry, onViewDetails }: SaleEntryCardProps) => {
                   Online
                 </Badge>
               )}
-              <Badge variant="outline" className={`${statusConf.bgColor} ${statusConf.color} text-xs font-medium border`}>
+              <Badge variant="outline" className={`${statusConf.bgColor} ${statusConf.color} text-xs font-medium border`} aria-label={`Payment status: ${statusConf.label}`}>
                 {statusConf.label}
               </Badge>
               {entry.transactionType === 'wholesale' && (
@@ -187,11 +196,12 @@ export const SaleEntryCard = ({ entry, onViewDetails }: SaleEntryCardProps) => {
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="h-8 px-3 text-xs hover:bg-primary/10 hover:text-primary"
+                className="h-10 w-10 sm:h-8 sm:w-auto sm:px-3 text-xs hover:bg-primary/10 hover:text-primary touch-manipulation"
                 onClick={() => onViewDetails(entry)}
+                aria-label={`View details for transaction ${entry.transactionNumber}`}
               >
-                <Eye className="h-3.5 w-3.5 mr-1" />
-                View
+                <Eye className="h-4 w-4 sm:mr-1" aria-hidden="true" />
+                <span className="hidden sm:inline">View</span>
               </Button>
             )}
           </div>
