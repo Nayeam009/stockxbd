@@ -31,7 +31,7 @@ import {
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
-import { getLpgBrandColor, validateCustomBrand } from "@/lib/brandConstants";
+import { getLpgBrandColor, getLpgColorByValveSize, validateCustomBrand, calculateDefaultPrices } from "@/lib/brandConstants";
 import { supabase } from "@/integrations/supabase/client";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { logger } from "@/lib/logger";
@@ -819,19 +819,38 @@ export const InventoryPOBDrawer = ({
           // Fetch current stock from DB (not in-memory) to avoid stale data
           const { data: currentBrand } = await supabase
             .from('lpg_brands')
-            .select(stockField)
+            .select(`${stockField}, empty_cylinder`)
             .eq('id', item.brandId)
             .single();
           
           if (currentBrand) {
             const currentStock = currentBrand[stockField as keyof typeof currentBrand] as number || 0;
-            await supabase
-              .from('lpg_brands')
-              .update({ 
-                [stockField]: currentStock + item.quantity,
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', item.brandId);
+            const currentEmpty = currentBrand.empty_cylinder || 0;
+            
+            // D.O. Mode (buy with money) for refill cylinders:
+            // - Reduce empty cylinder count (sent to plant for refilling)
+            // - Add refill cylinder count (refilled cylinders return)
+            // Add Mode: Only add to stock without reducing empty
+            if (pobMode === 'buy' && item.cylinderType === 'refill') {
+              // D.O. exchange: empty goes to plant, refill comes back
+              await supabase
+                .from('lpg_brands')
+                .update({ 
+                  [stockField]: currentStock + item.quantity,
+                  empty_cylinder: Math.max(0, currentEmpty - item.quantity),
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', item.brandId);
+            } else {
+              // Package or Add mode: just add to stock (no empty reduction)
+              await supabase
+                .from('lpg_brands')
+                .update({ 
+                  [stockField]: currentStock + item.quantity,
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', item.brandId);
+            }
           }
         } else if (item.type === 'stove' && item.stoveId) {
           // Fetch current stock from DB

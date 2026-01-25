@@ -1,6 +1,67 @@
 // Brand Constants for Bangladeshi LPG Business
 // Comprehensive lists of popular brands with metadata
 
+// ============= VALVE-SIZE SPECIFIC COLOR MAPS =============
+
+// 22mm Valve Size Colors (Primary cylinders - most common in Bangladesh)
+export const LPG_COLORS_22MM: Record<string, string> = {
+  "Bashundhara": "#991b1b",    // Deep Red
+  "Omera": "#22c55e",          // Parrot Green
+  "Fresh": "#2563eb",          // Blue
+  "Green": "#facc15",          // Yellow
+  "BM": "#0d9488",             // Turquoise/Teal
+  "BM Energy": "#0d9488",      // Turquoise/Teal
+  "Jamuna": "#dc2626",         // Red
+  "LAUGFS": "#ca8a04",         // Very Deep Yellow
+  "Laugfs": "#ca8a04",         // Very Deep Yellow
+  "Total": "#ea580c",          // Deep Orange
+  "Totalgaz": "#ea580c",       // Deep Orange
+  "Beximco": "#16a34a",        // Green
+  "Navana": "#166534",         // Deep Green
+  "Petromax": "#ec4899",       // Pink
+  "JMI": "#f97316",            // Orange
+  "G-Gas": "#3b82f6",          // Blue+Red mix
+  "G-Gas (Energypac)": "#3b82f6",
+  "Universal": "#22c55e",      // Kelly Green
+  "Universal Gas": "#22c55e",
+  "Sena": "#dc2626",           // Red
+  "Delta": "#dc2626",          // Red
+  "INDEX": "#9333ea",          // Purple
+  "Index": "#9333ea",          // Purple
+  "Unigas": "#fef3c7",         // Cream Yellow
+  "Uni Gas": "#fef3c7",
+  "Akij": "#a5b4fc",           // Powder Blue
+  "I-Gas": "#a5b4fc",          // Powder Blue
+  "Orion": "#581c87",          // Deep Purple
+};
+
+// 20mm Valve Size Colors (Different from 22mm for distinction)
+export const LPG_COLORS_20MM: Record<string, string> = {
+  "Bashundhara": "#facc15",    // Yellow
+  "Omera": "#166534",          // Deep Green
+  "Fresh": "#1e40af",          // Deep Blue
+  "BM": "#14b8a6",             // Green-Teal
+  "BM Energy": "#14b8a6",
+  "Jamuna": "#22c55e",         // Green
+  "LAUGFS": "#84cc16",         // Yellow-Green
+  "Laugfs": "#84cc16",
+  "Total": "#ea580c",          // Deep Orange
+  "Totalgaz": "#ea580c",
+  "Beximco": "#16a34a",        // Green
+  "Navana": "#166534",         // Deep Green
+  "Petromax": "#be185d",       // Deep Pink
+  "JMI": "#be185d",            // Deep Pink Green
+  "G-Gas": "#22c55e",          // Green
+  "G-Gas (Energypac)": "#22c55e",
+  "Universal": "#22c55e",      // Kelly Green
+  "Universal Gas": "#22c55e",
+  "Unigas": "#84cc16",         // Yellow-Green
+  "Uni Gas": "#84cc16",
+  "Akij": "#0d9488",           // Blue-Green
+  "I-Gas": "#0d9488",
+  "Orion": "#581c87",          // Deep Purple
+};
+
 // ============= LPG CYLINDER BRANDS =============
 export interface LpgBrandInfo {
   name: string;
@@ -10,23 +71,23 @@ export interface LpgBrandInfo {
 
 export const LPG_BRANDS: LpgBrandInfo[] = [
   // Market Leaders (22mm)
-  { name: "Bashundhara", mouthSize: "22mm", color: "#e11d48" },
+  { name: "Bashundhara", mouthSize: "22mm", color: "#991b1b" },
   { name: "Omera", mouthSize: "22mm", color: "#22c55e" },
-  { name: "Jamuna", mouthSize: "22mm", color: "#3b82f6" },
-  { name: "Beximco", mouthSize: "22mm", color: "#8b5cf6" },
-  { name: "INDEX", mouthSize: "22mm", color: "#f97316" },
-  { name: "BM Energy", mouthSize: "22mm", color: "#06b6d4" },
-  { name: "Fresh", mouthSize: "22mm", color: "#84cc16" },
-  { name: "Navana", mouthSize: "22mm", color: "#ec4899" },
-  { name: "Akij", mouthSize: "22mm", color: "#14b8a6" },
-  { name: "Orion", mouthSize: "22mm", color: "#6366f1" },
-  { name: "Delta", mouthSize: "22mm", color: "#f43f5e" },
-  { name: "JMI", mouthSize: "22mm", color: "#0ea5e9" },
-  { name: "G-Gas (Energypac)", mouthSize: "22mm", color: "#10b981" },
+  { name: "Jamuna", mouthSize: "22mm", color: "#dc2626" },
+  { name: "Beximco", mouthSize: "22mm", color: "#16a34a" },
+  { name: "INDEX", mouthSize: "22mm", color: "#9333ea" },
+  { name: "BM Energy", mouthSize: "22mm", color: "#0d9488" },
+  { name: "Fresh", mouthSize: "22mm", color: "#2563eb" },
+  { name: "Navana", mouthSize: "22mm", color: "#166534" },
+  { name: "Akij", mouthSize: "22mm", color: "#a5b4fc" },
+  { name: "Orion", mouthSize: "22mm", color: "#581c87" },
+  { name: "Delta", mouthSize: "22mm", color: "#dc2626" },
+  { name: "JMI", mouthSize: "22mm", color: "#f97316" },
+  { name: "G-Gas (Energypac)", mouthSize: "22mm", color: "#3b82f6" },
   { name: "Runner", mouthSize: "22mm", color: "#d946ef" },
   { name: "Meghna", mouthSize: "22mm", color: "#a855f7" },
   { name: "Unitex", mouthSize: "22mm", color: "#facc15" },
-  { name: "Sena", mouthSize: "22mm", color: "#64748b" },
+  { name: "Sena", mouthSize: "22mm", color: "#dc2626" },
   { name: "City", mouthSize: "22mm", color: "#78716c" },
   { name: "RP", mouthSize: "22mm", color: "#0284c7" },
   { name: "Golden", mouthSize: "22mm", color: "#ca8a04" },
@@ -35,9 +96,9 @@ export const LPG_BRANDS: LpgBrandInfo[] = [
   { name: "Unique", mouthSize: "22mm", color: "#ea580c" },
   { name: "S Alam", mouthSize: "22mm", color: "#0d9488" },
   // Additional 22mm Brands
-  { name: "Cylinderwala (BM)", mouthSize: "22mm", color: "#2563eb" },
-  { name: "Universal Gas", mouthSize: "22mm", color: "#7c3aed" },
-  { name: "Unigas", mouthSize: "22mm", color: "#0891b2" },
+  { name: "Cylinderwala (BM)", mouthSize: "22mm", color: "#0d9488" },
+  { name: "Universal Gas", mouthSize: "22mm", color: "#22c55e" },
+  { name: "Unigas", mouthSize: "22mm", color: "#fef3c7" },
   { name: "Star", mouthSize: "22mm", color: "#eab308" },
   { name: "Pioneer", mouthSize: "22mm", color: "#16a34a" },
   { name: "Summit", mouthSize: "22mm", color: "#ea580c" },
@@ -62,9 +123,9 @@ export const LPG_BRANDS: LpgBrandInfo[] = [
   { name: "Shikha", mouthSize: "22mm", color: "#f472b6" },
   { name: "Baraka", mouthSize: "22mm", color: "#059669" },
   // 20mm Brands
-  { name: "Totalgaz", mouthSize: "20mm", color: "#0891b2" },
-  { name: "Laugfs", mouthSize: "20mm", color: "#7c3aed" },
-  { name: "Petromax", mouthSize: "20mm", color: "#dc2626" },
+  { name: "Totalgaz", mouthSize: "20mm", color: "#ea580c" },
+  { name: "Laugfs", mouthSize: "20mm", color: "#84cc16" },
+  { name: "Petromax", mouthSize: "20mm", color: "#be185d" },
   { name: "K-Gas", mouthSize: "20mm", color: "#059669" },
   { name: "Lufs", mouthSize: "20mm", color: "#f59e0b" },
   { name: "Shell", mouthSize: "20mm", color: "#facc15" },
@@ -275,7 +336,68 @@ export const REGULATOR_SUPPLIERS: SupplierInfo[] = [
   { name: "Gas Equipment Wholesale", type: "regulator", category: "distributor" },
 ];
 
+// ============= DEFAULT PRICING CONSTANTS =============
+// Default pricing formulas for cylinders
+export const DEFAULT_PRICING = {
+  refill: {
+    wholesaleMarkup: 20,  // Company + 20 = Wholesale
+    retailMarkup: 30,     // Wholesale + 30 = Retail
+  },
+  package: {
+    wholesaleMarkup: 50,  // Company + 50 = Wholesale
+    retailMarkup: 50,     // Wholesale + 50 = Retail
+  }
+};
+
+/**
+ * Calculate default prices based on company price
+ */
+export const calculateDefaultPrices = (
+  companyPrice: number, 
+  cylinderType: 'refill' | 'package'
+): { wholesale: number; retail: number } => {
+  const config = DEFAULT_PRICING[cylinderType];
+  const wholesale = companyPrice + config.wholesaleMarkup;
+  const retail = wholesale + config.retailMarkup;
+  return { wholesale, retail };
+};
+
 // ============= HELPER FUNCTIONS =============
+
+/**
+ * Get LPG brand color based on valve size
+ * Different valve sizes have different colors for easy identification
+ */
+export const getLpgColorByValveSize = (
+  brandName: string, 
+  valveSize: "22mm" | "20mm"
+): string => {
+  // Normalize brand name for lookup
+  const normalizedName = brandName.trim();
+  
+  // Check valve-size-specific color maps first
+  const colorMap = valveSize === "22mm" ? LPG_COLORS_22MM : LPG_COLORS_20MM;
+  
+  // Try exact match
+  if (colorMap[normalizedName]) {
+    return colorMap[normalizedName];
+  }
+  
+  // Try partial match (brand name contains key)
+  for (const [key, color] of Object.entries(colorMap)) {
+    if (normalizedName.toLowerCase().includes(key.toLowerCase()) ||
+        key.toLowerCase().includes(normalizedName.toLowerCase())) {
+      return color;
+    }
+  }
+  
+  // Fallback to general brand lookup
+  const brand = LPG_BRANDS.find(b => 
+    b.name.toLowerCase() === normalizedName.toLowerCase()
+  );
+  
+  return brand?.color ?? "#22c55e"; // Default green
+};
 
 /**
  * Get LPG brands filtered by mouth size
@@ -285,11 +407,10 @@ export const getLpgBrandsByMouthSize = (size: "22mm" | "20mm"): LpgBrandInfo[] =
 };
 
 /**
- * Get the suggested color for a brand name
+ * Get the suggested color for a brand name (legacy - uses 22mm by default)
  */
 export const getLpgBrandColor = (brandName: string): string => {
-  const brand = LPG_BRANDS.find(b => b.name.toLowerCase() === brandName.toLowerCase());
-  return brand?.color ?? "#22c55e"; // Default green
+  return getLpgColorByValveSize(brandName, "22mm");
 };
 
 /**

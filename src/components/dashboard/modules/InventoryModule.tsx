@@ -28,6 +28,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
+import { getLpgColorByValveSize } from "@/lib/brandConstants";
 
 // Interfaces
 interface LPGBrand {
@@ -379,15 +380,22 @@ export const InventoryModule = () => {
     );
   };
 
-  // LPG Brand Card
+  // LPG Brand Card with valve-size-specific colors
   const LpgBrandCard = ({ brand }: { brand: LPGBrand }) => {
     const status = getLpgStatus(brand);
+    // Use valve-size-specific color for better identification
+    const brandColor = getLpgColorByValveSize(brand.name, brand.size as "22mm" | "20mm");
+    
     return (
       <Card className="border-border hover:shadow-md transition-shadow">
         <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-6 pt-3 sm:pt-4">
           <div className="flex items-center justify-between gap-2">
             <CardTitle className="flex items-center gap-2 text-sm sm:text-lg">
-              <span className="h-3 w-3 sm:h-4 sm:w-4 rounded-full flex-shrink-0" style={{ backgroundColor: brand.color }} />
+              <span 
+                className="h-4 w-4 sm:h-5 sm:w-5 rounded-full flex-shrink-0 ring-2 ring-offset-1 ring-offset-background shadow-sm" 
+                style={{ backgroundColor: brandColor, boxShadow: `0 0 8px ${brandColor}40` }}
+                title={`${brand.name} (${brand.size})`}
+              />
               <span className="truncate">{brand.name}</span>
             </CardTitle>
             <div className="flex items-center gap-2 flex-shrink-0">
@@ -397,19 +405,22 @@ export const InventoryModule = () => {
               </Button>
             </div>
           </div>
-          <Badge variant="outline" className="text-[10px] sm:text-xs w-fit mt-1">{selectedWeight}</Badge>
+          <div className="flex gap-1.5 mt-1">
+            <Badge variant="outline" className="text-[10px] sm:text-xs">{selectedWeight}</Badge>
+            <Badge variant="secondary" className="text-[10px] sm:text-xs">{brand.size}</Badge>
+          </div>
         </CardHeader>
         <CardContent className="space-y-3 px-3 sm:px-6 pb-3 sm:pb-4">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <EditableStockCell value={brand.package_cylinder} itemId={brand.id} field="package_cylinder" icon={Package} label="Package" bgColor="bg-green-100 dark:bg-green-900/30" type="lpg" onUpdate={handleUpdateLpg} />
+            <EditableStockCell value={brand.package_cylinder} itemId={brand.id} field="package_cylinder" icon={Package} label="Package" bgColor="bg-emerald-100 dark:bg-emerald-900/30" type="lpg" onUpdate={handleUpdateLpg} />
             <EditableStockCell value={brand.refill_cylinder} itemId={brand.id} field="refill_cylinder" icon={Cylinder} label="Refill" bgColor="bg-blue-100 dark:bg-blue-900/30" type="lpg" onUpdate={handleUpdateLpg} />
             <EditableStockCell value={brand.empty_cylinder} itemId={brand.id} field="empty_cylinder" icon={Package} label="Empty" bgColor="bg-gray-100 dark:bg-gray-800/50" type="lpg" onUpdate={handleUpdateLpg} />
             <EditableStockCell value={brand.problem_cylinder} itemId={brand.id} field="problem_cylinder" icon={AlertTriangle} label="Problem" bgColor="bg-red-100 dark:bg-red-900/30" type="lpg" onUpdate={handleUpdateLpg} />
           </div>
           {(brand.in_transit_cylinder || 0) > 0 && (
-            <div className="flex items-center justify-between p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded-md">
-              <span className="text-xs sm:text-sm flex items-center gap-2"><Truck className="h-3 w-3 sm:h-4 sm:w-4 text-yellow-600" />In Transit</span>
-              <Badge variant="outline" className="bg-yellow-500/20 text-yellow-700 dark:text-yellow-300">{brand.in_transit_cylinder}</Badge>
+            <div className="flex items-center justify-between p-2 bg-amber-50 dark:bg-amber-900/30 rounded-md">
+              <span className="text-xs sm:text-sm flex items-center gap-2"><Truck className="h-3 w-3 sm:h-4 sm:w-4 text-amber-600" />In Transit</span>
+              <Badge variant="outline" className="bg-amber-100/50 text-amber-700 dark:text-amber-300">{brand.in_transit_cylinder}</Badge>
             </div>
           )}
         </CardContent>
