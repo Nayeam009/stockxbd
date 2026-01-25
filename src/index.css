@@ -377,6 +377,34 @@
     }
   }
 
+  /* Tabular numbers for numeric data */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Focus visible ring for accessibility */
+  .focus-ring {
+    @apply focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2;
+  }
+
+  /* Screen reader only text */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  /* Accessible card interactive styles */
+  .card-interactive {
+    @apply transition-all duration-200 hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2;
+  }
+
   /* Hide Scrollbar but Keep Scroll */
   .no-scrollbar::-webkit-scrollbar {
     display: none;
