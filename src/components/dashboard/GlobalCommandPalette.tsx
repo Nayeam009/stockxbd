@@ -51,7 +51,7 @@ interface NavigationItem {
 }
 
 interface GlobalCommandPaletteProps {
-  userRole: 'owner' | 'manager' | 'driver';
+  userRole: 'owner' | 'manager' | 'driver' | 'staff';
   setActiveModule: (module: string) => void;
 }
 
@@ -59,10 +59,10 @@ export const GlobalCommandPalette = ({ userRole, setActiveModule }: GlobalComman
   const [open, setOpen] = useState(false);
   const isMobile = useIsMobile();
 
-  // Navigation items based on role
+  // Navigation items based on role (staff has limited access: overview, pos, settings)
   const navigationItems: NavigationItem[] = useMemo((): NavigationItem[] => [
-    { id: 'overview', title: 'Dashboard Overview', description: 'Main dashboard with KPIs and quick actions', icon: Home, category: 'page' as const, roles: ['owner', 'manager', 'driver'], keywords: ['home', 'dashboard', 'overview', 'main', 'kpi', 'summary'] },
-    { id: 'pos', title: 'Point of Sale (POS)', description: 'Create new sales transactions', icon: Receipt, category: 'page' as const, roles: ['owner', 'manager', 'driver'], keywords: ['pos', 'sale', 'sell', 'transaction', 'billing', 'invoice', 'cash'] },
+    { id: 'overview', title: 'Dashboard Overview', description: 'Main dashboard with KPIs and quick actions', icon: Home, category: 'page' as const, roles: ['owner', 'manager', 'driver', 'staff'], keywords: ['home', 'dashboard', 'overview', 'main', 'kpi', 'summary'] },
+    { id: 'pos', title: 'Point of Sale (POS)', description: 'Create new sales transactions', icon: Receipt, category: 'page' as const, roles: ['owner', 'manager', 'driver', 'staff'], keywords: ['pos', 'sale', 'sell', 'transaction', 'billing', 'invoice', 'cash'] },
     { id: 'daily-sales', title: 'Daily Sales', description: 'View and manage daily sales records', icon: BarChart3, category: 'page' as const, roles: ['owner', 'manager'], keywords: ['sales', 'daily', 'revenue', 'transactions', 'records'] },
     { id: 'daily-expenses', title: 'Daily Expenses', description: 'Track and manage daily expenses', icon: Wallet, category: 'page' as const, roles: ['owner', 'manager'], keywords: ['expenses', 'cost', 'spending', 'money out', 'bills'] },
     { id: 'analytics', title: 'Business Analytics', description: 'View business performance and analytics', icon: TrendingUp, category: 'page' as const, roles: ['owner', 'manager'], keywords: ['analytics', 'reports', 'charts', 'performance', 'profit', 'loss'] },
@@ -78,9 +78,9 @@ export const GlobalCommandPalette = ({ userRole, setActiveModule }: GlobalComman
     { id: 'vehicle-cost', title: 'Vehicle Costs', description: 'Track vehicle expenses and maintenance', icon: Truck, category: 'page' as const, roles: ['owner', 'manager'], keywords: ['vehicle', 'fuel', 'maintenance', 'cost', 'diesel', 'petrol'] },
     { id: 'community', title: 'Community Forum', description: 'Connect with other LPG dealers', icon: Users, category: 'page' as const, roles: ['owner', 'manager', 'driver'], keywords: ['community', 'forum', 'discussion', 'post', 'share'] },
     { id: 'search', title: 'Search & Reports', description: 'Advanced search and report generation', icon: Search, category: 'page' as const, roles: ['owner', 'manager'], keywords: ['search', 'find', 'report', 'query'] },
-    { id: 'settings', title: 'Settings', description: 'System settings and configuration', icon: Settings, category: 'page' as const, roles: ['owner', 'manager'], keywords: ['settings', 'config', 'preference', 'system', 'backup', 'team'] },
-    { id: 'profile', title: 'My Profile', description: 'View and edit your profile', icon: Users, category: 'page' as const, roles: ['owner', 'manager', 'driver'], keywords: ['profile', 'account', 'user', 'me', 'my'] },
-    { id: 'action-new-sale', title: 'Create New Sale', description: 'Start a new POS transaction', icon: Plus, category: 'action' as const, roles: ['owner', 'manager', 'driver'], keywords: ['new', 'sale', 'create', 'add', 'transaction'] },
+    { id: 'settings', title: 'Settings', description: 'System settings and configuration', icon: Settings, category: 'page' as const, roles: ['owner', 'manager', 'driver', 'staff'], keywords: ['settings', 'config', 'preference', 'system', 'backup', 'team'] },
+    { id: 'profile', title: 'My Profile', description: 'View and edit your profile', icon: Users, category: 'page' as const, roles: ['owner', 'manager', 'driver', 'staff'], keywords: ['profile', 'account', 'user', 'me', 'my'] },
+    { id: 'action-new-sale', title: 'Create New Sale', description: 'Start a new POS transaction', icon: Plus, category: 'action' as const, roles: ['owner', 'manager', 'driver', 'staff'], keywords: ['new', 'sale', 'create', 'add', 'transaction'] },
     { id: 'action-add-customer', title: 'Add New Customer', description: 'Register a new customer', icon: UserPlus, category: 'action' as const, roles: ['owner', 'manager'], keywords: ['add', 'new', 'customer', 'register', 'create'] },
     { id: 'action-add-expense', title: 'Add Expense', description: 'Record a new expense', icon: Wallet, category: 'action' as const, roles: ['owner', 'manager'], keywords: ['add', 'expense', 'cost', 'spending', 'record'] },
     { id: 'action-add-stock', title: 'Add New Stock', description: 'Add new LPG brand/stock', icon: PackagePlus, category: 'action' as const, roles: ['owner', 'manager'], keywords: ['add', 'stock', 'inventory', 'brand', 'new'] },

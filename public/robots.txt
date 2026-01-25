@@ -1,8 +1,18 @@
+# Stock-X LPG Management System - Robots.txt
+# https://stockxbd.lovable.app
+
+# Allow all major search engines
 User-agent: Googlebot
 Allow: /
+Allow: /community
+Disallow: /dashboard
+Disallow: /auth
 
 User-agent: Bingbot
 Allow: /
+Allow: /community
+Disallow: /dashboard
+Disallow: /auth
 
 User-agent: Twitterbot
 Allow: /
@@ -10,5 +20,17 @@ Allow: /
 User-agent: facebookexternalhit
 Allow: /
 
+# Default rules for all other bots
 User-agent: *
 Allow: /
+Allow: /community
+Allow: /community/shop/
+Disallow: /dashboard
+Disallow: /auth
+Disallow: /community/cart
+Disallow: /community/checkout
+Disallow: /community/orders
+Disallow: /community/profile
+
+# Sitemap location
+Sitemap: https://stockxbd.lovable.app/sitemap.xml

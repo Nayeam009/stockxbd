@@ -148,7 +148,7 @@ const DEFAULT_CREDIT_LIMIT = 10000;
 
 // ============= POS MODULE PROPS =============
 interface POSModuleProps {
-  userRole?: 'owner' | 'manager' | 'driver';
+  userRole?: 'owner' | 'manager' | 'driver' | 'staff';
   userName?: string;
 }
 
