@@ -17,7 +17,7 @@ import {
 interface DashboardHeaderProps {
   searchQuery: string;
   setSearchQuery: (query: string) => void;
-  userRole: 'owner' | 'manager' | 'driver';
+  userRole: 'owner' | 'manager' | 'driver' | 'staff';
   userName: string;
   onSettingsClick?: () => void;
   onProfileClick?: () => void;
@@ -66,8 +66,10 @@ export const DashboardHeader = ({
         return 'bg-secondary/15 text-secondary border-secondary/30';
       case 'driver':
         return 'bg-accent/15 text-accent border-accent/30';
+      case 'staff':
+        return 'bg-muted/50 text-muted-foreground border-border';
       default:
-        return 'bg-muted text-muted-foreground';
+        return 'bg-muted text-muted-foreground border-border';
     }
   };
 
@@ -79,6 +81,8 @@ export const DashboardHeader = ({
         return language === 'bn' ? 'ম্যানেজার' : 'Manager';
       case 'driver':
         return language === 'bn' ? 'ড্রাইভার' : 'Driver';
+      case 'staff':
+        return language === 'bn' ? 'স্টাফ' : 'Staff';
       default:
         return role;
     }
@@ -98,7 +102,7 @@ export const DashboardHeader = ({
       <div className="flex h-14 sm:h-16 items-center justify-between px-2 sm:px-4 gap-2 sm:gap-4">
         {/* Left Section */}
         <div className="flex items-center gap-2 sm:gap-3">
-          <SidebarTrigger className="h-8 w-8 sm:h-9 sm:w-9 hover:bg-primary/10 hover:text-primary rounded-lg sm:rounded-xl transition-all duration-300" />
+          <SidebarTrigger className="h-8 w-8 sm:h-9 sm:w-9 hover:bg-primary/10 hover:text-primary rounded-lg sm:rounded-xl transition-all duration-300" aria-label="Toggle sidebar navigation" />
         </div>
 
         {/* Center Section - Search */}

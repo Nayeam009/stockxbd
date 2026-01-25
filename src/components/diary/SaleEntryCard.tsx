@@ -88,7 +88,7 @@ export const SaleEntryCard = ({ entry, onViewDetails }: SaleEntryCardProps) => {
             {/* Header Row with Badges */}
             <div className="flex items-center gap-2 flex-wrap">
               {isPayment ? (
-                <Badge variant="outline" className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700 text-xs font-medium">
+                <Badge variant="outline" className="bg-success/15 text-success border-success/30 text-xs font-medium">
                   <ArrowUpRight className="h-3 w-3 mr-1" />
                   Payment
                 </Badge>
@@ -99,7 +99,7 @@ export const SaleEntryCard = ({ entry, onViewDetails }: SaleEntryCardProps) => {
                 </Badge>
               )}
               {entry.isOnlineOrder && (
-                <Badge className="bg-blue-500 text-white text-xs font-medium">
+                <Badge className="bg-primary text-primary-foreground text-xs font-medium">
                   <Globe className="h-3 w-3 mr-1" />
                   Online
                 </Badge>
@@ -108,7 +108,7 @@ export const SaleEntryCard = ({ entry, onViewDetails }: SaleEntryCardProps) => {
                 {statusConf.label}
               </Badge>
               {entry.transactionType === 'wholesale' && (
-                <Badge variant="secondary" className="text-xs bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border-0">
+                <Badge variant="secondary" className="text-xs bg-secondary/20 text-secondary-foreground dark:bg-secondary/30 border-0">
                   Wholesale
                 </Badge>
               )}
@@ -127,7 +127,7 @@ export const SaleEntryCard = ({ entry, onViewDetails }: SaleEntryCardProps) => {
             {/* Return Cylinders (only for Refill sales) */}
             {hasReturnCylinders && (
               <div className="flex items-center gap-2 flex-wrap">
-                <Badge variant="outline" className="bg-cyan-100 dark:bg-cyan-900/40 text-cyan-700 dark:text-cyan-300 border-cyan-200 dark:border-cyan-700 text-xs">
+                <Badge variant="outline" className="bg-accent/15 text-accent border-accent/30 text-xs">
                   <RotateCcw className="h-3 w-3 mr-1" />
                   Return: {entry.returnCylinders.map(r => `${r.quantity}x ${r.brand}`).join(', ')}
                 </Badge>
@@ -174,7 +174,7 @@ export const SaleEntryCard = ({ entry, onViewDetails }: SaleEntryCardProps) => {
             
             {/* Amount with Emphasis */}
             <div className="text-right">
-              <p className="text-lg sm:text-xl lg:text-2xl font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
+              <p className="text-lg sm:text-xl lg:text-2xl font-bold text-success tabular-nums">
                 +{BANGLADESHI_CURRENCY_SYMBOL}{entry.totalAmount.toLocaleString()}
               </p>
             </div>

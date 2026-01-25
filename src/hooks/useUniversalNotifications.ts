@@ -36,7 +36,7 @@ export interface UniversalNotification {
     moduleId: string;
   };
   data?: Record<string, any>;
-  roles: ('owner' | 'manager' | 'driver')[];
+  roles: ('owner' | 'manager' | 'driver' | 'staff')[];
 }
 
 // Helper to send browser push notification
@@ -59,7 +59,7 @@ const sendBrowserNotification = (title: string, body: string, tag: string) => {
   }
 };
 
-export const useUniversalNotifications = (userRole: 'owner' | 'manager' | 'driver' = 'driver') => {
+export const useUniversalNotifications = (userRole: 'owner' | 'manager' | 'driver' | 'staff' = 'driver') => {
   const [notifications, setNotifications] = useState<UniversalNotification[]>([]);
   const [loading, setLoading] = useState(true);
 
