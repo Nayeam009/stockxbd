@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -52,12 +52,58 @@ import { useCommunityData, CommunityOrder } from "@/hooks/useCommunityData";
 import { useCustomerData, SavedAddress } from "@/hooks/useCustomerData";
 import { useCylinderProfile } from "@/hooks/useCylinderProfile";
 import { supabase } from "@/integrations/supabase/client";
+import { getUserWithTimeout, AuthTimeoutError } from "@/lib/authUtils";
 import { toast } from "@/hooks/use-toast";
 import { DIVISIONS, getDistricts, getThanas } from "@/lib/bangladeshConstants";
 import { LPG_BRANDS } from "@/lib/brandConstants";
 
 const CYLINDER_WEIGHTS = ['5.5kg', '12kg', '25kg', '35kg', '45kg'];
 const VALVE_SIZES = ['22mm', '20mm'] as const;
+
+// Profile cache for instant tab recovery
+const PROFILE_CACHE_KEY = 'stock-x-profile-snapshot';
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+interface ProfileSnapshot {
+  ts: number;
+  profile: {
+    fullName: string;
+    email: string;
+    phone: string;
+    avatarUrl: string | null;
+  };
+  orders: CommunityOrder[];
+}
+
+const readProfileSnapshot = (): ProfileSnapshot | null => {
+  try {
+    const cached = sessionStorage.getItem(PROFILE_CACHE_KEY);
+    if (!cached) return null;
+    
+    const snapshot: ProfileSnapshot = JSON.parse(cached);
+    const age = Date.now() - snapshot.ts;
+    
+    if (age > CACHE_TTL) {
+      sessionStorage.removeItem(PROFILE_CACHE_KEY);
+      return null;
+    }
+    
+    return snapshot;
+  } catch {
+    return null;
+  }
+};
+
+const writeProfileSnapshot = (snapshot: Omit<ProfileSnapshot, 'ts'>) => {
+  try {
+    sessionStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify({
+      ...snapshot,
+      ts: Date.now()
+    }));
+  } catch (error) {
+    console.warn('Failed to cache profile:', error);
+  }
+};
 
 const CustomerProfile = () => {
   const navigate = useNavigate();
@@ -116,10 +162,76 @@ const CustomerProfile = () => {
   const newAvailableDistricts = newDivision ? getDistricts(newDivision) : [];
   const newAvailableThanas = newDistrict ? getThanas(newDistrict) : [];
 
+  const fetchProfileAndOrders = useCallback(async (useCache = false) => {
+    // Try to restore from cache immediately
+    if (useCache) {
+      const snapshot = readProfileSnapshot();
+      if (snapshot) {
+        setFullName(snapshot.profile.fullName);
+        setEmail(snapshot.profile.email);
+        setPhone(snapshot.profile.phone);
+        setAvatarUrl(snapshot.profile.avatarUrl);
+        setOrders(snapshot.orders);
+        setLoading(false);
+        // Continue to refresh in background
+      }
+    }
+
+    try {
+      const { data: { user } } = await getUserWithTimeout();
+      if (!user) {
+        navigate('/auth');
+        return;
+      }
+
+      setEmail(user.email || '');
+
+      // Fetch profile and orders in parallel
+      const [profileResult, ordersData] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('*')
+          .eq('user_id', user.id)
+          .maybeSingle(),
+        fetchCustomerOrders()
+      ]);
+
+      if (profileResult.data) {
+        setFullName(profileResult.data.full_name || '');
+        setPhone(profileResult.data.phone || '');
+        setAvatarUrl(profileResult.data.avatar_url);
+      }
+
+      setOrders(ordersData);
+
+      // Save to cache
+      writeProfileSnapshot({
+        profile: {
+          fullName: profileResult.data?.full_name || '',
+          email: user.email || '',
+          phone: profileResult.data?.phone || '',
+          avatarUrl: profileResult.data?.avatar_url || null
+        },
+        orders: ordersData
+      });
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+      if (error instanceof AuthTimeoutError) {
+        toast({ 
+          title: "Connection timeout", 
+          description: "Please check your connection and try again",
+          variant: "destructive" 
+        });
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [navigate, fetchCustomerOrders]);
+
   useEffect(() => {
-    fetchProfileAndOrders();
+    fetchProfileAndOrders(true); // Try cache first
     loadCart();
-  }, []);
+  }, [fetchProfileAndOrders]);
 
   // Auto-fill from saved customer data
   useEffect(() => {
@@ -137,40 +249,6 @@ const CustomerProfile = () => {
     const savedCart = localStorage.getItem('lpg-community-cart');
     if (savedCart) {
       setCart(JSON.parse(savedCart));
-    }
-  };
-
-  const fetchProfileAndOrders = async () => {
-    setLoading(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        navigate('/auth');
-        return;
-      }
-
-      setEmail(user.email || '');
-
-      // Fetch profile
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-
-      if (profile) {
-        setFullName(profile.full_name || '');
-        setPhone(profile.phone || '');
-        setAvatarUrl(profile.avatar_url);
-      }
-
-      // Fetch orders
-      const ordersData = await fetchCustomerOrders();
-      setOrders(ordersData);
-    } catch (error) {
-      console.error('Error fetching profile:', error);
-    } finally {
-      setLoading(false);
     }
   };
 

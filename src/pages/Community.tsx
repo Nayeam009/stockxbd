@@ -31,9 +31,48 @@ import { LocationSearchCombobox } from "@/components/community/LocationSearchCom
 import { useCommunityData, Shop, CartItem } from "@/hooks/useCommunityData";
 import { DIVISIONS, getDistricts, getThanas, POPULAR_LOCATIONS } from "@/lib/bangladeshConstants";
 
+// Shop list cache for instant tab recovery
+const SHOPS_CACHE_KEY = 'stock-x-shops-snapshot';
+const SHOPS_CACHE_TTL = 3 * 60 * 1000; // 3 minutes
+
+interface ShopsSnapshot {
+  ts: number;
+  shops: Shop[];
+}
+
+const readShopsSnapshot = (): Shop[] | null => {
+  try {
+    const cached = sessionStorage.getItem(SHOPS_CACHE_KEY);
+    if (!cached) return null;
+    
+    const snapshot: ShopsSnapshot = JSON.parse(cached);
+    const age = Date.now() - snapshot.ts;
+    
+    if (age > SHOPS_CACHE_TTL) {
+      sessionStorage.removeItem(SHOPS_CACHE_KEY);
+      return null;
+    }
+    
+    return snapshot.shops;
+  } catch {
+    return null;
+  }
+};
+
+const writeShopsSnapshot = (shops: Shop[]) => {
+  try {
+    sessionStorage.setItem(SHOPS_CACHE_KEY, JSON.stringify({
+      ts: Date.now(),
+      shops
+    }));
+  } catch (error) {
+    console.warn('Failed to cache shops:', error);
+  }
+};
+
 const Community = () => {
   const navigate = useNavigate();
-  const { shops, loading, currentUser, userRole } = useCommunityData();
+  const { shops, loading, currentUser, userRole, fetchShops } = useCommunityData();
   
   const [searchQuery, setSearchQuery] = useState("");
   const [locationSearch, setLocationSearch] = useState("");
@@ -42,18 +81,39 @@ const Community = () => {
   const [selectedThana, setSelectedThana] = useState<string>("all");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [showFilters, setShowFilters] = useState(false);
+  const [cachedShops, setCachedShops] = useState<Shop[]>([]);
+  const [isUsingCache, setIsUsingCache] = useState(false);
 
-  // Load cart from localStorage
+  // Load cart from localStorage and try to load shops from cache
   useEffect(() => {
     const savedCart = localStorage.getItem('lpg-community-cart');
     if (savedCart) {
       setCart(JSON.parse(savedCart));
     }
+
+    // Try to load shops from cache for instant display
+    const cached = readShopsSnapshot();
+    if (cached && cached.length > 0) {
+      setCachedShops(cached);
+      setIsUsingCache(true);
+    }
   }, []);
 
-  // Filter shops
+  // Update cache when shops load from server
+  useEffect(() => {
+    if (!loading && shops.length > 0) {
+      writeShopsSnapshot(shops);
+      setCachedShops(shops);
+      setIsUsingCache(false);
+    }
+  }, [shops, loading]);
+
+  // Use cached shops for instant display while loading
+  const displayShops = loading && isUsingCache ? cachedShops : shops;
+
+  // Filter shops (use displayShops for instant cache display)
   const filteredShops = useMemo(() => {
-    return shops.filter(shop => {
+    return displayShops.filter(shop => {
       // Text search filter (shop name, address)
       const searchLower = searchQuery.toLowerCase();
       const matchesSearch = !searchQuery || 
@@ -81,16 +141,16 @@ const Community = () => {
 
       return matchesSearch && matchesLocationSearch && matchesDivision && matchesDistrict && matchesThana;
     });
-  }, [shops, searchQuery, locationSearch, selectedDivision, selectedDistrict, selectedThana]);
+  }, [displayShops, searchQuery, locationSearch, selectedDivision, selectedDistrict, selectedThana]);
 
-  // Analytics
+  // Analytics (use displayShops for consistent UX)
   const analytics = useMemo(() => ({
-    totalShops: shops.length,
-    avgRating: shops.length > 0 
-      ? (shops.reduce((sum, s) => sum + (s.rating || 0), 0) / shops.length).toFixed(1) 
+    totalShops: displayShops.length,
+    avgRating: displayShops.length > 0 
+      ? (displayShops.reduce((sum, s) => sum + (s.rating || 0), 0) / displayShops.length).toFixed(1) 
       : '0.0',
-    totalOrders: shops.reduce((sum, s) => sum + s.total_orders, 0)
-  }), [shops]);
+    totalOrders: displayShops.reduce((sum, s) => sum + s.total_orders, 0)
+  }), [displayShops]);
 
   const handleViewShop = (shop: Shop) => {
     navigate(`/community/shop/${shop.id}`);
@@ -176,8 +236,8 @@ const Community = () => {
           </p>
         </div>
 
-        {/* Stats Cards */}
-        {loading ? (
+        {/* Stats Cards - Show cached data or skeleton */}
+        {loading && !isUsingCache ? (
           <StatsLoadingSkeleton />
         ) : (
           <div className="grid grid-cols-3 gap-2 sm:gap-4">
@@ -342,8 +402,8 @@ const Community = () => {
           </p>
         </div>
 
-        {/* Shop Grid */}
-        {loading ? (
+        {/* Shop Grid - Show cached data while loading if available */}
+        {loading && !isUsingCache ? (
           <ShopCardSkeletonGrid count={6} />
         ) : filteredShops.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getSessionWithTimeout, AuthTimeoutError } from "@/lib/authUtils";
 
 export type UserRole = 'owner' | 'manager' | 'driver' | 'staff' | 'customer';
 
@@ -35,7 +36,8 @@ export const useUserRole = (): UserRoleData => {
       }
       setError(null);
 
-      const { data: { session } } = await supabase.auth.getSession();
+      // Use timeout-protected session fetch
+      const { data: { session } } = await getSessionWithTimeout();
       
       if (!session?.user) {
         setUserRole('driver');
@@ -50,31 +52,41 @@ export const useUserRole = (): UserRoleData => {
       setUserId(session.user.id);
       cachedUserId = session.user.id;
 
-      // Fetch role and profile in parallel
+      // Fetch role and profile in parallel with individual timeouts
+      const rolePromise = supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', session.user.id)
+        .maybeSingle();
+
+      const profilePromise = supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('user_id', session.user.id)
+        .maybeSingle();
+
+      // Race each query against a timeout
+      const timeoutPromise = <T>(ms: number): Promise<T | null> => 
+        new Promise(resolve => setTimeout(() => resolve(null), ms));
+
       const [roleResult, profileResult] = await Promise.all([
-        supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', session.user.id)
-          .maybeSingle(),
-        supabase
-          .from('profiles')
-          .select('full_name')
-          .eq('user_id', session.user.id)
-          .maybeSingle()
+        Promise.race([rolePromise, timeoutPromise<typeof rolePromise>(5000)]),
+        Promise.race([profilePromise, timeoutPromise<typeof profilePromise>(5000)])
       ]);
 
-      if (roleResult.error) {
-        console.error('Error fetching role:', roleResult.error);
-        setError('Failed to fetch user role');
-      } else if (roleResult.data) {
+      // Handle role result
+      if (roleResult && 'data' in roleResult && roleResult.data) {
         const role = roleResult.data.role as UserRole;
         setUserRole(role);
         cachedRole = role;
+      } else if (roleResult && 'error' in roleResult && roleResult.error) {
+        console.error('Error fetching role:', roleResult.error);
+        setError('Failed to fetch user role');
       }
 
       // Use full name from profile, or email prefix, or 'User'
-      const displayName = profileResult.data?.full_name || 
+      const profileData = profileResult && 'data' in profileResult ? profileResult.data : null;
+      const displayName = profileData?.full_name || 
                          session.user.email?.split('@')[0] || 
                          'User';
       setUserName(displayName);
@@ -85,7 +97,21 @@ export const useUserRole = (): UserRoleData => {
 
     } catch (err) {
       console.error('Error in useUserRole:', err);
-      setError('An error occurred while fetching user data');
+      
+      // On timeout, use cache if available, otherwise set defaults
+      if (err instanceof AuthTimeoutError) {
+        if (cachedRole && cachedName) {
+          setUserRole(cachedRole);
+          setUserName(cachedName);
+          setUserId(cachedUserId);
+        } else {
+          setError('Connection timed out');
+          setUserRole('driver');
+          setUserName('Guest');
+        }
+      } else {
+        setError('An error occurred while fetching user data');
+      }
     } finally {
       if (isInitialLoadRef.current) {
         setLoading(false);
