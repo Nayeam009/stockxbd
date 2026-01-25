@@ -2,63 +2,74 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover" />
-    <title>Stock-X - LPG Inventory & Online Delivery Platform | Bangladesh</title>
-    <meta name="description" content="Stock-X is Bangladesh's leading LPG business management platform. Complete inventory tracking, POS system, customer management, and online delivery for LPG distributors.">
-    <meta name="author" content="Stock-X" />
-    <meta name="keywords" content="LPG, Gas Cylinder, Bangladesh, Inventory Management, POS System, Delivery Platform, Business Management, LPG Distributor, Gas Business, Stock Management">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5" />
     
-    <!-- Mobile Web App Meta Tags -->
-    <meta name="theme-color" content="#1e3a5f" media="(prefers-color-scheme: light)">
-    <meta name="theme-color" content="#0d1526" media="(prefers-color-scheme: dark)">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Stock-X">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="format-detection" content="telephone=no">
-    <meta name="msapplication-TileColor" content="#1e3a5f">
-    <meta name="msapplication-tap-highlight" content="no">
+    <!-- Primary Meta Tags -->
+    <title>Stock-X | LPG Inventory & Delivery Management Platform</title>
+    <meta name="title" content="Stock-X | LPG Inventory & Delivery Management Platform" />
+    <meta name="description" content="Complete LPG business management: real-time inventory tracking, POS, customer management, online delivery platform. Trusted by 500+ businesses." />
+    <meta name="author" content="Stock-X Bangladesh" />
+    <meta name="keywords" content="LPG, gas cylinder, inventory management, Bangladesh, delivery, POS, business management, Omera, Bashundhara" />
     
-    <!-- SEO & Robots -->
-    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
-    <link rel="canonical" href="https://stockxbd.lovable.app">
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#1e3a5f" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Stock-X" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="application-name" content="Stock-X" />
+    <meta name="format-detection" content="telephone=no" />
     
-    <!-- Favicons -->
-    <link rel="icon" type="image/x-icon" href="/favicon.ico">
-    <link rel="apple-touch-icon" sizes="180x180" href="/favicon.ico">
+    <!-- SEO -->
+    <meta name="robots" content="index, follow" />
+    <meta name="googlebot" content="index, follow" />
+    <link rel="canonical" href="https://stockxbd.lovable.app/" />
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/favicon.ico" />
     
     <!-- PWA Manifest -->
-    <link rel="manifest" href="/manifest.json">
+    <link rel="manifest" href="/manifest.json" />
     
-    <!-- Open Graph -->
+    <!-- Preload Critical Assets (LCP Optimization) -->
+    <link rel="preload" href="/src/assets/hero-lpg-cylinders.png" as="image" fetchpriority="high" />
+    <link rel="preload" href="/src/assets/stock-x-logo.png" as="image" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" as="style" />
+    
+    <!-- DNS Prefetch for API -->
+    <link rel="dns-prefetch" href="https://xupvteigmqcrfluuadte.supabase.co" />
+    <link rel="preconnect" href="https://xupvteigmqcrfluuadte.supabase.co" />
+    
+    <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://stockxbd.lovable.app">
-    <meta property="og:site_name" content="Stock-X">
-    <meta property="og:locale" content="en_BD">
-    <meta property="og:image" content="https://storage.googleapis.com/gpt-engineer-file-uploads/e4OuZymYAwfg5EBwekOrwYCfpp42/social-images/social-1767353832826-image_fd4dfe38-3b8e-4a4a-8431-69c6a22a8ab4.png">
-    <meta property="og:image:width" content="1200">
-    <meta property="og:image:height" content="630">
-    <meta property="og:image:alt" content="Stock-X LPG Business Management Platform">
-    <meta property="og:title" content="Stock-X - LPG Inventory & Online Delivery Platform">
-    <meta property="og:description" content="Bangladesh's leading LPG business management platform. Complete inventory tracking, POS system, customer management, and online delivery for LPG distributors.">
+    <meta property="og:url" content="https://stockxbd.lovable.app/" />
+    <meta property="og:title" content="Stock-X | LPG Inventory & Delivery Platform" />
+    <meta property="og:description" content="Complete LPG business management: real-time inventory, POS, customer management, online delivery." />
+    <meta property="og:image" content="/src/assets/stock-x-logo.png" />
+    <meta property="og:locale" content="en_BD" />
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="https://stockxbd.lovable.app/" />
+    <meta property="twitter:title" content="Stock-X | LPG Business Management" />
+    <meta property="twitter:description" content="Complete LPG business management platform for Bangladesh." />
 
-    <!-- Twitter Card -->
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:site" content="@stock_x_lpg" />
-    <meta name="twitter:creator" content="@stock_x_lpg" />
-    <meta name="twitter:title" content="Stock-X - LPG Inventory & Online Delivery Platform">
-    <meta name="twitter:description" content="Bangladesh's leading LPG business management platform. Complete inventory tracking, POS system, customer management, and online delivery.">
-    <meta name="twitter:image" content="https://storage.googleapis.com/gpt-engineer-file-uploads/e4OuZymYAwfg5EBwekOrwYCfpp42/social-images/social-1767353832826-image_fd4dfe38-3b8e-4a4a-8431-69c6a22a8ab4.png">
-    <meta name="twitter:image:alt" content="Stock-X LPG Business Management Platform">
+    <!-- Critical Inline CSS (FCP Optimization) -->
+    <style>
+      /* Critical path CSS for instant paint */
+      *{box-sizing:border-box;margin:0;padding:0}
+      html{font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;-webkit-font-smoothing:antialiased}
+      body{background:#f8fafc;color:#1e293b}
+      .loading-container{display:flex;flex-direction:column;justify-content:center;align-items:center;min-height:100vh;background:linear-gradient(135deg,#1e3a5f 0%,#0d1526 100%)}
+      .loading-spinner{width:48px;height:48px;border:3px solid rgba(255,255,255,0.1);border-top-color:#3b82f6;border-radius:50%;animation:spin 1s linear infinite}
+      .loading-text{color:rgba(255,255,255,0.8);margin-top:1rem;font-size:0.875rem;font-weight:500}
+      @keyframes spin{to{transform:rotate(360deg)}}
+    </style>
     
-    <!-- Preconnect for Performance -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    
-    <!-- DNS Prefetch -->
-    <link rel="dns-prefetch" href="https://xupvteigmqcrfluuadte.supabase.co">
-    
-    <!-- JSON-LD Structured Data -->
+    <!-- Structured Data -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -66,22 +77,16 @@
       "name": "Stock-X",
       "applicationCategory": "BusinessApplication",
       "operatingSystem": "Web",
-      "description": "Bangladesh's leading LPG business management platform with inventory tracking, POS, and online delivery.",
-      "url": "https://stockxbd.lovable.app",
+      "description": "Complete LPG inventory and delivery management platform for Bangladesh businesses",
       "offers": {
         "@type": "Offer",
-        "price": "500",
+        "price": "0",
         "priceCurrency": "BDT"
       },
       "aggregateRating": {
         "@type": "AggregateRating",
         "ratingValue": "4.8",
         "ratingCount": "500"
-      },
-      "author": {
-        "@type": "Organization",
-        "name": "Stock-X",
-        "url": "https://stockxbd.lovable.app"
       }
     }
     </script>
@@ -90,12 +95,23 @@
   <body>
     <div id="root">
       <!-- Loading fallback shown before React mounts -->
-      <div style="display:flex;flex-direction:column;justify-content:center;align-items:center;height:100vh;background:linear-gradient(135deg,#1e3a5f 0%,#0d1526 100%);font-family:system-ui,-apple-system,sans-serif;">
-        <div style="width:60px;height:60px;border:3px solid rgba(255,255,255,0.1);border-top-color:#3b82f6;border-radius:50%;animation:spin 1s linear infinite;"></div>
-        <p style="color:rgba(255,255,255,0.8);margin-top:1rem;font-size:0.875rem;">Loading Stock-X...</p>
+      <div class="loading-container">
+        <div class="loading-spinner"></div>
+        <p class="loading-text">Loading Stock-X...</p>
       </div>
-      <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
     </div>
+    
+    <!-- Service Worker Registration -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then(reg => console.log('[Stock-X] SW registered'))
+            .catch(err => console.log('[Stock-X] SW registration failed:', err));
+        });
+      }
+    </script>
+    
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

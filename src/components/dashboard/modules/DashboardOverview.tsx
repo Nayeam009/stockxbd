@@ -10,9 +10,9 @@ import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Driver, DashboardAnalytics, CylinderStock } from "@/hooks/useDashboardData";
 import { Progress } from "@/components/ui/progress";
-import { useState, useEffect, useMemo } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { startOfDay, endOfDay, format } from "date-fns";
+import { useEffect, useMemo, useCallback } from "react";
+import { useDashboardKPIs } from "@/hooks/queries/useOptimizedQueries";
+
 interface DashboardOverviewProps {
   analytics: DashboardAnalytics;
   drivers: Driver[];
@@ -31,93 +31,58 @@ export const DashboardOverview = ({
   onRefresh
 }: DashboardOverviewProps) => {
   const { t } = useLanguage();
-  const [todaySales, setTodaySales] = useState(0);
-  const [todayExpenses, setTodayExpenses] = useState(0);
+  
+  // Use optimized RPC-based KPIs instead of client-side calculations
+  const { 
+    todaySales, 
+    todayExpenses, 
+    todayProfit, 
+    activeOrders,
+    isLoading: kpisLoading,
+    refetch: refetchKPIs 
+  } = useDashboardKPIs();
   
   const isOwnerOrManager = userRole === 'owner' || userRole === 'manager';
   const isOwner = userRole === 'owner';
 
-  // Fetch today's sale and expense totals
-  useEffect(() => {
-    const fetchTodayData = async () => {
-      const today = new Date();
-      const todayStart = format(startOfDay(today), "yyyy-MM-dd");
-      const todayEnd = format(endOfDay(today), "yyyy-MM-dd'T'23:59:59");
-      
-      // Fetch today's sales from pos_transactions
-      const { data: salesData } = await supabase
-        .from('pos_transactions')
-        .select('total')
-        .gte('created_at', todayStart)
-        .lte('created_at', todayEnd);
-      
-      const totalSales = salesData?.reduce((sum, t) => sum + Number(t.total || 0), 0) || 0;
-      setTodaySales(totalSales);
-      
-      // Fetch today's expenses from daily_expenses
-      const { data: expenseData } = await supabase
-        .from('daily_expenses')
-        .select('amount')
-        .eq('expense_date', todayStart);
-      
-      const totalExpenses = expenseData?.reduce((sum, e) => sum + Number(e.amount || 0), 0) || 0;
-      setTodayExpenses(totalExpenses);
-    };
-    
-    fetchTodayData();
-    
-    // Real-time subscription
-    const channels = [
-      supabase.channel('dashboard-pos-realtime').on('postgres_changes',
-        { event: '*', schema: 'public', table: 'pos_transactions' },
-        () => fetchTodayData()
-      ).subscribe(),
-      supabase.channel('dashboard-expenses-realtime').on('postgres_changes',
-        { event: '*', schema: 'public', table: 'daily_expenses' },
-        () => fetchTodayData()
-      ).subscribe(),
-    ];
-    
-    return () => channels.forEach(ch => supabase.removeChannel(ch));
-  }, []);
+  const profitMargin = useMemo(() => {
+    return todaySales > 0 ? Math.round((todayProfit / todaySales) * 100) : 0;
+  }, [todaySales, todayProfit]);
 
-  const todayProfit = todaySales - todayExpenses;
-  const profitMargin = todaySales > 0 ? Math.round((todayProfit / todaySales) * 100) : 0;
-
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'F1') {
-        e.preventDefault();
-        setActiveModule?.('pos');
-      } else if (e.key === 'F2') {
-        e.preventDefault();
-        setActiveModule?.('business-diary');
-      } else if (e.key === 'F3') {
-        e.preventDefault();
-        setActiveModule?.('inventory');
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+  // Keyboard shortcuts - memoized handler
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === 'F1') {
+      e.preventDefault();
+      setActiveModule?.('pos');
+    } else if (e.key === 'F2') {
+      e.preventDefault();
+      setActiveModule?.('business-diary');
+    } else if (e.key === 'F3') {
+      e.preventDefault();
+      setActiveModule?.('inventory');
+    }
   }, [setActiveModule]);
 
-  // Safe number formatting
-  const formatNumber = (num: number | undefined | null) => {
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyDown]);
+
+  // Safe number formatting - memoized
+  const formatNumber = useCallback((num: number | undefined | null) => {
     if (num === undefined || num === null || isNaN(num)) return '0';
     return num.toLocaleString();
-  };
+  }, []);
 
-  const formatCurrency = (num: number | undefined | null) => {
+  const formatCurrency = useCallback((num: number | undefined | null) => {
     return `${BANGLADESHI_CURRENCY_SYMBOL}${formatNumber(num)}`;
-  };
+  }, [formatNumber]);
 
-  const safePercentage = (value: number, total: number) => {
+  const safePercentage = useCallback((value: number, total: number) => {
     if (!total || total === 0 || isNaN(total)) return 0;
     const result = Math.round((value / total) * 100);
     return isNaN(result) ? 0 : result;
-  };
+  }, []);
 
   // KPI Cards - Redesigned with Total Sale / Expense / Profit
   const getKpiCards = () => {
@@ -163,14 +128,14 @@ export const DashboardOverview = ({
       });
     }
 
-    // Active Orders - Clickable
+    // Active Orders - Clickable (use RPC data)
     cards.push({
       id: 'active-orders',
       title: "Active Orders",
-      value: formatNumber(analytics.activeOrders),
-      subtitle: `${formatNumber(analytics.pendingOrders)} pending, ${formatNumber(analytics.dispatchedOrders)} dispatched`,
-      change: (analytics.activeOrders || 0) > 0 ? "On the road" : "All clear",
-      changeType: (analytics.activeOrders || 0) > 0 ? "warning" as const : "positive" as const,
+      value: formatNumber(activeOrders.total_active),
+      subtitle: `${formatNumber(activeOrders.pending_count)} pending, ${formatNumber(activeOrders.dispatched_count)} dispatched`,
+      change: (activeOrders.total_active || 0) > 0 ? "On the road" : "All clear",
+      changeType: (activeOrders.total_active || 0) > 0 ? "warning" as const : "positive" as const,
       icon: ClipboardList,
       clickable: true,
       onClick: () => setActiveModule?.('community')

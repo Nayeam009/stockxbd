@@ -121,7 +121,10 @@ const Welcome = () => {
                 <img 
                   src={stockXLogo} 
                   alt="Stock-X Logo" 
-                  className="h-9 w-9 sm:h-11 sm:w-11 lg:h-12 lg:w-12 rounded-xl shadow-lg transition-transform duration-300 group-hover:scale-105" 
+                  className="h-9 w-9 sm:h-11 sm:w-11 lg:h-12 lg:w-12 rounded-xl shadow-lg transition-transform duration-300 group-hover:scale-105"
+                  width="48"
+                  height="48"
+                  loading="eager"
                 />
               </div>
               <div className="min-w-0">
@@ -248,7 +251,7 @@ const Welcome = () => {
             <div className="relative order-1 lg:order-2">
               <div className="relative mx-auto max-w-md lg:max-w-none">
                 {/* Glow Effect */}
-                <div className="absolute -inset-4 bg-secondary/20 rounded-3xl blur-2xl" />
+                <div className="absolute -inset-4 bg-secondary/20 rounded-3xl blur-2xl" aria-hidden="true" />
                 
                 <img 
                   src={heroLpgImage} 
@@ -256,6 +259,7 @@ const Welcome = () => {
                   className="relative w-full h-auto rounded-2xl sm:rounded-3xl shadow-2xl border-4 border-white/10"
                   loading="eager"
                   decoding="async"
+                  fetchPriority="high"
                   width="600"
                   height="400"
                 />
