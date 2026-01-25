@@ -85,7 +85,8 @@ export const CommunityBottomNav = ({
 
   return (
     <nav 
-      className="fixed bottom-0 left-0 right-0 z-50 sm:hidden bg-background/95 backdrop-blur-xl border-t border-border safe-area-bottom"
+      className="fixed bottom-0 left-0 right-0 z-50 sm:hidden bg-background/95 backdrop-blur-xl border-t border-border"
+      style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       aria-label="Community navigation"
     >
       <div className="grid grid-cols-4 h-16">

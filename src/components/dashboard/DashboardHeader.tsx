@@ -128,9 +128,10 @@ export const DashboardHeader = ({
             variant="ghost" 
             size="icon" 
             onClick={openCommandPalette}
-            className="sm:hidden h-8 w-8 rounded-lg hover:bg-primary/10 hover:text-primary transition-all duration-300"
+            aria-label="Search"
+            className="sm:hidden h-9 w-9 rounded-lg hover:bg-primary/10 hover:text-primary transition-all duration-300 touch-target-44"
           >
-            <Search className="h-4 w-4" />
+            <Search className="h-4 w-4" aria-hidden="true" />
           </Button>
 
           {/* Notifications */}
@@ -145,9 +146,10 @@ export const DashboardHeader = ({
                     variant="ghost" 
                     size="icon" 
                     onClick={() => navigate('/community')}
+                    aria-label="Browse Marketplace"
                     className="hidden sm:flex h-8 w-8 sm:h-9 sm:w-9 rounded-lg sm:rounded-xl hover:bg-secondary/20 hover:text-secondary transition-all duration-300"
                   >
-                    <Globe className="h-4 w-4" />
+                    <Globe className="h-4 w-4" aria-hidden="true" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
@@ -161,9 +163,10 @@ export const DashboardHeader = ({
                     variant="ghost" 
                     size="icon" 
                     onClick={() => navigate(shopId ? `/community/shop/${shopId}` : '/community')}
+                    aria-label="View My Shop"
                     className="hidden sm:flex h-8 w-8 sm:h-9 sm:w-9 rounded-lg sm:rounded-xl hover:bg-primary/10 hover:text-primary transition-all duration-300"
                   >
-                    <Store className="h-4 w-4" />
+                    <Store className="h-4 w-4" aria-hidden="true" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
@@ -178,9 +181,10 @@ export const DashboardHeader = ({
             variant="ghost" 
             size="icon" 
             onClick={onSettingsClick} 
+            aria-label="Settings"
             className="hidden sm:flex h-8 w-8 sm:h-9 sm:w-9 rounded-lg sm:rounded-xl hover:bg-primary/10 hover:text-primary transition-all duration-300"
           >
-            <Settings className="h-4 w-4" />
+            <Settings className="h-4 w-4" aria-hidden="true" />
           </Button>
 
           {/* Divider */}
