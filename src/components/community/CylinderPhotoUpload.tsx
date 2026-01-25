@@ -88,12 +88,15 @@ export const CylinderPhotoUpload = ({
 
       if (uploadError) throw uploadError;
 
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
+      // Get signed URL (bucket is now private for security)
+      // Store the file path instead of URL - we'll generate signed URLs when displaying
+      const { data: signedData, error: signedError } = await supabase.storage
         .from('cylinder-photos')
-        .getPublicUrl(filePath);
+        .createSignedUrl(filePath, 60 * 60 * 24 * 365); // 1 year expiry
 
-      onPhotoChange(publicUrl);
+      if (signedError) throw signedError;
+
+      onPhotoChange(signedData.signedUrl);
       toast({ title: "Photo uploaded successfully!" });
     } catch (error: any) {
       console.error('Upload error:', error);

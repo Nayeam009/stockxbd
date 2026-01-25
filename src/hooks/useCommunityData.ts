@@ -4,13 +4,13 @@ import { logger } from "@/lib/logger";
 
 export interface Shop {
   id: string;
-  owner_id?: string; // Made optional - hidden from public view for security
+  owner_id?: string; // Hidden from public view for security
   shop_name: string;
   description: string | null;
   logo_url: string | null;
   cover_image_url: string | null;
-  phone: string;
-  whatsapp: string | null;
+  phone?: string; // Now optional - only visible to authenticated users on shop detail page
+  whatsapp?: string | null; // Now optional - only visible to authenticated users
   address: string;
   division: string;
   district: string;
@@ -24,6 +24,11 @@ export interface Shop {
   total_reviews: number;
   total_orders: number;
   created_at: string;
+  // Payment details - only visible to authenticated users placing orders
+  bkash_number?: string | null;
+  nagad_number?: string | null;
+  rocket_number?: string | null;
+  online_payment_only?: boolean;
 }
 
 export interface ShopProduct {
@@ -95,25 +100,23 @@ export const useCommunityData = () => {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userShop, setUserShop] = useState<Shop | null>(null);
 
-  // Fetch all open shops using the public view (hides owner_id)
+  // Fetch all open shops using the public view (excludes sensitive contact info)
   const fetchShops = useCallback(async () => {
     setLoading(true);
     try {
-      // Use the public view that excludes sensitive owner_id - cast properly for TypeScript
+      // Use the public view that excludes sensitive data (phone, whatsapp, payment numbers)
       const { data, error } = await supabase
-        .from('shop_profiles')
-        .select('id, shop_name, description, phone, whatsapp, address, division, district, thana, latitude, longitude, logo_url, cover_image_url, is_open, is_verified, rating, total_reviews, total_orders, delivery_fee, created_at, updated_at')
+        .from('shop_profiles_public')
+        .select('*')
         .eq('is_open', true)
         .order('rating', { ascending: false });
 
       if (error) throw error;
-      // Map data to exclude owner_id from the type
-      const shopsWithoutOwnerId = (data || []).map(shop => ({
+      // Map public view data - contact info is intentionally excluded for security
+      const publicShops = (data || []).map(shop => ({
         id: shop.id,
         shop_name: shop.shop_name,
         description: shop.description,
-        phone: shop.phone,
-        whatsapp: shop.whatsapp,
         address: shop.address,
         division: shop.division,
         district: shop.district,
@@ -124,13 +127,14 @@ export const useCommunityData = () => {
         cover_image_url: shop.cover_image_url,
         is_open: shop.is_open,
         is_verified: shop.is_verified,
-        rating: Number(shop.rating),
-        total_reviews: shop.total_reviews,
-        total_orders: shop.total_orders,
-        delivery_fee: Number(shop.delivery_fee),
-        created_at: shop.created_at
+        rating: Number(shop.rating || 0),
+        total_reviews: shop.total_reviews || 0,
+        total_orders: shop.total_orders || 0,
+        delivery_fee: Number(shop.delivery_fee || 50),
+        created_at: shop.created_at || new Date().toISOString()
+        // Note: phone, whatsapp, payment numbers intentionally excluded from public listing
       })) as Shop[];
-      setShops(shopsWithoutOwnerId);
+      setShops(publicShops);
     } catch (error) {
       logger.error('Error fetching shops:', error);
     } finally {
@@ -138,17 +142,39 @@ export const useCommunityData = () => {
     }
   }, []);
 
-  // Fetch shop by ID
+  // Fetch shop by ID - includes contact details only for authenticated users
   const fetchShopById = useCallback(async (shopId: string): Promise<Shop | null> => {
     try {
-      const { data, error } = await supabase
-        .from('shop_profiles')
-        .select('*')
-        .eq('id', shopId)
-        .single();
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (user) {
+        // Authenticated users can see contact info from main table (RLS controlled)
+        const { data, error } = await supabase
+          .from('shop_profiles')
+          .select('*')
+          .eq('id', shopId)
+          .single();
 
-      if (error) throw error;
-      return data as Shop;
+        if (error) throw error;
+        return data as Shop;
+      } else {
+        // Unauthenticated users get public view only (no contact info)
+        const { data, error } = await supabase
+          .from('shop_profiles_public')
+          .select('*')
+          .eq('id', shopId)
+          .single();
+
+        if (error) throw error;
+        return {
+          ...data,
+          rating: Number(data.rating || 0),
+          total_reviews: data.total_reviews || 0,
+          total_orders: data.total_orders || 0,
+          delivery_fee: Number(data.delivery_fee || 50),
+          created_at: data.created_at || new Date().toISOString()
+        } as Shop;
+      }
     } catch (error) {
       logger.error('Error fetching shop:', error);
       return null;
