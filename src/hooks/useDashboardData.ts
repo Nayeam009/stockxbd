@@ -396,6 +396,7 @@ export const useDashboardData = () => {
       setCylinderStock(cylinderItems);
 
       // Process drivers
+      let formattedDrivers: Driver[] = [];
       if (userRoles && userRoles.length > 0) {
         const driverUserIds = userRoles.map(ur => ur.user_id);
         const { data: driverProfiles } = await supabase
@@ -442,7 +443,7 @@ export const useDashboardData = () => {
           }
         });
 
-        const formattedDrivers: Driver[] = userRoles.map((ur, index) => ({
+        formattedDrivers = userRoles.map((ur, index) => ({
           id: ur.user_id,
           name: profileMap[ur.user_id]?.name || `Driver ${index + 1}`,
           phone: profileMap[ur.user_id]?.phone || '01700-000000',
@@ -466,7 +467,7 @@ export const useDashboardData = () => {
         salesData: formattedSales,
         stockData: stockItems,
         cylinderStock: cylinderItems,
-        drivers: drivers.length ? drivers : [],
+        drivers: formattedDrivers,
         customers: formattedCustomers,
         orders: formattedOrders,
       });
