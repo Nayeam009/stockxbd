@@ -7,7 +7,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
   RefreshCcw, 
-  Loader2, 
   TrendingUp, 
   TrendingDown,
   Calendar,
@@ -19,15 +18,30 @@ import {
   Receipt,
   CircleDollarSign
 } from "lucide-react";
-import { format } from "date-fns";
+import { format, startOfMonth, endOfMonth, subMonths, startOfWeek, endOfWeek, startOfYear, endOfYear } from "date-fns";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
-import { useBusinessDiaryData } from "@/hooks/useBusinessDiaryData";
+import { useBusinessSales, useBusinessExpenses, useBusinessDiaryRealtime } from "@/hooks/queries/useBusinessDiaryQueries";
 import { SaleEntryCard } from "@/components/diary/SaleEntryCard";
 import { ExpenseEntryCard } from "@/components/diary/ExpenseEntryCard";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { BusinessDiarySkeleton } from "./BusinessDiarySkeleton";
+import { useQueryClient } from "@tanstack/react-query";
 
 export const BusinessDiaryModule = () => {
-  const { sales, expenses, loading, refetch, analytics } = useBusinessDiaryData();
+  // TanStack Query hooks with caching
+  const { data: sales = [], isLoading: salesLoading } = useBusinessSales();
+  const { data: expenses = [], isLoading: expensesLoading } = useBusinessExpenses();
+  const loading = salesLoading || expensesLoading;
+  
+  // Set up real-time subscriptions with debouncing
+  useBusinessDiaryRealtime();
+  
+  const queryClient = useQueryClient();
+  const refetch = () => {
+    queryClient.invalidateQueries({ queryKey: ['business-diary-sales'] });
+    queryClient.invalidateQueries({ queryKey: ['business-diary-expenses'] });
+  };
+  
   const isMobile = useIsMobile();
   const [activeTab, setActiveTab] = useState<'sales' | 'expenses'>('sales');
   const [searchQuery, setSearchQuery] = useState("");
@@ -60,25 +74,16 @@ export const BusinessDiaryModule = () => {
     });
   }, [expenses, dateFilter, searchQuery]);
 
-  // Day totals
+  // Day totals (memoized)
   const dayTotals = useMemo(() => {
     const dayIncome = filteredSales.reduce((sum, s) => sum + s.totalAmount, 0);
     const dayExpenses = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
     return { income: dayIncome, expenses: dayExpenses, profit: dayIncome - dayExpenses };
   }, [filteredSales, filteredExpenses]);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center space-y-4">
-          <div className="relative">
-            <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl animate-pulse" />
-            <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto relative" />
-          </div>
-          <p className="text-muted-foreground font-medium">Loading Business Diary...</p>
-        </div>
-      </div>
-    );
+  // Show skeleton during initial load only
+  if (loading && sales.length === 0 && expenses.length === 0) {
+    return <BusinessDiarySkeleton />;
   }
 
   const handleNavigateToSource = (source: string) => {
