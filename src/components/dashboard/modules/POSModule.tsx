@@ -1075,11 +1075,11 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
 
       if (txnError) throw txnError;
 
-      // Insert items with error handling
+      // Insert items with error handling - product_id is nullable, don't force invalid UUIDs
       if (transaction) {
         const items = saleItems.map(item => ({
           transaction_id: transaction.id,
-          product_id: item.brandId || item.stoveId || item.regulatorId || transaction.id,
+          product_id: item.brandId || item.stoveId || item.regulatorId || null,
           product_name: `${item.name} - ${item.details}`,
           quantity: item.quantity,
           unit_price: item.price,

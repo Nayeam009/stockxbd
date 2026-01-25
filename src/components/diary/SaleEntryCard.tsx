@@ -55,24 +55,18 @@ export const SaleEntryCard = ({ entry, onViewDetails }: SaleEntryCardProps) => {
   const paymentConfig = paymentMethodConfig[entry.paymentMethod] || paymentMethodConfig.cash;
   const PaymentIcon = paymentConfig.icon;
   
-  // Normalize payment status - handle 'completed' from database
-  const normalizedStatus = (entry.paymentStatus === 'paid' || (entry as any).paymentStatus === 'completed') 
-    ? 'paid' 
-    : entry.paymentStatus === 'partial' 
-      ? 'partial' 
-      : 'due';
-  
-  const statusConf = statusConfig[normalizedStatus] || statusConfig.paid;
+  // Status is already normalized by the hook - trust it directly
+  const statusConf = statusConfig[entry.paymentStatus] || statusConfig.paid;
   const roleConf = staffRoleConfig[entry.staffRole] || staffRoleConfig.unknown;
   const RoleIcon = roleConf.icon;
   
   const isPayment = entry.type === 'payment';
   const hasReturnCylinders = entry.returnCylinders && entry.returnCylinders.length > 0;
 
-  // Get status bar color based on normalized status
+  // Get status bar color based on payment status
   const getStatusBarColor = () => {
-    if (normalizedStatus === 'paid') return 'bg-emerald-400';
-    if (normalizedStatus === 'due') return 'bg-rose-400';
+    if (entry.paymentStatus === 'paid') return 'bg-emerald-400';
+    if (entry.paymentStatus === 'due') return 'bg-rose-400';
     return 'bg-amber-400';
   };
 
