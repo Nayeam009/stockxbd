@@ -84,7 +84,10 @@ export const CommunityBottomNav = ({
   };
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 sm:hidden bg-background/95 backdrop-blur-xl border-t border-border safe-area-bottom">
+    <nav 
+      className="fixed bottom-0 left-0 right-0 z-50 sm:hidden bg-background/95 backdrop-blur-xl border-t border-border safe-area-bottom"
+      aria-label="Community navigation"
+    >
       <div className="grid grid-cols-4 h-16">
         {navItems.map((item) => {
           const active = isActive(item.path);
@@ -95,20 +98,23 @@ export const CommunityBottomNav = ({
             <button
               key={item.id}
               onClick={() => navigate(item.path)}
+              aria-label={item.label}
+              aria-current={active ? 'page' : undefined}
               className={cn(
-                "flex flex-col items-center justify-center gap-1 transition-colors relative",
+                "flex flex-col items-center justify-center gap-1 transition-colors relative touch-target min-h-[64px]",
                 active 
                   ? isHighlight ? "text-blue-600" : "text-primary"
                   : isHighlight 
-                    ? "text-blue-500/70 hover:text-blue-600" 
-                    : "text-muted-foreground hover:text-foreground"
+                    ? "text-blue-500/70 hover:text-blue-600 active:scale-95" 
+                    : "text-muted-foreground hover:text-foreground active:scale-95"
               )}
             >
               <div className="relative">
-                <Icon className={cn("h-5 w-5", active && "stroke-[2.5px]")} />
+                <Icon className={cn("h-5 w-5", active && "stroke-[2.5px]")} aria-hidden="true" />
                 {'badge' in item && item.badge !== undefined && item.badge > 0 && (
                   <Badge 
                     className="absolute -top-2 -right-2 h-4 min-w-4 flex items-center justify-center p-0 text-[10px] bg-primary"
+                    aria-label={`${item.badge} items in cart`}
                   >
                     {item.badge > 9 ? '9+' : item.badge}
                   </Badge>
@@ -123,10 +129,13 @@ export const CommunityBottomNav = ({
               
               {/* Active indicator */}
               {active && (
-                <div className={cn(
-                  "absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full",
-                  isHighlight ? "bg-blue-600" : "bg-primary"
-                )} />
+                <div 
+                  className={cn(
+                    "absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full",
+                    isHighlight ? "bg-blue-600" : "bg-primary"
+                  )}
+                  aria-hidden="true"
+                />
               )}
             </button>
           );

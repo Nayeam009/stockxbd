@@ -85,8 +85,8 @@ export const CommunityHeader = ({
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
         {/* Logo */}
-        <Link to="/community" className="flex items-center space-x-2">
-          <img src={stockXLogo} alt="LPG Community" className="h-8 w-8" />
+        <Link to="/community" className="flex items-center space-x-2 touch-target" aria-label="LPG Community Home">
+          <img src={stockXLogo} alt="" className="h-8 w-8" aria-hidden="true" />
           <div className="hidden sm:block">
             <span className="font-bold text-primary">LPG</span>
             <span className="text-muted-foreground"> Community</span>
@@ -94,7 +94,7 @@ export const CommunityHeader = ({
         </Link>
 
         {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center space-x-1">
+        <nav className="hidden md:flex items-center space-x-1" aria-label="Main navigation">
           <NavLinks />
         </nav>
 
@@ -108,9 +108,10 @@ export const CommunityHeader = ({
                   variant="default" 
                   size="sm"
                   onClick={() => navigate('/dashboard')}
-                  className="hidden sm:flex items-center gap-2 bg-primary hover:bg-primary/90"
+                  className="hidden sm:flex items-center gap-2 bg-primary hover:bg-primary/90 h-10 touch-target"
+                  aria-label="Go to Shop Dashboard"
                 >
-                  <Store className="h-4 w-4" />
+                  <Store className="h-4 w-4" aria-hidden="true" />
                   <span className="hidden md:inline">My Shop</span>
                 </Button>
               </TooltipTrigger>
@@ -124,13 +125,15 @@ export const CommunityHeader = ({
           <Button 
             variant="outline" 
             size="icon" 
-            className="relative"
+            className="relative h-10 w-10 touch-target"
             onClick={onCartClick}
+            aria-label={`Shopping cart${cartItemCount > 0 ? `, ${cartItemCount} items` : ''}`}
           >
-            <ShoppingCart className="h-5 w-5" />
+            <ShoppingCart className="h-5 w-5" aria-hidden="true" />
             {cartItemCount > 0 && (
               <Badge 
                 className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center p-0 text-xs bg-primary"
+                aria-hidden="true"
               >
                 {cartItemCount}
               </Badge>
@@ -140,8 +143,8 @@ export const CommunityHeader = ({
           {/* User Menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon">
-                <User className="h-5 w-5" />
+              <Button variant="outline" size="icon" className="h-10 w-10 touch-target" aria-label="User menu">
+                <User className="h-5 w-5" aria-hidden="true" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
@@ -182,8 +185,8 @@ export const CommunityHeader = ({
           {/* Mobile Menu */}
           <Sheet>
             <SheetTrigger asChild className="md:hidden">
-              <Button variant="ghost" size="icon">
-                <Menu className="h-5 w-5" />
+              <Button variant="ghost" size="icon" className="h-10 w-10 touch-target" aria-label="Open menu">
+                <Menu className="h-5 w-5" aria-hidden="true" />
               </Button>
             </SheetTrigger>
             <SheetContent side="right" className="w-64">
