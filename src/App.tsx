@@ -3,7 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense, useEffect, memo } from "react";
 import Welcome from "./pages/Welcome";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
@@ -24,14 +24,24 @@ const CustomerCheckout = lazy(() => import("./pages/CustomerCheckout"));
 const CustomerOrders = lazy(() => import("./pages/CustomerOrders"));
 const CustomerProfile = lazy(() => import("./pages/CustomerProfile"));
 
-const queryClient = new QueryClient();
+// Optimized QueryClient with aggressive caching for production
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5 minutes default
+      gcTime: 1000 * 60 * 30, // 30 minutes garbage collection
+      retry: 2,
+      refetchOnWindowFocus: false, // Reduce unnecessary refetches
+    },
+  },
+});
 
-// Loading fallback for lazy-loaded pages
-const PageLoader = () => (
+// Memoized loading fallback for lazy-loaded pages
+const PageLoader = memo(() => (
   <div className="min-h-screen flex items-center justify-center bg-background">
-    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    <Loader2 className="h-8 w-8 animate-spin text-primary" aria-label="Loading page" />
   </div>
-);
+));
 
 // Security: Clear sensitive data on logout
 const useAuthCleanup = () => {
