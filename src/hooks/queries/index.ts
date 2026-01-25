@@ -2,7 +2,7 @@
  * Optimized Query Hooks - Central Export
  * 
  * Import from here for all data fetching needs:
- * import { useLpgBrands, useDashboardKPIs } from '@/hooks/queries';
+ * import { useLpgBrands, useDashboardKPIs, useBusinessSales } from '@/hooks/queries';
  */
 
 export {
@@ -31,3 +31,12 @@ export {
   // Utilities
   useInvalidateDashboard,
 } from './useOptimizedQueries';
+
+// Business Diary optimized queries
+export {
+  useBusinessSales,
+  useBusinessExpenses,
+  useBusinessDiaryRealtime,
+  type SaleEntry,
+  type ExpenseEntry,
+} from './useBusinessDiaryQueries';
