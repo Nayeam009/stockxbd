@@ -87,8 +87,8 @@ const CustomerCheckout = () => {
       }
       setCart(parsedCart);
       
-      // Fetch shop payment info
-      const shopId = parsedCart[0]?.shop_id;
+      // Fetch shop payment info - handle both shop.id and shop_id references
+      const shopId = parsedCart[0]?.shop?.id || parsedCart[0]?.shop_id;
       if (shopId) {
         fetchShopPaymentInfo(shopId);
       }
