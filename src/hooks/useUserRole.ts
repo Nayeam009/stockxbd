@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 export type UserRole = 'owner' | 'manager' | 'driver' | 'staff' | 'customer';
@@ -12,16 +12,27 @@ interface UserRoleData {
   refetch: () => Promise<void>;
 }
 
-export const useUserRole = (): UserRoleData => {
-  const [userRole, setUserRole] = useState<UserRole>('driver');
-  const [userName, setUserName] = useState<string>('User');
-  const [userId, setUserId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+// Module-level cache for instant recovery on tab switch
+let cachedRole: UserRole | null = null;
+let cachedName: string | null = null;
+let cachedUserId: string | null = null;
+let lastFetchTime = 0;
+const CACHE_DURATION = 60000; // 1 minute cache
 
-  const fetchUserData = useCallback(async () => {
+export const useUserRole = (): UserRoleData => {
+  const [userRole, setUserRole] = useState<UserRole>(cachedRole || 'driver');
+  const [userName, setUserName] = useState<string>(cachedName || 'User');
+  const [userId, setUserId] = useState<string | null>(cachedUserId);
+  const [loading, setLoading] = useState(!cachedRole); // No loading if we have cache
+  const [error, setError] = useState<string | null>(null);
+  const isInitialLoadRef = useRef(!cachedRole);
+
+  const fetchUserData = useCallback(async (isSoftRefresh = false) => {
     try {
-      setLoading(true);
+      // Only show loading on initial load, not soft refreshes
+      if (!isSoftRefresh && isInitialLoadRef.current) {
+        setLoading(true);
+      }
       setError(null);
 
       const { data: { session } } = await supabase.auth.getSession();
@@ -30,55 +41,109 @@ export const useUserRole = (): UserRoleData => {
         setUserRole('driver');
         setUserName('Guest');
         setUserId(null);
+        cachedRole = null;
+        cachedName = null;
+        cachedUserId = null;
         return;
       }
 
       setUserId(session.user.id);
+      cachedUserId = session.user.id;
 
-      // Fetch role from user_roles table
-      const { data: roleData, error: roleError } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', session.user.id)
-        .maybeSingle();
+      // Fetch role and profile in parallel
+      const [roleResult, profileResult] = await Promise.all([
+        supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', session.user.id)
+          .maybeSingle(),
+        supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('user_id', session.user.id)
+          .maybeSingle()
+      ]);
 
-      if (roleError) {
-        console.error('Error fetching role:', roleError);
+      if (roleResult.error) {
+        console.error('Error fetching role:', roleResult.error);
         setError('Failed to fetch user role');
-      } else if (roleData) {
-        setUserRole(roleData.role as UserRole);
-      }
-
-      // Fetch profile for user name
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('full_name')
-        .eq('user_id', session.user.id)
-        .maybeSingle();
-
-      if (profileError) {
-        console.error('Error fetching profile:', profileError);
+      } else if (roleResult.data) {
+        const role = roleResult.data.role as UserRole;
+        setUserRole(role);
+        cachedRole = role;
       }
 
       // Use full name from profile, or email prefix, or 'User'
-      const displayName = profileData?.full_name || 
+      const displayName = profileResult.data?.full_name || 
                          session.user.email?.split('@')[0] || 
                          'User';
       setUserName(displayName);
+      cachedName = displayName;
+      
+      // Update cache timestamp
+      lastFetchTime = Date.now();
 
     } catch (err) {
       console.error('Error in useUserRole:', err);
       setError('An error occurred while fetching user data');
     } finally {
-      setLoading(false);
+      if (isInitialLoadRef.current) {
+        setLoading(false);
+        isInitialLoadRef.current = false;
+      }
     }
   }, []);
 
+  // Handle visibility changes for instant tab recovery
   useEffect(() => {
-    fetchUserData();
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        const timeSinceLastFetch = Date.now() - lastFetchTime;
+        
+        // Use cache if fresh, otherwise soft refresh
+        if (cachedRole && timeSinceLastFetch < CACHE_DURATION) {
+          // Cache is fresh, no need to refetch
+          return;
+        }
+        
+        // Cache is stale, do a soft refresh
+        fetchUserData(true);
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', handleVisibility);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', handleVisibility);
+    };
+  }, [fetchUserData]);
+
+  useEffect(() => {
+    // If we have cache, use it immediately
+    if (cachedRole && cachedName) {
+      setUserRole(cachedRole);
+      setUserName(cachedName);
+      setUserId(cachedUserId);
+      setLoading(false);
+      
+      // Still refresh in background if cache is stale
+      const timeSinceLastFetch = Date.now() - lastFetchTime;
+      if (timeSinceLastFetch > CACHE_DURATION) {
+        fetchUserData(true);
+      }
+    } else {
+      fetchUserData();
+    }
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+      // Clear cache on auth change
+      cachedRole = null;
+      cachedName = null;
+      cachedUserId = null;
+      isInitialLoadRef.current = true;
       fetchUserData();
     });
 
@@ -91,6 +156,6 @@ export const useUserRole = (): UserRoleData => {
     userId,
     loading,
     error,
-    refetch: fetchUserData
+    refetch: () => fetchUserData(false)
   };
 };

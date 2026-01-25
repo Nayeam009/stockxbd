@@ -3,6 +3,13 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Loading animation for soft refresh indicator */
+@keyframes loading {
+  0% { transform: translateX(-100%); }
+  50% { transform: translateX(200%); }
+  100% { transform: translateX(-100%); }
+}
+
 /* Stock-X LPG Management Dashboard Design System - Navy/Orange Theme */
 
 @layer base {

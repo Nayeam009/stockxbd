@@ -116,6 +116,7 @@ const Dashboard = () => {
     staff,
     analytics,
     loading: dataLoading,
+    softLoading,
     refetch,
     setSalesData,
     setStockData,
@@ -248,8 +249,15 @@ const Dashboard = () => {
 
   return (
     <SidebarProvider defaultOpen={false}>
+      {/* Soft loading indicator - shows during background refresh */}
+      {softLoading && (
+        <div className="fixed top-0 left-0 right-0 h-0.5 bg-primary/20 z-[100]">
+          <div className="h-full bg-primary animate-[loading_1s_ease-in-out_infinite] w-1/3" />
+        </div>
+      )}
+      
       {/* Transition pending indicator - shows during module switch */}
-      {isPending && (
+      {isPending && !softLoading && (
         <div className="fixed top-0 left-0 right-0 h-1 bg-primary/20 z-[100]">
           <div className="h-full w-1/3 bg-primary rounded-r-full animate-pulse transition-loading" />
         </div>
