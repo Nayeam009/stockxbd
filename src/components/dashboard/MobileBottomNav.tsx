@@ -149,6 +149,7 @@ export const MobileBottomNav = ({
             </SheetHeader>
             <div className="grid grid-cols-3 gap-3 py-4 overflow-y-auto max-h-[calc(70vh-80px)]">
               {filteredMoreItems.map(item => {
+                const Icon = item.icon;
                 const isActive = activeModule === item.id;
                 return (
                   <button 
@@ -156,12 +157,13 @@ export const MobileBottomNav = ({
                     onClick={() => handleModuleChange(item.id)} 
                     aria-current={isActive ? 'page' : undefined} 
                     className={cn(
-                      "flex flex-col items-center justify-center p-4 rounded-xl transition-all duration-200 border min-h-[72px] touch-target", 
+                      "flex flex-col items-center justify-center p-4 rounded-xl transition-all duration-200 border min-h-[80px] touch-target gap-2", 
                       isActive 
                         ? "bg-primary/10 border-primary/30 text-primary" 
                         : "bg-muted/30 border-border/30 text-foreground hover:bg-muted/50 active:scale-95"
                     )}
                   >
+                    <Icon className={cn("h-6 w-6", isActive && "text-primary")} aria-hidden="true" />
                     <span className={cn("text-xs font-medium text-center line-clamp-2", isActive && "font-semibold")}>
                       {t(item.labelKey)}
                     </span>
