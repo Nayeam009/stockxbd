@@ -150,30 +150,34 @@ const Welcome = () => {
 
             {/* Mobile Menu Button */}
             <button 
-              className="md:hidden p-2 -mr-1 rounded-lg hover:bg-muted transition-colors"
+              className="md:hidden p-2 -mr-1 rounded-lg hover:bg-muted transition-colors touch-target min-h-[44px] min-w-[44px] flex items-center justify-center"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              aria-label="Toggle menu"
+              aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+              aria-expanded={mobileMenuOpen}
             >
-              {mobileMenuOpen ? <X className="h-5 w-5 sm:h-6 sm:w-6 text-primary" /> : <Menu className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />}
+              {mobileMenuOpen ? <X className="h-5 w-5 sm:h-6 sm:w-6 text-primary" aria-hidden="true" /> : <Menu className="h-5 w-5 sm:h-6 sm:w-6 text-primary" aria-hidden="true" />}
             </button>
           </nav>
 
           {/* Mobile Menu */}
           {mobileMenuOpen && (
-            <div className="md:hidden absolute top-full left-0 right-0 bg-card border-b border-border shadow-xl py-4 px-4 space-y-3 animate-fade-in">
-              <a href="#features" className="block py-2.5 px-3 text-sm font-medium text-muted-foreground hover:text-primary hover:bg-muted/50 rounded-lg transition-colors">Features</a>
-              <a href="#services" className="block py-2.5 px-3 text-sm font-medium text-muted-foreground hover:text-primary hover:bg-muted/50 rounded-lg transition-colors">Services</a>
-              <a href="#pricing" className="block py-2.5 px-3 text-sm font-medium text-muted-foreground hover:text-primary hover:bg-muted/50 rounded-lg transition-colors">Pricing</a>
-              <Link to="/community" className="block py-2.5 px-3 text-sm font-medium text-muted-foreground hover:text-primary hover:bg-muted/50 rounded-lg transition-colors">Marketplace</Link>
-              <div className="pt-2 space-y-2">
+            <nav 
+              className="md:hidden absolute top-full left-0 right-0 bg-card border-b border-border shadow-xl py-4 px-4 space-y-2 animate-fade-in z-50"
+              aria-label="Mobile navigation"
+            >
+              <a href="#features" className="flex items-center py-3 px-4 text-base font-medium text-muted-foreground hover:text-primary hover:bg-muted/50 rounded-lg transition-colors touch-target min-h-[48px]">Features</a>
+              <a href="#services" className="flex items-center py-3 px-4 text-base font-medium text-muted-foreground hover:text-primary hover:bg-muted/50 rounded-lg transition-colors touch-target min-h-[48px]">Services</a>
+              <a href="#pricing" className="flex items-center py-3 px-4 text-base font-medium text-muted-foreground hover:text-primary hover:bg-muted/50 rounded-lg transition-colors touch-target min-h-[48px]">Pricing</a>
+              <Link to="/community" className="flex items-center py-3 px-4 text-base font-medium text-muted-foreground hover:text-primary hover:bg-muted/50 rounded-lg transition-colors touch-target min-h-[48px]">Marketplace</Link>
+              <div className="pt-3 space-y-2">
                 <Link to="/auth" className="block">
-                  <Button className="w-full btn-cta text-secondary-foreground font-semibold h-11">
+                  <Button className="w-full btn-cta text-secondary-foreground font-semibold h-12 touch-target text-base">
                     Get Started
-                    <ArrowRight className="ml-2 h-4 w-4" />
+                    <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
                   </Button>
                 </Link>
               </div>
-            </div>
+            </nav>
           )}
         </div>
       </header>
