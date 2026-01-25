@@ -4,11 +4,11 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { 
   Search, 
   MapPin, 
   Filter,
-  Loader2,
   Store,
   Star,
   TrendingUp,
@@ -26,6 +26,7 @@ import {
 import { CommunityHeader } from "@/components/community/CommunityHeader";
 import { CommunityBottomNav } from "@/components/community/CommunityBottomNav";
 import { ShopCard } from "@/components/community/ShopCard";
+import { ShopCardSkeletonGrid } from "@/components/community/ShopCardSkeleton";
 import { LocationSearchCombobox } from "@/components/community/LocationSearchCombobox";
 import { useCommunityData, Shop, CartItem } from "@/hooks/useCommunityData";
 import { DIVISIONS, getDistricts, getThanas, POPULAR_LOCATIONS } from "@/lib/bangladeshConstants";
@@ -136,18 +137,20 @@ const Community = () => {
 
   const hasActiveFilters = searchQuery || locationSearch || selectedDivision !== "all";
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center" role="status" aria-live="polite">
-        <div className="text-center space-y-4">
-          <div className="w-16 h-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" aria-hidden="true" />
-          </div>
-          <p className="text-muted-foreground">Loading shops...</p>
-        </div>
-      </div>
-    );
-  }
+  // Stats Skeleton for loading state
+  const StatsLoadingSkeleton = () => (
+    <div className="grid grid-cols-3 gap-2 sm:gap-4">
+      {[1, 2, 3].map((i) => (
+        <Card key={i} className="bg-muted/30">
+          <CardContent className="p-3 sm:p-4 text-center space-y-2">
+            <Skeleton className="h-5 w-5 sm:h-6 sm:w-6 mx-auto rounded" />
+            <Skeleton className="h-6 w-12 mx-auto" />
+            <Skeleton className="h-3 w-16 mx-auto" />
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-background pb-20 sm:pb-0">
@@ -174,29 +177,33 @@ const Community = () => {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-3 gap-2 sm:gap-4">
-          <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
-            <CardContent className="p-3 sm:p-4 text-center">
-              <Store className="h-5 w-5 sm:h-6 sm:w-6 mx-auto text-primary mb-1 sm:mb-2" />
-              <p className="text-xl sm:text-2xl font-bold text-foreground tabular-nums">{analytics.totalShops}</p>
-              <p className="text-[10px] sm:text-xs text-muted-foreground">Active Shops</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-gradient-to-br from-amber-500/10 to-amber-500/5 border-amber-500/20">
-            <CardContent className="p-3 sm:p-4 text-center">
-              <Star className="h-5 w-5 sm:h-6 sm:w-6 mx-auto text-amber-500 mb-1 sm:mb-2" />
-              <p className="text-xl sm:text-2xl font-bold text-foreground tabular-nums">{analytics.avgRating}</p>
-              <p className="text-[10px] sm:text-xs text-muted-foreground">Avg Rating</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-emerald-500/20">
-            <CardContent className="p-3 sm:p-4 text-center">
-              <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 mx-auto text-emerald-500 mb-1 sm:mb-2" />
-              <p className="text-xl sm:text-2xl font-bold text-foreground tabular-nums">{analytics.totalOrders}</p>
-              <p className="text-[10px] sm:text-xs text-muted-foreground">Total Orders</p>
-            </CardContent>
-          </Card>
-        </div>
+        {loading ? (
+          <StatsLoadingSkeleton />
+        ) : (
+          <div className="grid grid-cols-3 gap-2 sm:gap-4">
+            <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20 hover:shadow-md transition-shadow">
+              <CardContent className="p-3 sm:p-4 text-center">
+                <Store className="h-5 w-5 sm:h-6 sm:w-6 mx-auto text-primary mb-1 sm:mb-2" aria-hidden="true" />
+                <p className="text-xl sm:text-2xl font-bold text-foreground tabular-nums">{analytics.totalShops}</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">Active Shops</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-gradient-to-br from-amber-500/10 to-amber-500/5 border-amber-500/20 hover:shadow-md transition-shadow">
+              <CardContent className="p-3 sm:p-4 text-center">
+                <Star className="h-5 w-5 sm:h-6 sm:w-6 mx-auto text-amber-500 mb-1 sm:mb-2" aria-hidden="true" />
+                <p className="text-xl sm:text-2xl font-bold text-foreground tabular-nums">{analytics.avgRating}</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">Avg Rating</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-emerald-500/20 hover:shadow-md transition-shadow">
+              <CardContent className="p-3 sm:p-4 text-center">
+                <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 mx-auto text-emerald-500 mb-1 sm:mb-2" aria-hidden="true" />
+                <p className="text-xl sm:text-2xl font-bold text-foreground tabular-nums">{analytics.totalOrders}</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">Total Orders</p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* Search and Filters */}
         <Card className="border-border overflow-hidden">
@@ -336,7 +343,9 @@ const Community = () => {
         </div>
 
         {/* Shop Grid */}
-        {filteredShops.length > 0 ? (
+        {loading ? (
+          <ShopCardSkeletonGrid count={6} />
+        ) : filteredShops.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             {filteredShops.map(shop => (
               <ShopCard 

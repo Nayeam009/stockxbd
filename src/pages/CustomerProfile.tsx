@@ -26,7 +26,8 @@ import {
   Trash2,
   Home,
   Briefcase,
-  Cylinder
+  Cylinder,
+  Sparkles
 } from "lucide-react";
 import {
   Select,
@@ -286,11 +287,56 @@ const CustomerProfile = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center" role="status" aria-live="polite">
-        <div className="text-center space-y-3">
-          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" aria-hidden="true" />
-          <p className="text-muted-foreground">Loading profile...</p>
-        </div>
+      <div className="min-h-screen bg-background pb-20 sm:pb-0">
+        <CommunityHeader 
+          cartItemCount={cart.length}
+          userRole={userRole}
+          userName={currentUser?.email}
+          onCartClick={() => navigate('/community/cart')}
+        />
+        <main className="container mx-auto px-4 py-4 sm:py-6 max-w-2xl">
+          {/* Header Skeleton */}
+          <div className="flex items-center gap-3 mb-4 sm:mb-6">
+            <div className="h-10 w-10 rounded-lg bg-muted animate-pulse" />
+            <div className="space-y-2">
+              <div className="h-6 w-32 bg-muted animate-pulse rounded" />
+              <div className="h-4 w-48 bg-muted animate-pulse rounded" />
+            </div>
+          </div>
+          {/* Profile Card Skeleton */}
+          <Card className="overflow-hidden border-border mb-4">
+            <div className="h-20 bg-gradient-to-r from-primary/20 via-primary/10 to-primary/5 animate-pulse" />
+            <CardContent className="pt-0 pb-4">
+              <div className="flex flex-col items-center gap-3 -mt-8">
+                <div className="h-16 w-16 rounded-full bg-muted animate-pulse border-4 border-background" />
+                <div className="h-6 w-32 bg-muted animate-pulse rounded" />
+                <div className="h-5 w-24 bg-muted animate-pulse rounded-full" />
+              </div>
+              <div className="grid grid-cols-3 gap-2 mt-4">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="p-3 rounded-xl bg-muted/50 flex flex-col items-center gap-2">
+                    <div className="h-5 w-5 bg-muted animate-pulse rounded" />
+                    <div className="h-6 w-10 bg-muted animate-pulse rounded" />
+                    <div className="h-3 w-16 bg-muted animate-pulse rounded" />
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+          {/* Tabs Skeleton */}
+          <div className="h-12 w-full bg-muted animate-pulse rounded-lg mb-4" />
+          <Card className="border-border">
+            <CardContent className="p-6 space-y-4">
+              <div className="h-5 w-40 bg-muted animate-pulse rounded" />
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div className="h-12 w-full bg-muted animate-pulse rounded-md" />
+                <div className="h-12 w-full bg-muted animate-pulse rounded-md" />
+              </div>
+              <div className="h-12 w-full bg-muted animate-pulse rounded-md" />
+            </CardContent>
+          </Card>
+        </main>
+        <CommunityBottomNav cartItemCount={cart.length} userRole={userRole} />
       </div>
     );
   }
@@ -316,22 +362,26 @@ const CustomerProfile = () => {
           </div>
         </div>
 
-        {/* Profile Header Card */}
-        <Card className="overflow-hidden border-border">
-          <div className="h-16 sm:h-20 bg-gradient-to-r from-primary via-primary/90 to-primary/70" />
-          <CardContent className="pt-0 pb-4 sm:pb-6">
-            <div className="flex flex-col sm:flex-row items-center sm:items-end gap-3 sm:gap-4 -mt-8 sm:-mt-10">
-              <Avatar className="h-16 w-16 sm:h-20 sm:w-20 border-4 border-background shadow-lg">
+        {/* Profile Header Card - Enhanced */}
+        <Card className="overflow-hidden border-border shadow-sm">
+          <div className="h-20 sm:h-28 bg-gradient-to-r from-primary via-primary/90 to-primary/70 relative overflow-hidden">
+            {/* Decorative Elements */}
+            <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxjaXJjbGUgY3g9IjIwIiBjeT0iMjAiIHI9IjIiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC4xKSIvPjwvZz48L3N2Zz4=')] opacity-50" />
+          </div>
+          <CardContent className="pt-0 pb-5 sm:pb-6">
+            <div className="flex flex-col sm:flex-row items-center sm:items-end gap-3 sm:gap-4 -mt-10 sm:-mt-12">
+              <Avatar className="h-20 w-20 sm:h-24 sm:w-24 border-4 border-background shadow-lg ring-2 ring-primary/20">
                 <AvatarImage src={avatarUrl || undefined} alt={fullName} />
-                <AvatarFallback className="text-xl sm:text-2xl font-bold bg-gradient-to-br from-primary to-primary/80 text-primary-foreground">
+                <AvatarFallback className="text-2xl sm:text-3xl font-bold bg-gradient-to-br from-primary to-primary/80 text-primary-foreground">
                   {getInitials(fullName || email)}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 text-center sm:text-left">
-                <h2 className="text-lg sm:text-xl font-bold text-foreground">{fullName || email}</h2>
-                <div className="flex items-center gap-2 justify-center sm:justify-start mt-1">
+                <h2 className="text-xl sm:text-2xl font-bold text-foreground">{fullName || email}</h2>
+                <div className="flex items-center gap-2 justify-center sm:justify-start mt-1.5">
                   {userRole === 'owner' || userRole === 'manager' ? (
                     <Badge className="bg-blue-500/15 text-blue-600 border-blue-500/30">
+                      <Sparkles className="h-3 w-3 mr-1" />
                       Wholesale Customer
                     </Badge>
                   ) : (
@@ -343,20 +393,20 @@ const CustomerProfile = () => {
               </div>
             </div>
 
-            {/* Stats */}
-            <div className="grid grid-cols-3 gap-2 sm:gap-4 mt-4 sm:mt-6">
-              <div className="text-center p-2 sm:p-3 rounded-xl bg-muted/50">
-                <ShoppingBag className="h-4 w-4 sm:h-5 sm:w-5 mx-auto text-primary mb-1" />
+            {/* Stats - Enhanced */}
+            <div className="grid grid-cols-3 gap-2 sm:gap-4 mt-5 sm:mt-6">
+              <div className="text-center p-2.5 sm:p-3 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/10 hover:shadow-sm transition-shadow">
+                <ShoppingBag className="h-4 w-4 sm:h-5 sm:w-5 mx-auto text-primary mb-1" aria-hidden="true" />
                 <p className="text-xl sm:text-2xl font-bold tabular-nums">{totalOrders}</p>
                 <p className="text-[10px] sm:text-xs text-muted-foreground">Total Orders</p>
               </div>
-              <div className="text-center p-2 sm:p-3 rounded-xl bg-amber-500/10">
-                <Clock className="h-4 w-4 sm:h-5 sm:w-5 mx-auto text-amber-500 mb-1" />
+              <div className="text-center p-2.5 sm:p-3 rounded-xl bg-gradient-to-br from-amber-500/10 to-amber-500/5 border border-amber-500/10 hover:shadow-sm transition-shadow">
+                <Clock className="h-4 w-4 sm:h-5 sm:w-5 mx-auto text-amber-500 mb-1" aria-hidden="true" />
                 <p className="text-xl sm:text-2xl font-bold tabular-nums">{pendingOrders}</p>
                 <p className="text-[10px] sm:text-xs text-muted-foreground">Pending</p>
               </div>
-              <div className="text-center p-2 sm:p-3 rounded-xl bg-emerald-500/10">
-                <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 mx-auto text-emerald-500 mb-1" />
+              <div className="text-center p-2.5 sm:p-3 rounded-xl bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border border-emerald-500/10 hover:shadow-sm transition-shadow">
+                <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 mx-auto text-emerald-500 mb-1" aria-hidden="true" />
                 <p className="text-xl sm:text-2xl font-bold tabular-nums">{completedOrders}</p>
                 <p className="text-[10px] sm:text-xs text-muted-foreground">Completed</p>
               </div>
@@ -364,19 +414,22 @@ const CustomerProfile = () => {
           </CardContent>
         </Card>
 
-        {/* Tabs */}
+        {/* Tabs - Enhanced */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="w-full h-12">
-            <TabsTrigger value="profile" className="flex-1 h-10 text-sm">
-              <User className="h-4 w-4 mr-1.5" />
+          <TabsList className="w-full h-14 p-1 bg-muted/50">
+            <TabsTrigger value="profile" className="flex-1 h-11 text-sm touch-target data-[state=active]:shadow-sm">
+              <User className="h-4 w-4 mr-1.5" aria-hidden="true" />
               Profile
             </TabsTrigger>
-            <TabsTrigger value="cylinder" className="flex-1 h-10 text-sm">
-              <Cylinder className="h-4 w-4 mr-1.5" />
+            <TabsTrigger value="cylinder" className="flex-1 h-11 text-sm touch-target data-[state=active]:shadow-sm relative">
+              <Cylinder className="h-4 w-4 mr-1.5" aria-hidden="true" />
               Cylinder
+              {!hasCylinderProfile && (
+                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
+              )}
             </TabsTrigger>
-            <TabsTrigger value="orders" className="flex-1 h-10 text-sm">
-              <Package className="h-4 w-4 mr-1.5" />
+            <TabsTrigger value="orders" className="flex-1 h-11 text-sm touch-target data-[state=active]:shadow-sm">
+              <Package className="h-4 w-4 mr-1.5" aria-hidden="true" />
               Orders
             </TabsTrigger>
           </TabsList>
