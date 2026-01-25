@@ -53,7 +53,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 interface UniversalNotificationCenterProps {
-  userRole: 'owner' | 'manager' | 'driver';
+  userRole: 'owner' | 'manager' | 'driver' | 'staff';
 }
 
 export const UniversalNotificationCenter = ({ userRole }: UniversalNotificationCenterProps) => {
