@@ -291,24 +291,28 @@ export const OnlineProductSelector = ({
             variant={activeTable === 'sale' ? 'default' : 'ghost'}
             size="sm"
             className={cn(
-              "h-12 flex-col gap-0.5",
+              "h-12 flex-col gap-0.5 touch-target",
               activeTable === 'sale' && "bg-emerald-600 hover:bg-emerald-700"
             )}
             onClick={() => setActiveTable('sale')}
+            aria-label={`View order items, ${saleItems.length} items in cart`}
+            aria-pressed={activeTable === 'sale'}
           >
-            <ShoppingCart className="h-4 w-4" />
+            <ShoppingCart className="h-4 w-4" aria-hidden="true" />
             <span className="text-xs">Order ({saleItems.length})</span>
           </Button>
           <Button
             variant={activeTable === 'return' ? 'default' : 'ghost'}
             size="sm"
             className={cn(
-              "h-12 flex-col gap-0.5",
+              "h-12 flex-col gap-0.5 touch-target",
               activeTable === 'return' && "bg-amber-600 hover:bg-amber-700"
             )}
             onClick={() => setActiveTable('return')}
+            aria-label={`View return cylinders, ${returnItems.length} items to return`}
+            aria-pressed={activeTable === 'return'}
           >
-            <RotateCcw className="h-4 w-4" />
+            <RotateCcw className="h-4 w-4" aria-hidden="true" />
             <span className="text-xs">Return ({returnItems.length})</span>
           </Button>
         </div>
@@ -355,33 +359,36 @@ export const OnlineProductSelector = ({
                           <Button 
                             variant="outline" 
                             size="icon" 
-                            className="h-7 w-7"
+                            className="h-8 w-8 touch-target"
                             onClick={() => updateSaleQty(item.id, -1)}
+                            aria-label={`Decrease quantity of ${item.product.brand_name}`}
                           >
-                            <Minus className="h-3 w-3" />
+                            <Minus className="h-3.5 w-3.5" />
                           </Button>
-                          <span className="w-6 text-center font-medium">{item.quantity}</span>
+                          <span className="w-6 text-center font-medium tabular-nums">{item.quantity}</span>
                           <Button 
                             variant="outline" 
                             size="icon" 
-                            className="h-7 w-7"
+                            className="h-8 w-8 touch-target"
                             onClick={() => updateSaleQty(item.id, 1)}
+                            aria-label={`Increase quantity of ${item.product.brand_name}`}
                           >
-                            <Plus className="h-3 w-3" />
+                            <Plus className="h-3.5 w-3.5" />
                           </Button>
                         </div>
                       </TableCell>
-                      <TableCell className="text-right font-medium">
+                      <TableCell className="text-right font-medium tabular-nums">
                         ৳{(item.product.price * item.quantity).toLocaleString()}
                       </TableCell>
                       <TableCell>
                         <Button 
                           variant="ghost" 
                           size="icon"
-                          className="h-7 w-7 text-destructive hover:text-destructive"
+                          className="h-8 w-8 touch-target text-destructive hover:text-destructive"
                           onClick={() => removeSaleItem(item.id)}
+                          aria-label={`Remove ${item.product.brand_name} from cart`}
                         >
-                          <Trash2 className="h-3.5 w-3.5" />
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -444,19 +451,21 @@ export const OnlineProductSelector = ({
                           <Button 
                             variant="outline" 
                             size="icon" 
-                            className="h-7 w-7"
+                            className="h-8 w-8 touch-target"
                             onClick={() => updateReturnQty(item.id, -1)}
+                            aria-label={`Decrease return quantity of ${item.brandName}`}
                           >
-                            <Minus className="h-3 w-3" />
+                            <Minus className="h-3.5 w-3.5" />
                           </Button>
-                          <span className="w-6 text-center font-medium">{item.quantity}</span>
+                          <span className="w-6 text-center font-medium tabular-nums">{item.quantity}</span>
                           <Button 
                             variant="outline" 
                             size="icon" 
-                            className="h-7 w-7"
+                            className="h-8 w-8 touch-target"
                             onClick={() => updateReturnQty(item.id, 1)}
+                            aria-label={`Increase return quantity of ${item.brandName}`}
                           >
-                            <Plus className="h-3 w-3" />
+                            <Plus className="h-3.5 w-3.5" />
                           </Button>
                         </div>
                       </TableCell>
@@ -464,8 +473,9 @@ export const OnlineProductSelector = ({
                         <Button
                           variant={item.type === 'leaked' ? 'destructive' : 'outline'}
                           size="sm"
-                          className="h-7 text-xs"
+                          className="h-8 text-xs touch-target"
                           onClick={() => toggleReturnType(item.id)}
+                          aria-label={`Toggle return type for ${item.brandName}, currently ${item.type}`}
                         >
                           {item.type === 'empty' ? 'Empty' : 'Leaked'}
                         </Button>
@@ -474,10 +484,11 @@ export const OnlineProductSelector = ({
                         <Button 
                           variant="ghost" 
                           size="icon"
-                          className="h-7 w-7 text-destructive hover:text-destructive"
+                          className="h-8 w-8 touch-target text-destructive hover:text-destructive"
                           onClick={() => setReturnItems(returnItems.filter(r => r.id !== item.id))}
+                          aria-label={`Remove ${item.brandName} from returns`}
                         >
-                          <Trash2 className="h-3.5 w-3.5" />
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -519,17 +530,19 @@ export const OnlineProductSelector = ({
                         <Button 
                           variant="outline" 
                           size="icon" 
-                          className="h-9 w-9"
+                          className="h-10 w-10 touch-target"
                           onClick={() => updateSaleQty(item.id, -1)}
+                          aria-label={`Decrease quantity of ${item.product.brand_name}`}
                         >
                           <Minus className="h-4 w-4" />
                         </Button>
-                        <span className="w-8 text-center font-bold">{item.quantity}</span>
+                        <span className="w-8 text-center font-bold tabular-nums">{item.quantity}</span>
                         <Button 
                           variant="outline" 
                           size="icon" 
-                          className="h-9 w-9"
+                          className="h-10 w-10 touch-target"
                           onClick={() => updateSaleQty(item.id, 1)}
+                          aria-label={`Increase quantity of ${item.product.brand_name}`}
                         >
                           <Plus className="h-4 w-4" />
                         </Button>
@@ -537,8 +550,9 @@ export const OnlineProductSelector = ({
                       <Button 
                         variant="ghost" 
                         size="icon"
-                        className="h-9 w-9 text-destructive"
+                        className="h-10 w-10 touch-target text-destructive"
                         onClick={() => removeSaleItem(item.id)}
+                        aria-label={`Remove ${item.product.brand_name} from cart`}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -586,8 +600,9 @@ export const OnlineProductSelector = ({
                       <Button
                         variant={item.type === 'leaked' ? 'destructive' : 'outline'}
                         size="sm"
-                        className="h-9 text-xs px-3"
+                        className="h-10 text-xs px-3 touch-target"
                         onClick={() => toggleReturnType(item.id)}
+                        aria-label={`Toggle return type for ${item.brandName}, currently ${item.type}`}
                       >
                         {item.type === 'empty' ? 'Empty' : 'Leaked'}
                       </Button>
@@ -595,17 +610,19 @@ export const OnlineProductSelector = ({
                         <Button 
                           variant="outline" 
                           size="icon" 
-                          className="h-9 w-9"
+                          className="h-10 w-10 touch-target"
                           onClick={() => updateReturnQty(item.id, -1)}
+                          aria-label={`Decrease return quantity of ${item.brandName}`}
                         >
                           <Minus className="h-4 w-4" />
                         </Button>
-                        <span className="w-8 text-center font-bold">{item.quantity}</span>
+                        <span className="w-8 text-center font-bold tabular-nums">{item.quantity}</span>
                         <Button 
                           variant="outline" 
                           size="icon" 
-                          className="h-9 w-9"
+                          className="h-10 w-10 touch-target"
                           onClick={() => updateReturnQty(item.id, 1)}
+                          aria-label={`Increase return quantity of ${item.brandName}`}
                         >
                           <Plus className="h-4 w-4" />
                         </Button>

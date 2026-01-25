@@ -16,6 +16,7 @@ import {
 import { CommunityHeader } from "@/components/community/CommunityHeader";
 import { CommunityBottomNav } from "@/components/community/CommunityBottomNav";
 import { OrderCard } from "@/components/community/OrderCard";
+import { OrderCardSkeletonList } from "@/components/community/OrderCardSkeleton";
 import { useCommunityData, CommunityOrder } from "@/hooks/useCommunityData";
 
 const CustomerOrders = () => {
@@ -158,10 +159,7 @@ const CustomerOrders = () => {
           </TabsList>
 
           {loading ? (
-            <div className="flex flex-col items-center justify-center py-12 gap-3">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">Loading orders...</p>
-            </div>
+            <OrderCardSkeletonList count={3} />
           ) : filteredOrders.length === 0 ? (
             <Card className="border-dashed">
               <CardContent className="p-8 sm:p-12 text-center">
