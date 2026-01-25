@@ -20,12 +20,16 @@ import { MobileBottomNav } from "@/components/dashboard/MobileBottomNav";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { getNextModule } from "@/hooks/useSwipeNavigation";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useUserRole } from "@/hooks/useUserRole";
+import { Loader2 } from "lucide-react";
+
 const Dashboard = () => {
   const [activeModule, setActiveModule] = useState("overview");
   const [searchQuery, setSearchQuery] = useState("");
-  // Development mode - hardcoded owner role (auth disabled)
-  const userRole = 'owner' as const;
-  const userName = "Shop Owner";
+  
+  // Use real authentication - fetch user role from database
+  const { userRole, userName, loading: authLoading, error: authError } = useUserRole();
+  
   const isMobile = useIsMobile();
 
   // Swipe gesture state
@@ -49,17 +53,18 @@ const Dashboard = () => {
     const isLeftSwipe = distance > minSwipeDistance;
     const isRightSwipe = distance < -minSwipeDistance;
 
+    // Use actual role for swipe navigation (staff and customer use limited nav)
+    const swipeRole = userRole === 'customer' ? 'staff' : userRole;
+
     if (isLeftSwipe) {
-      const nextModule = getNextModule(activeModule, 'left', userRole);
+      const nextModule = getNextModule(activeModule, 'left', swipeRole);
       setActiveModule(nextModule);
     }
     if (isRightSwipe) {
-      const nextModule = getNextModule(activeModule, 'right', userRole);
+      const nextModule = getNextModule(activeModule, 'right', swipeRole);
       setActiveModule(nextModule);
     }
   }, [touchStart, touchEnd, activeModule, userRole]);
-
-  // Auth disabled for development - skipping role fetch
 
   // Listen for module navigation events from other components
   useEffect(() => {
@@ -85,7 +90,7 @@ const Dashboard = () => {
     vehicles,
     staff,
     analytics,
-    loading,
+    loading: dataLoading,
     refetch,
     setSalesData,
     setStockData,
@@ -94,11 +99,14 @@ const Dashboard = () => {
     setOrders,
   } = useDashboardData();
 
+  // Combined loading state
+  const loading = authLoading || dataLoading;
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center space-y-4 animate-fade-in">
-          <div className="h-12 w-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" aria-label="Loading dashboard" />
           <div className="space-y-2">
             <p className="text-lg font-medium text-foreground">Loading Stock-X Dashboard</p>
             <p className="text-muted-foreground">Preparing your LPG management system...</p>
@@ -108,6 +116,31 @@ const Dashboard = () => {
     );
   }
 
+  // Show error state if auth failed
+  if (authError) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center space-y-4 p-6 max-w-md">
+          <div className="h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center mx-auto">
+            <span className="text-destructive text-xl">!</span>
+          </div>
+          <h2 className="text-lg font-semibold text-foreground">Failed to Load</h2>
+          <p className="text-muted-foreground">{authError}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Get sanitized role for components that expect specific types
+  const dashboardRole = userRole === 'customer' ? 'driver' : userRole;
+  const navRole = userRole === 'customer' ? 'driver' : userRole;
+
   const renderActiveModule = () => {
     switch (activeModule) {
       case "overview":
@@ -116,13 +149,13 @@ const Dashboard = () => {
             analytics={analytics}
             drivers={drivers}
             cylinderStock={cylinderStock}
-            userRole={userRole}
+            userRole={dashboardRole as 'owner' | 'manager' | 'driver'}
             setActiveModule={setActiveModule}
             onRefresh={refetch}
           />
         );
       case "pos":
-        return <POSModule userRole={userRole} userName={userName} />;
+        return <POSModule userRole={dashboardRole as 'owner' | 'manager' | 'driver'} userName={userName} />;
       case "inventory":
       case "pob":
         return <InventoryModule />;
@@ -158,7 +191,7 @@ const Dashboard = () => {
             customers={customers}
             stockData={stockData}
             drivers={drivers}
-            userRole={userRole}
+            userRole={dashboardRole as 'owner' | 'manager' | 'driver'}
           />
         );
       default:
@@ -167,7 +200,7 @@ const Dashboard = () => {
             analytics={analytics}
             drivers={drivers}
             cylinderStock={cylinderStock}
-            userRole={userRole}
+            userRole={dashboardRole as 'owner' | 'manager' | 'driver'}
             setActiveModule={setActiveModule}
             onRefresh={refetch}
           />
@@ -181,7 +214,7 @@ const Dashboard = () => {
         <AppSidebar
           activeModule={activeModule}
           setActiveModule={setActiveModule}
-          userRole={userRole}
+          userRole={dashboardRole as 'owner' | 'manager' | 'driver'}
           userName={userName}
           analytics={analytics}
         />
@@ -190,7 +223,7 @@ const Dashboard = () => {
           <DashboardHeader
             searchQuery={searchQuery}
             setSearchQuery={setSearchQuery}
-            userRole={userRole}
+            userRole={dashboardRole as 'owner' | 'manager' | 'driver'}
             userName={userName}
             onSettingsClick={() => setActiveModule("settings")}
             onProfileClick={() => setActiveModule("profile")}
@@ -212,13 +245,13 @@ const Dashboard = () => {
           <MobileBottomNav
             activeModule={activeModule}
             setActiveModule={setActiveModule}
-            userRole={userRole}
+            userRole={navRole as 'owner' | 'manager' | 'driver' | 'staff'}
           />
         </div>
         
         {/* Global Command Palette */}
         <GlobalCommandPalette 
-          userRole={userRole}
+          userRole={dashboardRole as 'owner' | 'manager' | 'driver'}
           setActiveModule={setActiveModule}
         />
       </div>

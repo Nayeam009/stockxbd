@@ -7,7 +7,7 @@ import { useState } from "react";
 interface MobileBottomNavProps {
   activeModule: string;
   setActiveModule: (module: string) => void;
-  userRole: 'owner' | 'manager' | 'driver';
+  userRole: 'owner' | 'manager' | 'driver' | 'staff';
 }
 
 // Primary bottom nav items - most accessed modules
