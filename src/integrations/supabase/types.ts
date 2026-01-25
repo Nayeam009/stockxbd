@@ -1864,14 +1864,12 @@ export type Database = {
           latitude: number | null
           logo_url: string | null
           longitude: number | null
-          phone: string | null
           rating: number | null
           shop_name: string | null
           thana: string | null
           total_orders: number | null
           total_reviews: number | null
           updated_at: string | null
-          whatsapp: string | null
         }
         Insert: {
           address?: string | null
@@ -1887,14 +1885,12 @@ export type Database = {
           latitude?: number | null
           logo_url?: string | null
           longitude?: number | null
-          phone?: string | null
           rating?: number | null
           shop_name?: string | null
           thana?: string | null
           total_orders?: number | null
           total_reviews?: number | null
           updated_at?: string | null
-          whatsapp?: string | null
         }
         Update: {
           address?: string | null
@@ -1910,14 +1906,12 @@ export type Database = {
           latitude?: number | null
           logo_url?: string | null
           longitude?: number | null
-          phone?: string | null
           rating?: number | null
           shop_name?: string | null
           thana?: string | null
           total_orders?: number | null
           total_reviews?: number | null
           updated_at?: string | null
-          whatsapp?: string | null
         }
         Relationships: []
       }
