@@ -1,10 +1,7 @@
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { lazy, Suspense, useEffect, memo } from "react";
-import Welcome from "./pages/Welcome";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import NotFound from "./pages/NotFound";
@@ -16,13 +13,18 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { supabase } from "./integrations/supabase/client";
 import { clearSensitiveStorage } from "./lib/securityUtils";
 
-// Lazy load community pages for better performance
+// Lazy load pages for better performance (code splitting)
+const Welcome = lazy(() => import("./pages/Welcome"));
 const Community = lazy(() => import("./pages/Community"));
 const ShopProfile = lazy(() => import("./pages/ShopProfile"));
 const CustomerCart = lazy(() => import("./pages/CustomerCart"));
 const CustomerCheckout = lazy(() => import("./pages/CustomerCheckout"));
 const CustomerOrders = lazy(() => import("./pages/CustomerOrders"));
 const CustomerProfile = lazy(() => import("./pages/CustomerProfile"));
+
+// Lazy load non-critical UI components (deferred)
+const Toaster = lazy(() => import("@/components/ui/toaster").then(m => ({ default: m.Toaster })));
+const Sonner = lazy(() => import("@/components/ui/sonner").then(m => ({ default: m.Toaster })));
 
 // Optimized QueryClient with aggressive caching for production
 const queryClient = new QueryClient({
@@ -72,8 +74,11 @@ const App = () => (
         <ThemeProvider>
           <LanguageProvider>
             <TooltipProvider>
-              <Toaster />
-              <Sonner />
+              {/* Deferred non-critical toasters */}
+              <Suspense fallback={null}>
+                <Toaster />
+                <Sonner />
+              </Suspense>
               <BrowserRouter>
                 <ErrorBoundary>
                   <Suspense fallback={<PageLoader />}>

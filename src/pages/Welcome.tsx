@@ -32,8 +32,11 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useState } from "react";
-import stockXLogo from "@/assets/stock-x-logo.png";
-import heroLpgImage from "@/assets/hero-lpg-cylinders.png";
+// WebP with PNG fallback for optimal LCP performance
+import stockXLogoWebP from "@/assets/stock-x-logo.webp";
+import stockXLogoPng from "@/assets/stock-x-logo.png";
+import heroLpgImageWebP from "@/assets/hero-lpg-cylinders.webp";
+import heroLpgImagePng from "@/assets/hero-lpg-cylinders.png";
 
 const Welcome = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -118,14 +121,17 @@ const Welcome = () => {
             {/* Logo */}
             <div className="flex items-center gap-2 sm:gap-3 group cursor-pointer">
               <div className="relative flex-shrink-0">
-                <img 
-                  src={stockXLogo} 
-                  alt="Stock-X Logo" 
-                  className="h-9 w-9 sm:h-11 sm:w-11 lg:h-12 lg:w-12 rounded-xl shadow-lg transition-transform duration-300 group-hover:scale-105"
-                  width="48"
-                  height="48"
-                  loading="eager"
-                />
+                <picture>
+                  <source srcSet={stockXLogoWebP} type="image/webp" />
+                  <img 
+                    src={stockXLogoPng} 
+                    alt="Stock-X Logo" 
+                    className="h-9 w-9 sm:h-11 sm:w-11 lg:h-12 lg:w-12 rounded-xl shadow-lg transition-transform duration-300 group-hover:scale-105"
+                    width="48"
+                    height="48"
+                    loading="eager"
+                  />
+                </picture>
               </div>
               <div className="min-w-0">
                 <h1 className="text-base sm:text-lg lg:text-xl font-bold text-primary tracking-tight truncate">STOCK X</h1>
@@ -253,16 +259,19 @@ const Welcome = () => {
                 {/* Glow Effect */}
                 <div className="absolute -inset-4 bg-secondary/20 rounded-3xl blur-2xl" aria-hidden="true" />
                 
-                <img 
-                  src={heroLpgImage} 
-                  alt="LPG Cylinders - Stock X Inventory Management" 
-                  className="relative w-full h-auto rounded-2xl sm:rounded-3xl shadow-2xl border-4 border-white/10"
-                  loading="eager"
-                  decoding="async"
-                  fetchPriority="high"
-                  width="600"
-                  height="400"
-                />
+                <picture>
+                  <source srcSet={heroLpgImageWebP} type="image/webp" />
+                  <img 
+                    src={heroLpgImagePng} 
+                    alt="LPG Cylinders - Stock X Inventory Management" 
+                    className="relative w-full h-auto rounded-2xl sm:rounded-3xl shadow-2xl border-4 border-white/10"
+                    loading="eager"
+                    decoding="async"
+                    fetchPriority="high"
+                    width="600"
+                    height="400"
+                  />
+                </picture>
 
                 {/* Floating Badge - Inventory */}
                 <div className="absolute -bottom-4 -left-4 sm:bottom-4 sm:left-4 bg-card text-foreground rounded-xl sm:rounded-2xl p-3 sm:p-4 shadow-xl border border-border/50 hidden sm:flex items-center gap-3">
@@ -610,7 +619,10 @@ const Welcome = () => {
             {/* Company Info */}
             <div className="sm:col-span-2 space-y-4 sm:space-y-6">
               <div className="flex items-center gap-2 sm:gap-3">
-                <img src={stockXLogo} alt="Stock-X Logo" className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-white/10 p-1" />
+                <picture>
+                  <source srcSet={stockXLogoWebP} type="image/webp" />
+                  <img src={stockXLogoPng} alt="Stock-X Logo" className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-white/10 p-1" />
+                </picture>
                 <div>
                   <h3 className="text-lg sm:text-xl font-bold">STOCK X</h3>
                   <p className="text-xs sm:text-sm text-white/60">LPG Management Platform</p>

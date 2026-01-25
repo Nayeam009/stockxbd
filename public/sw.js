@@ -1,22 +1,28 @@
 /**
- * Stock-X Service Worker
- * Provides offline caching and performance optimization
+ * Stock-X Service Worker v2
+ * Provides offline caching and performance optimization with long-term caching for hashed assets
  */
 
-const CACHE_VERSION = 'stock-x-v1';
+const CACHE_VERSION = 'stock-x-v2';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
+const ASSET_CACHE = `${CACHE_VERSION}-assets`;
 
-// Assets to cache immediately on install
+// Critical assets to cache immediately on install
 const STATIC_ASSETS = [
   '/',
   '/manifest.json',
   '/favicon.ico',
 ];
 
+// Long cache duration for hashed assets (1 year in seconds)
+const LONG_CACHE_DURATION = 31536000;
+// Short cache duration for dynamic content (1 hour)
+const SHORT_CACHE_DURATION = 3600;
+
 // Install event - cache static assets
 self.addEventListener('install', (event) => {
-  console.log('[SW] Installing Stock-X Service Worker...');
+  console.log('[SW] Installing Stock-X Service Worker v2...');
   event.waitUntil(
     caches.open(STATIC_CACHE)
       .then((cache) => {
@@ -29,12 +35,12 @@ self.addEventListener('install', (event) => {
 
 // Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
-  console.log('[SW] Activating Stock-X Service Worker...');
+  console.log('[SW] Activating Stock-X Service Worker v2...');
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames
-          .filter((name) => name.startsWith('stock-x-') && name !== STATIC_CACHE && name !== DYNAMIC_CACHE)
+          .filter((name) => name.startsWith('stock-x-') && !name.startsWith(CACHE_VERSION))
           .map((name) => {
             console.log('[SW] Deleting old cache:', name);
             return caches.delete(name);
@@ -44,7 +50,7 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch event - network first with cache fallback for API, cache first for static
+// Fetch event - optimized caching strategies
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
@@ -58,38 +64,83 @@ self.addEventListener('fetch', (event) => {
   // Skip Chrome extension URLs
   if (url.protocol === 'chrome-extension:') return;
 
-  // For static assets (images, fonts, css, js) - cache first
+  // Skip hot module replacement in development
+  if (url.pathname.includes('__vite') || url.pathname.includes('@vite')) return;
+
+  // For hashed assets (long-term cache) - immutable cache strategy
+  if (isHashedAsset(url.pathname)) {
+    event.respondWith(immutableCacheFirst(request, ASSET_CACHE));
+    return;
+  }
+
+  // For static assets (images, fonts) - stale-while-revalidate
   if (isStaticAsset(url.pathname)) {
-    event.respondWith(cacheFirst(request));
+    event.respondWith(staleWhileRevalidate(request, STATIC_CACHE));
     return;
   }
 
   // For pages - network first with cache fallback
-  event.respondWith(networkFirst(request));
+  event.respondWith(networkFirst(request, DYNAMIC_CACHE));
 });
+
+// Helper: Check if URL is a hashed asset (e.g., main-abc123.js)
+function isHashedAsset(pathname) {
+  // Match files with hash patterns like: filename.abc123.js or filename-abc123.js
+  return /\.[a-f0-9]{8,}\.(js|css|woff2?)$/i.test(pathname) ||
+         /-[a-f0-9]{8,}\.(js|css|woff2?)$/i.test(pathname);
+}
 
 // Helper: Check if URL is a static asset
 function isStaticAsset(pathname) {
-  return /\.(js|css|png|jpg|jpeg|gif|webp|svg|woff|woff2|ttf|eot|ico)$/i.test(pathname);
+  return /\.(png|jpg|jpeg|gif|webp|svg|ico|woff|woff2|ttf|eot)$/i.test(pathname);
 }
 
-// Strategy: Cache first (for static assets)
-async function cacheFirst(request) {
+// Strategy: Immutable cache first (for hashed assets - never expires)
+async function immutableCacheFirst(request, cacheName) {
   const cached = await caches.match(request);
   if (cached) {
-    // Return cached, but update cache in background
-    updateCache(request);
     return cached;
   }
-  return fetchAndCache(request);
-}
-
-// Strategy: Network first with cache fallback (for pages)
-async function networkFirst(request) {
+  
   try {
     const response = await fetch(request);
     if (response.ok) {
-      const cache = await caches.open(DYNAMIC_CACHE);
+      const cache = await caches.open(cacheName);
+      // Clone response before caching
+      cache.put(request, response.clone());
+    }
+    return response;
+  } catch (error) {
+    // Return cached version if available
+    const fallback = await caches.match(request);
+    if (fallback) return fallback;
+    throw error;
+  }
+}
+
+// Strategy: Stale-while-revalidate (for static assets)
+async function staleWhileRevalidate(request, cacheName) {
+  const cache = await caches.open(cacheName);
+  const cached = await cache.match(request);
+  
+  // Start fetch in background
+  const fetchPromise = fetch(request).then((response) => {
+    if (response.ok) {
+      cache.put(request, response.clone());
+    }
+    return response;
+  }).catch(() => cached);
+  
+  // Return cached immediately if available, otherwise wait for network
+  return cached || fetchPromise;
+}
+
+// Strategy: Network first with cache fallback (for pages)
+async function networkFirst(request, cacheName) {
+  try {
+    const response = await fetch(request);
+    if (response.ok) {
+      const cache = await caches.open(cacheName);
       cache.put(request, response.clone());
     }
     return response;
@@ -99,36 +150,27 @@ async function networkFirst(request) {
     
     // Return offline fallback for navigation requests
     if (request.mode === 'navigate') {
-      return caches.match('/');
+      const fallback = await caches.match('/');
+      if (fallback) return fallback;
     }
     throw error;
   }
-}
-
-// Helper: Fetch and cache
-async function fetchAndCache(request) {
-  const response = await fetch(request);
-  if (response.ok) {
-    const cache = await caches.open(STATIC_CACHE);
-    cache.put(request, response.clone());
-  }
-  return response;
-}
-
-// Helper: Update cache in background
-function updateCache(request) {
-  fetch(request).then((response) => {
-    if (response.ok) {
-      caches.open(STATIC_CACHE).then((cache) => {
-        cache.put(request, response);
-      });
-    }
-  }).catch(() => {});
 }
 
 // Handle messages from the app
 self.addEventListener('message', (event) => {
   if (event.data === 'skipWaiting') {
     self.skipWaiting();
+  }
+  
+  // Allow manual cache clearing
+  if (event.data === 'clearCache') {
+    caches.keys().then((names) => {
+      names.forEach((name) => {
+        if (name.startsWith('stock-x-')) {
+          caches.delete(name);
+        }
+      });
+    });
   }
 });

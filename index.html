@@ -32,23 +32,24 @@
     <!-- PWA Manifest -->
     <link rel="manifest" href="/manifest.json" />
     
-    <!-- Preload Critical Assets (LCP Optimization) -->
-    <link rel="preload" href="/src/assets/hero-lpg-cylinders.png" as="image" fetchpriority="high" />
-    <link rel="preload" href="/src/assets/stock-x-logo.png" as="image" />
+    <!-- DNS Prefetch and Preconnect for External Resources -->
+    <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
+    <link rel="dns-prefetch" href="https://fonts.gstatic.com" />
     <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" as="style" />
-    
-    <!-- DNS Prefetch for API -->
     <link rel="dns-prefetch" href="https://xupvteigmqcrfluuadte.supabase.co" />
     <link rel="preconnect" href="https://xupvteigmqcrfluuadte.supabase.co" />
+    
+    <!-- Async Google Fonts Loading (Non-Blocking) -->
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'" />
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" /></noscript>
     
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://stockxbd.lovable.app/" />
     <meta property="og:title" content="Stock-X | LPG Inventory & Delivery Platform" />
     <meta property="og:description" content="Complete LPG business management: real-time inventory, POS, customer management, online delivery." />
-    <meta property="og:image" content="/src/assets/stock-x-logo.png" />
+    <meta property="og:image" content="/og-image.png" />
     <meta property="og:locale" content="en_BD" />
     
     <!-- Twitter -->
