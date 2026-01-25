@@ -50,7 +50,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
-import { getBrandMouthSizeMap } from "@/lib/brandConstants";
+import { getBrandMouthSizeMap, getLpgColorByValveSize } from "@/lib/brandConstants";
 import { supabase } from "@/integrations/supabase/client";
 import { parsePositiveNumber, sanitizeString } from "@/lib/validationSchemas";
 import { InvoiceDialog } from "@/components/invoice/InvoiceDialog";
@@ -331,13 +331,33 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
   }, [fetchData]);
 
   // ============= PRICE HELPERS =============
+  // Enhanced price lookup based on cylinder type (refill/package) and sale type (retail/wholesale)
   const getLPGPrice = useCallback((brandId: string, weightVal: string, cylType: 'refill' | 'package', saleTp: 'retail' | 'wholesale') => {
-    const priceEntry = productPrices.find(
-      p => p.product_type === 'lpg' && p.brand_id === brandId && p.size?.includes(weightVal)
+    // Find pricing entry matching brand + variant (Refill or Package)
+    const variant = cylType === 'refill' ? 'Refill' : 'Package';
+    
+    // First try to find exact match with brand_id and variant
+    let priceEntry = productPrices.find(
+      p => p.product_type === 'lpg' && 
+           p.brand_id === brandId && 
+           p.variant === variant
     );
+    
+    // Fallback: find by brand_id only (legacy records)
+    if (!priceEntry) {
+      priceEntry = productPrices.find(
+        p => p.product_type === 'lpg' && p.brand_id === brandId && p.size?.includes(weightVal)
+      );
+    }
+    
     if (!priceEntry) return 0;
-    if (cylType === 'package') return priceEntry.package_price || priceEntry.retail_price;
-    return saleTp === 'wholesale' ? priceEntry.distributor_price : priceEntry.retail_price;
+    
+    // For Package cylinder: use retail_price or distributor_price based on sale type
+    // For Refill cylinder: use retail_price or distributor_price based on sale type
+    if (saleTp === 'wholesale') {
+      return priceEntry.distributor_price || 0;
+    }
+    return priceEntry.retail_price || 0;
   }, [productPrices]);
 
   const getStovePrice = useCallback((brand: string, model: string) => {

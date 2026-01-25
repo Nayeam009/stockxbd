@@ -25,7 +25,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { BrandSelect } from "@/components/shared/BrandSelect";
-import { getLpgBrandNames, getStoveBrandNames, getRegulatorBrandNames } from "@/lib/brandConstants";
+import { getLpgBrandNames, getStoveBrandNames, getRegulatorBrandNames, getLpgColorByValveSize } from "@/lib/brandConstants";
 
 interface ProductPrice {
   id: string;
@@ -399,6 +399,9 @@ export const ProductPricingModule = () => {
       );
     }
 
+    // Use valve-size-specific color for the brand
+    const brandColor = getLpgColorByValveSize(brand.name, sizeTab);
+    
     return (
       <Card className="border-border hover:shadow-lg transition-all duration-200">
         {/* Card Header - Brand Name + Weight Badge */}
@@ -406,14 +409,20 @@ export const ProductPricingModule = () => {
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2.5 text-base sm:text-lg font-semibold">
               <span 
-                className="h-3.5 w-3.5 sm:h-4 sm:w-4 rounded-full flex-shrink-0 ring-2 ring-offset-2 ring-offset-background" 
-                style={{ backgroundColor: brand.color, boxShadow: `0 0 8px ${brand.color}40` }}
+                className="h-4 w-4 sm:h-5 sm:w-5 rounded-full flex-shrink-0 ring-2 ring-offset-2 ring-offset-background shadow-sm" 
+                style={{ backgroundColor: brandColor, boxShadow: `0 0 10px ${brandColor}50` }}
+                title={`${brand.name} (${sizeTab})`}
               />
               <span className="truncate">{brand.name}</span>
             </CardTitle>
-            <Badge variant="secondary" className="text-xs px-2.5 py-0.5 font-medium">
-              {selectedWeight}
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="text-xs px-2.5 py-0.5 font-medium">
+                {selectedWeight}
+              </Badge>
+              <Badge variant="outline" className="text-[10px] px-2 py-0.5">
+                {sizeTab}
+              </Badge>
+            </div>
           </div>
         </CardHeader>
 
