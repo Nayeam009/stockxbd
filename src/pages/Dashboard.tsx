@@ -138,8 +138,8 @@ const Dashboard = () => {
   }
 
   // Get sanitized role for components that expect specific types
-  const dashboardRole = userRole === 'customer' ? 'driver' : userRole;
-  const navRole = userRole === 'customer' ? 'driver' : userRole;
+  const dashboardRole = (userRole === 'customer' ? 'driver' : userRole) as 'owner' | 'manager' | 'driver' | 'staff';
+  const navRole = dashboardRole;
 
   const renderActiveModule = () => {
     switch (activeModule) {
@@ -214,7 +214,7 @@ const Dashboard = () => {
         <AppSidebar
           activeModule={activeModule}
           setActiveModule={setActiveModule}
-          userRole={dashboardRole as 'owner' | 'manager' | 'driver'}
+          userRole={dashboardRole}
           userName={userName}
           analytics={analytics}
         />
@@ -245,7 +245,7 @@ const Dashboard = () => {
           <MobileBottomNav
             activeModule={activeModule}
             setActiveModule={setActiveModule}
-            userRole={navRole as 'owner' | 'manager' | 'driver' | 'staff'}
+            userRole={navRole}
           />
         </div>
         
