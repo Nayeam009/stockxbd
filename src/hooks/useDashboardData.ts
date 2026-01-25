@@ -144,37 +144,79 @@ export const useDashboardData = () => {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
   const [loading, setLoading] = useState(true);
+  const [softLoading, setSoftLoading] = useState(false);
+  
+  // Track data freshness and channel health
+  const lastFetchTimeRef = useRef<number>(Date.now());
+  const channelHealthyRef = useRef<boolean>(true);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const isInitialLoadRef = useRef<boolean>(true);
 
-  const fetchData = useCallback(async () => {
+  // Soft fetch - background refresh without loading spinner
+  const fetchData = useCallback(async (isSoftRefresh = false) => {
     try {
+      if (isSoftRefresh) {
+        setSoftLoading(true);
+      }
+      
       const today = new Date().toISOString().split('T')[0];
       const now = new Date();
-      const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-      const firstDayOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().split('T')[0];
-      const lastDayOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().split('T')[0];
       const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-      // Fetch POS transactions for sales data with payment status
-      const { data: transactions } = await supabase
-        .from('pos_transactions')
-        .select(`
-          id,
-          created_at,
-          total,
-          payment_method,
-          payment_status,
-          created_by,
-          pos_transaction_items (
-            product_name,
-            quantity,
-            unit_price,
-            total_price
-          )
-        `)
-        .order('created_at', { ascending: false })
-        .limit(500);
+      // Parallel fetch all data for faster loading
+      const [
+        transactionsResult,
+        customerDataResult,
+        ordersDataResult,
+        lpgBrandsResult,
+        stovesResult,
+        userRolesResult
+      ] = await Promise.all([
+        supabase
+          .from('pos_transactions')
+          .select(`
+            id,
+            created_at,
+            total,
+            payment_method,
+            payment_status,
+            created_by,
+            pos_transaction_items (
+              product_name,
+              quantity,
+              unit_price,
+              total_price
+            )
+          `)
+          .order('created_at', { ascending: false })
+          .limit(500),
+        supabase.from('customers').select('*').order('name'),
+        supabase
+          .from('orders')
+          .select(`
+            *,
+            order_items (
+              id,
+              product_id,
+              product_name,
+              quantity,
+              price
+            )
+          `)
+          .order('created_at', { ascending: false }),
+        supabase.from('lpg_brands').select('*').eq('is_active', true),
+        supabase.from('stoves').select('*').eq('is_active', true),
+        supabase.from('user_roles').select('user_id, role').eq('role', 'driver')
+      ]);
 
+      const transactions = transactionsResult.data;
+      const customerData = customerDataResult.data;
+      const ordersData = ordersDataResult.data;
+      const lpgBrands = lpgBrandsResult.data;
+      const stoves = stovesResult.data;
+      const userRoles = userRolesResult.data;
+
+      // Process transactions
       if (transactions) {
         const formattedSales: SalesData[] = transactions.flatMap(txn => 
           (txn.pos_transaction_items || []).map((item: any) => ({
@@ -195,14 +237,8 @@ export const useDashboardData = () => {
         setSalesData(formattedSales);
       }
 
-      // Fetch customers with order activity
-      const { data: customerData } = await supabase
-        .from('customers')
-        .select('*')
-        .order('name');
-
+      // Process customers
       if (customerData) {
-        // Get order counts and last order dates
         const { data: orderStats } = await supabase
           .from('orders')
           .select('customer_id, order_date')
@@ -238,21 +274,7 @@ export const useDashboardData = () => {
         setCustomers(formattedCustomers);
       }
 
-      // Fetch orders
-      const { data: ordersData } = await supabase
-        .from('orders')
-        .select(`
-          *,
-          order_items (
-            id,
-            product_id,
-            product_name,
-            quantity,
-            price
-          )
-        `)
-        .order('created_at', { ascending: false });
-
+      // Process orders
       if (ordersData) {
         const formattedOrders: Order[] = ordersData.map(o => ({
           id: o.id,
@@ -276,17 +298,7 @@ export const useDashboardData = () => {
         setOrders(formattedOrders);
       }
 
-      // Fetch LPG stock with detailed cylinder counts
-      const { data: lpgBrands } = await supabase
-        .from('lpg_brands')
-        .select('*')
-        .eq('is_active', true);
-
-      const { data: stoves } = await supabase
-        .from('stoves')
-        .select('*')
-        .eq('is_active', true);
-
+      // Process stock
       const stockItems: StockItem[] = [];
       const cylinderItems: CylinderStock[] = [];
       
@@ -333,12 +345,7 @@ export const useDashboardData = () => {
       setStockData(stockItems);
       setCylinderStock(cylinderItems);
 
-      // Fetch drivers with stock and cash tracking
-      const { data: userRoles } = await supabase
-        .from('user_roles')
-        .select('user_id, role')
-        .eq('role', 'driver');
-
+      // Process drivers
       if (userRoles && userRoles.length > 0) {
         const driverUserIds = userRoles.map(ur => ur.user_id);
         const { data: driverProfiles } = await supabase
@@ -354,7 +361,6 @@ export const useDashboardData = () => {
           };
         });
 
-        // Get today's orders per driver
         const { data: todayOrders } = await supabase
           .from('orders')
           .select('driver_id, total_amount, status, payment_status')
@@ -375,7 +381,7 @@ export const useDashboardData = () => {
             }
             driverStats[o.driver_id].sales += Number(o.total_amount);
             if (o.status === 'dispatched') {
-              driverStats[o.driver_id].stockOut += 1; // Cylinders currently out
+              driverStats[o.driver_id].stockOut += 1;
             }
             if (o.status === 'delivered') {
               driverStats[o.driver_id].deliveries += 1;
@@ -400,10 +406,18 @@ export const useDashboardData = () => {
         setDrivers(formattedDrivers);
       }
 
+      // Update freshness tracking
+      lastFetchTimeRef.current = Date.now();
+      channelHealthyRef.current = true;
+
     } catch (error) {
       logger.error('Error fetching dashboard data', error, { component: 'Dashboard' });
     } finally {
-      setLoading(false);
+      if (isInitialLoadRef.current) {
+        setLoading(false);
+        isInitialLoadRef.current = false;
+      }
+      setSoftLoading(false);
     }
   }, []);
 
@@ -415,30 +429,71 @@ export const useDashboardData = () => {
       clearTimeout(debounceRef.current);
     }
     debounceRef.current = setTimeout(() => {
-      fetchData();
+      fetchData(true); // Soft refresh
     }, 2000); // 2-second debounce for smooth performance
   }, [fetchData]);
 
-  // Fetch real data from Supabase with consolidated real-time channel
-  useEffect(() => {
-    fetchData();
-
-    // Single consolidated channel for all dashboard tables with debounced updates
+  // Reconnect channel if needed
+  const reconnectChannel = useCallback(() => {
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+    }
+    
     const channel = supabase
-      .channel('dashboard-combined-realtime')
+      .channel('dashboard-combined-realtime-' + Date.now()) // Unique name for fresh connection
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, debouncedRefetch)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pos_transactions' }, debouncedRefetch)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'lpg_brands' }, debouncedRefetch)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'customers' }, debouncedRefetch)
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          channelHealthyRef.current = true;
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          channelHealthyRef.current = false;
+        }
+      });
+    
+    channelRef.current = channel;
+    return channel;
+  }, [debouncedRefetch]);
+
+  // Handle page visibility changes for instant tab-switch recovery
+  const handleVisibilityChange = useCallback(() => {
+    if (document.visibilityState === 'visible') {
+      const timeSinceLastFetch = Date.now() - lastFetchTimeRef.current;
+      const isStale = timeSinceLastFetch > 30000; // 30 seconds
+      
+      // Always check channel health on return
+      if (!channelHealthyRef.current) {
+        reconnectChannel();
+        fetchData(true); // Soft refresh
+      } else if (isStale) {
+        fetchData(true); // Soft refresh only if stale
+      }
+    }
+  }, [fetchData, reconnectChannel]);
+
+  // Setup visibility listener and initial channel
+  useEffect(() => {
+    // Initial fetch
+    fetchData();
+    
+    // Create channel
+    const channel = reconnectChannel();
+
+    // Listen for visibility changes
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleVisibilityChange);
 
     return () => {
       if (debounceRef.current) {
         clearTimeout(debounceRef.current);
       }
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleVisibilityChange);
       supabase.removeChannel(channel);
     };
-  }, [fetchData, debouncedRefetch]);
+  }, [fetchData, reconnectChannel, handleVisibilityChange]);
 
   // MEMOIZED Analytics calculations - prevents expensive recalculation on every render
   const analytics = useMemo((): DashboardAnalytics => {
@@ -525,6 +580,7 @@ export const useDashboardData = () => {
     staff,
     analytics,
     loading,
+    softLoading,
     refetch: fetchData,
     setSalesData,
     setStockData,
