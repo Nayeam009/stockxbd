@@ -8,14 +8,10 @@ interface ProtectedRouteProps {
 }
 
 export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
-  // Authentication bypassed for testing
-  const BYPASS_AUTH = true;
-  
-  const [loading, setLoading] = useState(!BYPASS_AUTH);
-  const [authenticated, setAuthenticated] = useState(BYPASS_AUTH);
+  const [loading, setLoading] = useState(true);
+  const [authenticated, setAuthenticated] = useState(false);
 
   useEffect(() => {
-    if (BYPASS_AUTH) return;
     
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
