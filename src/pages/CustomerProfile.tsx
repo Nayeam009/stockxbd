@@ -25,7 +25,8 @@ import {
   Plus,
   Trash2,
   Home,
-  Briefcase
+  Briefcase,
+  Cylinder
 } from "lucide-react";
 import {
   Select,
@@ -44,11 +45,18 @@ import {
 import { CommunityHeader } from "@/components/community/CommunityHeader";
 import { CommunityBottomNav } from "@/components/community/CommunityBottomNav";
 import { OrderCard } from "@/components/community/OrderCard";
+import { MyCylinderCard } from "@/components/community/MyCylinderCard";
+import { CylinderPhotoUpload } from "@/components/community/CylinderPhotoUpload";
 import { useCommunityData, CommunityOrder } from "@/hooks/useCommunityData";
 import { useCustomerData, SavedAddress } from "@/hooks/useCustomerData";
+import { useCylinderProfile } from "@/hooks/useCylinderProfile";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { DIVISIONS, getDistricts, getThanas } from "@/lib/bangladeshConstants";
+import { LPG_BRANDS } from "@/lib/brandConstants";
+
+const CYLINDER_WEIGHTS = ['5.5kg', '12kg', '25kg', '35kg', '45kg'];
+const VALVE_SIZES = ['22mm', '20mm'] as const;
 
 const CustomerProfile = () => {
   const navigate = useNavigate();
@@ -63,6 +71,13 @@ const CustomerProfile = () => {
     setDefaultAddress,
     isLoaded: customerDataLoaded
   } = useCustomerData();
+  const {
+    profile: cylinderProfile,
+    loading: cylinderLoading,
+    saving: cylinderSaving,
+    saveProfile: saveCylinderProfile,
+    hasProfile: hasCylinderProfile
+  } = useCylinderProfile();
   
   const [activeTab, setActiveTab] = useState("profile");
   const [loading, setLoading] = useState(true);
@@ -70,6 +85,7 @@ const CustomerProfile = () => {
   const [orders, setOrders] = useState<CommunityOrder[]>([]);
   const [cart, setCart] = useState<any[]>([]);
   const [addAddressOpen, setAddAddressOpen] = useState(false);
+  const [cylinderDialogOpen, setCylinderDialogOpen] = useState(false);
   
   // Profile state
   const [fullName, setFullName] = useState("");
@@ -80,6 +96,12 @@ const CustomerProfile = () => {
   const [district, setDistrict] = useState("");
   const [thana, setThana] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  // Cylinder profile form state
+  const [cylBrand, setCylBrand] = useState("");
+  const [cylWeight, setCylWeight] = useState("12kg");
+  const [cylValveSize, setCylValveSize] = useState<'22mm' | '20mm'>("22mm");
+  const [cylPhotoUrl, setCylPhotoUrl] = useState<string | null>(null);
 
   // New address form state
   const [newAddressLabel, setNewAddressLabel] = useState("Home");
@@ -212,6 +234,37 @@ const CustomerProfile = () => {
     toast({ title: "Address saved!" });
   };
 
+  // Initialize cylinder form from existing profile
+  useEffect(() => {
+    if (cylinderProfile) {
+      setCylBrand(cylinderProfile.brand_name);
+      setCylWeight(cylinderProfile.weight);
+      setCylValveSize(cylinderProfile.valve_size);
+      setCylPhotoUrl(cylinderProfile.cylinder_photo_url);
+    }
+  }, [cylinderProfile]);
+
+  const handleSaveCylinderProfile = async () => {
+    if (!cylBrand) {
+      toast({ title: "Please select a brand", variant: "destructive" });
+      return;
+    }
+
+    const success = await saveCylinderProfile({
+      brand_name: cylBrand,
+      weight: cylWeight,
+      valve_size: cylValveSize,
+      cylinder_photo_url: cylPhotoUrl
+    });
+
+    if (success) {
+      toast({ title: "Cylinder profile saved!" });
+      setCylinderDialogOpen(false);
+    } else {
+      toast({ title: "Failed to save profile", variant: "destructive" });
+    }
+  };
+
   const getInitials = (name: string) => {
     if (!name) return "U";
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
@@ -317,6 +370,10 @@ const CustomerProfile = () => {
             <TabsTrigger value="profile" className="flex-1 h-10 text-sm">
               <User className="h-4 w-4 mr-1.5" />
               Profile
+            </TabsTrigger>
+            <TabsTrigger value="cylinder" className="flex-1 h-10 text-sm">
+              <Cylinder className="h-4 w-4 mr-1.5" />
+              Cylinder
             </TabsTrigger>
             <TabsTrigger value="orders" className="flex-1 h-10 text-sm">
               <Package className="h-4 w-4 mr-1.5" />
@@ -616,6 +673,131 @@ const CustomerProfile = () => {
               )}
               Save Changes
             </Button>
+          </TabsContent>
+
+          {/* Cylinder Profile Tab */}
+          <TabsContent value="cylinder" className="space-y-4 mt-4 sm:mt-6">
+            {/* My Cylinder Card */}
+            <MyCylinderCard 
+              profile={cylinderProfile ? {
+                brand_name: cylinderProfile.brand_name,
+                weight: cylinderProfile.weight,
+                valve_size: cylinderProfile.valve_size,
+                cylinder_photo_url: cylinderProfile.cylinder_photo_url,
+                is_verified: cylinderProfile.is_verified
+              } : null}
+              onEdit={() => setCylinderDialogOpen(true)}
+            />
+
+            {/* Info Card */}
+            <Card className="border-primary/20 bg-primary/5">
+              <CardContent className="py-4">
+                <div className="flex gap-3">
+                  <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                    <Cylinder className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-sm mb-1">Why Set Up a Cylinder Profile?</h4>
+                    <ul className="text-xs text-muted-foreground space-y-1">
+                      <li>• <strong>Auto-fill Returns:</strong> Your return cylinder is automatically added to refill orders</li>
+                      <li>• <strong>Brand Matching:</strong> Ensures you get the right cylinder type</li>
+                      <li>• <strong>Faster Checkout:</strong> Skip the return selection step</li>
+                    </ul>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Cylinder Profile Dialog */}
+            <Dialog open={cylinderDialogOpen} onOpenChange={setCylinderDialogOpen}>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Cylinder className="h-5 w-5 text-primary" />
+                    {hasCylinderProfile ? 'Edit Cylinder Profile' : 'Set Up Cylinder Profile'}
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 pt-2">
+                  {/* Photo Upload */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Cylinder Photo</Label>
+                    <CylinderPhotoUpload
+                      currentPhotoUrl={cylPhotoUrl}
+                      onPhotoChange={setCylPhotoUrl}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Upload a clear photo of your cylinder for verification
+                    </p>
+                  </div>
+
+                  {/* Brand Selection */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Brand *</Label>
+                    <Select value={cylBrand} onValueChange={setCylBrand}>
+                      <SelectTrigger className="h-12 text-base">
+                        <SelectValue placeholder="Select brand" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {LPG_BRANDS.map(brand => (
+                          <SelectItem key={brand.name} value={brand.name}>
+                            <div className="flex items-center gap-2">
+                              <div 
+                                className="w-3 h-3 rounded-full" 
+                                style={{ backgroundColor: brand.color }}
+                              />
+                              {brand.name}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Weight and Valve Size */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Weight</Label>
+                      <Select value={cylWeight} onValueChange={setCylWeight}>
+                        <SelectTrigger className="h-12 text-base">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {CYLINDER_WEIGHTS.map(w => (
+                            <SelectItem key={w} value={w}>{w}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Valve Size</Label>
+                      <Select value={cylValveSize} onValueChange={(v) => setCylValveSize(v as '22mm' | '20mm')}>
+                        <SelectTrigger className="h-12 text-base">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {VALVE_SIZES.map(v => (
+                            <SelectItem key={v} value={v}>{v}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <Button 
+                    onClick={handleSaveCylinderProfile} 
+                    disabled={cylinderSaving || !cylBrand}
+                    className="w-full h-12"
+                  >
+                    {cylinderSaving ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Save className="h-4 w-4 mr-2" />
+                    )}
+                    Save Cylinder Profile
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
           </TabsContent>
 
           <TabsContent value="orders" className="space-y-4 mt-4 sm:mt-6">
