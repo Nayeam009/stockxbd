@@ -597,13 +597,14 @@ export const CustomerManagementModule = () => {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 p-0"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-10 w-10 p-0 touch-manipulation"
                   onClick={() => {
                     setMemoSearchQuery("");
                     setMemoSearchResults([]);
                   }}
+                  aria-label="Clear search"
                 >
-                  <X className="h-4 w-4" />
+                  <X className="h-4 w-4" aria-hidden="true" />
                 </Button>
               )}
             </div>
@@ -690,12 +691,12 @@ export const CustomerManagementModule = () => {
                               {BANGLADESHI_CURRENCY_SYMBOL}{result.transaction.total.toLocaleString()}
                             </p>
                             <Badge 
-                              className={result.transaction.payment_status === 'paid' 
+                              className={(result.transaction.payment_status === 'paid' || result.transaction.payment_status === 'completed')
                                 ? 'bg-emerald-500/20 text-emerald-600 border-emerald-500/30' 
                                 : 'bg-amber-500/20 text-amber-600 border-amber-500/30'
                               }
                             >
-                              {result.transaction.payment_status}
+                              {(result.transaction.payment_status === 'completed' || result.transaction.payment_status === 'paid') ? 'Paid' : result.transaction.payment_status === 'partial' ? 'Partial' : 'Due'}
                             </Badge>
                           </div>
                         </div>
