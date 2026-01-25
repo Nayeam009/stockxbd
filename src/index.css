@@ -468,4 +468,129 @@
       padding-bottom: 0;
     }
   }
+
+  /* =====================================================
+   * PHASE 1-2: PERFORMANCE OPTIMIZATION UTILITIES
+   * CLS Protection, Lazy Loading, INP Optimization
+   * ===================================================== */
+
+  /* CLS Protection: Force aspect ratio on image containers */
+  .aspect-square-container {
+    aspect-ratio: 1 / 1;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .aspect-video-container {
+    aspect-ratio: 16 / 9;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .aspect-card-container {
+    aspect-ratio: 4 / 3;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* CLS: Placeholder skeleton with fixed dimensions */
+  .img-placeholder {
+    background: linear-gradient(
+      90deg,
+      hsl(var(--muted)) 0%,
+      hsl(var(--muted-foreground) / 0.1) 50%,
+      hsl(var(--muted)) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+
+  /* Chart container with fixed height to prevent CLS */
+  .chart-container-sm {
+    min-height: 200px;
+    height: 200px;
+  }
+
+  .chart-container-md {
+    min-height: 300px;
+    height: 300px;
+  }
+
+  .chart-container-lg {
+    min-height: 400px;
+    height: 400px;
+  }
+
+  /* INP Optimization: Reduce paint on hover */
+  .will-change-transform {
+    will-change: transform;
+  }
+
+  .will-change-opacity {
+    will-change: opacity;
+  }
+
+  /* Hardware acceleration for smooth animations */
+  .gpu-accelerated {
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
+
+  /* Reduce layout shift for icons */
+  .icon-fixed {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  /* Avatar with fixed dimensions to prevent CLS */
+  .avatar-fixed-sm {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    min-height: 32px;
+  }
+
+  .avatar-fixed-md {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    min-height: 40px;
+  }
+
+  .avatar-fixed-lg {
+    width: 48px;
+    height: 48px;
+    min-width: 48px;
+    min-height: 48px;
+  }
+
+  /* Content visibility optimization for long lists */
+  .content-visibility-auto {
+    content-visibility: auto;
+    contain-intrinsic-size: 0 80px;
+  }
+
+  /* Reduce motion for accessibility */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  /* Lazy image fade-in effect */
+  .lazy-image {
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+  }
+
+  .lazy-image.loaded {
+    opacity: 1;
+  }
 }
