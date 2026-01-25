@@ -252,26 +252,28 @@ export const ShopProductsTab = ({ shopId }: ShopProductsTabProps) => {
     }
   }, [shopId, fetchData]);
 
-  // Real-time sync
+  // Debounced real-time sync - consolidate channels and add throttling
   useEffect(() => {
     if (!shopId) return;
     
-    const channels = [
-      supabase.channel('shop-products-lpg').on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'lpg_brands' }, 
-        () => fetchData()
-      ).subscribe(),
-      supabase.channel('shop-products-stoves').on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'stoves' }, 
-        () => fetchData()
-      ).subscribe(),
-      supabase.channel('shop-products-regulators').on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'regulators' }, 
-        () => fetchData()
-      ).subscribe(),
-    ];
+    let debounceTimer: NodeJS.Timeout;
+    const debouncedFetch = () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => fetchData(), 3000); // 3 second debounce
+    };
     
-    return () => channels.forEach(ch => supabase.removeChannel(ch));
+    // Single consolidated channel for all inventory changes
+    const channel = supabase
+      .channel('shop-products-inventory-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'lpg_brands' }, debouncedFetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'stoves' }, debouncedFetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'regulators' }, debouncedFetch)
+      .subscribe();
+    
+    return () => {
+      clearTimeout(debounceTimer);
+      supabase.removeChannel(channel);
+    };
   }, [shopId, fetchData]);
 
   const updateProduct = (index: number, field: 'price' | 'is_available', value: number | boolean) => {

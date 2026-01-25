@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,10 +9,8 @@ import {
   ShoppingBag, 
   BarChart3, 
   Settings,
-  Loader2,
   ExternalLink,
   Globe,
-  Sparkles
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,7 +21,7 @@ import { ShopOrdersTab } from "./shop-profile/ShopOrdersTab";
 import { ShopAnalyticsTab } from "./shop-profile/ShopAnalyticsTab";
 import { ShopSettingsTab } from "./shop-profile/ShopSettingsTab";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { PremiumModuleHeader } from "@/components/shared/PremiumModuleHeader";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const DEFAULT_SHOP_PROFILE: ShopProfile = {
   shop_name: '',
@@ -37,19 +36,25 @@ const DEFAULT_SHOP_PROFILE: ShopProfile = {
   is_open: false
 };
 
+// Query keys for caching
+const shopProfileKeys = {
+  profile: (userId: string) => ['shop-profile', userId] as const,
+  pendingOrders: (shopId: string) => ['shop-pending-orders', shopId] as const,
+};
+
 export const MyShopProfileModule = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("info");
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [shopProfile, setShopProfile] = useState<ShopProfile>(DEFAULT_SHOP_PROFILE);
-  const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
+  const [localShopProfile, setLocalShopProfile] = useState<ShopProfile>(DEFAULT_SHOP_PROFILE);
 
-  // Fetch shop profile
-  const fetchShopProfile = useCallback(async () => {
-    try {
+  // Cached query for shop profile - 5 minute stale time
+  const { data: shopProfile, isLoading: loading, refetch } = useQuery({
+    queryKey: shopProfileKeys.profile('current'),
+    queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) return null;
 
       const { data, error } = await supabase
         .from('shop_profiles')
@@ -60,7 +65,7 @@ export const MyShopProfileModule = () => {
       if (error && error.code !== 'PGRST116') throw error;
 
       if (data) {
-        setShopProfile({
+        return {
           id: data.id,
           owner_id: data.owner_id,
           shop_name: data.shop_name || '',
@@ -78,47 +83,77 @@ export const MyShopProfileModule = () => {
           rating: data.rating,
           total_orders: data.total_orders,
           total_reviews: data.total_reviews
-        });
-
-        // Fetch pending orders count
-        const { count } = await supabase
-          .from('community_orders')
-          .select('*', { count: 'exact', head: true })
-          .eq('shop_id', data.id)
-          .eq('status', 'pending');
-
-        setPendingOrdersCount(count || 0);
+        } as ShopProfile;
       }
-    } catch (error: any) {
-      console.error('Error fetching shop profile:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+      return null;
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000,
+  });
 
+  // Cached query for pending orders count
+  const { data: pendingOrdersCount = 0 } = useQuery({
+    queryKey: shopProfileKeys.pendingOrders(shopProfile?.id || ''),
+    queryFn: async () => {
+      if (!shopProfile?.id) return 0;
+      
+      const { count } = await supabase
+        .from('community_orders')
+        .select('*', { count: 'exact', head: true })
+        .eq('shop_id', shopProfile.id)
+        .eq('status', 'pending');
+
+      return count || 0;
+    },
+    enabled: !!shopProfile?.id,
+    staleTime: 30 * 1000, // 30 seconds - orders change frequently
+    gcTime: 60 * 1000,
+  });
+
+  // Sync local state with query data
   useEffect(() => {
-    fetchShopProfile();
+    if (shopProfile) {
+      setLocalShopProfile(shopProfile);
+    }
+  }, [shopProfile]);
 
-    // Real-time subscription for orders
+  // Debounced real-time subscription for orders only
+  useEffect(() => {
+    if (!shopProfile?.id) return;
+
+    let debounceTimer: NodeJS.Timeout;
+    
     const channel = supabase
-      .channel('shop-profile-orders')
+      .channel('shop-profile-orders-optimized')
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'community_orders' },
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'community_orders',
+          filter: `shop_id=eq.${shopProfile.id}`
+        },
         () => {
-          fetchShopProfile();
+          // Debounce refetch by 2 seconds to prevent excessive calls
+          clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(() => {
+            queryClient.invalidateQueries({ 
+              queryKey: shopProfileKeys.pendingOrders(shopProfile.id!) 
+            });
+          }, 2000);
         }
       )
       .subscribe();
 
     return () => {
+      clearTimeout(debounceTimer);
       supabase.removeChannel(channel);
     };
-  }, [fetchShopProfile]);
+  }, [shopProfile?.id, queryClient]);
 
-  // Save shop profile
+  // Save shop profile with optimistic update
   const handleSaveShopProfile = async () => {
-    if (!shopProfile.shop_name || !shopProfile.phone || !shopProfile.division || !shopProfile.district || !shopProfile.address) {
+    if (!localShopProfile.shop_name || !localShopProfile.phone || !localShopProfile.division || !localShopProfile.district || !localShopProfile.address) {
       toast({ 
         title: "Missing required fields", 
         description: "Please fill in shop name, phone, location and address",
@@ -134,25 +169,25 @@ export const MyShopProfileModule = () => {
 
       const shopData = {
         owner_id: user.id,
-        shop_name: shopProfile.shop_name,
-        description: shopProfile.description,
-        phone: shopProfile.phone,
-        whatsapp: shopProfile.whatsapp || shopProfile.phone,
-        address: shopProfile.address,
-        division: shopProfile.division,
-        district: shopProfile.district,
-        thana: shopProfile.thana,
-        delivery_fee: shopProfile.delivery_fee,
-        is_open: shopProfile.is_open,
+        shop_name: localShopProfile.shop_name,
+        description: localShopProfile.description,
+        phone: localShopProfile.phone,
+        whatsapp: localShopProfile.whatsapp || localShopProfile.phone,
+        address: localShopProfile.address,
+        division: localShopProfile.division,
+        district: localShopProfile.district,
+        thana: localShopProfile.thana,
+        delivery_fee: localShopProfile.delivery_fee,
+        is_open: localShopProfile.is_open,
         updated_at: new Date().toISOString()
       };
 
       let result;
-      if (shopProfile.id) {
+      if (localShopProfile.id) {
         result = await supabase
           .from('shop_profiles')
           .update(shopData)
-          .eq('id', shopProfile.id)
+          .eq('id', localShopProfile.id)
           .select()
           .single();
       } else {
@@ -165,7 +200,13 @@ export const MyShopProfileModule = () => {
 
       if (result.error) throw result.error;
 
-      setShopProfile(prev => ({ ...prev, id: result.data.id, owner_id: result.data.owner_id }));
+      // Update cache immediately
+      queryClient.setQueryData(shopProfileKeys.profile('current'), {
+        ...localShopProfile,
+        id: result.data.id,
+        owner_id: result.data.owner_id
+      });
+
       toast({ title: "Shop profile saved successfully!" });
     } catch (error: any) {
       console.error('Error saving shop:', error);
@@ -179,12 +220,41 @@ export const MyShopProfileModule = () => {
     }
   };
 
+  // Memoized current profile for child components
+  const currentProfile = useMemo(() => localShopProfile, [localShopProfile]);
+
   if (loading) {
     return (
-      <div className="min-h-[400px] flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="h-12 w-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-muted-foreground">Loading shop profile...</p>
+      <div className="space-y-5">
+        {/* Header Skeleton */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-1">
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-12 w-12 rounded-xl" />
+            <div className="space-y-2">
+              <Skeleton className="h-6 w-48" />
+              <Skeleton className="h-4 w-32" />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Skeleton className="h-10 w-24" />
+            <Skeleton className="h-10 w-24" />
+          </div>
+        </div>
+
+        {/* Tabs Skeleton */}
+        <div className="flex gap-2">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <Skeleton key={i} className="h-10 w-24 rounded-md" />
+          ))}
+        </div>
+
+        {/* Content Skeleton */}
+        <div className="space-y-4">
+          <Skeleton className="h-32 w-full rounded-xl" />
+          <div className="grid grid-cols-2 gap-4">
+            <Skeleton className="h-24 rounded-xl" />
+            <Skeleton className="h-24 rounded-xl" />
+          </div>
         </div>
       </div>
     );
@@ -203,11 +273,11 @@ export const MyShopProfileModule = () => {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-xl sm:text-2xl font-bold tracking-tight">
-                  {shopProfile.shop_name || 'My Shop Profile'}
+                  {currentProfile.shop_name || 'My Shop Profile'}
                 </h1>
-                {shopProfile.id && (
-                  <Badge className={`${shopProfile.is_open ? 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30' : 'bg-muted text-muted-foreground'}`}>
-                    {shopProfile.is_open ? '● Open' : '○ Closed'}
+                {currentProfile.id && (
+                  <Badge className={`${currentProfile.is_open ? 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30' : 'bg-muted text-muted-foreground'}`}>
+                    {currentProfile.is_open ? '● Open' : '○ Closed'}
                   </Badge>
                 )}
               </div>
@@ -218,12 +288,12 @@ export const MyShopProfileModule = () => {
           </div>
           
           {/* Quick Actions */}
-          {shopProfile.id && (
+          {currentProfile.id && (
             <div className="flex items-center gap-2">
               <Button 
                 variant="outline" 
                 size="sm" 
-                onClick={() => navigate(`/community/shop/${shopProfile.id}`)}
+                onClick={() => navigate(`/community/shop/${currentProfile.id}`)}
                 className="h-10 gap-2 text-sm"
               >
                 <ExternalLink className="h-4 w-4" />
@@ -295,8 +365,8 @@ export const MyShopProfileModule = () => {
 
         <TabsContent value="info" className="mt-5">
           <ShopInfoTab 
-            shopProfile={shopProfile}
-            setShopProfile={setShopProfile}
+            shopProfile={currentProfile}
+            setShopProfile={setLocalShopProfile}
             loading={false}
             onSave={handleSaveShopProfile}
             saving={saving}
@@ -304,21 +374,23 @@ export const MyShopProfileModule = () => {
         </TabsContent>
 
         <TabsContent value="products" className="mt-5">
-          <ShopProductsTab shopId={shopProfile.id || null} />
+          <ShopProductsTab shopId={currentProfile.id || null} />
         </TabsContent>
 
         <TabsContent value="orders" className="mt-5">
-          <ShopOrdersTab shopId={shopProfile.id || null} />
+          <ShopOrdersTab shopId={currentProfile.id || null} />
         </TabsContent>
 
         <TabsContent value="analytics" className="mt-5">
-          <ShopAnalyticsTab shopId={shopProfile.id || null} />
+          <ShopAnalyticsTab shopId={currentProfile.id || null} />
         </TabsContent>
 
         <TabsContent value="settings" className="mt-5">
-          <ShopSettingsTab shopId={shopProfile.id || null} />
+          <ShopSettingsTab shopId={currentProfile.id || null} />
         </TabsContent>
       </Tabs>
     </div>
   );
 };
+
+export default MyShopProfileModule;
