@@ -14,15 +14,16 @@ import {
   MessageCircle,
   Flame,
   Package,
-  Loader2,
   Edit,
   Sparkles,
-  RefreshCcw
+  RefreshCcw,
+  Truck
 } from "lucide-react";
 import { CommunityHeader } from "@/components/community/CommunityHeader";
 import { CommunityBottomNav } from "@/components/community/CommunityBottomNav";
 import { OnlineProductSelector } from "@/components/community/OnlineProductSelector";
 import { CylinderExchangeRequestCard } from "@/components/community/CylinderExchangeRequestCard";
+import { ShopProfilePageSkeleton } from "@/components/community/ShopProfileSkeleton";
 import { useCommunityData, Shop, ShopProduct, CartItem } from "@/hooks/useCommunityData";
 import { toast } from "@/hooks/use-toast";
 
@@ -128,11 +129,10 @@ const ShopProfile = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center" role="status" aria-live="polite">
-        <div className="text-center space-y-3">
-          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" aria-hidden="true" />
-          <p className="text-muted-foreground">Loading shop...</p>
-        </div>
+      <div className="min-h-screen bg-background pb-20 sm:pb-0">
+        <CommunityHeader cartItemCount={cart.length} userRole={userRole} onCartClick={handleCartClick} />
+        <ShopProfilePageSkeleton />
+        <CommunityBottomNav cartItemCount={cart.length} userRole={userRole} />
       </div>
     );
   }
@@ -204,85 +204,118 @@ const ShopProfile = () => {
         </div>
       </div>
 
-      {/* Hero Section */}
-      <div className="relative h-48 sm:h-64 bg-gradient-to-br from-primary/20 to-primary/5 overflow-hidden">
+      {/* Hero Section - Enhanced */}
+      <div className="relative h-52 sm:h-72 bg-gradient-to-br from-primary/30 via-primary/20 to-accent/10 overflow-hidden">
         {shop.cover_image_url ? (
           <img 
             src={shop.cover_image_url} 
             alt=""
             className="w-full h-full object-cover"
-            loading="lazy"
+            loading="eager"
+            fetchPriority="high"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center" aria-hidden="true">
-            <Flame className="h-24 w-24 text-primary/20" />
+            <div className="relative">
+              <Flame className="h-28 w-28 text-primary/30 animate-pulse" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-5xl font-bold text-primary/50">{shop.shop_name.charAt(0)}</span>
+              </div>
+            </div>
           </div>
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/50 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
+        
+        {/* Floating Quick Actions - Mobile */}
+        <div className="absolute bottom-4 right-4 flex gap-2 sm:hidden">
+          <a href={`tel:${shop.phone}`}>
+            <Button size="icon" className="h-11 w-11 rounded-full shadow-lg bg-primary hover:bg-primary/90">
+              <Phone className="h-5 w-5" />
+            </Button>
+          </a>
+          {shop.whatsapp && (
+            <a href={`https://wa.me/${shop.whatsapp.replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener noreferrer">
+              <Button size="icon" variant="secondary" className="h-11 w-11 rounded-full shadow-lg">
+                <MessageCircle className="h-5 w-5" />
+              </Button>
+            </a>
+          )}
+        </div>
       </div>
 
-      {/* Shop Info */}
-      <div className="container mx-auto px-4 -mt-16 relative z-10">
-        <Card className="border-border">
-          <CardContent className="p-6">
+      {/* Shop Info - Enhanced */}
+      <div className="container mx-auto px-4 -mt-20 sm:-mt-24 relative z-10">
+        <Card className="border-border shadow-elegant-lg">
+          <CardContent className="p-5 sm:p-6">
             <div className="flex flex-col sm:flex-row gap-4 items-start">
               {/* Logo */}
               {shop.logo_url ? (
                 <img 
                   src={shop.logo_url} 
                   alt={shop.shop_name}
-                  className="w-20 h-20 rounded-xl object-cover border-4 border-background shadow-lg"
+                  className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl object-cover border-4 border-background shadow-lg"
                 />
               ) : (
-                <div className="w-20 h-20 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center border-4 border-background shadow-lg">
-                  <span className="text-2xl font-bold text-primary-foreground">
+                <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center border-4 border-background shadow-lg">
+                  <span className="text-3xl font-bold text-primary-foreground">
                     {shop.shop_name.charAt(0)}
                   </span>
                 </div>
               )}
 
-              <div className="flex-1 space-y-2">
+              <div className="flex-1 space-y-3">
                 <div className="flex items-start justify-between gap-2 flex-wrap">
                   <div>
-                    <h1 className="text-2xl font-bold text-foreground">{shop.shop_name}</h1>
-                    <div className="flex items-center gap-2 flex-wrap mt-1">
+                    <h1 className="text-2xl sm:text-3xl font-bold text-foreground">{shop.shop_name}</h1>
+                    <div className="flex items-center gap-2 flex-wrap mt-2">
                       {shop.is_open && (
-                        <Badge className="bg-emerald-500 text-white border-0">
-                          <Clock className="h-3 w-3 mr-1" />
+                        <Badge className="bg-emerald-500 text-white border-0 shadow-sm">
+                          <Clock className="h-3 w-3 mr-1" aria-hidden="true" />
                           Open Now
                         </Badge>
                       )}
                       {shop.is_verified && (
-                        <Badge className="bg-blue-500 text-white border-0">
-                          <Shield className="h-3 w-3 mr-1" />
+                        <Badge className="bg-blue-500 text-white border-0 shadow-sm">
+                          <Shield className="h-3 w-3 mr-1" aria-hidden="true" />
                           Verified
                         </Badge>
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-1 bg-amber-100 dark:bg-amber-900/30 px-3 py-1.5 rounded-full">
-                    <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-                    <span className="font-semibold">{shop.rating?.toFixed(1) || '0.0'}</span>
+                  <div className="flex items-center gap-1.5 bg-amber-100 dark:bg-amber-900/30 px-3 py-2 rounded-full shadow-sm">
+                    <Star className="h-5 w-5 fill-amber-400 text-amber-400" aria-hidden="true" />
+                    <span className="font-bold text-lg tabular-nums">{shop.rating?.toFixed(1) || '0.0'}</span>
                     <span className="text-muted-foreground text-sm">({shop.total_reviews})</span>
                   </div>
                 </div>
 
                 <div className="flex items-center text-muted-foreground">
-                  <MapPin className="h-4 w-4 mr-1 flex-shrink-0" />
+                  <MapPin className="h-4 w-4 mr-1.5 flex-shrink-0" aria-hidden="true" />
                   <span>{shop.address}, {shop.district}, {shop.division}</span>
                 </div>
 
-                <div className="flex items-center gap-4 pt-2">
+                {/* Delivery Info */}
+                <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-1.5">
+                    <Truck className="h-4 w-4" aria-hidden="true" />
+                    <span>৳{shop.delivery_fee || 50} delivery</span>
+                  </div>
+                  <span aria-hidden="true">•</span>
+                  <span>~30 min</span>
+                </div>
+
+                {/* Desktop Action Buttons */}
+                <div className="hidden sm:flex items-center gap-3 pt-2">
                   <a href={`tel:${shop.phone}`}>
-                    <Button size="sm" variant="outline">
-                      <Phone className="h-4 w-4 mr-2" />
-                      Call
+                    <Button variant="outline" className="h-11 touch-target">
+                      <Phone className="h-4 w-4 mr-2" aria-hidden="true" />
+                      Call Shop
                     </Button>
                   </a>
                   {shop.whatsapp && (
                     <a href={`https://wa.me/${shop.whatsapp.replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener noreferrer">
-                      <Button size="sm" variant="outline">
-                        <MessageCircle className="h-4 w-4 mr-2" />
+                      <Button variant="outline" className="h-11 touch-target">
+                        <MessageCircle className="h-4 w-4 mr-2" aria-hidden="true" />
                         WhatsApp
                       </Button>
                     </a>
@@ -297,22 +330,23 @@ const ShopProfile = () => {
       {/* Tabs */}
       <div className="container mx-auto px-4 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="w-full sm:w-auto">
-            <TabsTrigger value="products" className="flex-1 sm:flex-none">
-              <Package className="h-4 w-4 mr-2" />
+          <TabsList className="w-full sm:w-auto h-12">
+            <TabsTrigger value="products" className="flex-1 sm:flex-none h-10 touch-target">
+              <Package className="h-4 w-4 mr-2" aria-hidden="true" />
               Products
             </TabsTrigger>
             {isOwner && !isOwnShop && userShop && currentUser && (
-              <TabsTrigger value="exchange" className="flex-1 sm:flex-none">
-                <RefreshCcw className="h-4 w-4 mr-2" />
+              <TabsTrigger value="exchange" className="flex-1 sm:flex-none h-10 touch-target">
+                <RefreshCcw className="h-4 w-4 mr-2" aria-hidden="true" />
                 Exchange
               </TabsTrigger>
             )}
-            <TabsTrigger value="about" className="flex-1 sm:flex-none">
+            <TabsTrigger value="about" className="flex-1 sm:flex-none h-10 touch-target">
               About
             </TabsTrigger>
-            <TabsTrigger value="reviews" className="flex-1 sm:flex-none">
-              Reviews ({shop.total_reviews})
+            <TabsTrigger value="reviews" className="flex-1 sm:flex-none h-10 touch-target">
+              <Star className="h-4 w-4 mr-1.5 sm:mr-2" aria-hidden="true" />
+              <span className="hidden sm:inline">Reviews</span> ({shop.total_reviews})
             </TabsTrigger>
           </TabsList>
 
