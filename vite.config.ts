@@ -78,9 +78,6 @@ export default defineConfig(({ mode }) => ({
             '@radix-ui/react-label',
           ],
           
-          // Supabase client
-          'vendor-supabase': ['@supabase/supabase-js'],
-          
           // Date utilities
           'vendor-date': ['date-fns'],
           
@@ -122,14 +119,13 @@ export default defineConfig(({ mode }) => ({
       'react-dom',
       'react-router-dom',
       '@tanstack/react-query',
+      '@supabase/supabase-js',
       'recharts',
       'lucide-react',
       'date-fns',
       'clsx',
       'tailwind-merge',
     ],
-    // Exclude heavy libs that are already optimized
-    exclude: ['@supabase/supabase-js'],
   },
   
   // CSS optimization
