@@ -1,27 +1,30 @@
-import { useState, useEffect, useCallback, TouchEvent } from "react";
+import { useState, useEffect, useCallback, TouchEvent, Suspense, lazy } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/dashboard/AppSidebar";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { GlobalCommandPalette } from "@/components/dashboard/GlobalCommandPalette";
-import { DashboardOverview } from "@/components/dashboard/modules/DashboardOverview";
-import { BusinessDiaryModule } from "@/components/dashboard/modules/BusinessDiaryModule";
-import { InventoryModule } from "@/components/dashboard/modules/InventoryModule";
-import { MarketplaceOrdersModule } from "@/components/dashboard/modules/MarketplaceOrdersModule";
-import { AnalysisSearchReportModule } from "@/components/dashboard/modules/AnalysisSearchReportModule";
-import { POSModule } from "@/components/dashboard/modules/POSModule";
-import { CommunityModule } from "@/components/dashboard/modules/CommunityModule";
-import { ProductPricingModule } from "@/components/dashboard/modules/ProductPricingModule";
-import { UtilityExpenseModule } from "@/components/dashboard/modules/UtilityExpenseModule";
-import { CustomerManagementModule } from "@/components/dashboard/modules/CustomerManagementModule";
-import { SettingsModule } from "@/components/dashboard/modules/SettingsModule";
-import { ProfileModule } from "@/components/dashboard/modules/ProfileModule";
-import { MyShopProfileModule } from "@/components/dashboard/modules/MyShopProfileModule";
 import { MobileBottomNav } from "@/components/dashboard/MobileBottomNav";
+import { ModuleSkeleton } from "@/components/dashboard/ModuleSkeleton";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { getNextModule } from "@/hooks/useSwipeNavigation";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useUserRole } from "@/hooks/useUserRole";
 import { Loader2 } from "lucide-react";
+
+// Lazy load heavy modules for faster initial render
+const DashboardOverview = lazy(() => import("@/components/dashboard/modules/DashboardOverview").then(m => ({ default: m.DashboardOverview })));
+const BusinessDiaryModule = lazy(() => import("@/components/dashboard/modules/BusinessDiaryModule").then(m => ({ default: m.BusinessDiaryModule })));
+const InventoryModule = lazy(() => import("@/components/dashboard/modules/InventoryModule").then(m => ({ default: m.InventoryModule })));
+const MarketplaceOrdersModule = lazy(() => import("@/components/dashboard/modules/MarketplaceOrdersModule").then(m => ({ default: m.MarketplaceOrdersModule })));
+const AnalysisSearchReportModule = lazy(() => import("@/components/dashboard/modules/AnalysisSearchReportModule").then(m => ({ default: m.AnalysisSearchReportModule })));
+const POSModule = lazy(() => import("@/components/dashboard/modules/POSModule").then(m => ({ default: m.POSModule })));
+const CommunityModule = lazy(() => import("@/components/dashboard/modules/CommunityModule").then(m => ({ default: m.CommunityModule })));
+const ProductPricingModule = lazy(() => import("@/components/dashboard/modules/ProductPricingModule").then(m => ({ default: m.ProductPricingModule })));
+const UtilityExpenseModule = lazy(() => import("@/components/dashboard/modules/UtilityExpenseModule").then(m => ({ default: m.UtilityExpenseModule })));
+const CustomerManagementModule = lazy(() => import("@/components/dashboard/modules/CustomerManagementModule").then(m => ({ default: m.CustomerManagementModule })));
+const SettingsModule = lazy(() => import("@/components/dashboard/modules/SettingsModule").then(m => ({ default: m.SettingsModule })));
+const ProfileModule = lazy(() => import("@/components/dashboard/modules/ProfileModule").then(m => ({ default: m.ProfileModule })));
+const MyShopProfileModule = lazy(() => import("@/components/dashboard/modules/MyShopProfileModule").then(m => ({ default: m.MyShopProfileModule })));
 
 const Dashboard = () => {
   const [activeModule, setActiveModule] = useState("overview");
@@ -142,70 +145,78 @@ const Dashboard = () => {
   const navRole = dashboardRole;
 
   const renderActiveModule = () => {
-    switch (activeModule) {
-      case "overview":
-        return (
-          <DashboardOverview
-            analytics={analytics}
-            drivers={drivers}
-            cylinderStock={cylinderStock}
-            userRole={dashboardRole as 'owner' | 'manager' | 'driver'}
-            setActiveModule={setActiveModule}
-            onRefresh={refetch}
-          />
-        );
-      case "pos":
-        return <POSModule userRole={dashboardRole as 'owner' | 'manager' | 'driver'} userName={userName} />;
-      case "inventory":
-      case "pob":
-        return <InventoryModule />;
-      case "marketplace-orders":
-        return <MarketplaceOrdersModule />;
-      case "profile":
-        return <ProfileModule />;
-      case "customers":
-        return <CustomerManagementModule />;
-      case "settings":
-        return <SettingsModule />;
-      case "product-pricing":
-        return <ProductPricingModule />;
-      case "business-diary":
-      case "daily-sales":
-      case "daily-expenses":
-      case "analytics":
-      case "driver-sales":
-        return <BusinessDiaryModule />;
-      case "my-shop":
-        return <MyShopProfileModule />;
-      case "community":
-        return <CommunityModule />;
-      case "utility-expense":
-      case "staff-salary":
-      case "vehicle-cost":
-        return <UtilityExpenseModule />;
-      case "search":
-      case "analysis-search":
-        return (
-          <AnalysisSearchReportModule
-            salesData={salesData}
-            customers={customers}
-            stockData={stockData}
-            drivers={drivers}
-            userRole={dashboardRole as 'owner' | 'manager' | 'driver'}
-          />
-        );
-      default:
-        return (
-          <DashboardOverview
-            analytics={analytics}
-            drivers={drivers}
-            cylinderStock={cylinderStock}
-            userRole={dashboardRole as 'owner' | 'manager' | 'driver'}
-            setActiveModule={setActiveModule}
-            onRefresh={refetch}
-          />
-        );
-    }
+    const moduleContent = (() => {
+      switch (activeModule) {
+        case "overview":
+          return (
+            <DashboardOverview
+              analytics={analytics}
+              drivers={drivers}
+              cylinderStock={cylinderStock}
+              userRole={dashboardRole as 'owner' | 'manager' | 'driver'}
+              setActiveModule={setActiveModule}
+              onRefresh={refetch}
+            />
+          );
+        case "pos":
+          return <POSModule userRole={dashboardRole as 'owner' | 'manager' | 'driver'} userName={userName} />;
+        case "inventory":
+        case "pob":
+          return <InventoryModule />;
+        case "marketplace-orders":
+          return <MarketplaceOrdersModule />;
+        case "profile":
+          return <ProfileModule />;
+        case "customers":
+          return <CustomerManagementModule />;
+        case "settings":
+          return <SettingsModule />;
+        case "product-pricing":
+          return <ProductPricingModule />;
+        case "business-diary":
+        case "daily-sales":
+        case "daily-expenses":
+        case "analytics":
+        case "driver-sales":
+          return <BusinessDiaryModule />;
+        case "my-shop":
+          return <MyShopProfileModule />;
+        case "community":
+          return <CommunityModule />;
+        case "utility-expense":
+        case "staff-salary":
+        case "vehicle-cost":
+          return <UtilityExpenseModule />;
+        case "search":
+        case "analysis-search":
+          return (
+            <AnalysisSearchReportModule
+              salesData={salesData}
+              customers={customers}
+              stockData={stockData}
+              drivers={drivers}
+              userRole={dashboardRole as 'owner' | 'manager' | 'driver'}
+            />
+          );
+        default:
+          return (
+            <DashboardOverview
+              analytics={analytics}
+              drivers={drivers}
+              cylinderStock={cylinderStock}
+              userRole={dashboardRole as 'owner' | 'manager' | 'driver'}
+              setActiveModule={setActiveModule}
+              onRefresh={refetch}
+            />
+          );
+      }
+    })();
+
+    return (
+      <Suspense fallback={<ModuleSkeleton />}>
+        {moduleContent}
+      </Suspense>
+    );
   };
 
   return (
