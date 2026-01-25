@@ -8,8 +8,8 @@ interface ProtectedRouteProps {
 }
 
 export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
-  // Authentication enabled
-  const BYPASS_AUTH = false;
+  // Authentication bypassed for testing
+  const BYPASS_AUTH = true;
   
   const [loading, setLoading] = useState(!BYPASS_AUTH);
   const [authenticated, setAuthenticated] = useState(BYPASS_AUTH);
