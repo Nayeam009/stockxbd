@@ -13,7 +13,7 @@ import { useNavigate } from "react-router-dom";
 interface AppSidebarProps {
   activeModule: string;
   setActiveModule: (module: string) => void;
-  userRole: 'owner' | 'manager' | 'driver';
+  userRole: 'owner' | 'manager' | 'driver' | 'staff';
   userName: string;
   analytics: {
     lowStockItems: any[];
@@ -36,17 +36,18 @@ export const AppSidebar = ({
   const isCollapsed = state === "collapsed" && !isMobile;
   
   // All navigation items in a single flat list - no groups, no separators
+  // All navigation items - staff sees limited modules (overview, POS, settings)
   const allNavItems = [
-    { id: 'overview', titleKey: 'overview', icon: Home, roles: ['owner', 'manager', 'driver'] },
+    { id: 'overview', titleKey: 'overview', icon: Home, roles: ['owner', 'manager', 'driver', 'staff'] },
     { id: 'business-diary', titleKey: 'business_diary', icon: BarChart3, roles: ['owner', 'manager'] },
-    { id: 'pos', titleKey: 'pos', icon: Receipt, roles: ['owner', 'manager', 'driver'] },
+    { id: 'pos', titleKey: 'pos', icon: Receipt, roles: ['owner', 'manager', 'driver', 'staff'] },
     { id: 'my-shop', titleKey: 'my_shop', icon: Store, roles: ['owner', 'manager'], badge: analytics.activeOrders > 0 ? analytics.activeOrders : null },
     { id: 'inventory', titleKey: 'inventory', icon: Package, roles: ['owner', 'manager'], badge: analytics.lowStockItems.length > 0 ? analytics.lowStockItems.length : null },
     { id: 'product-pricing', titleKey: 'product_pricing', icon: Tag, roles: ['owner', 'manager'] },
-    { id: 'customers', titleKey: 'customers', icon: Users, roles: ['owner', 'manager'] },
+    { id: 'customers', titleKey: 'customers', icon: Users, roles: ['owner', 'manager', 'driver'] },
     { id: 'utility-expense', titleKey: 'utility_expense', icon: Wallet, roles: ['owner', 'manager'] },
     { id: 'analysis-search', titleKey: 'analysis_search', icon: Search, roles: ['owner', 'manager'] },
-    { id: 'settings', titleKey: 'settings', icon: Settings, roles: ['owner'] },
+    { id: 'settings', titleKey: 'settings', icon: Settings, roles: ['owner', 'manager', 'driver', 'staff'] },
   ];
   const handleModuleChange = (moduleId: string) => {
     setActiveModule(moduleId);

@@ -15,7 +15,7 @@ const navItems = [{
   id: 'overview',
   labelKey: 'overview',
   icon: Home,
-  roles: ['owner', 'manager', 'driver']
+  roles: ['owner', 'manager', 'driver', 'staff']
 }, {
   id: 'business-diary',
   labelKey: 'business_diary',
@@ -25,7 +25,7 @@ const navItems = [{
   id: 'pos',
   labelKey: 'pos',
   icon: Receipt,
-  roles: ['owner', 'manager', 'driver']
+  roles: ['owner', 'manager', 'driver', 'staff']
 }, {
   id: 'my-shop',
   labelKey: 'my_shop',
@@ -48,7 +48,7 @@ const moreItems = [{
   id: 'customers',
   labelKey: 'customers',
   icon: Users,
-  roles: ['owner', 'manager']
+  roles: ['owner', 'manager', 'driver']
 }, {
   id: 'utility-expense',
   labelKey: 'utility_expense',
@@ -63,7 +63,7 @@ const moreItems = [{
   id: 'settings',
   labelKey: 'settings',
   icon: Settings,
-  roles: ['owner', 'manager']
+  roles: ['owner', 'manager', 'driver', 'staff']
 }];
 
 export const MobileBottomNav = ({
