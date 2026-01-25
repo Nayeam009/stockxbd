@@ -986,7 +986,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
   };
 
   // ============= COMPLETE SALE =============
-  const handleCompleteSale = async (paymentStat: 'completed' | 'pending') => {
+  const handleCompleteSale = async (paymentStat: 'paid' | 'due') => {
     if (saleItems.length === 0) {
       toast({ title: "Cart is empty", variant: "destructive" });
       return;
@@ -1004,7 +1004,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
 
     const effectiveCustomerId = isWalkin ? "walkin" : selectedCustomerId;
 
-    if (paymentStat === 'pending' && effectiveCustomerId === "walkin") {
+    if (paymentStat === 'due' && effectiveCustomerId === "walkin") {
       toast({ 
         title: "Cannot save as due", 
         description: "Credit requires a registered customer",
@@ -1014,7 +1014,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
     }
 
     // Credit limit check
-    if (paymentStat === 'pending' && selectedCustomer) {
+    if (paymentStat === 'due' && selectedCustomer) {
       const currentDue = selectedCustomer.total_due || 0;
       const limit = selectedCustomer.credit_limit || DEFAULT_CREDIT_LIMIT;
       if (currentDue + total > limit) {
@@ -1141,7 +1141,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
       }
 
       // Update customer dues (track both money AND cylinders including refill debt)
-      if (paymentStat === 'pending' && customerId) {
+      if (paymentStat === 'due' && customerId) {
         const customer = customers.find(c => c.id === customerId);
         if (customer) {
           // Package cylinders = always owed (customer gets new cylinder)
@@ -1221,7 +1221,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
       setIsWalkin(true);
 
       toast({ 
-        title: paymentStat === 'completed' ? "Sale completed!" : "Saved as due",
+        title: paymentStat === 'paid' ? "Sale completed!" : "Saved as due",
         description: transactionNumber
       });
 
@@ -1874,52 +1874,11 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
           </CardContent>
         </Card>
 
-        {/* ===== CUSTOMER SECTION (Always Visible Fields) ===== */}
+        {/* ===== UNIFIED CUSTOMER FORM ===== */}
         <Card className="border-border/50">
           <CardContent className="p-3 space-y-3">
-            {/* Row 1: Customer Action Buttons */}
-            <div className="flex items-center gap-2">
-              <Button
-                variant={!isWalkin ? "default" : "outline"}
-                size="sm"
-                className="flex-1 h-11 min-w-0"
-                onClick={() => {
-                  setIsWalkin(false);
-                  // Focus the phone input
-                  setTimeout(() => {
-                    const phoneInput = document.querySelector('input[placeholder="01XXXXXXXXX"]') as HTMLInputElement;
-                    if (phoneInput) phoneInput.focus();
-                  }, 100);
-                }}
-              >
-                <Phone className="h-4 w-4 mr-1.5" />
-                <span className="hidden sm:inline">Lookup</span>
-                <span className="sm:hidden">Phone</span>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex-1 h-11 min-w-0"
-                onClick={() => setShowAddCustomerDialog(true)}
-              >
-                <UserPlus className="h-4 w-4 mr-1.5" />
-                <span className="hidden sm:inline">Add New</span>
-                <span className="sm:hidden">New</span>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex-1 h-11 min-w-0"
-                onClick={() => setShowCustomerListDialog(true)}
-              >
-                <Users className="h-4 w-4 mr-1.5" />
-                <span className="hidden sm:inline">Browse</span>
-                <span className="sm:hidden">List</span>
-              </Button>
-            </div>
-
-            {/* Customer Status Badge */}
-            <div className="flex items-center gap-2">
+            {/* Customer Status Badge - Shows current state */}
+            <div className="flex items-center gap-2 flex-wrap">
               {isWalkin && (
                 <Badge variant="secondary" className="bg-muted text-muted-foreground">
                   <User className="h-3 w-3 mr-1" />
@@ -1933,14 +1892,14 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                 </Badge>
               )}
               {customerStatus === 'found' && foundCustomer && (
-                <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
-                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                <Badge variant="secondary" className="bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400">
+                  <UserCircle className="h-3 w-3 mr-1" />
                   Found: {foundCustomer.name}
                 </Badge>
               )}
               {customerStatus === 'new' && (
-                <Badge variant="secondary" className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                  <UserPlus className="h-3 w-3 mr-1" />
+                <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                  <Sparkles className="h-3 w-3 mr-1" />
                   New Customer
                 </Badge>
               )}
@@ -1950,23 +1909,41 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                   Due: {BANGLADESHI_CURRENCY_SYMBOL}{(foundCustomer.total_due || 0).toLocaleString()}
                 </Badge>
               )}
+              {foundCustomer && (foundCustomer.cylinders_due || 0) > 0 && (
+                <Badge variant="outline" className="text-amber-600 border-amber-300 dark:border-amber-700">
+                  {foundCustomer.cylinders_due} Cylinder{foundCustomer.cylinders_due > 1 ? 's' : ''} Due
+                </Badge>
+              )}
             </div>
 
-            {/* Row 2: Customer Details Form - Always Visible */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {/* Phone Field */}
+            {/* Unified Customer Details Form - Phone, Name, Location */}
+            <div className="grid grid-cols-1 gap-3">
+              {/* Phone Field - Primary lookup key */}
               <div>
-                <Label className="text-xs text-muted-foreground mb-1.5 block">Phone</Label>
+                <Label className="text-xs text-muted-foreground mb-1.5 block">
+                  Phone Number
+                  {!isWalkin && <span className="text-primary ml-1">(auto-lookup)</span>}
+                </Label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     type="tel"
                     value={phoneQuery}
-                    onChange={(e) => setPhoneQuery(e.target.value.replace(/\D/g, '').slice(0, 11))}
-                    placeholder={isWalkin ? "Walk-in customer" : "01XXXXXXXXX"}
-                    className="h-11 pl-10 text-base font-medium"
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/\D/g, '').slice(0, 11);
+                      setPhoneQuery(value);
+                      if (value.length > 0) {
+                        setIsWalkin(false);
+                      } else {
+                        setIsWalkin(true);
+                        setCustomerStatus('idle');
+                        setFoundCustomer(null);
+                      }
+                    }}
+                    placeholder="01XXXXXXXXX (Leave empty for walk-in)"
+                    className="h-11 pl-10 text-base font-medium input-accessible"
                     maxLength={11}
-                    disabled={isWalkin}
+                    autoComplete="tel"
                   />
                   {customerStatus === 'searching' && (
                     <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
@@ -1984,78 +1961,57 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                 </div>
               </div>
 
-              {/* Name Field - Always Visible */}
-              <div>
-                <Label className="text-xs text-muted-foreground mb-1.5 block">
-                  Name {customerStatus === 'new' && <span className="text-destructive">*</span>}
-                </Label>
-                {customerStatus === 'found' && foundCustomer ? (
-                  <div className="h-11 px-3 flex items-center gap-2 rounded-md border bg-sky-50 dark:bg-sky-950/30 border-sky-200 dark:border-sky-800 text-sm font-medium text-foreground">
-                    <UserCircle className="h-4 w-4 text-sky-500 shrink-0" />
-                    <span className="truncate">{foundCustomer.name}</span>
-                  </div>
-                ) : (
-                  <Input
-                    value={newCustomerName}
-                    onChange={(e) => setNewCustomerName(e.target.value)}
-                    placeholder={isWalkin ? "Optional" : "Customer name"}
-                    className="h-11"
-                    disabled={isWalkin && customerStatus === 'idle'}
-                  />
-                )}
-              </div>
+              {/* Name & Location in same row on larger screens */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Name Field */}
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1.5 block">
+                    Name {customerStatus === 'new' && <span className="text-destructive">*</span>}
+                  </Label>
+                  {customerStatus === 'found' && foundCustomer ? (
+                    <div className="h-11 px-3 flex items-center gap-2 rounded-md border bg-sky-50 dark:bg-sky-950/30 border-sky-200 dark:border-sky-800 text-sm font-medium text-foreground">
+                      <UserCircle className="h-4 w-4 text-sky-500 shrink-0" />
+                      <span className="truncate">{foundCustomer.name}</span>
+                    </div>
+                  ) : (
+                    <Input
+                      value={newCustomerName}
+                      onChange={(e) => setNewCustomerName(e.target.value)}
+                      placeholder={isWalkin ? "Optional for walk-in" : "Customer name"}
+                      className="h-11 input-accessible"
+                      autoComplete="name"
+                    />
+                  )}
+                </div>
 
-              {/* Address Field - Always Visible */}
-              <div>
-                <Label className="text-xs text-muted-foreground mb-1.5 block">Address</Label>
-                {customerStatus === 'found' && foundCustomer ? (
-                  <div className="h-11 px-3 flex items-center rounded-md border bg-sky-50 dark:bg-sky-950/30 border-sky-200 dark:border-sky-800 text-sm text-muted-foreground">
-                    <span className="truncate">{foundCustomer.address || 'No address'}</span>
-                  </div>
-                ) : (
-                  <Input
-                    value={newCustomerAddress}
-                    onChange={(e) => setNewCustomerAddress(e.target.value)}
-                    placeholder={isWalkin ? "Optional" : "Address"}
-                    className="h-11"
-                    disabled={isWalkin && customerStatus === 'idle'}
-                  />
-                )}
+                {/* Location/Address Field */}
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1.5 block">Location</Label>
+                  {customerStatus === 'found' && foundCustomer ? (
+                    <div className="h-11 px-3 flex items-center gap-2 rounded-md border bg-sky-50 dark:bg-sky-950/30 border-sky-200 dark:border-sky-800 text-sm text-muted-foreground">
+                      <MapPin className="h-4 w-4 text-sky-500 shrink-0" />
+                      <span className="truncate">{foundCustomer.address || 'No address'}</span>
+                    </div>
+                  ) : (
+                    <div className="relative">
+                      <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        value={newCustomerAddress}
+                        onChange={(e) => setNewCustomerAddress(e.target.value)}
+                        placeholder={isWalkin ? "Optional" : "Address/Location"}
+                        className="h-11 pl-10 input-accessible"
+                        autoComplete="street-address"
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
-            {/* Row 3: Status Indicator (Compact) */}
-            {customerStatus === 'found' && foundCustomer && (
-              <div className="flex items-center gap-2 px-1">
-                <Badge variant="secondary" className="bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800">
-                  <UserCircle className="h-3 w-3 mr-1" />
-                  Existing Customer
-                </Badge>
-                {(foundCustomer.total_due || 0) > 0 && (
-                  <Badge variant="destructive">
-                    Due: {BANGLADESHI_CURRENCY_SYMBOL}{foundCustomer.total_due?.toLocaleString()}
-                  </Badge>
-                )}
-                {(foundCustomer.cylinders_due || 0) > 0 && (
-                  <Badge variant="outline" className="text-amber-600 border-amber-300">
-                    {foundCustomer.cylinders_due} Cylinder{foundCustomer.cylinders_due > 1 ? 's' : ''} Due
-                  </Badge>
-                )}
-              </div>
-            )}
-            {customerStatus === 'new' && (
-              <div className="flex items-center gap-2 px-1">
-                <Badge className="bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800">
-                  <Sparkles className="h-3 w-3 mr-1" />
-                  New Customer
-                </Badge>
-              </div>
-            )}
-
-            {/* Row 4: Settlement & Seller */}
+            {/* Settlement & Seller Row */}
             <div className="grid grid-cols-2 gap-3 pt-1">
               <div>
-                <Label className="text-xs text-muted-foreground mb-1.5 block">Settlement/Discount</Label>
+                <Label className="text-xs text-muted-foreground mb-1.5 block">Settlement</Label>
                 <Input
                   type="number"
                   value={discount}
@@ -2167,7 +2123,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
               {paymentStatus === 'paid' ? (
                 <Button 
                   className="flex-1 h-12 bg-emerald-600 hover:bg-emerald-700"
-                  onClick={() => handleCompleteSale('completed')}
+                  onClick={() => handleCompleteSale('paid')}
                   disabled={processing}
                 >
                   {processing ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Confirm & Print'}
@@ -2176,7 +2132,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                 <Button 
                   className="flex-1 h-12"
                   variant="outline"
-                  onClick={() => handleCompleteSale('pending')}
+                  onClick={() => handleCompleteSale('due')}
                   disabled={processing || isWalkin}
                 >
                   {processing ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Save as Due'}
