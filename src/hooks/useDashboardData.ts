@@ -152,6 +152,54 @@ export const useDashboardData = () => {
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const isInitialLoadRef = useRef<boolean>(true);
 
+  // Persist a lightweight snapshot so if the browser discards the tab,
+  // the dashboard can render instantly on restore.
+  const DASHBOARD_CACHE_KEY = 'stockx.dashboard.snapshot.v1';
+  const DASHBOARD_CACHE_TTL_MS = 1000 * 60 * 10; // 10 minutes
+
+  type DashboardSnapshot = {
+    ts: number;
+    salesData: SalesData[];
+    stockData: StockItem[];
+    cylinderStock: CylinderStock[];
+    drivers: Driver[];
+    customers: Customer[];
+    orders: Order[];
+  };
+
+  const readSnapshot = useCallback((): DashboardSnapshot | null => {
+    try {
+      const raw = sessionStorage.getItem(DASHBOARD_CACHE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as DashboardSnapshot;
+      if (!parsed?.ts) return null;
+      if (Date.now() - parsed.ts > DASHBOARD_CACHE_TTL_MS) return null;
+      return parsed;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const writeSnapshot = useCallback((snapshot: DashboardSnapshot) => {
+    try {
+      sessionStorage.setItem(DASHBOARD_CACHE_KEY, JSON.stringify(snapshot));
+    } catch {
+      // ignore quota/serialization errors
+    }
+  }, []);
+
+  const withTimeout = useCallback(async <T,>(promise: Promise<T>, ms: number): Promise<T> => {
+    let t: number | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+      t = window.setTimeout(() => reject(new Error('Dashboard fetch timeout')), ms);
+    });
+    try {
+      return await Promise.race([promise, timeout]);
+    } finally {
+      if (t) window.clearTimeout(t);
+    }
+  }, []);
+
   // Soft fetch - background refresh without loading spinner
   const fetchData = useCallback(async (isSoftRefresh = false) => {
     try {
@@ -171,7 +219,7 @@ export const useDashboardData = () => {
         lpgBrandsResult,
         stovesResult,
         userRolesResult
-      ] = await Promise.all([
+      ] = await withTimeout(Promise.all([
         supabase
           .from('pos_transactions')
           .select(`
@@ -194,7 +242,18 @@ export const useDashboardData = () => {
         supabase
           .from('orders')
           .select(`
-            *,
+            id,
+            order_number,
+            customer_id,
+            customer_name,
+            total_amount,
+            status,
+            payment_status,
+            delivery_address,
+            driver_id,
+            order_date,
+            delivery_date,
+            created_at,
             order_items (
               id,
               product_id,
@@ -203,11 +262,12 @@ export const useDashboardData = () => {
               price
             )
           `)
-          .order('created_at', { ascending: false }),
+          .order('created_at', { ascending: false })
+          .limit(500),
         supabase.from('lpg_brands').select('*').eq('is_active', true),
         supabase.from('stoves').select('*').eq('is_active', true),
         supabase.from('user_roles').select('user_id, role').eq('role', 'driver')
-      ]);
+      ]), 15000);
 
       const transactions = transactionsResult.data;
       const customerData = customerDataResult.data;
@@ -216,87 +276,77 @@ export const useDashboardData = () => {
       const stoves = stovesResult.data;
       const userRoles = userRolesResult.data;
 
-      // Process transactions
-      if (transactions) {
-        const formattedSales: SalesData[] = transactions.flatMap(txn => 
-          (txn.pos_transaction_items || []).map((item: any) => ({
-            id: `${txn.id}-${item.product_name}`,
-            date: new Date(txn.created_at).toISOString().split('T')[0],
-            productType: item.product_name?.toLowerCase().includes('stove') ? 'stove' as const : 
-                        item.product_name?.toLowerCase().includes('regulator') ? 'accessory' as const : 'cylinder' as const,
-            productName: item.product_name || 'Unknown',
-            quantity: item.quantity,
-            unitPrice: Number(item.unit_price),
-            totalAmount: Number(item.total_price),
-            paymentMethod: txn.payment_method as any,
-            staffId: txn.created_by || '',
-            staffName: 'Staff',
-            paymentStatus: txn.payment_status || 'paid'
-          }))
-        );
-        setSalesData(formattedSales);
-      }
+      const formattedSales: SalesData[] = transactions
+        ? transactions.flatMap(txn =>
+            (txn.pos_transaction_items || []).map((item: any) => ({
+              id: `${txn.id}-${item.product_name}`,
+              date: new Date(txn.created_at).toISOString().split('T')[0],
+              productType: item.product_name?.toLowerCase().includes('stove') ? 'stove' as const :
+                          item.product_name?.toLowerCase().includes('regulator') ? 'accessory' as const : 'cylinder' as const,
+              productName: item.product_name || 'Unknown',
+              quantity: item.quantity,
+              unitPrice: Number(item.unit_price),
+              totalAmount: Number(item.total_price),
+              paymentMethod: txn.payment_method as any,
+              staffId: txn.created_by || '',
+              staffName: 'Staff',
+              paymentStatus: txn.payment_status || 'paid'
+            }))
+          )
+        : [];
+      setSalesData(formattedSales);
 
-      // Process customers
-      if (customerData) {
-        const { data: orderStats } = await supabase
-          .from('orders')
-          .select('customer_id, order_date')
-          .order('order_date', { ascending: false });
-
-        const customerOrderMap: Record<string, { count: number; lastOrder: string }> = {};
-        orderStats?.forEach(o => {
-          if (o.customer_id) {
-            if (!customerOrderMap[o.customer_id]) {
-              customerOrderMap[o.customer_id] = { count: 0, lastOrder: o.order_date };
-            }
-            customerOrderMap[o.customer_id].count += 1;
+      // Build customer activity from the orders we already fetched (no extra query)
+      const customerOrderMap: Record<string, { count: number; lastOrder: string }> = {};
+      (ordersData || []).forEach(o => {
+        if (o.customer_id) {
+          if (!customerOrderMap[o.customer_id]) {
+            customerOrderMap[o.customer_id] = { count: 0, lastOrder: o.order_date };
           }
-        });
+          customerOrderMap[o.customer_id].count += 1;
+          // orders are sorted desc, so first seen is last order
+        }
+      });
 
-        const formattedCustomers: Customer[] = customerData.map(c => {
-          const orderInfo = customerOrderMap[c.id];
-          const lastOrderDate = orderInfo?.lastOrder ? new Date(orderInfo.lastOrder) : null;
-          const isActive = lastOrderDate ? lastOrderDate >= new Date(thirtyDaysAgo) : false;
-          
-          return {
-            id: c.id,
-            name: c.name,
-            phone: c.phone || '',
-            address: c.address || '',
-            totalOrders: orderInfo?.count || 0,
-            lastOrder: orderInfo?.lastOrder || '',
-            outstanding: Number(c.total_due) || 0,
-            loyaltyPoints: 0,
-            isActive
-          };
-        });
-        setCustomers(formattedCustomers);
-      }
+      const formattedCustomers: Customer[] = (customerData || []).map(c => {
+        const orderInfo = customerOrderMap[c.id];
+        const lastOrderDate = orderInfo?.lastOrder ? new Date(orderInfo.lastOrder) : null;
+        const isActive = lastOrderDate ? lastOrderDate >= new Date(thirtyDaysAgo) : false;
 
-      // Process orders
-      if (ordersData) {
-        const formattedOrders: Order[] = ordersData.map(o => ({
-          id: o.id,
-          orderNumber: o.order_number,
-          customerId: o.customer_id || '',
-          customerName: o.customer_name,
-          items: (o.order_items || []).map((item: any) => ({
-            productId: item.product_id || '',
-            productName: item.product_name,
-            quantity: item.quantity,
-            price: Number(item.price)
-          })),
-          totalAmount: Number(o.total_amount),
-          status: o.status as Order['status'],
-          paymentStatus: o.payment_status as Order['paymentStatus'],
-          deliveryAddress: o.delivery_address,
-          driverId: o.driver_id,
-          orderDate: o.order_date,
-          deliveryDate: o.delivery_date
-        }));
-        setOrders(formattedOrders);
-      }
+        return {
+          id: c.id,
+          name: c.name,
+          phone: c.phone || '',
+          address: c.address || '',
+          totalOrders: orderInfo?.count || 0,
+          lastOrder: orderInfo?.lastOrder || '',
+          outstanding: Number(c.total_due) || 0,
+          loyaltyPoints: 0,
+          isActive
+        };
+      });
+      setCustomers(formattedCustomers);
+
+      const formattedOrders: Order[] = (ordersData || []).map(o => ({
+        id: o.id,
+        orderNumber: o.order_number,
+        customerId: o.customer_id || '',
+        customerName: o.customer_name,
+        items: (o.order_items || []).map((item: any) => ({
+          productId: item.product_id || '',
+          productName: item.product_name,
+          quantity: item.quantity,
+          price: Number(item.price)
+        })),
+        totalAmount: Number(o.total_amount),
+        status: o.status as Order['status'],
+        paymentStatus: o.payment_status as Order['paymentStatus'],
+        deliveryAddress: o.delivery_address,
+        driverId: o.driver_id,
+        orderDate: o.order_date,
+        deliveryDate: o.delivery_date
+      }));
+      setOrders(formattedOrders);
 
       // Process stock
       const stockItems: StockItem[] = [];
@@ -361,12 +411,6 @@ export const useDashboardData = () => {
           };
         });
 
-        const { data: todayOrders } = await supabase
-          .from('orders')
-          .select('driver_id, total_amount, status, payment_status')
-          .gte('order_date', `${today}T00:00:00`)
-          .lte('order_date', `${today}T23:59:59`);
-
         const driverStats: Record<string, { 
           sales: number; 
           deliveries: number; 
@@ -374,7 +418,13 @@ export const useDashboardData = () => {
           cashCollected: number;
         }> = {};
         
-        todayOrders?.forEach(o => {
+        // Use already-fetched ordersData for today's driver stats (no extra query)
+        const todaysOrders = (ordersData || []).filter(o => {
+          const d = new Date(o.order_date).toISOString().split('T')[0];
+          return d === today;
+        });
+
+        todaysOrders.forEach(o => {
           if (o.driver_id) {
             if (!driverStats[o.driver_id]) {
               driverStats[o.driver_id] = { sales: 0, deliveries: 0, stockOut: 0, cashCollected: 0 };
@@ -409,6 +459,17 @@ export const useDashboardData = () => {
       // Update freshness tracking
       lastFetchTimeRef.current = Date.now();
       channelHealthyRef.current = true;
+
+      // Persist snapshot for instant restore (tab discard / memory reclaim)
+      writeSnapshot({
+        ts: Date.now(),
+        salesData: formattedSales,
+        stockData: stockItems,
+        cylinderStock: cylinderItems,
+        drivers: drivers.length ? drivers : [],
+        customers: formattedCustomers,
+        orders: formattedOrders,
+      });
 
     } catch (error) {
       logger.error('Error fetching dashboard data', error, { component: 'Dashboard' });
@@ -475,8 +536,23 @@ export const useDashboardData = () => {
 
   // Setup visibility listener and initial channel
   useEffect(() => {
-    // Initial fetch
-    fetchData();
+    // Restore cached snapshot immediately if available (prevents blank / stuck loader)
+    const snapshot = readSnapshot();
+    if (snapshot) {
+      setSalesData(snapshot.salesData || []);
+      setStockData(snapshot.stockData || []);
+      setCylinderStock(snapshot.cylinderStock || []);
+      setDrivers(snapshot.drivers || []);
+      setCustomers(snapshot.customers || []);
+      setOrders(snapshot.orders || []);
+      lastFetchTimeRef.current = snapshot.ts;
+      setLoading(false);
+      isInitialLoadRef.current = false;
+      fetchData(true); // background refresh
+    } else {
+      // Initial fetch
+      fetchData();
+    }
     
     // Create channel
     const channel = reconnectChannel();
