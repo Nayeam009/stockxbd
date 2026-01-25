@@ -61,6 +61,9 @@ export default defineConfig(({ mode }) => ({
           // React Router - rarely changes
           'vendor-router': ['react-router-dom'],
           
+          // Icons - large, cache separately to reduce initial JS
+          'vendor-icons': ['lucide-react'],
+          
           // Charting library - large, cache separately
           'vendor-charts': ['recharts'],
           

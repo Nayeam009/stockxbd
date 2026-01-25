@@ -1,7 +1,4 @@
-/* Import Professional Fonts */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@300;400;500;600;700&display=swap');
-
+/* Fonts loaded async via index.html - No blocking @import */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
