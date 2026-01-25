@@ -695,4 +695,50 @@
     background: hsl(var(--muted-foreground) / 0.3);
     margin: 8px auto 16px;
   }
+
+  /* =====================================================
+   * PHASE 4-8: BUTTER-SMOOTH MODULE TRANSITION UTILITIES
+   * GPU-accelerated animations for 60fps navigation
+   * ===================================================== */
+
+  /* GPU-accelerated container for module content */
+  .module-transition {
+    will-change: opacity, transform;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
+
+  /* Smooth enter animation for modules */
+  .module-enter {
+    animation: module-fade-in 0.15s ease-out forwards;
+  }
+
+  @keyframes module-fade-in {
+    from {
+      opacity: 0.85;
+      transform: translateY(4px) translateZ(0);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) translateZ(0);
+    }
+  }
+
+  /* Transition loading indicator animation */
+  .transition-loading {
+    animation: loading-slide 1s ease-in-out infinite;
+  }
+
+  @keyframes loading-slide {
+    0% { transform: translateX(-100%); }
+    50% { transform: translateX(100%); }
+    100% { transform: translateX(300%); }
+  }
+
+  /* Hardware-accelerated backface hidden utility */
+  .backface-visibility-hidden {
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
 }

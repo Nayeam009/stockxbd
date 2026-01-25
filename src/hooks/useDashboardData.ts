@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/lib/logger';
 
@@ -407,106 +407,112 @@ export const useDashboardData = () => {
     }
   }, []);
 
-  // Fetch real data from Supabase with full real-time sync
+  // Debounce ref for real-time updates - prevents excessive refetches
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  
+  const debouncedRefetch = useCallback(() => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+    debounceRef.current = setTimeout(() => {
+      fetchData();
+    }, 2000); // 2-second debounce for smooth performance
+  }, [fetchData]);
+
+  // Fetch real data from Supabase with consolidated real-time channel
   useEffect(() => {
     fetchData();
 
-    // Subscribe to realtime updates for all critical tables
-    const channels = [
-      supabase.channel('dashboard-orders-realtime').on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'orders' }, 
-        () => fetchData()
-      ).subscribe(),
-      supabase.channel('dashboard-pos-realtime').on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'pos_transactions' }, 
-        () => fetchData()
-      ).subscribe(),
-      supabase.channel('dashboard-lpg-realtime').on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'lpg_brands' }, 
-        () => fetchData()
-      ).subscribe(),
-      supabase.channel('dashboard-customers-realtime').on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'customers' }, 
-        () => fetchData()
-      ).subscribe(),
-    ];
+    // Single consolidated channel for all dashboard tables with debounced updates
+    const channel = supabase
+      .channel('dashboard-combined-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, debouncedRefetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pos_transactions' }, debouncedRefetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'lpg_brands' }, debouncedRefetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'customers' }, debouncedRefetch)
+      .subscribe();
 
     return () => {
-      channels.forEach(ch => supabase.removeChannel(ch));
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+      supabase.removeChannel(channel);
     };
-  }, [fetchData]);
+  }, [fetchData, debouncedRefetch]);
 
-  // Analytics calculations with LPG business logic
-  const today = new Date().toISOString().split('T')[0];
-  const now = new Date();
-  
-  // Calculate today's revenue - Cash only (not credit/due)
-  const todaysSales = salesData.filter(sale => sale.date === today);
-  const todayCashRevenue = todaysSales
-    .filter(sale => sale.paymentStatus === 'paid' || sale.paymentStatus === 'completed')
-    .reduce((sum, sale) => sum + sale.totalAmount, 0);
-  const todayDueRevenue = todaysSales
-    .filter(sale => sale.paymentStatus === 'pending' || sale.paymentStatus === 'partial')
-    .reduce((sum, sale) => sum + sale.totalAmount, 0);
-
-  // Monthly revenue calculations
-  const monthlyRevenue = salesData
-    .filter(sale => {
-      const saleDate = new Date(sale.date);
-      return saleDate.getMonth() === now.getMonth() && saleDate.getFullYear() === now.getFullYear();
-    })
-    .reduce((sum, sale) => sum + sale.totalAmount, 0);
-
-  const lastMonthRevenue = salesData
-    .filter(sale => {
-      const saleDate = new Date(sale.date);
-      const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      return saleDate.getMonth() === lastMonth.getMonth() && saleDate.getFullYear() === lastMonth.getFullYear();
-    })
-    .reduce((sum, sale) => sum + sale.totalAmount, 0);
-
-  const monthlyGrowthPercent = lastMonthRevenue > 0 
-    ? Math.round(((monthlyRevenue - lastMonthRevenue) / lastMonthRevenue) * 100)
-    : 0;
-
-  // Cylinder stock health
-  const totalFullCylinders = cylinderStock.reduce((sum, c) => sum + (c.fullCylinders || 0), 0);
-  const totalEmptyCylinders = cylinderStock.reduce((sum, c) => sum + (c.emptyCylinders || 0), 0);
-  const cylinderStockHealth: 'critical' | 'warning' | 'good' = 
-    totalEmptyCylinders > totalFullCylinders ? 'critical' :
-    totalFullCylinders < 20 ? 'warning' : 'good';
-
-  // Customer metrics
-  const activeCustomers = customers.filter(c => c.isActive).length;
-  const lostCustomers = customers.filter(c => !c.isActive && c.totalOrders > 0).length;
-
-  // Order metrics
-  const pendingOrders = orders.filter(o => o.status === 'pending').length;
-  const dispatchedOrders = orders.filter(o => o.status === 'dispatched').length;
-
-  const analytics: DashboardAnalytics = {
-    todayRevenue: todayCashRevenue || 0, // Only cash received
-    todayCashRevenue: todayCashRevenue || 0,
-    todayDueRevenue: todayDueRevenue || 0,
-    monthlyRevenue: monthlyRevenue || 0,
-    lastMonthRevenue: lastMonthRevenue || 0,
-    monthlyGrowthPercent: isNaN(monthlyGrowthPercent) ? 0 : monthlyGrowthPercent,
+  // MEMOIZED Analytics calculations - prevents expensive recalculation on every render
+  const analytics = useMemo((): DashboardAnalytics => {
+    const today = new Date().toISOString().split('T')[0];
+    const now = new Date();
     
-    lowStockItems: stockData.filter(item => item.currentStock <= item.minStock),
-    totalFullCylinders: totalFullCylinders || 0,
-    totalEmptyCylinders: totalEmptyCylinders || 0,
-    cylinderStockHealth,
-    
-    activeOrders: orders.filter(order => ['pending', 'confirmed', 'dispatched'].includes(order.status)).length,
-    pendingOrders: pendingOrders || 0,
-    dispatchedOrders: dispatchedOrders || 0,
-    
-    totalCustomers: customers.length || 0,
-    activeCustomers: activeCustomers || 0,
-    lostCustomers: lostCustomers || 0,
-    
-    activeDrivers: drivers.filter(driver => driver.status === 'active').length,
-  };
+    // Calculate today's revenue - Cash only (not credit/due)
+    const todaysSales = salesData.filter(sale => sale.date === today);
+    const todayCashRevenue = todaysSales
+      .filter(sale => sale.paymentStatus === 'paid' || sale.paymentStatus === 'completed')
+      .reduce((sum, sale) => sum + sale.totalAmount, 0);
+    const todayDueRevenue = todaysSales
+      .filter(sale => sale.paymentStatus === 'pending' || sale.paymentStatus === 'partial')
+      .reduce((sum, sale) => sum + sale.totalAmount, 0);
+
+    // Monthly revenue calculations
+    const monthlyRevenue = salesData
+      .filter(sale => {
+        const saleDate = new Date(sale.date);
+        return saleDate.getMonth() === now.getMonth() && saleDate.getFullYear() === now.getFullYear();
+      })
+      .reduce((sum, sale) => sum + sale.totalAmount, 0);
+
+    const lastMonthRevenue = salesData
+      .filter(sale => {
+        const saleDate = new Date(sale.date);
+        const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        return saleDate.getMonth() === lastMonth.getMonth() && saleDate.getFullYear() === lastMonth.getFullYear();
+      })
+      .reduce((sum, sale) => sum + sale.totalAmount, 0);
+
+    const monthlyGrowthPercent = lastMonthRevenue > 0 
+      ? Math.round(((monthlyRevenue - lastMonthRevenue) / lastMonthRevenue) * 100)
+      : 0;
+
+    // Cylinder stock health
+    const totalFullCylinders = cylinderStock.reduce((sum, c) => sum + (c.fullCylinders || 0), 0);
+    const totalEmptyCylinders = cylinderStock.reduce((sum, c) => sum + (c.emptyCylinders || 0), 0);
+    const cylinderStockHealth: 'critical' | 'warning' | 'good' = 
+      totalEmptyCylinders > totalFullCylinders ? 'critical' :
+      totalFullCylinders < 20 ? 'warning' : 'good';
+
+    // Customer metrics
+    const activeCustomers = customers.filter(c => c.isActive).length;
+    const lostCustomers = customers.filter(c => !c.isActive && c.totalOrders > 0).length;
+
+    // Order metrics
+    const pendingOrders = orders.filter(o => o.status === 'pending').length;
+    const dispatchedOrders = orders.filter(o => o.status === 'dispatched').length;
+
+    return {
+      todayRevenue: todayCashRevenue || 0,
+      todayCashRevenue: todayCashRevenue || 0,
+      todayDueRevenue: todayDueRevenue || 0,
+      monthlyRevenue: monthlyRevenue || 0,
+      lastMonthRevenue: lastMonthRevenue || 0,
+      monthlyGrowthPercent: isNaN(monthlyGrowthPercent) ? 0 : monthlyGrowthPercent,
+      
+      lowStockItems: stockData.filter(item => item.currentStock <= item.minStock),
+      totalFullCylinders: totalFullCylinders || 0,
+      totalEmptyCylinders: totalEmptyCylinders || 0,
+      cylinderStockHealth,
+      
+      activeOrders: orders.filter(order => ['pending', 'confirmed', 'dispatched'].includes(order.status)).length,
+      pendingOrders: pendingOrders || 0,
+      dispatchedOrders: dispatchedOrders || 0,
+      
+      totalCustomers: customers.length || 0,
+      activeCustomers: activeCustomers || 0,
+      lostCustomers: lostCustomers || 0,
+      
+      activeDrivers: drivers.filter(driver => driver.status === 'active').length,
+    };
+  }, [salesData, stockData, cylinderStock, customers, orders, drivers]);
 
   return {
     salesData,

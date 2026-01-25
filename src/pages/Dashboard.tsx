@@ -1,15 +1,16 @@
-import { useState, useEffect, useCallback, TouchEvent, Suspense, lazy } from "react";
+import { useState, useEffect, useCallback, TouchEvent, Suspense, lazy, useTransition } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/dashboard/AppSidebar";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { GlobalCommandPalette } from "@/components/dashboard/GlobalCommandPalette";
 import { MobileBottomNav } from "@/components/dashboard/MobileBottomNav";
-import { ModuleSkeleton } from "@/components/dashboard/ModuleSkeleton";
+import { ModuleSkeleton, QuickLoader } from "@/components/dashboard/ModuleSkeleton";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { getNextModule } from "@/hooks/useSwipeNavigation";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useUserRole } from "@/hooks/useUserRole";
 import { Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 // Lazy load heavy modules for faster initial render
 const DashboardOverview = lazy(() => import("@/components/dashboard/modules/DashboardOverview").then(m => ({ default: m.DashboardOverview })));
@@ -30,10 +31,31 @@ const Dashboard = () => {
   const [activeModule, setActiveModule] = useState("overview");
   const [searchQuery, setSearchQuery] = useState("");
   
+  // Performance: React 18 transitions for non-blocking module switches
+  const [isPending, startTransition] = useTransition();
+  
+  // Track loaded modules for instant revisit rendering
+  const [loadedModules, setLoadedModules] = useState<Set<string>>(new Set(['overview']));
+  const [hasInitiallyLoaded, setHasInitiallyLoaded] = useState(false);
+  
+  // Smooth module switching with transitions
+  const handleModuleChange = useCallback((module: string) => {
+    startTransition(() => {
+      setActiveModule(module);
+      setLoadedModules(prev => new Set([...prev, module]));
+    });
+  }, []);
+  
   // Use real authentication - fetch user role from database
   const { userRole, userName, loading: authLoading, error: authError } = useUserRole();
   
   const isMobile = useIsMobile();
+
+  // Mark initial load complete for animation control
+  useEffect(() => {
+    const timer = setTimeout(() => setHasInitiallyLoaded(true), 100);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Swipe gesture state
   const [touchStart, setTouchStart] = useState<number | null>(null);
@@ -61,19 +83,19 @@ const Dashboard = () => {
 
     if (isLeftSwipe) {
       const nextModule = getNextModule(activeModule, 'left', swipeRole);
-      setActiveModule(nextModule);
+      handleModuleChange(nextModule);
     }
     if (isRightSwipe) {
       const nextModule = getNextModule(activeModule, 'right', swipeRole);
-      setActiveModule(nextModule);
+      handleModuleChange(nextModule);
     }
-  }, [touchStart, touchEnd, activeModule, userRole]);
+  }, [touchStart, touchEnd, activeModule, userRole, handleModuleChange]);
 
   // Listen for module navigation events from other components
   useEffect(() => {
     const handleNavigate = (e: CustomEvent) => {
       if (e.detail && typeof e.detail === 'string') {
-        setActiveModule(e.detail);
+        handleModuleChange(e.detail);
       }
     };
 
@@ -81,7 +103,7 @@ const Dashboard = () => {
     return () => {
       window.removeEventListener('navigate-module', handleNavigate as EventListener);
     };
-  }, []);
+  }, [handleModuleChange]);
 
   const {
     salesData,
@@ -145,6 +167,9 @@ const Dashboard = () => {
   const navRole = dashboardRole;
 
   const renderActiveModule = () => {
+    // Check if this module was previously loaded for faster revisit
+    const isFirstLoad = !loadedModules.has(activeModule);
+    
     const moduleContent = (() => {
       switch (activeModule) {
         case "overview":
@@ -154,7 +179,7 @@ const Dashboard = () => {
               drivers={drivers}
               cylinderStock={cylinderStock}
               userRole={dashboardRole as 'owner' | 'manager' | 'driver'}
-              setActiveModule={setActiveModule}
+              setActiveModule={handleModuleChange}
               onRefresh={refetch}
             />
           );
@@ -205,7 +230,7 @@ const Dashboard = () => {
               drivers={drivers}
               cylinderStock={cylinderStock}
               userRole={dashboardRole as 'owner' | 'manager' | 'driver'}
-              setActiveModule={setActiveModule}
+              setActiveModule={handleModuleChange}
               onRefresh={refetch}
             />
           );
@@ -213,18 +238,27 @@ const Dashboard = () => {
     })();
 
     return (
-      <Suspense fallback={<ModuleSkeleton />}>
-        {moduleContent}
+      <Suspense fallback={isFirstLoad ? <ModuleSkeleton /> : <QuickLoader />}>
+        <div className="module-transition module-enter">
+          {moduleContent}
+        </div>
       </Suspense>
     );
   };
 
   return (
     <SidebarProvider defaultOpen={false}>
+      {/* Transition pending indicator - shows during module switch */}
+      {isPending && (
+        <div className="fixed top-0 left-0 right-0 h-1 bg-primary/20 z-[100]">
+          <div className="h-full w-1/3 bg-primary rounded-r-full animate-pulse transition-loading" />
+        </div>
+      )}
+      
       <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-background to-muted/30">
         <AppSidebar
           activeModule={activeModule}
-          setActiveModule={setActiveModule}
+          setActiveModule={handleModuleChange}
           userRole={dashboardRole}
           userName={userName}
           analytics={analytics}
@@ -236,8 +270,8 @@ const Dashboard = () => {
             setSearchQuery={setSearchQuery}
             userRole={dashboardRole as 'owner' | 'manager' | 'driver'}
             userName={userName}
-            onSettingsClick={() => setActiveModule("settings")}
-            onProfileClick={() => setActiveModule("profile")}
+            onSettingsClick={() => handleModuleChange("settings")}
+            onProfileClick={() => handleModuleChange("profile")}
           />
 
           {/* Main Content with Swipe Support */}
@@ -247,7 +281,10 @@ const Dashboard = () => {
             onTouchMove={isMobile ? onTouchMove : undefined}
             onTouchEnd={isMobile ? onTouchEnd : undefined}
           >
-            <div className="container mx-auto p-3 sm:p-4 md:p-6 animate-fade-in max-w-7xl">
+            <div className={cn(
+              "container mx-auto p-3 sm:p-4 md:p-6 max-w-7xl",
+              !hasInitiallyLoaded && "animate-fade-in"
+            )}>
               {renderActiveModule()}
             </div>
           </main>
@@ -255,7 +292,7 @@ const Dashboard = () => {
           {/* Mobile Bottom Navigation */}
           <MobileBottomNav
             activeModule={activeModule}
-            setActiveModule={setActiveModule}
+            setActiveModule={handleModuleChange}
             userRole={navRole}
           />
         </div>
@@ -263,7 +300,7 @@ const Dashboard = () => {
         {/* Global Command Palette */}
         <GlobalCommandPalette 
           userRole={dashboardRole as 'owner' | 'manager' | 'driver'}
-          setActiveModule={setActiveModule}
+          setActiveModule={handleModuleChange}
         />
       </div>
     </SidebarProvider>

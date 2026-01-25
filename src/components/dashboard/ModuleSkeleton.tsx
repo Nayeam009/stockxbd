@@ -68,4 +68,14 @@ export const CompactModuleSkeleton = () => (
   </div>
 );
 
+/**
+ * Quick loader for previously-loaded modules (instant revisit)
+ * Minimal visual footprint for butter-smooth transitions
+ */
+export const QuickLoader = () => (
+  <div className="min-h-[200px] flex items-center justify-center module-transition">
+    <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+  </div>
+);
+
 export default ModuleSkeleton;
