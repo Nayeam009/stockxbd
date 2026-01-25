@@ -243,6 +243,8 @@ export const useCommunityData = () => {
       district: string;
       thana?: string;
       notes?: string;
+      paymentMethod?: 'cod' | 'bkash' | 'nagad' | 'rocket';
+      paymentTrxId?: string;
     }
   ): Promise<{ success: boolean; orderId?: string; error?: string }> => {
     try {
@@ -259,6 +261,10 @@ export const useCommunityData = () => {
       const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
       const deliveryFee = isSelfOrder ? 0 : 50; // No delivery fee for self-orders
       const totalAmount = subtotal + deliveryFee;
+
+      // Determine payment status based on method
+      const paymentMethod = customerInfo.paymentMethod || 'cod';
+      const paymentStatus = paymentMethod !== 'cod' && customerInfo.paymentTrxId ? 'paid' : 'pending';
 
       // Create order with customer_type and is_self_order
       const { data: orderData, error: orderError } = await supabase
@@ -277,8 +283,9 @@ export const useCommunityData = () => {
           delivery_fee: deliveryFee,
           total_amount: totalAmount,
           status: 'pending',
-          payment_method: 'cod',
-          payment_status: 'pending',
+          payment_method: paymentMethod,
+          payment_status: paymentStatus,
+          payment_trx_id: customerInfo.paymentTrxId || null,
           customer_type: customerType,
           is_self_order: isSelfOrder
         }] as any)

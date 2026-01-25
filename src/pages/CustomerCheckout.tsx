@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { 
   ArrowLeft, 
   Truck,
@@ -17,7 +18,10 @@ import {
   MapPin,
   Bookmark,
   X,
-  Sparkles
+  Sparkles,
+  Copy,
+  Check,
+  AlertCircle
 } from "lucide-react";
 import {
   Select,
@@ -32,6 +36,14 @@ import { CartItem, useCommunityData } from "@/hooks/useCommunityData";
 import { useCustomerData } from "@/hooks/useCustomerData";
 import { DIVISIONS, getDistricts, getThanas } from "@/lib/bangladeshConstants";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+
+interface ShopPaymentInfo {
+  bkash_number: string | null;
+  nagad_number: string | null;
+  rocket_number: string | null;
+  online_payment_only: boolean;
+}
 
 const CustomerCheckout = () => {
   const navigate = useNavigate();
@@ -50,6 +62,8 @@ const CustomerCheckout = () => {
   const [orderId, setOrderId] = useState<string | null>(null);
   const [useSavedAddress, setUseSavedAddress] = useState(true);
   const [isAutoFilled, setIsAutoFilled] = useState(false);
+  const [shopPaymentInfo, setShopPaymentInfo] = useState<ShopPaymentInfo | null>(null);
+  const [copiedNumber, setCopiedNumber] = useState<string | null>(null);
 
   // Form state
   const [name, setName] = useState("");
@@ -59,8 +73,10 @@ const CustomerCheckout = () => {
   const [district, setDistrict] = useState("");
   const [thana, setThana] = useState("");
   const [notes, setNotes] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<'cod' | 'bkash' | 'nagad' | 'rocket'>('cod');
+  const [paymentTrxId, setPaymentTrxId] = useState("");
 
-  // Load cart from localStorage
+  // Load cart from localStorage and fetch shop payment info
   useEffect(() => {
     const savedCart = localStorage.getItem('lpg-community-cart');
     if (savedCart) {
@@ -70,10 +86,43 @@ const CustomerCheckout = () => {
         return;
       }
       setCart(parsedCart);
+      
+      // Fetch shop payment info
+      const shopId = parsedCart[0]?.shop_id;
+      if (shopId) {
+        fetchShopPaymentInfo(shopId);
+      }
     } else {
       navigate('/community/cart');
     }
   }, [navigate]);
+
+  const fetchShopPaymentInfo = async (shopId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('shop_profiles')
+        .select('bkash_number, nagad_number, rocket_number, online_payment_only')
+        .eq('id', shopId)
+        .maybeSingle();
+      
+      if (!error && data) {
+        setShopPaymentInfo(data);
+        // If shop requires online payment only, set default to bkash
+        if (data.online_payment_only && (data.bkash_number || data.nagad_number || data.rocket_number)) {
+          setPaymentMethod('bkash');
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching shop payment info:', error);
+    }
+  };
+
+  const handleCopyNumber = (number: string) => {
+    navigator.clipboard.writeText(number);
+    setCopiedNumber(number);
+    toast({ title: "Number copied!" });
+    setTimeout(() => setCopiedNumber(null), 2000);
+  };
 
   // Auto-fill from saved customer data
   useEffect(() => {
@@ -158,6 +207,16 @@ const CustomerCheckout = () => {
       return;
     }
 
+    // Validate online payment requires TrxID
+    if (paymentMethod !== 'cod' && !paymentTrxId.trim()) {
+      toast({ 
+        title: "Transaction ID required", 
+        description: "Please enter your payment transaction ID",
+        variant: "destructive" 
+      });
+      return;
+    }
+
     setLoading(true);
 
     const result = await placeOrder(shopId, cart, {
@@ -167,7 +226,9 @@ const CustomerCheckout = () => {
       division,
       district,
       thana: thana || undefined,
-      notes: notes || undefined
+      notes: notes || undefined,
+      paymentMethod,
+      paymentTrxId: paymentMethod !== 'cod' ? paymentTrxId : undefined
     });
 
     setLoading(false);
@@ -425,27 +486,213 @@ const CustomerCheckout = () => {
                     Payment Method
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-3 pt-4">
-                  <div className="p-4 rounded-xl border-2 border-primary bg-primary/5 flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <Truck className="h-6 w-6 text-primary" />
+                <CardContent className="space-y-4 pt-4">
+                  {/* Online Payment Only Warning */}
+                  {shopPaymentInfo?.online_payment_only && (
+                    <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 flex items-start gap-2">
+                      <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                      <p className="text-sm text-amber-800 dark:text-amber-200">
+                        This shop requires <strong>online payment only</strong>. Please pay via bKash/Nagad/Rocket before placing your order.
+                      </p>
                     </div>
-                    <div className="flex-1">
-                      <p className="font-semibold">Cash on Delivery</p>
-                      <p className="text-sm text-muted-foreground">Pay when you receive your order</p>
-                    </div>
-                    <CheckCircle2 className="h-6 w-6 text-primary flex-shrink-0" />
-                  </div>
+                  )}
 
-                  <div className="p-4 rounded-xl border border-muted flex items-center gap-3 opacity-50">
-                    <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                      <CreditCard className="h-6 w-6 text-muted-foreground" />
+                  <RadioGroup value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as any)}>
+                    {/* Cash on Delivery - hide if shop requires online payment */}
+                    {!shopPaymentInfo?.online_payment_only && (
+                      <div 
+                        className={`p-4 rounded-xl border-2 flex items-center gap-3 cursor-pointer transition-colors ${
+                          paymentMethod === 'cod' 
+                            ? 'border-primary bg-primary/5' 
+                            : 'border-border hover:border-primary/50'
+                        }`}
+                        onClick={() => setPaymentMethod('cod')}
+                      >
+                        <RadioGroupItem value="cod" id="cod" className="sr-only" />
+                        <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                          <Truck className="h-6 w-6 text-primary" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-semibold">Cash on Delivery</p>
+                          <p className="text-sm text-muted-foreground">Pay when you receive your order</p>
+                        </div>
+                        {paymentMethod === 'cod' && (
+                          <CheckCircle2 className="h-6 w-6 text-primary flex-shrink-0" />
+                        )}
+                      </div>
+                    )}
+
+                    {/* bKash */}
+                    {shopPaymentInfo?.bkash_number && (
+                      <div 
+                        className={`p-4 rounded-xl border-2 cursor-pointer transition-colors ${
+                          paymentMethod === 'bkash' 
+                            ? 'border-rose-500 bg-rose-50 dark:bg-rose-950/30' 
+                            : 'border-border hover:border-rose-500/50'
+                        }`}
+                        onClick={() => setPaymentMethod('bkash')}
+                      >
+                        <div className="flex items-center gap-3">
+                          <RadioGroupItem value="bkash" id="bkash" className="sr-only" />
+                          <div className="w-12 h-12 rounded-full bg-rose-500/10 flex items-center justify-center flex-shrink-0">
+                            <span className="text-2xl">🔴</span>
+                          </div>
+                          <div className="flex-1">
+                            <p className="font-semibold">bKash</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <code className="text-sm font-mono bg-background px-2 py-0.5 rounded border">
+                                {shopPaymentInfo.bkash_number}
+                              </code>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCopyNumber(shopPaymentInfo.bkash_number!);
+                                }}
+                              >
+                                {copiedNumber === shopPaymentInfo.bkash_number ? (
+                                  <Check className="h-4 w-4 text-emerald-500" />
+                                ) : (
+                                  <Copy className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </div>
+                          </div>
+                          {paymentMethod === 'bkash' && (
+                            <CheckCircle2 className="h-6 w-6 text-rose-500 flex-shrink-0" />
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Nagad */}
+                    {shopPaymentInfo?.nagad_number && (
+                      <div 
+                        className={`p-4 rounded-xl border-2 cursor-pointer transition-colors ${
+                          paymentMethod === 'nagad' 
+                            ? 'border-orange-500 bg-orange-50 dark:bg-orange-950/30' 
+                            : 'border-border hover:border-orange-500/50'
+                        }`}
+                        onClick={() => setPaymentMethod('nagad')}
+                      >
+                        <div className="flex items-center gap-3">
+                          <RadioGroupItem value="nagad" id="nagad" className="sr-only" />
+                          <div className="w-12 h-12 rounded-full bg-orange-500/10 flex items-center justify-center flex-shrink-0">
+                            <span className="text-2xl">🟠</span>
+                          </div>
+                          <div className="flex-1">
+                            <p className="font-semibold">Nagad</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <code className="text-sm font-mono bg-background px-2 py-0.5 rounded border">
+                                {shopPaymentInfo.nagad_number}
+                              </code>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCopyNumber(shopPaymentInfo.nagad_number!);
+                                }}
+                              >
+                                {copiedNumber === shopPaymentInfo.nagad_number ? (
+                                  <Check className="h-4 w-4 text-emerald-500" />
+                                ) : (
+                                  <Copy className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </div>
+                          </div>
+                          {paymentMethod === 'nagad' && (
+                            <CheckCircle2 className="h-6 w-6 text-orange-500 flex-shrink-0" />
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Rocket */}
+                    {shopPaymentInfo?.rocket_number && (
+                      <div 
+                        className={`p-4 rounded-xl border-2 cursor-pointer transition-colors ${
+                          paymentMethod === 'rocket' 
+                            ? 'border-purple-500 bg-purple-50 dark:bg-purple-950/30' 
+                            : 'border-border hover:border-purple-500/50'
+                        }`}
+                        onClick={() => setPaymentMethod('rocket')}
+                      >
+                        <div className="flex items-center gap-3">
+                          <RadioGroupItem value="rocket" id="rocket" className="sr-only" />
+                          <div className="w-12 h-12 rounded-full bg-purple-500/10 flex items-center justify-center flex-shrink-0">
+                            <span className="text-2xl">🟣</span>
+                          </div>
+                          <div className="flex-1">
+                            <p className="font-semibold">Rocket</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <code className="text-sm font-mono bg-background px-2 py-0.5 rounded border">
+                                {shopPaymentInfo.rocket_number}
+                              </code>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCopyNumber(shopPaymentInfo.rocket_number!);
+                                }}
+                              >
+                                {copiedNumber === shopPaymentInfo.rocket_number ? (
+                                  <Check className="h-4 w-4 text-emerald-500" />
+                                ) : (
+                                  <Copy className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </div>
+                          </div>
+                          {paymentMethod === 'rocket' && (
+                            <CheckCircle2 className="h-6 w-6 text-purple-500 flex-shrink-0" />
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </RadioGroup>
+
+                  {/* No Online Payment Available */}
+                  {!shopPaymentInfo?.bkash_number && !shopPaymentInfo?.nagad_number && !shopPaymentInfo?.rocket_number && shopPaymentInfo?.online_payment_only && (
+                    <div className="p-4 rounded-lg border-2 border-dashed border-destructive/50 bg-destructive/5 text-center">
+                      <AlertCircle className="h-8 w-8 text-destructive mx-auto mb-2" />
+                      <p className="text-sm text-destructive font-medium">
+                        No online payment methods available
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Please contact the shop for payment options
+                      </p>
                     </div>
-                    <div className="flex-1">
-                      <p className="font-medium text-muted-foreground">bKash / Nagad</p>
-                      <p className="text-sm text-muted-foreground">Coming soon</p>
+                  )}
+
+                  {/* Transaction ID Input */}
+                  {paymentMethod !== 'cod' && (
+                    <div className="space-y-2 pt-2">
+                      <Label htmlFor="trxId" className="text-sm font-medium">
+                        Transaction ID <span className="text-destructive">*</span>
+                      </Label>
+                      <Input
+                        id="trxId"
+                        placeholder="Enter your payment TrxID"
+                        value={paymentTrxId}
+                        onChange={(e) => setPaymentTrxId(e.target.value)}
+                        className="h-12 text-base font-mono"
+                        required
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        ⚠️ Pay first to the number above, then enter your TrxID
+                      </p>
                     </div>
-                  </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
