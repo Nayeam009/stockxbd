@@ -212,58 +212,8 @@ export const AccountSettingsSection = () => {
 
   return (
     <div className="space-y-4">
-      {/* Profile Header Card */}
-      <Card className="overflow-hidden border-0 shadow-lg">
-        <div className="h-16 sm:h-20 bg-gradient-to-r from-primary via-primary/80 to-secondary" />
-        <CardContent className="relative pt-0 -mt-10 sm:-mt-12 pb-4 sm:pb-6">
-          <div className="flex flex-col sm:flex-row items-center sm:items-end gap-3 sm:gap-4">
-            {/* Avatar with Upload */}
-            <div className="relative">
-              <Avatar className="h-20 w-20 sm:h-24 sm:w-24 border-4 border-background shadow-xl">
-                <AvatarImage src={avatarUrl || undefined} alt={fullName} />
-                <AvatarFallback className="text-xl sm:text-2xl font-bold bg-gradient-to-br from-primary to-secondary text-primary-foreground">
-                  {getInitials(fullName || userEmail)}
-                </AvatarFallback>
-              </Avatar>
-              <label 
-                className="absolute bottom-0 right-0 p-1.5 bg-primary rounded-full cursor-pointer hover:bg-primary/90 transition-colors shadow-lg"
-                htmlFor="avatar-upload"
-              >
-                {uploadingAvatar ? (
-                  <Loader2 className="h-3.5 w-3.5 text-primary-foreground animate-spin" />
-                ) : (
-                  <Camera className="h-3.5 w-3.5 text-primary-foreground" />
-                )}
-              </label>
-              <input
-                id="avatar-upload"
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleAvatarUpload}
-                disabled={uploadingAvatar}
-              />
-            </div>
-            
-            {/* User Info */}
-            <div className="flex-1 text-center sm:text-left space-y-1">
-              <div className="flex flex-col sm:flex-row items-center sm:items-center gap-2">
-                <h2 className="text-lg sm:text-xl font-bold text-foreground">{fullName || 'User'}</h2>
-                <Badge className={`${getRoleBadgeStyle(userRole)} px-2.5 py-0.5 text-xs`}>
-                  {userRole.charAt(0).toUpperCase() + userRole.slice(1)}
-                </Badge>
-              </div>
-              <p className="text-sm text-muted-foreground">{userEmail}</p>
-              <p className="text-xs text-muted-foreground">
-                {t("member_since")} {userCreatedAt ? new Date(userCreatedAt).toLocaleDateString() : 'N/A'}
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Accordion Sections */}
-      <Accordion 
+      {/* Accordion Sections - Profile hero is in ProfileModule */}
+      <Accordion
         type="multiple" 
         defaultValue={["profile", "appearance"]} 
         className="space-y-3"
