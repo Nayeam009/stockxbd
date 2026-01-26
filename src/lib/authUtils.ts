@@ -8,9 +8,9 @@
 import { supabase } from "@/integrations/supabase/client";
 
 // Maximum time to wait for auth operations (20 seconds - very generous for slow networks)
-const AUTH_TIMEOUT = 20000;
-const MAX_RETRIES = 2; // Reduced to 2 attempts with longer timeout
-const INITIAL_RETRY_DELAY = 2000; // 2 seconds
+const AUTH_TIMEOUT = 5000; // 5 seconds - faster failure detection
+const MAX_RETRIES = 1; // Single retry only
+const INITIAL_RETRY_DELAY = 500; // 500ms - quick retry
 
 // LocalStorage keys for persistent cache
 const CACHE_KEY_SESSION = 'stockx.auth.session.cache';
