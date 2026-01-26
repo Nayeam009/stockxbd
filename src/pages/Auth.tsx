@@ -5,34 +5,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Shield, Loader2, Users, Crown, AlertCircle, UserPlus, LogIn, ShoppingCart, Package, Globe, CheckCircle2, Building2, Eye, EyeOff, RefreshCcw } from "lucide-react";
+import { ArrowLeft, Shield, Loader2, Users, Crown, AlertCircle, UserPlus, LogIn, ShoppingCart, Package, Globe, CheckCircle2, Eye, EyeOff, RefreshCcw, LinkIcon } from "lucide-react";
 import stockXLogo from "@/assets/stock-x-logo.png";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { validateBDPhone, getPhoneValidationError } from "@/lib/phoneValidation";
+import { validateBDPhone, getPhoneValidationError, formatBDPhone } from "@/lib/phoneValidation";
 
-type AuthMode = 'signin' | 'signup' | 'invite' | 'team-signup';
+type AuthMode = 'signin' | 'signup' | 'manager-invite';
 type UserRole = 'owner' | 'manager' | 'customer';
-type SignupCategory = 'customer' | 'owner' | 'team';
-
-interface RoleOption {
-  id: UserRole;
-  label: string;
-  description: string;
-  icon: React.ElementType;
-  color: string;
-  bgColor: string;
-  borderColor: string;
-  features: string[];
-}
+type SignupCategory = 'customer' | 'owner';
 
 interface SignupCategoryOption {
   id: SignupCategory;
@@ -62,60 +44,12 @@ const signupCategories: SignupCategoryOption[] = [
     color: 'text-amber-600',
     bgColor: 'bg-amber-50 dark:bg-amber-950/30',
     borderColor: 'border-amber-500',
-  },
-  {
-    id: 'team',
-    label: 'Team Member',
-    description: 'Join a shop',
-    icon: Users,
-    color: 'text-primary',
-    bgColor: 'bg-primary/5',
-    borderColor: 'border-primary',
   }
-];
-
-const roleOptions: RoleOption[] = [
-  {
-    id: 'customer',
-    label: 'Customer',
-    description: 'Order LPG online',
-    icon: ShoppingCart,
-    color: 'text-emerald-600',
-    bgColor: 'bg-emerald-50 dark:bg-emerald-950/30',
-    borderColor: 'border-emerald-500',
-    features: ['Browse nearby LPG shops', 'Place orders online', 'Real-time delivery tracking']
-  },
-  {
-    id: 'owner',
-    label: 'Owner',
-    description: 'Full business control',
-    icon: Crown,
-    color: 'text-amber-600',
-    bgColor: 'bg-amber-50 dark:bg-amber-950/30',
-    borderColor: 'border-amber-500',
-    features: ['Complete inventory management', 'Team & staff management', 'Business analytics & reports']
-  },
-  {
-    id: 'manager',
-    label: 'Manager',
-    description: 'Inventory & sales',
-    icon: Users,
-    color: 'text-primary',
-    bgColor: 'bg-primary/5',
-    borderColor: 'border-primary',
-    features: ['Inventory management', 'Sales & POS access', 'Customer management']
-  }
-];
-
-// Only manager role is available for team members
-const teamRoleOptions = [
-  { value: 'manager', label: 'Manager', description: 'Full inventory & sales access' }
 ];
 
 const Auth = () => {
   const [searchParams] = useSearchParams();
   const inviteCode = searchParams.get('invite');
-  const inviteRoleParam = searchParams.get('role');
   
   const [authMode, setAuthMode] = useState<AuthMode>('signin');
   const [signupCategory, setSignupCategory] = useState<SignupCategory>('customer');
@@ -123,21 +57,17 @@ const Auth = () => {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [fullName, setFullName] = useState("");
-  const [selectedRole, setSelectedRole] = useState<UserRole>('customer');
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [loading, setLoading] = useState(false);
   const [checkingSystem, setCheckingSystem] = useState(true);
   const [ownersExist, setOwnersExist] = useState(true);
-  const [inviteValid, setInviteValid] = useState<boolean | null>(null);
-  const [inviteRole, setInviteRole] = useState<string>('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   
-  // Team member specific fields
-  const [ownerEmail, setOwnerEmail] = useState("");
-  const [teamRole, setTeamRole] = useState<string>("manager");
-  const [verifyingOwner, setVerifyingOwner] = useState(false);
-  const [ownerVerified, setOwnerVerified] = useState(false);
+  // Manager invite specific state
+  const [inviteValid, setInviteValid] = useState<boolean | null>(null);
+  const [inviteData, setInviteData] = useState<{ role: string; created_by: string } | null>(null);
   const [ownerShopName, setOwnerShopName] = useState("");
   
   const navigate = useNavigate();
@@ -153,35 +83,6 @@ const Auth = () => {
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
     let mounted = true;
-    
-    const processInviteForExistingUser = async (userId: string, userEmail: string) => {
-      if (!inviteCode) return;
-      
-      try {
-        const { data, error } = await supabase.rpc('mark_invite_used', {
-          _code: inviteCode,
-          _user_id: userId,
-          _email: userEmail
-        });
-        
-        if (error || !data) {
-          toast({
-            title: "Invite Processing Failed",
-            description: "Could not process the invite. It may be invalid or already used.",
-            variant: "destructive"
-          });
-        } else {
-          toast({
-            title: "Welcome to the Team!",
-            description: `You've been added as ${inviteRoleParam || 'team member'}`,
-          });
-        }
-        navigate('/dashboard');
-      } catch (err) {
-        console.error('Error processing invite:', err);
-        navigate('/dashboard');
-      }
-    };
 
     const checkSystemState = async () => {
       if (!mounted) return;
@@ -191,50 +92,56 @@ const Auth = () => {
         if (mounted) {
           setLoadError('Connection is slow. Please check your internet and try again.');
         }
-      }, 15000); // 15 second timeout
+      }, 15000);
       
       try {
         // Check if user is already logged in
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
-          // If invite code present, process it for existing user
-          if (inviteCode) {
-            await processInviteForExistingUser(session.user.id, session.user.email || '');
+          // Check user role and redirect accordingly
+          const { data: roleData } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', session.user.id)
+            .maybeSingle();
+          
+          if (roleData?.role === 'customer') {
+            navigate('/community');
           } else {
-            // Check user role and redirect accordingly
-            const { data: roleData } = await supabase
-              .from('user_roles')
-              .select('role')
-              .eq('user_id', session.user.id)
-              .single();
-            
-            if (roleData?.role === 'customer') {
-              navigate('/community');
-            } else {
-              navigate('/dashboard');
-            }
-            return;
+            navigate('/dashboard');
           }
+          return;
         }
 
-        // If invite code is present, validate it
+        // If invite code is present, validate it for manager signup
         if (inviteCode) {
-          const { data: inviteData, error } = await supabase.rpc('validate_invite', { _code: inviteCode });
+          const { data: inviteResult, error } = await supabase.rpc('validate_invite', { _code: inviteCode });
           
-          if (error || !inviteData || inviteData.length === 0) {
+          if (error || !inviteResult || inviteResult.length === 0) {
             if (mounted) {
               setInviteValid(false);
               setAuthMode('signin');
               toast({
-                title: "Invalid Invite",
-                description: "This invite link is invalid or expired",
+                title: "Invalid Invite Link",
+                description: "This invitation link is invalid or expired. Please request a new one from the shop owner.",
                 variant: "destructive"
               });
             }
           } else if (mounted) {
             setInviteValid(true);
-            setInviteRole(inviteData[0].role);
-            setAuthMode('invite');
+            setInviteData({ role: inviteResult[0].role, created_by: inviteResult[0].created_by });
+            setAuthMode('manager-invite');
+            
+            // Get shop name for display
+            const { data: shopData } = await supabase
+              .from('shop_profiles')
+              .select('shop_name')
+              .eq('owner_id', inviteResult[0].created_by)
+              .maybeSingle();
+            
+            if (shopData) {
+              setOwnerShopName(shopData.shop_name);
+            }
           }
         } else {
           // Check if any owners exist
@@ -268,119 +175,82 @@ const Auth = () => {
       mounted = false;
       clearTimeout(timeoutId);
     };
-  }, [inviteCode, navigate, inviteRoleParam]);
+  }, [inviteCode, navigate]);
 
-  // Verify owner email
-  const verifyOwnerEmail = async () => {
-    if (!ownerEmail) {
-      toast({ title: "Please enter owner's email", variant: "destructive" });
-      return;
-    }
-
-    setVerifyingOwner(true);
-    try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/verify-owner`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`
-          },
-          body: JSON.stringify({ owner_email: ownerEmail })
-        }
-      );
-
-      const data = await response.json();
-
-      if (data.exists) {
-        setOwnerVerified(true);
-        setOwnerShopName(data.shop_name || '');
-        toast({ 
-          title: "Owner Verified!", 
-          description: data.shop_name ? `Shop: ${data.shop_name}` : "You can now complete registration" 
-        });
-      } else {
-        setOwnerVerified(false);
-        toast({ 
-          title: "Owner Not Found", 
-          description: data.error || "Please check the email and try again", 
-          variant: "destructive" 
-        });
-      }
-    } catch (error) {
-      console.error('Error verifying owner:', error);
-      toast({ title: "Verification Failed", variant: "destructive" });
-    } finally {
-      setVerifyingOwner(false);
-    }
-  };
-
-  // Handle team member registration
-  const handleTeamSignUp = async () => {
-    if (!ownerEmail || !password || !fullName || !email) {
+  // Handle manager registration with invite
+  const handleManagerSignUp = async () => {
+    if (!email || !password || !fullName || !phoneNumber) {
       toast({ title: "Please fill in all fields", variant: "destructive" });
       return;
     }
 
-    if (!ownerVerified) {
-      toast({ title: "Please verify the owner's email first", variant: "destructive" });
+    if (password !== confirmPassword) {
+      toast({ title: "Passwords do not match", variant: "destructive" });
+      return;
+    }
+
+    if (password.length < 6) {
+      toast({ title: "Password must be at least 6 characters", variant: "destructive" });
+      return;
+    }
+
+    if (!validateBDPhone(phoneNumber)) {
+      toast({ title: getPhoneValidationError(phoneNumber), variant: "destructive" });
+      return;
+    }
+
+    if (!inviteCode || !inviteData) {
+      toast({ title: "Invalid invitation", variant: "destructive" });
       return;
     }
 
     setLoading(true);
+
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/register-team-member`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`
-          },
-          body: JSON.stringify({
-            owner_email: ownerEmail,
-            owner_password: password,
-            member_name: fullName,
-            member_email: email,
-            member_role: teamRole
-          })
+      // Create the manager account
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: window.location.origin,
+          data: {
+            full_name: fullName,
+            phone: formatBDPhone(phoneNumber),
+            requested_role: 'manager'
+          }
         }
-      );
+      });
 
-      const data = await response.json();
+      if (error) throw error;
 
-      if (data.success) {
-        toast({ 
-          title: "Registration Successful!", 
-          description: data.message || `You've been registered as ${teamRole}` 
+      if (data.user) {
+        // Mark invite as used and add to team
+        await supabase.rpc('mark_invite_used', {
+          _code: inviteCode,
+          _user_id: data.user.id,
+          _email: email
         });
         
-        // Sign in the new team member
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-          email: email,
-          password: password // Uses owner's password
+        // Update profile with phone
+        await supabase.from('profiles').upsert({
+          user_id: data.user.id,
+          full_name: fullName,
+          phone: formatBDPhone(phoneNumber)
         });
-
-        if (signInError) {
-          toast({ 
-            title: "Please sign in", 
-            description: "Your account has been created. Please sign in." 
-          });
-          setAuthMode('signin');
-        } else {
-          navigate('/dashboard');
-        }
-      } else {
+        
         toast({ 
-          title: "Registration Failed", 
-          description: data.error || "Please try again", 
-          variant: "destructive" 
+          title: "Welcome to the Team!", 
+          description: `You've successfully joined ${ownerShopName || 'the shop'} as Manager` 
         });
+        
+        navigate('/dashboard');
       }
     } catch (error: any) {
-      console.error('Error registering team member:', error);
-      toast({ title: "Registration Failed", variant: "destructive" });
+      toast({ 
+        title: "Registration Failed", 
+        description: error.message, 
+        variant: "destructive" 
+      });
     } finally {
       setLoading(false);
     }
@@ -405,19 +275,16 @@ const Auth = () => {
     setLoading(true);
 
     try {
-      const actualRole = signupCategory === 'customer' ? 'customer' : 
-                         signupCategory === 'owner' ? 'owner' : selectedRole;
+      const actualRole = signupCategory === 'customer' ? 'customer' : 'owner';
 
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: inviteCode 
-            ? `${window.location.origin}/auth?invite=${inviteCode}&role=${inviteRoleParam || inviteRole}`
-            : window.location.origin,
+          emailRedirectTo: window.location.origin,
           data: {
             full_name: fullName || undefined,
-            requested_role: inviteCode ? undefined : actualRole
+            requested_role: actualRole
           }
         }
       });
@@ -425,26 +292,12 @@ const Auth = () => {
       if (error) throw error;
 
       if (data.user) {
-        // If invite code present, mark it as used (team member signup)
-        if (inviteCode) {
-          await supabase.rpc('mark_invite_used', {
-            _code: inviteCode,
-            _user_id: data.user.id,
-            _email: email
-          });
-          
-          toast({ 
-            title: "Welcome to the Team!", 
-            description: `You've successfully joined as ${getRoleLabel(inviteRole)}` 
-          });
-        } else {
-          toast({ 
-            title: "Account Created Successfully!", 
-            description: `Welcome! You've signed up as ${getRoleLabel(actualRole)}` 
-          });
-        }
+        toast({ 
+          title: "Account Created Successfully!", 
+          description: `Welcome! You've signed up as ${actualRole === 'customer' ? 'Customer' : 'Shop Owner'}` 
+        });
         
-        // Redirect based on role - customers go to community, others to dashboard
+        // Redirect based on role
         if (actualRole === 'customer') {
           navigate('/community');
         } else {
@@ -478,20 +331,7 @@ const Auth = () => {
 
       if (error) throw error;
 
-      // If invite code present, process it for existing user signing in
-      if (inviteCode && data.user) {
-        await supabase.rpc('mark_invite_used', {
-          _code: inviteCode,
-          _user_id: data.user.id,
-          _email: email
-        });
-        
-        toast({ 
-          title: "Welcome to the Team!", 
-          description: `You've joined as ${getRoleLabel(inviteRole)}` 
-        });
-        navigate('/dashboard');
-      } else if (data.user) {
+      if (data.user) {
         toast({ title: "Welcome back!", description: "Successfully signed in" });
         
         // Check user role and redirect accordingly
@@ -499,7 +339,7 @@ const Auth = () => {
           .from('user_roles')
           .select('role')
           .eq('user_id', data.user.id)
-          .single();
+          .maybeSingle();
         
         if (roleData?.role === 'customer') {
           navigate('/community');
@@ -521,14 +361,10 @@ const Auth = () => {
   const handleGoogleAuth = async () => {
     setLoading(true);
     try {
-      const redirectUrl = inviteCode 
-        ? `${window.location.origin}/auth?invite=${inviteCode}&role=${inviteRoleParam || inviteRole}`
-        : `${window.location.origin}/auth`;
-
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: redirectUrl
+          redirectTo: `${window.location.origin}/auth`
         }
       });
 
@@ -548,32 +384,14 @@ const Auth = () => {
     
     if (authMode === 'signin') {
       await handleSignIn();
-    } else if (authMode === 'team-signup') {
-      await handleTeamSignUp();
+    } else if (authMode === 'manager-invite') {
+      await handleManagerSignUp();
     } else {
       await handleSignUp();
     }
   };
 
-  const getRoleLabel = (role: string) => {
-    switch (role) {
-      case 'owner': return 'Owner';
-      case 'manager': return 'Manager';
-      case 'customer': return 'Customer';
-      default: return role;
-    }
-  };
-
-  const getRoleIcon = (role: string) => {
-    switch (role) {
-      case 'owner': return Crown;
-      case 'manager': return Users;
-      case 'customer': return ShoppingCart;
-      default: return Users;
-    }
-  };
-
-  const isSignUpMode = authMode === 'signup' || authMode === 'invite' || authMode === 'team-signup';
+  const isSignUpMode = authMode === 'signup' || authMode === 'manager-invite';
 
   if (checkingSystem) {
     return (
@@ -706,15 +524,26 @@ const Auth = () => {
         <div className="flex-1 flex items-center justify-center p-4 sm:p-8">
           <Card className="w-full max-w-md border-0 shadow-xl">
             <CardHeader className="text-center pb-4">
-              {authMode === 'invite' && inviteValid ? (
+              {authMode === 'manager-invite' && inviteValid ? (
                 <>
                   <Badge variant="secondary" className="w-fit mx-auto mb-2 px-4 py-2 bg-primary/10 text-primary">
-                    <UserPlus className="h-3 w-3 mr-1" />
-                    Team Invitation
+                    <LinkIcon className="h-3 w-3 mr-1" />
+                    Manager Invitation
                   </Badge>
-                  <CardTitle className="text-2xl">Join the Team</CardTitle>
+                  <CardTitle className="text-2xl">Join as Manager</CardTitle>
                   <CardDescription>
-                    You've been invited to join as {getRoleLabel(inviteRole)}
+                    You've been invited to join {ownerShopName || 'a shop'} as Manager
+                  </CardDescription>
+                </>
+              ) : authMode === 'manager-invite' && inviteValid === false ? (
+                <>
+                  <Badge variant="destructive" className="w-fit mx-auto mb-2 px-4 py-2">
+                    <AlertCircle className="h-3 w-3 mr-1" />
+                    Invalid Link
+                  </Badge>
+                  <CardTitle className="text-2xl">Invitation Expired</CardTitle>
+                  <CardDescription>
+                    Please request a new invitation link from the shop owner
                   </CardDescription>
                 </>
               ) : !ownersExist ? (
@@ -726,17 +555,6 @@ const Auth = () => {
                   <CardTitle className="text-2xl">Create Your Account</CardTitle>
                   <CardDescription>
                     Set up the first owner account for your business
-                  </CardDescription>
-                </>
-              ) : authMode === 'team-signup' ? (
-                <>
-                  <Badge variant="secondary" className="w-fit mx-auto mb-2 px-4 py-2 bg-primary/10 text-primary">
-                    <Users className="h-3 w-3 mr-1" />
-                    Join a Shop
-                  </Badge>
-                  <CardTitle className="text-2xl">Team Member Registration</CardTitle>
-                  <CardDescription>
-                    Use your shop owner's credentials to join their team
                   </CardDescription>
                 </>
               ) : authMode === 'signup' ? (
@@ -762,39 +580,37 @@ const Auth = () => {
                 <Alert variant="destructive" className="mb-4">
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>
-                    This invite link is invalid or expired. Please request a new one.
+                    This invitation link is invalid or expired. Please request a new one from the shop owner.
                   </AlertDescription>
                 </Alert>
               )}
 
-              {/* Invite Role Display */}
-              {authMode === 'invite' && inviteValid && (
+              {/* Manager Invite Display */}
+              {authMode === 'manager-invite' && inviteValid && (
                 <div className="p-4 mb-4 rounded-xl border-2 border-primary/20 bg-primary/5">
                   <div className="flex items-center gap-3">
-                    {(() => {
-                      const RoleIcon = getRoleIcon(inviteRole);
-                      return <RoleIcon className="h-8 w-8 text-primary" />;
-                    })()}
+                    <Users className="h-8 w-8 text-primary" />
                     <div>
-                      <h3 className="font-semibold text-primary">{getRoleLabel(inviteRole)} Role</h3>
+                      <h3 className="font-semibold text-primary">Manager Role</h3>
                       <p className="text-sm text-muted-foreground">
-                        {inviteRole === 'manager' 
-                          ? 'Access to inventory, sales, and team coordination'
-                          : inviteRole === 'driver'
-                            ? 'Access to deliveries and customer updates'
-                            : 'Full access to all features'
-                        }
+                        Access to inventory, sales, and customer management
                       </p>
                     </div>
                   </div>
+                  {ownerShopName && (
+                    <div className="mt-3 pt-3 border-t border-primary/10 flex items-center gap-2 text-sm">
+                      <CheckCircle2 className="h-4 w-4 text-green-500" />
+                      <span className="text-muted-foreground">Shop: <strong>{ownerShopName}</strong></span>
+                    </div>
+                  )}
                 </div>
               )}
 
-              {/* Signup Category Selection - Only for Signup (not invite, not team-signup) */}
+              {/* Signup Category Selection - Only for Signup (not manager invite) */}
               {authMode === 'signup' && !inviteCode && ownersExist && (
                 <div className="mb-6">
                   <Label className="mb-3 block">I want to...</Label>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 gap-3">
                     {signupCategories.map((category) => {
                       const Icon = category.icon;
                       const isSelected = signupCategory === category.id;
@@ -802,26 +618,25 @@ const Auth = () => {
                         <button
                           key={category.id}
                           type="button"
-                          onClick={() => {
-                            setSignupCategory(category.id);
-                            if (category.id === 'team') {
-                              setAuthMode('team-signup');
-                            }
-                          }}
+                          onClick={() => setSignupCategory(category.id)}
                           disabled={loading}
-                          className={`p-3 rounded-xl border-2 transition-all text-center ${
+                          className={`p-4 rounded-xl border-2 transition-all text-center ${
                             isSelected 
                               ? `${category.borderColor} ${category.bgColor}` 
                               : 'border-border hover:border-muted-foreground/50'
                           }`}
                         >
-                          <Icon className={`h-6 w-6 mx-auto mb-1.5 ${category.color}`} />
-                          <span className="font-semibold text-xs block">{category.label}</span>
-                          <span className="text-[10px] text-muted-foreground block leading-tight">{category.description}</span>
+                          <Icon className={`h-8 w-8 mx-auto mb-2 ${category.color}`} />
+                          <span className="font-semibold text-sm block">{category.label}</span>
+                          <span className="text-xs text-muted-foreground block leading-tight mt-1">{category.description}</span>
                         </button>
                       );
                     })}
                   </div>
+                  <p className="text-xs text-muted-foreground text-center mt-3">
+                    <Users className="h-3 w-3 inline mr-1" />
+                    Team members need an invitation link from the shop owner
+                  </p>
                 </div>
               )}
 
@@ -840,99 +655,63 @@ const Auth = () => {
                 </div>
               )}
 
-              {/* Team Member Registration Form */}
-              {authMode === 'team-signup' && (
+              {/* Manager Invite Form */}
+              {authMode === 'manager-invite' && inviteValid && (
                 <form onSubmit={handleSubmit} className="space-y-4">
-                  {/* Owner Verification Section */}
-                  <div className="space-y-3 p-4 rounded-xl border bg-muted/30">
-                    <Label className="text-sm font-medium">Step 1: Verify Shop Owner</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        type="email"
-                        placeholder="Shop owner's email"
-                        value={ownerEmail}
-                        onChange={(e) => {
-                          setOwnerEmail(e.target.value);
-                          setOwnerVerified(false);
-                        }}
-                        disabled={loading || verifyingOwner}
-                        className="h-11 flex-1"
-                      />
-                      <Button
-                        type="button"
-                        variant={ownerVerified ? "secondary" : "default"}
-                        onClick={verifyOwnerEmail}
-                        disabled={loading || verifyingOwner || !ownerEmail}
-                        className="h-11 px-4"
-                      >
-                        {verifyingOwner ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : ownerVerified ? (
-                          <CheckCircle2 className="h-4 w-4 text-success" />
-                        ) : (
-                          "Verify"
-                        )}
-                      </Button>
-                    </div>
-                    {ownerVerified && ownerShopName && (
-                      <div className="flex items-center gap-2 text-sm text-success">
-                        <Building2 className="h-4 w-4" />
-                        <span>Shop: {ownerShopName}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Member Details Section */}
-                  <div className="space-y-3">
-                    <Label className="text-sm font-medium">Step 2: Your Details</Label>
-                    
+                  <div className="space-y-2">
+                    <Label htmlFor="fullName">Full Name *</Label>
                     <Input 
+                      id="fullName" 
                       type="text" 
-                      placeholder="Your full name"
+                      placeholder="Enter your full name"
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
                       disabled={loading}
-                      className="h-11"
+                      className="h-12"
+                      required
                     />
-
-                    <Input 
-                      type="email" 
-                      placeholder="Your email address"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      disabled={loading}
-                      className="h-11"
-                    />
-
-                    <Select value={teamRole} onValueChange={setTeamRole}>
-                      <SelectTrigger className="h-11">
-                        <SelectValue placeholder="Select your role" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {teamRoleOptions.map(role => (
-                          <SelectItem key={role.value} value={role.value}>
-                            <span className="font-medium">{role.label}</span>
-                            <span className="text-muted-foreground ml-2 text-xs">- {role.description}</span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
                   </div>
 
-                  {/* Password Section */}
-                  <div className="space-y-3">
-                    <Label className="text-sm font-medium">Step 3: Owner's Password</Label>
-                    <p className="text-xs text-muted-foreground">
-                      Enter the shop owner's password to verify your team membership
-                    </p>
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email Address *</Label>
+                    <Input 
+                      id="email" 
+                      type="email" 
+                      placeholder="your@email.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      disabled={loading}
+                      className="h-12"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="phone">Phone Number *</Label>
+                    <Input 
+                      id="phone" 
+                      type="tel" 
+                      placeholder="01XXXXXXXXX"
+                      value={phoneNumber}
+                      onChange={(e) => setPhoneNumber(e.target.value)}
+                      required
+                      disabled={loading}
+                      className="h-12"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Password *</Label>
                     <div className="relative">
                       <Input 
+                        id="password" 
                         type={showPassword ? "text" : "password"}
-                        placeholder="Enter owner's password"
+                        placeholder="Create a password (min 6 characters)"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
+                        required
                         disabled={loading}
-                        className="h-11 pr-10"
+                        className="h-12 pr-10"
                       />
                       <Button
                         type="button"
@@ -946,41 +725,69 @@ const Auth = () => {
                     </div>
                   </div>
 
+                  <div className="space-y-2">
+                    <Label htmlFor="confirmPassword">Confirm Password *</Label>
+                    <div className="relative">
+                      <Input 
+                        id="confirmPassword" 
+                        type={showConfirmPassword ? "text" : "password"}
+                        placeholder="Re-enter your password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        required
+                        disabled={loading}
+                        className="h-12 pr-10"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      >
+                        {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                  </div>
+
                   <Button 
                     type="submit" 
                     className="w-full h-12 bg-gradient-primary hover:opacity-90 transition-opacity text-base"
-                    disabled={loading || !ownerVerified}
+                    disabled={loading}
                   >
                     {loading ? (
                       <>
                         <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                        Registering...
+                        Joining Team...
                       </>
                     ) : (
                       <>
                         <UserPlus className="mr-2 h-5 w-5" />
-                        Join Team
+                        Join as Manager
                       </>
                     )}
                   </Button>
 
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => {
-                      setAuthMode('signup');
-                      setSignupCategory('customer');
-                    }}
-                  >
-                    <ArrowLeft className="mr-2 h-4 w-4" />
-                    Back to Sign Up Options
-                  </Button>
+                  <div className="pt-4 border-t border-border text-center">
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Already have an account?
+                    </p>
+                    <Button 
+                      variant="outline" 
+                      className="w-full h-11"
+                      onClick={() => setAuthMode('signin')}
+                      type="button"
+                      disabled={loading}
+                    >
+                      <LogIn className="mr-2 h-4 w-4" />
+                      Sign In Instead
+                    </Button>
+                  </div>
                 </form>
               )}
 
               {/* Regular Sign In / Sign Up Form */}
-              {authMode !== 'team-signup' && (
+              {authMode !== 'manager-invite' && (
                 <form onSubmit={handleSubmit} className="space-y-4">
                   {/* Full Name - Only for Sign Up */}
                   {isSignUpMode && (
@@ -1133,23 +940,7 @@ const Auth = () => {
 
                   {/* Toggle Between Sign In and Sign Up */}
                   <div className="pt-4 border-t border-border">
-                    {authMode === 'invite' ? (
-                      <div className="text-center space-y-2">
-                        <p className="text-sm text-muted-foreground">
-                          Already have an account?
-                        </p>
-                        <Button 
-                          variant="outline" 
-                          className="w-full h-11"
-                          onClick={() => setAuthMode('signin')}
-                          type="button"
-                          disabled={loading}
-                        >
-                          <LogIn className="mr-2 h-4 w-4" />
-                          Sign In Instead
-                        </Button>
-                      </div>
-                    ) : authMode === 'signin' ? (
+                    {authMode === 'signin' ? (
                       <div className="text-center space-y-3">
                         <p className="text-sm text-muted-foreground">
                           Don't have an account yet?
@@ -1165,7 +956,8 @@ const Auth = () => {
                           Create New Account
                         </Button>
                         <p className="text-xs text-muted-foreground">
-                          Team member? Click above and select "Team Member"
+                          <LinkIcon className="h-3 w-3 inline mr-1" />
+                          Team members need an invitation link from the shop owner
                         </p>
                       </div>
                     ) : (
