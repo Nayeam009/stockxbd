@@ -216,10 +216,9 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
   const [foundCustomer, setFoundCustomer] = useState<Customer | null>(null);
   const [newCustomerName, setNewCustomerName] = useState("");
   const [newCustomerAddress, setNewCustomerAddress] = useState("");
-  const [isWalkin, setIsWalkin] = useState(true);
   
   // ===== LEGACY CUSTOMER STATE (kept for compatibility) =====
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>("walkin");
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
@@ -242,16 +241,18 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
 
   // ============= PHONE-FIRST CUSTOMER LOOKUP =============
   useEffect(() => {
-    if (phoneQuery.length >= 11 && !isWalkin) {
+    // Only search when we have exactly 11 digits (complete BD phone)
+    if (phoneQuery.length >= 11) {
       setCustomerStatus('searching');
       const timer = setTimeout(async () => {
         const { data } = await supabase
           .from('customers')
           .select('*')
           .eq('phone', phoneQuery)
-          .single();
+          .maybeSingle();
         
         if (data) {
+          // Old customer found - auto-fill all fields
           setCustomerStatus('found');
           setFoundCustomer(data);
           setSelectedCustomerId(data.id);
@@ -259,20 +260,33 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
           setCustomerName(data.name);
           setCustomerPhone(data.phone || "");
           setCustomerAddress(data.address || "");
+          // Auto-fill editable fields too
+          setNewCustomerName(data.name);
+          setNewCustomerAddress(data.address || "");
         } else {
+          // New customer - phone not in system
           setCustomerStatus('new');
           setFoundCustomer(null);
           setSelectedCustomerId(null);
           setSelectedCustomer(null);
           setCustomerPhone(phoneQuery);
+          setNewCustomerName("");
+          setNewCustomerAddress("");
         }
       }, 300);
       return () => clearTimeout(timer);
-    } else if (phoneQuery.length < 11 && !isWalkin) {
+    } else if (phoneQuery.length > 0 && phoneQuery.length < 11) {
+      // Partial phone entry - show idle state
       setCustomerStatus('idle');
       setFoundCustomer(null);
+    } else {
+      // Empty phone - reset to idle
+      setCustomerStatus('idle');
+      setFoundCustomer(null);
+      setNewCustomerName("");
+      setNewCustomerAddress("");
     }
-  }, [phoneQuery, isWalkin]);
+  }, [phoneQuery]);
 
   // ============= HANDLE CUSTOM WEIGHT SELECTION =============
   useEffect(() => {
@@ -949,15 +963,15 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
 
   // ============= CUSTOMER ACTIONS =============
   const handleCustomerSelect = (customerId: string) => {
-    if (customerId === "walkin") {
-      setSelectedCustomerId("walkin");
+    if (customerId === "walkin" || !customerId) {
+      setSelectedCustomerId(null);
       setSelectedCustomer(null);
       setCustomerName("");
       setCustomerPhone("");
       setCustomerAddress("");
-      setIsWalkin(true);
       setPhoneQuery("");
       setCustomerStatus('idle');
+      setFoundCustomer(null);
       return;
     }
 
@@ -1029,12 +1043,13 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
       return;
     }
 
-    const effectiveCustomerId = isWalkin ? "walkin" : selectedCustomerId;
+    // Due requires a registered customer (phone number entered)
+    const hasCustomer = phoneQuery.length >= 11 || selectedCustomerId;
 
-    if (paymentStat === 'due' && effectiveCustomerId === "walkin") {
+    if (paymentStat === 'due' && !hasCustomer) {
       toast({ 
         title: "Cannot save as due", 
-        description: "Credit requires a registered customer",
+        description: "Credit requires a registered customer with phone number",
         variant: "destructive" 
       });
       return;
@@ -1064,7 +1079,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
       const { data: txnNum } = await supabase.rpc('generate_transaction_number');
       const transactionNumber = txnNum || `TXN-${Date.now()}`;
 
-      let customerId = effectiveCustomerId === "walkin" ? null : effectiveCustomerId;
+      let customerId = selectedCustomerId;
 
       // Create customer if new (from phone-first flow)
       if (!customerId && customerStatus === 'new' && newCustomerName) {
@@ -1201,9 +1216,9 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
       }
 
       // Prepare invoice with return items
-      const finalCustomerName = isWalkin ? "Walk-in" : (foundCustomer?.name || newCustomerName || customerName || "Walk-in");
-      const finalPhone = isWalkin ? "" : (foundCustomer?.phone || phoneQuery || customerPhone || "");
-      const finalAddress = isWalkin ? "" : (foundCustomer?.address || newCustomerAddress || customerAddress || "");
+      const finalCustomerName = foundCustomer?.name || newCustomerName || customerName || "Customer";
+      const finalPhone = foundCustomer?.phone || phoneQuery || customerPhone || "";
+      const finalAddress = foundCustomer?.address || newCustomerAddress || customerAddress || "";
 
       setLastTransaction({
         invoiceNumber: transactionNumber,
@@ -1245,7 +1260,6 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
       setNewCustomerAddress("");
       setCustomerStatus('idle');
       setFoundCustomer(null);
-      setIsWalkin(true);
 
       toast({ 
         title: paymentStat === 'paid' ? "Sale completed!" : "Saved as due",
@@ -1904,12 +1918,18 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
         {/* ===== UNIFIED CUSTOMER FORM ===== */}
         <Card className="border-border/50">
           <CardContent className="p-3 space-y-3">
-            {/* Customer Status Badge - Shows current state */}
+            {/* Customer Status Badge - Shows Old/New customer state */}
             <div className="flex items-center gap-2 flex-wrap">
-              {isWalkin && (
+              {customerStatus === 'idle' && phoneQuery.length === 0 && (
                 <Badge variant="secondary" className="bg-muted text-muted-foreground">
                   <User className="h-3 w-3 mr-1" />
-                  Walk-in Customer
+                  Enter Phone Number
+                </Badge>
+              )}
+              {customerStatus === 'idle' && phoneQuery.length > 0 && phoneQuery.length < 11 && (
+                <Badge variant="secondary" className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                  <Phone className="h-3 w-3 mr-1" />
+                  {11 - phoneQuery.length} digits remaining
                 </Badge>
               )}
               {customerStatus === 'searching' && (
@@ -1921,7 +1941,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
               {customerStatus === 'found' && foundCustomer && (
                 <Badge variant="secondary" className="bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400">
                   <UserCircle className="h-3 w-3 mr-1" />
-                  Found: {foundCustomer.name}
+                  Old Customer
                 </Badge>
               )}
               {customerStatus === 'new' && (
@@ -1949,7 +1969,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
               <div>
                 <Label className="text-xs text-muted-foreground mb-1.5 block">
                   Phone Number
-                  {!isWalkin && <span className="text-primary ml-1">(auto-lookup)</span>}
+                  <span className="text-primary ml-1">(auto-lookup)</span>
                 </Label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -1959,15 +1979,8 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                     onChange={(e) => {
                       const value = e.target.value.replace(/\D/g, '').slice(0, 11);
                       setPhoneQuery(value);
-                      if (value.length > 0) {
-                        setIsWalkin(false);
-                      } else {
-                        setIsWalkin(true);
-                        setCustomerStatus('idle');
-                        setFoundCustomer(null);
-                      }
                     }}
-                    placeholder="01XXXXXXXXX (Leave empty for walk-in)"
+                    placeholder="01XXXXXXXXX"
                     className="h-11 pl-10 text-base font-medium input-accessible"
                     maxLength={11}
                     autoComplete="tel"
@@ -1990,7 +2003,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
 
               {/* Name & Location in same row on larger screens */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {/* Name Field */}
+                {/* Name Field - Auto-filled for old customers, editable for new */}
                 <div>
                   <Label className="text-xs text-muted-foreground mb-1.5 block">
                     Name {customerStatus === 'new' && <span className="text-destructive">*</span>}
@@ -2004,14 +2017,14 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                     <Input
                       value={newCustomerName}
                       onChange={(e) => setNewCustomerName(e.target.value)}
-                      placeholder={isWalkin ? "Optional for walk-in" : "Customer name"}
+                      placeholder="Customer name"
                       className="h-11 input-accessible"
                       autoComplete="name"
                     />
                   )}
                 </div>
 
-                {/* Location/Address Field */}
+                {/* Location/Address Field - Auto-filled for old customers, editable for new */}
                 <div>
                   <Label className="text-xs text-muted-foreground mb-1.5 block">Location</Label>
                   {customerStatus === 'found' && foundCustomer ? (
@@ -2025,7 +2038,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                       <Input
                         value={newCustomerAddress}
                         onChange={(e) => setNewCustomerAddress(e.target.value)}
-                        placeholder={isWalkin ? "Optional" : "Address/Location"}
+                        placeholder="Address/Location"
                         className="h-11 pl-10 input-accessible"
                         autoComplete="street-address"
                       />
@@ -2132,10 +2145,10 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                 ))}
               </div>
 
-              {/* Due Warning */}
-              {paymentStatus === 'due' && isWalkin && (
+              {/* Due Warning - Show when no customer selected */}
+              {paymentStatus === 'due' && phoneQuery.length < 11 && !selectedCustomerId && (
                 <p className="text-xs text-destructive text-center">
-                  ⚠ Due requires a registered customer
+                  ⚠ Due requires a customer with phone number
                 </p>
               )}
             </div>
@@ -2160,7 +2173,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                   className="flex-1 h-12"
                   variant="outline"
                   onClick={() => handleCompleteSale('due')}
-                  disabled={processing || isWalkin}
+                  disabled={processing || (phoneQuery.length < 11 && !selectedCustomerId)}
                 >
                   {processing ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Save as Due'}
                 </Button>
@@ -2251,7 +2264,6 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                       <button
                         key={customer.id}
                         onClick={() => {
-                          setIsWalkin(false);
                           setPhoneQuery(customer.phone || "");
                           setCustomerStatus('found');
                           setFoundCustomer(customer);
@@ -2260,6 +2272,8 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                           setCustomerName(customer.name);
                           setCustomerPhone(customer.phone || "");
                           setCustomerAddress(customer.address || "");
+                          setNewCustomerName(customer.name);
+                          setNewCustomerAddress(customer.address || "");
                           setShowCustomerListDialog(false);
                           toast({ title: "Customer selected", description: customer.name });
                         }}
