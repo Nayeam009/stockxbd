@@ -48,7 +48,7 @@ export const AppSidebar = ({
     { id: 'customers', titleKey: 'customers', icon: Users, roles: ['owner', 'manager'] },
     { id: 'utility-expense', titleKey: 'utility_expense', icon: Wallet, roles: ['owner', 'manager'] },
     { id: 'analysis-search', titleKey: 'analysis_search', icon: Search, roles: ['owner', 'manager'] },
-    ...(isAdmin ? [{ id: 'admin-panel', titleKey: 'admin_panel', icon: Shield, roles: ['owner'] }] : []),
+    ...(isAdmin ? [{ id: 'admin-panel', titleKey: 'admin_panel', icon: Shield, roles: ['owner', 'manager'] }] : []),
     { id: 'settings', titleKey: 'settings', icon: Settings, roles: ['owner', 'manager'] },
   ];
   const handleModuleChange = (moduleId: string) => {
