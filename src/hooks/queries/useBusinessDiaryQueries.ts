@@ -485,6 +485,7 @@ export const useBusinessExpenses = () => {
 export const useBusinessDiaryRealtime = () => {
   const queryClient = useQueryClient();
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  const isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
   
   const debouncedInvalidate = useCallback(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -495,6 +496,9 @@ export const useBusinessDiaryRealtime = () => {
   }, [queryClient]);
   
   useEffect(() => {
+    // Skip subscriptions when offline to prevent connection errors
+    if (!isOnline) return;
+    
     // Single consolidated channel for all diary-related tables
     const channel = supabase
       .channel('diary-combined-realtime-v2')
@@ -512,5 +516,5 @@ export const useBusinessDiaryRealtime = () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
       supabase.removeChannel(channel);
     };
-  }, [debouncedInvalidate]);
+  }, [debouncedInvalidate, isOnline]);
 };

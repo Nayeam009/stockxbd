@@ -6,6 +6,7 @@ import { GlobalCommandPalette } from "@/components/dashboard/GlobalCommandPalett
 import { MobileBottomNav } from "@/components/dashboard/MobileBottomNav";
 import { ModuleSkeleton, QuickLoader } from "@/components/dashboard/ModuleSkeleton";
 import { OfflineIndicator } from "@/components/shared/OfflineIndicator";
+import { OfflineErrorBoundary } from "@/components/shared/OfflineErrorBoundary";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { getNextModule } from "@/hooks/useSwipeNavigation";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -328,11 +329,13 @@ const Dashboard = () => {
     })();
 
     return (
-      <Suspense fallback={isFirstLoad ? <ModuleSkeleton /> : <QuickLoader />}>
-        <div className="module-transition module-enter">
-          {moduleContent}
-        </div>
-      </Suspense>
+      <OfflineErrorBoundary moduleName={activeModule}>
+        <Suspense fallback={isFirstLoad ? <ModuleSkeleton /> : <QuickLoader />}>
+          <div className="module-transition module-enter">
+            {moduleContent}
+          </div>
+        </Suspense>
+      </OfflineErrorBoundary>
     );
   };
 

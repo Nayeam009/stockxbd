@@ -45,3 +45,6 @@ export {
 export { usePOSOfflineData } from '../usePOSOfflineData';
 export { useInventoryOfflineData } from '../useInventoryOfflineData';
 export { useDashboardOfflineData } from '../useDashboardOfflineData';
+export { useDashboardOfflineKPIs } from '../useDashboardOfflineKPIs';
+export { useOfflineAwareQuery, useOfflineValue } from '../useOfflineAwareQuery';
+export { useDataHydration } from '../useDataHydration';
