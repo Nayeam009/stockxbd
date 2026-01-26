@@ -4,14 +4,15 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { 
   Users, Banknote, TrendingUp, TrendingDown, Truck, Receipt, Wallet, 
-  ClipboardList, Settings, Package, AlertTriangle, Cylinder, Store, BarChart3
+  ClipboardList, Settings, Package, AlertTriangle, Cylinder, Store, BarChart3, WifiOff, Clock
 } from "lucide-react";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Driver, DashboardAnalytics, CylinderStock } from "@/hooks/useDashboardData";
 import { Progress } from "@/components/ui/progress";
 import { useEffect, useMemo, useCallback } from "react";
-import { useDashboardKPIs } from "@/hooks/queries/useOptimizedQueries";
+import { useDashboardOfflineKPIs } from "@/hooks/useDashboardOfflineKPIs";
+import { formatDistanceToNow } from "date-fns";
 
 interface DashboardOverviewProps {
   analytics: DashboardAnalytics;
@@ -32,15 +33,18 @@ export const DashboardOverview = ({
 }: DashboardOverviewProps) => {
   const { t } = useLanguage();
   
-  // Use optimized RPC-based KPIs instead of client-side calculations
+  // Use offline-aware KPIs hook for seamless online/offline operation
   const { 
     todaySales, 
     todayExpenses, 
     todayProfit, 
     activeOrders,
     isLoading: kpisLoading,
+    isFromCache,
+    isOffline,
+    lastUpdated,
     refetch: refetchKPIs 
-  } = useDashboardKPIs();
+  } = useDashboardOfflineKPIs();
   
   const isOwnerOrManager = userRole === 'owner' || userRole === 'manager';
   const isOwner = userRole === 'owner';
@@ -178,6 +182,41 @@ export const DashboardOverview = ({
 
   return (
     <div className="space-y-4 sm:space-y-6 px-1 sm:px-2 md:px-0">
+      {/* Offline Mode Banner */}
+      {(isOffline || isFromCache) && (
+        <div 
+          className={`${isOffline ? 'bg-warning/10 border-warning/30' : 'bg-muted/50 border-border/50'} border rounded-xl p-3 sm:p-4 flex items-center gap-3`}
+          role="status"
+          aria-live="polite"
+        >
+          {isOffline ? (
+            <WifiOff className="h-5 w-5 text-warning flex-shrink-0" aria-hidden="true" />
+          ) : (
+            <Clock className="h-5 w-5 text-muted-foreground flex-shrink-0" aria-hidden="true" />
+          )}
+          <div className="min-w-0 flex-1">
+            <p className={`font-medium text-sm ${isOffline ? 'text-warning' : 'text-muted-foreground'}`}>
+              {isOffline ? 'Working Offline' : 'Showing Cached Data'}
+            </p>
+            {lastUpdated && (
+              <p className="text-xs text-muted-foreground">
+                Last updated: {formatDistanceToNow(lastUpdated, { addSuffix: true })}
+              </p>
+            )}
+          </div>
+          {!isOffline && (
+            <Button 
+              size="sm" 
+              variant="ghost" 
+              className="flex-shrink-0 h-8"
+              onClick={() => refetchKPIs()}
+            >
+              Refresh
+            </Button>
+          )}
+        </div>
+      )}
+
       {/* Critical Alert Banner */}
       {analytics.cylinderStockHealth === 'critical' && (
         <div 

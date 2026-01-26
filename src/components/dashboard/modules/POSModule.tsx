@@ -57,6 +57,7 @@ import { InvoiceDialog } from "@/components/invoice/InvoiceDialog";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { logger } from "@/lib/logger";
+import { useNetwork } from "@/contexts/NetworkContext";
 
 // ============= INTERFACES =============
 interface LPGBrand {
@@ -164,6 +165,7 @@ const ROLE_CONFIG: Record<string, { label: string; color: string; bgColor: strin
 export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModuleProps) => {
   const { t, language } = useLanguage();
   const isMobile = useIsMobile();
+  const { isOnline } = useNetwork();
   
   // ===== DATA STATE =====
   const [loading, setLoading] = useState(true);
@@ -307,8 +309,13 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
       setLoading(false);
     };
     initData();
+  }, [fetchData]);
 
-    // Real-time subscriptions
+  // Real-time subscriptions - only when online
+  useEffect(() => {
+    // Skip subscriptions when offline to prevent connection errors
+    if (!isOnline) return;
+    
     const channels = [
       supabase.channel('pos-lpg').on('postgres_changes', { event: '*', schema: 'public', table: 'lpg_brands' }, () => {
         supabase.from('lpg_brands').select('*').eq('is_active', true).then(({ data }) => data && setLpgBrands(data));
@@ -328,7 +335,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
     ];
 
     return () => channels.forEach(ch => supabase.removeChannel(ch));
-  }, [fetchData]);
+  }, [isOnline]);
 
   // ============= PRICE HELPERS =============
   // Enhanced price lookup based on cylinder type (refill/package) and sale type (retail/wholesale)

@@ -29,6 +29,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
 import { getLpgColorByValveSize } from "@/lib/brandConstants";
+import { useNetwork } from "@/contexts/NetworkContext";
 
 // Interfaces
 interface LPGBrand {
@@ -85,6 +86,7 @@ const WEIGHT_OPTIONS_20MM = [
 ];
 
 export const InventoryModule = () => {
+  const { isOnline } = useNetwork();
   // Main tabs
   const [activeTab, setActiveTab] = useState("lpg");
   const [loading, setLoading] = useState(true);
@@ -168,8 +170,11 @@ export const InventoryModule = () => {
     fetchData();
   }, [fetchData]);
 
-  // Real-time inventory sync
+  // Real-time inventory sync - only when online
   useEffect(() => {
+    // Skip subscriptions when offline to prevent connection errors
+    if (!isOnline) return;
+    
     const channels = [
       supabase.channel('inv-lpg-realtime').on('postgres_changes', 
         { event: '*', schema: 'public', table: 'lpg_brands' }, 
@@ -186,7 +191,7 @@ export const InventoryModule = () => {
     ];
     
     return () => channels.forEach(ch => supabase.removeChannel(ch));
-  }, [fetchData]);
+  }, [fetchData, isOnline]);
 
   // Filtered data with useMemo for performance
   const filteredLpgBrands = useMemo(() => 
