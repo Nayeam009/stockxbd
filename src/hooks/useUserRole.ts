@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { getSessionWithRetry, AuthTimeoutError, isOnline } from "@/lib/authUtils";
+import { getSessionWithRetry, AuthTimeoutError, isOnline, getCachedUserId } from "@/lib/authUtils";
 
 export type UserRole = 'owner' | 'manager' | 'customer';
 
@@ -13,17 +13,37 @@ interface UserRoleData {
   refetch: () => Promise<void>;
 }
 
-// Module-level cache for instant recovery on tab switch
+// Module-level cache for instant recovery on tab switch - persistent across component remounts
 let cachedRole: UserRole | null = null;
 let cachedName: string | null = null;
 let cachedUserId: string | null = null;
 let lastFetchTime = 0;
-const CACHE_DURATION = 300000; // 5 minutes cache - be aggressive about using cache
+const CACHE_DURATION = 600000; // 10 minutes cache - be very aggressive about using cache
+
+// Try to restore from localStorage on module load
+try {
+  const storedRole = localStorage.getItem('stockx.user.role');
+  const storedName = localStorage.getItem('stockx.user.name');
+  const storedUserId = localStorage.getItem('stockx.user.id');
+  const storedTime = localStorage.getItem('stockx.user.timestamp');
+  
+  if (storedRole && storedTime) {
+    const age = Date.now() - parseInt(storedTime);
+    if (age < CACHE_DURATION) {
+      cachedRole = storedRole as UserRole;
+      cachedName = storedName || 'User';
+      cachedUserId = storedUserId;
+      lastFetchTime = parseInt(storedTime);
+    }
+  }
+} catch (e) {
+  // Ignore localStorage errors
+}
 
 export const useUserRole = (): UserRoleData => {
   const [userRole, setUserRole] = useState<UserRole>(cachedRole || 'customer');
   const [userName, setUserName] = useState<string>(cachedName || 'User');
-  const [userId, setUserId] = useState<string | null>(cachedUserId);
+  const [userId, setUserId] = useState<string | null>(cachedUserId || getCachedUserId());
   const [loading, setLoading] = useState(!cachedRole); // No loading if we have cache
   const [error, setError] = useState<string | null>(null);
   const isInitialLoadRef = useRef(!cachedRole);
@@ -39,7 +59,19 @@ export const useUserRole = (): UserRoleData => {
     try {
       isFetchingRef.current = true;
       
-      // Network-aware: if offline and we have cache, use it immediately
+      // PRIORITY 1: Use module cache if fresh
+      const timeSinceLastFetch = Date.now() - lastFetchTime;
+      if (cachedRole && cachedName && timeSinceLastFetch < CACHE_DURATION) {
+        console.log('[UserRole] Using cached data, age:', Math.round(timeSinceLastFetch / 1000), 's');
+        setUserRole(cachedRole);
+        setUserName(cachedName);
+        setUserId(cachedUserId);
+        setLoading(false);
+        isInitialLoadRef.current = false;
+        return;
+      }
+      
+      // PRIORITY 2: Network-aware - if offline and we have cache, use it immediately
       const online = typeof navigator !== 'undefined' ? navigator.onLine : true;
       if (!online || !isOnline()) {
         console.log('[UserRole] Offline mode detected');
@@ -68,7 +100,7 @@ export const useUserRole = (): UserRoleData => {
       setError(null);
 
       // Use retry-protected session fetch with cache fallback
-      const { data: { session } } = await getSessionWithRetry(1, true); // Single retry always
+      const { data: { session } } = await getSessionWithRetry(2, true); // 2 retries with cache
       
       if (!session?.user) {
         // Only clear cache if we got a definitive "no session" response
@@ -99,13 +131,13 @@ export const useUserRole = (): UserRoleData => {
         .eq('user_id', session.user.id)
         .maybeSingle();
 
-      // Race each query against a timeout
+      // Race each query against a generous timeout
       const timeoutPromise = <T>(ms: number): Promise<T | null> => 
         new Promise(resolve => setTimeout(() => resolve(null), ms));
 
       const [roleResult, profileResult] = await Promise.all([
-        Promise.race([rolePromise, timeoutPromise<typeof rolePromise>(8000)]),
-        Promise.race([profilePromise, timeoutPromise<typeof profilePromise>(8000)])
+        Promise.race([rolePromise, timeoutPromise<typeof rolePromise>(15000)]),
+        Promise.race([profilePromise, timeoutPromise<typeof profilePromise>(15000)])
       ]);
 
       // Handle role result
@@ -130,9 +162,18 @@ export const useUserRole = (): UserRoleData => {
                          'User';
       setUserName(displayName);
       cachedName = displayName;
+      cachedUserId = session.user.id;
       
-      // Update cache timestamp
+      // Update cache timestamp and persist to localStorage
       lastFetchTime = Date.now();
+      try {
+        localStorage.setItem('stockx.user.role', cachedRole || 'customer');
+        localStorage.setItem('stockx.user.name', cachedName || 'User');
+        localStorage.setItem('stockx.user.id', cachedUserId || '');
+        localStorage.setItem('stockx.user.timestamp', lastFetchTime.toString());
+      } catch (e) {
+        // Ignore localStorage errors
+      }
 
     } catch (err) {
       console.error('Error in useUserRole:', err);

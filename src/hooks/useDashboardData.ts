@@ -200,11 +200,11 @@ export const useDashboardData = () => {
     }
   }, []);
 
-  // Retry wrapper for data fetches
+  // Retry wrapper for data fetches - more resilient
   const withRetry = useCallback(async <T,>(
     fetchFn: () => Promise<T>, 
-    retries = 3, 
-    delayMs = 1000
+    retries = 2, 
+    delayMs = 500
   ): Promise<T> => {
     let lastError: Error | null = null;
     for (let attempt = 0; attempt < retries; attempt++) {
@@ -214,7 +214,7 @@ export const useDashboardData = () => {
         lastError = error as Error;
         logger.warn(`Data fetch attempt ${attempt + 1}/${retries} failed`, { error });
         if (attempt < retries - 1) {
-          await new Promise(resolve => setTimeout(resolve, delayMs * Math.pow(2, attempt)));
+          await new Promise(resolve => setTimeout(resolve, delayMs * Math.pow(1.5, attempt)));
         }
       }
     }
@@ -306,7 +306,7 @@ export const useDashboardData = () => {
         supabase.from('user_roles').select('user_id, role').eq('role', 'manager') // Updated: no more driver role
       ]);
 
-      // Apply retry and timeout
+      // Apply retry and timeout - increased timeout for reliability
       const [
         transactionsResult,
         customerDataResult,
@@ -315,9 +315,9 @@ export const useDashboardData = () => {
         stovesResult,
         userRolesResult
       ] = await withRetry(
-        () => withTimeout(fetchAllData(), 5000), // 5s timeout per attempt
+        () => withTimeout(fetchAllData(), 15000), // 15s timeout per attempt
         2, // 2 retries max
-        500 // 500ms initial delay
+        300 // 300ms initial delay
       );
 
       const transactions = transactionsResult.data;
