@@ -7,7 +7,7 @@ import { OfflineIndicator } from "@/components/shared/OfflineIndicator";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useNetwork } from "@/contexts/NetworkContext";
-import { Search, Settings, Command, Store, Globe } from "lucide-react";
+import { Search, Settings, Command, Store, Globe, Shield } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -140,6 +140,26 @@ export const DashboardHeader = ({
 
           {/* Notifications */}
           <UniversalNotificationCenter userRole={userRole} />
+
+          {/* Admin Panel Button - Admin only */}
+          {isAdmin && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={() => navigate('/dashboard?module=admin-panel')}
+                  aria-label="Admin Panel"
+                  className="hidden sm:flex h-8 w-8 sm:h-9 sm:w-9 rounded-lg sm:rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 transition-all duration-300"
+                >
+                  <Shield className="h-4 w-4" aria-hidden="true" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Admin Panel</p>
+              </TooltipContent>
+            </Tooltip>
+          )}
 
           {/* Marketplace Button - Owner only */}
           {userRole === 'owner' && (

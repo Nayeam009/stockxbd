@@ -40,6 +40,7 @@ export const AppSidebar = ({
   // All navigation items - only owner and manager access dashboard
   const allNavItems = [
     { id: 'overview', titleKey: 'overview', icon: Home, roles: ['owner', 'manager'] },
+    ...(isAdmin ? [{ id: 'admin-panel', titleKey: 'admin_panel', icon: Shield, roles: ['owner', 'manager'], isAdmin: true }] : []),
     { id: 'business-diary', titleKey: 'business_diary', icon: BarChart3, roles: ['owner', 'manager'] },
     { id: 'pos', titleKey: 'pos', icon: Receipt, roles: ['owner', 'manager'] },
     { id: 'my-shop', titleKey: 'my_shop', icon: Store, roles: ['owner', 'manager'], badge: analytics.activeOrders > 0 ? analytics.activeOrders : null },
@@ -48,7 +49,6 @@ export const AppSidebar = ({
     { id: 'customers', titleKey: 'customers', icon: Users, roles: ['owner', 'manager'] },
     { id: 'utility-expense', titleKey: 'utility_expense', icon: Wallet, roles: ['owner', 'manager'] },
     { id: 'analysis-search', titleKey: 'analysis_search', icon: Search, roles: ['owner', 'manager'] },
-    ...(isAdmin ? [{ id: 'admin-panel', titleKey: 'admin_panel', icon: Shield, roles: ['owner', 'manager'] }] : []),
     { id: 'settings', titleKey: 'settings', icon: Settings, roles: ['owner', 'manager'] },
   ];
 
@@ -76,13 +76,15 @@ export const AppSidebar = ({
     icon: any;
     roles: string[];
     badge?: number | null;
+    isAdmin?: boolean;
   }) => {
     const Icon = item.icon;
     const isActive = activeModule === item.id;
     const displayTitle = t(item.titleKey) + (item.titleSuffix || '');
-    const button = <SidebarMenuButton onClick={() => handleModuleChange(item.id)} isActive={isActive} className={`relative group transition-all duration-200 h-9 ${isCollapsed ? 'justify-center px-0' : 'px-2'} ${isActive ? 'bg-primary text-primary-foreground shadow-sm' : 'hover:bg-muted text-muted-foreground hover:text-foreground'}`}>
-        <div className={`flex items-center justify-center h-7 w-7 rounded-md shrink-0 transition-all duration-200 ${isActive ? 'bg-white/20' : 'bg-transparent group-hover:bg-primary/10'}`}>
-          <Icon className={`h-4 w-4 transition-colors ${isActive ? 'text-primary-foreground' : 'text-muted-foreground group-hover:text-primary'}`} />
+    const isAdminItem = item.isAdmin;
+    const button = <SidebarMenuButton onClick={() => handleModuleChange(item.id)} isActive={isActive} className={`relative group transition-all duration-200 h-9 ${isCollapsed ? 'justify-center px-0' : 'px-2'} ${isActive ? 'bg-primary text-primary-foreground shadow-sm' : isAdminItem ? 'hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 bg-amber-500/10' : 'hover:bg-muted text-muted-foreground hover:text-foreground'}`}>
+        <div className={`flex items-center justify-center h-7 w-7 rounded-md shrink-0 transition-all duration-200 ${isActive ? 'bg-white/20' : isAdminItem ? 'bg-amber-500/20' : 'bg-transparent group-hover:bg-primary/10'}`}>
+          <Icon className={`h-4 w-4 transition-colors ${isActive ? 'text-primary-foreground' : isAdminItem ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground group-hover:text-primary'}`} />
         </div>
         {!isCollapsed && <div className="flex items-center justify-between w-full ml-1.5 overflow-hidden">
             <span className="text-sm font-medium truncate">{displayTitle}</span>
@@ -114,7 +116,7 @@ export const AppSidebar = ({
   };
   // Filter items by role
   const filteredNavItems = allNavItems.filter(item => item.roles.includes(userRole));
-  return <Sidebar collapsible="icon" className="border-r border-border/40 bg-sidebar shadow-lg transition-all duration-300">
+  return <Sidebar key={`sidebar-${isAdmin ? 'admin' : 'user'}`} collapsible="icon" className="border-r border-border/40 bg-sidebar shadow-lg transition-all duration-300">
       {/* Header with Logo */}
       <SidebarHeader className={`border-b border-border/40 transition-all duration-300 ${isCollapsed ? 'p-2' : 'p-3'}`}>
         <div className={`flex items-center transition-all duration-300 ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
