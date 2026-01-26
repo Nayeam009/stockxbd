@@ -13,8 +13,7 @@ import {
   Camera, 
   Loader2,
   Save,
-  Shield,
-  Settings
+  Shield
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -274,9 +273,10 @@ export const ProfileModule = () => {
 
   const getRoleBadgeColor = (role: string) => {
     switch (role) {
-      case 'owner': return 'bg-gradient-to-r from-amber-500 to-orange-500 text-white';
+      case 'owner': return 'bg-gradient-to-r from-emerald-500 to-green-600 text-white';
       case 'manager': return 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white';
-      case 'driver': return 'bg-gradient-to-r from-green-500 to-emerald-500 text-white';
+      case 'driver': return 'bg-gradient-to-r from-purple-500 to-pink-500 text-white';
+      case 'customer': return 'bg-gradient-to-r from-purple-500 to-pink-500 text-white';
       default: return 'bg-muted text-muted-foreground';
     }
   };
@@ -341,7 +341,11 @@ export const ProfileModule = () => {
               </h3>
               <div className="flex items-center gap-2">
                 {isAdmin && (
-                  <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 text-white border-amber-400/50">
+                  <Badge 
+                    className="bg-gradient-to-r from-amber-500 to-orange-500 text-white border-amber-400/50 cursor-pointer hover:from-amber-600 hover:to-orange-600 transition-all shadow-md hover:shadow-lg"
+                    onClick={() => navigate('/dashboard?module=admin-panel')}
+                    title="Click to open Admin Panel"
+                  >
                     <Shield className="h-3 w-3 mr-1" />
                     Admin
                   </Badge>
@@ -358,17 +362,6 @@ export const ProfileModule = () => {
               <Mail className="h-4 w-4" />
               {userEmail}
             </p>
-            {isAdmin && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigate('/dashboard?module=admin-panel')}
-                className="mt-2 border-amber-500/50 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30"
-              >
-                <Settings className="h-4 w-4 mr-2" />
-                Open Admin Panel
-              </Button>
-            )}
           </div>
         </CardContent>
       </Card>
