@@ -313,6 +313,7 @@ const Dashboard = () => {
             setSearchQuery={setSearchQuery}
             userRole={dashboardRole}
             userName={userName}
+            isAdmin={isAdmin}
             onSettingsClick={() => handleModuleChange("settings")}
             onProfileClick={() => handleModuleChange("profile")}
           />
