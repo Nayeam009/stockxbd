@@ -3,19 +3,22 @@
  * 
  * These wrappers prevent the "stuck forever" issue caused by invalid refresh tokens
  * by enforcing a timeout on all auth operations with automatic retry.
+ * 
+ * OPTIMIZED: Extended timeouts and aggressive caching for reliable dashboard access.
  */
 
 import { supabase } from "@/integrations/supabase/client";
 
-// Maximum time to wait for auth operations (20 seconds - very generous for slow networks)
-const AUTH_TIMEOUT = 5000; // 5 seconds - faster failure detection
-const MAX_RETRIES = 1; // Single retry only
-const INITIAL_RETRY_DELAY = 500; // 500ms - quick retry
+// Maximum time to wait for auth operations - generous for slow networks
+const AUTH_TIMEOUT = 15000; // 15 seconds - generous for slow connections
+const MAX_RETRIES = 2; // Two retries for better resilience
+const INITIAL_RETRY_DELAY = 300; // 300ms - quick initial retry
 
 // LocalStorage keys for persistent cache
 const CACHE_KEY_SESSION = 'stockx.auth.session.cache';
 const CACHE_KEY_TIMESTAMP = 'stockx.auth.timestamp';
-const CACHE_TTL = 300000; // 5 minutes
+const CACHE_KEY_USER_ID = 'stockx.auth.user_id';
+const CACHE_TTL = 600000; // 10 minutes - extended for better offline support
 
 export class AuthTimeoutError extends Error {
   constructor() {
@@ -48,7 +51,9 @@ const getCachedSession = (): any => {
     if (cached && timestamp) {
       const age = Date.now() - parseInt(timestamp);
       if (age < CACHE_TTL) {
-        return JSON.parse(cached);
+        const parsed = JSON.parse(cached);
+        console.log('[Auth] Using cached session, age:', Math.round(age / 1000), 's');
+        return parsed;
       }
     }
   } catch (error) {
@@ -65,9 +70,23 @@ const setCachedSession = (session: any): void => {
     if (session) {
       localStorage.setItem(CACHE_KEY_SESSION, JSON.stringify(session));
       localStorage.setItem(CACHE_KEY_TIMESTAMP, Date.now().toString());
+      if (session.user?.id) {
+        localStorage.setItem(CACHE_KEY_USER_ID, session.user.id);
+      }
     }
   } catch (error) {
     console.warn('[Auth] Cache write error:', error);
+  }
+};
+
+/**
+ * Get cached user ID for quick auth checks
+ */
+export const getCachedUserId = (): string | null => {
+  try {
+    return localStorage.getItem(CACHE_KEY_USER_ID);
+  } catch {
+    return null;
   }
 };
 

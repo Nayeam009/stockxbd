@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, RefreshCw, LogIn, WifiOff, Clock, ShieldAlert } from "lucide-react";
-import { getSessionWithRetry, AuthTimeoutError, isOnline, clearAuthCache } from "@/lib/authUtils";
+import { getSessionWithRetry, AuthTimeoutError, isOnline, clearAuthCache, getCachedUserId } from "@/lib/authUtils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -12,62 +12,101 @@ interface ProtectedRouteProps {
   children: React.ReactNode;
 }
 
+// Module-level persistent auth state - survives component remounts and tab switches
+let persistentAuthState = {
+  authenticated: false,
+  userRole: null as string | null,
+  lastVerified: 0,
+  userId: null as string | null,
+};
+
+const AUTH_STATE_TTL = 600000; // 10 minutes - trust cached auth for longer
+
 export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
-  const [loading, setLoading] = useState(true);
-  const [authenticated, setAuthenticated] = useState(false);
-  const [userRole, setUserRole] = useState<string | null>(null);
+  const [loading, setLoading] = useState(() => {
+    // If we have recent persistent auth, skip loading entirely
+    const timeSinceVerified = Date.now() - persistentAuthState.lastVerified;
+    return !(persistentAuthState.authenticated && timeSinceVerified < AUTH_STATE_TTL);
+  });
+  const [authenticated, setAuthenticated] = useState(persistentAuthState.authenticated);
+  const [userRole, setUserRole] = useState<string | null>(persistentAuthState.userRole);
   const [authError, setAuthError] = useState<'timeout' | 'expired' | 'offline' | 'fatal' | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const [usingCache, setUsingCache] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   
-  // Cache for quick visibility recovery - extended to 60 seconds
-  const lastAuthCheckRef = useRef<number>(0);
-  const cachedAuthRef = useRef<boolean>(false);
-  const cachedRoleRef = useRef<string | null>(null);
+  // Refs for tracking
+  const isVerifyingRef = useRef(false);
+  const mountedRef = useRef(true);
+  
+  // Cache for quick visibility recovery - extended to 5 minutes
+  const lastAuthCheckRef = useRef<number>(persistentAuthState.lastVerified);
+  const cachedAuthRef = useRef<boolean>(persistentAuthState.authenticated);
+  const cachedRoleRef = useRef<string | null>(persistentAuthState.userRole);
 
   const checkAuthAndRole = useCallback(async (isVisibilityCheck = false) => {
+    // Prevent concurrent verification
+    if (isVerifyingRef.current) {
+      console.log('[Auth] Verification already in progress');
+      return;
+    }
+    
     try {
-      // Offline detection - use cache immediately if offline
-      if (!isOnline() && cachedAuthRef.current) {
-        console.log('[Auth] Offline - using cached auth');
+      isVerifyingRef.current = true;
+      
+      // PRIORITY 1: Use persistent module state if fresh
+      const timeSinceVerified = Date.now() - persistentAuthState.lastVerified;
+      if (persistentAuthState.authenticated && timeSinceVerified < AUTH_STATE_TTL) {
+        console.log('[Auth] Using persistent auth state, age:', Math.round(timeSinceVerified / 1000), 's');
         setAuthenticated(true);
-        setUserRole(cachedRoleRef.current);
+        setUserRole(persistentAuthState.userRole);
         setLoading(false);
+        
+        // Do background validation only if stale by half TTL
+        if (timeSinceVerified > AUTH_STATE_TTL / 2 && !isVisibilityCheck) {
+          getSessionWithRetry(1, true).catch(() => {});
+        }
         return;
       }
 
-      // If visibility check and we have recent cache (within 60s), use cache
+      // PRIORITY 2: Offline detection - use cache immediately if offline
+      if (!isOnline()) {
+        if (cachedAuthRef.current || getCachedUserId()) {
+          console.log('[Auth] Offline - using cached auth');
+          setAuthenticated(true);
+          setUserRole(cachedRoleRef.current);
+          setUsingCache(true);
+          setLoading(false);
+          return;
+        }
+      }
+
+      // PRIORITY 3: If visibility check and we have recent cache (within 5 min), use cache
       if (isVisibilityCheck && cachedAuthRef.current) {
         const timeSinceLastCheck = Date.now() - lastAuthCheckRef.current;
-        if (timeSinceLastCheck < 60000) { // Extended from 30s to 60s
-          // Still validate session in background without blocking
-          getSessionWithRetry(1).then(({ data: { session } }) => {
-            if (!session && cachedAuthRef.current) {
-              setAuthenticated(false);
-              cachedAuthRef.current = false;
-            }
-          }).catch(() => {
-            // Ignore background validation errors
-          });
-          return;
+        if (timeSinceLastCheck < 300000) { // 5 minutes
+          console.log('[Auth] Tab visible - using cached auth, age:', Math.round(timeSinceLastCheck / 1000), 's');
+          return; // Keep current state, no reload needed
         }
       }
 
       // Reset error state
       setAuthError(null);
 
-      // Use retry logic for session check
-      const { data: { session } } = await getSessionWithRetry();
+      // PRIORITY 4: Fetch fresh session with retry
+      const { data: { session } } = await getSessionWithRetry(2, true); // 2 retries with cache fallback
       
-      // Check if we're using cached session (indicated by lack of recent timestamp)
+      // Check if we're using cached session
       const isCached = session && !session.access_token;
       setUsingCache(isCached);
       
       if (!session) {
+        // No session at all - redirect to login
         setAuthenticated(false);
         cachedAuthRef.current = false;
+        persistentAuthState.authenticated = false;
+        persistentAuthState.userRole = null;
         setAuthError('expired');
         setLoading(false);
         return;
@@ -81,7 +120,7 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
         return;
       }
 
-      // Fetch user role with a shorter timeout
+      // Fetch user role with generous timeout
       const rolePromise = supabase
         .from('user_roles')
         .select('role')
@@ -89,19 +128,26 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
         .maybeSingle();
 
       const roleTimeoutPromise = new Promise<null>((resolve) => 
-        setTimeout(() => resolve(null), 5000)
+        setTimeout(() => resolve(null), 10000) // 10s timeout for role fetch
       );
 
       const roleResult = await Promise.race([rolePromise, roleTimeoutPromise]);
       const roleData = roleResult && 'data' in roleResult ? roleResult.data : null;
 
+      // Update all caches
+      const role = roleData?.role || null;
       setAuthenticated(true);
-      setUserRole(roleData?.role || null);
+      setUserRole(role);
       
-      // Update cache
       cachedAuthRef.current = true;
-      cachedRoleRef.current = roleData?.role || null;
+      cachedRoleRef.current = role;
       lastAuthCheckRef.current = Date.now();
+      
+      // Update persistent state
+      persistentAuthState.authenticated = true;
+      persistentAuthState.userRole = role;
+      persistentAuthState.lastVerified = Date.now();
+      persistentAuthState.userId = session.user.id;
       
       setLoading(false);
     } catch (error) {
@@ -110,22 +156,26 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
       // Increment retry count for UI feedback
       setRetryCount(prev => prev + 1);
       
-      // If offline and we have cache, use it
-      if (!isOnline() && cachedAuthRef.current) {
-        setAuthError('offline');
+      // FALLBACK: If we have ANY cached auth, use it
+      if (cachedAuthRef.current || persistentAuthState.authenticated || getCachedUserId()) {
+        console.log('[Auth] Error occurred but using cached auth');
         setAuthenticated(true);
-        setUserRole(cachedRoleRef.current);
+        setUserRole(cachedRoleRef.current || persistentAuthState.userRole);
         setUsingCache(true);
+        setLoading(false);
+        return;
+      }
+      
+      // If offline and we have cache, use it
+      if (!isOnline()) {
+        setAuthError('offline');
         setLoading(false);
         return;
       }
       
       // Determine error type
       if (error instanceof AuthTimeoutError) {
-        // After 2 failed attempts, consider it fatal
         setAuthError(retryCount >= 2 ? 'fatal' : 'timeout');
-      } else if (!isOnline()) {
-        setAuthError('offline');
       } else {
         setAuthError('expired');
       }
@@ -134,9 +184,12 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
       setAuthenticated(false);
       cachedAuthRef.current = false;
       cachedRoleRef.current = null;
+      persistentAuthState.authenticated = false;
       setLoading(false);
+    } finally {
+      isVerifyingRef.current = false;
     }
-  }, []);
+  }, [retryCount]);
 
   const handleClearCacheAndRetry = async () => {
     console.log('[Auth] Clearing cache and retrying...');
@@ -166,18 +219,29 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   }, [checkAuthAndRole]);
 
   useEffect(() => {
-    let mounted = true;
-
-    checkAuthAndRole();
+    mountedRef.current = true;
+    
+    // If we have recent persistent auth, skip initial check entirely
+    const timeSinceVerified = Date.now() - persistentAuthState.lastVerified;
+    if (persistentAuthState.authenticated && timeSinceVerified < AUTH_STATE_TTL) {
+      console.log('[Auth] Using persistent state on mount');
+      setAuthenticated(true);
+      setUserRole(persistentAuthState.userRole);
+      setLoading(false);
+    } else {
+      checkAuthAndRole();
+    }
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (!mounted) return;
+      if (!mountedRef.current) return;
       
       if (!session) {
         setAuthenticated(false);
         setUserRole(null);
         cachedAuthRef.current = false;
         cachedRoleRef.current = null;
+        persistentAuthState.authenticated = false;
+        persistentAuthState.userRole = null;
         setLoading(false);
         return;
       }
@@ -189,18 +253,26 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
         .eq('user_id', session.user.id)
         .maybeSingle();
 
-      if (mounted) {
+      if (mountedRef.current) {
+        const role = roleData?.role || null;
         setAuthenticated(true);
-        setUserRole(roleData?.role || null);
+        setUserRole(role);
         cachedAuthRef.current = true;
-        cachedRoleRef.current = roleData?.role || null;
+        cachedRoleRef.current = role;
         lastAuthCheckRef.current = Date.now();
+        
+        // Update persistent state
+        persistentAuthState.authenticated = true;
+        persistentAuthState.userRole = role;
+        persistentAuthState.lastVerified = Date.now();
+        persistentAuthState.userId = session.user.id;
+        
         setLoading(false);
       }
     });
 
     return () => {
-      mounted = false;
+      mountedRef.current = false;
       subscription.unsubscribe();
     };
   }, [checkAuthAndRole]);
