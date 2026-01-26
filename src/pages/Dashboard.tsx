@@ -75,23 +75,46 @@ const Dashboard = () => {
   // Use real authentication - fetch user role from database
   const { userRole, userName, userId, loading: authLoading, error: authError } = useUserRole();
   
-  // Check if user is super admin
+ // Check if user is super admin with timeout protection
   const [isAdmin, setIsAdmin] = useState(false);
+ const [adminCheckComplete, setAdminCheckComplete] = useState(false);
   
   useEffect(() => {
     const checkAdminStatus = async () => {
       if (!userId) {
+       setIsAdmin(false);
+       setAdminCheckComplete(true);
         return;
       }
       
-      const { data, error } = await supabase
-        .from('admin_users')
-        .select('id')
-        .eq('user_id', userId)
-        .maybeSingle();
+     try {
+       // Add timeout protection to prevent dashboard freeze
+       const timeoutPromise = new Promise<null>((resolve) => 
+         setTimeout(() => resolve(null), 3000) // 3 second timeout
+       );
+       
+       const queryPromise = supabase
+         .from('admin_users')
+         .select('id')
+         .eq('user_id', userId)
+         .maybeSingle();
+       
+       const result = await Promise.race([queryPromise, timeoutPromise]);
       
-      const isAdminUser = !!data;
-      setIsAdmin(isAdminUser);
+       if (result && 'data' in result) {
+         const isAdminUser = !!result.data;
+         setIsAdmin(isAdminUser);
+       } else {
+         // Timeout or error - default to false
+         console.warn('[Dashboard] Admin check timed out, defaulting to false');
+         setIsAdmin(false);
+       }
+     } catch (error) {
+       console.error('[Dashboard] Admin check error:', error);
+       setIsAdmin(false);
+     } finally {
+       setAdminCheckComplete(true);
+     }
     };
     
     checkAdminStatus();

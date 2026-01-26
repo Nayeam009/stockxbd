@@ -112,6 +112,23 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
         return;
       }
 
+     // CRITICAL FIX: If using cached session without access token, skip database query
+     // and use cached role immediately to prevent hanging on invalid auth
+     if (isCached || !session.access_token) {
+       console.log('[Auth] Using cached session - skipping database query');
+       if (cachedRoleRef.current || persistentAuthState.userRole) {
+         setAuthenticated(true);
+         setUserRole(cachedRoleRef.current || persistentAuthState.userRole);
+         setLoading(false);
+         return;
+       }
+       // No cached role available - set defaults
+       setAuthenticated(true);
+       setUserRole('customer');
+       setLoading(false);
+       return;
+     }
+
       // Use cached role if available and this is a visibility check
       if (isVisibilityCheck && cachedRoleRef.current) {
         setAuthenticated(true);
