@@ -38,6 +38,9 @@ const Dashboard = () => {
   const [loadedModules, setLoadedModules] = useState<Set<string>>(new Set(['overview']));
   const [hasInitiallyLoaded, setHasInitiallyLoaded] = useState(false);
   
+  // Safety timeout to prevent infinite loading
+  const [safetyTimeoutReached, setSafetyTimeoutReached] = useState(false);
+  
   // Smooth module switching with transitions
   const handleModuleChange = useCallback((module: string) => {
     startTransition(() => {
@@ -125,10 +128,56 @@ const Dashboard = () => {
     setOrders,
   } = useDashboardData();
 
+  // Safety timeout: if loading takes more than 30 seconds, force show error
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (authLoading || dataLoading) {
+        console.error('[Dashboard] Safety timeout reached - loading took too long');
+        setSafetyTimeoutReached(true);
+      }
+    }, 30000); // 30 second safety net
+
+    return () => clearTimeout(timeout);
+  }, [authLoading, dataLoading]);
+
   // Combined loading state
   const loading = authLoading || dataLoading;
 
-  if (loading) {
+  // Safety timeout: if loading takes too long, show error recovery UI
+  if (safetyTimeoutReached) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="text-center space-y-4 max-w-md">
+          <div className="h-16 w-16 rounded-full bg-warning/10 flex items-center justify-center mx-auto">
+            <Loader2 className="h-8 w-8 text-warning animate-spin" />
+          </div>
+          <h2 className="text-xl font-semibold text-foreground">Loading is Taking Longer Than Expected</h2>
+          <p className="text-muted-foreground">
+            This might be due to slow network conditions. Please check your internet connection and try again.
+          </p>
+          <div className="flex flex-col gap-3">
+            <button 
+              onClick={() => window.location.reload()} 
+              className="px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium"
+            >
+              Reload Dashboard
+            </button>
+            <button 
+              onClick={() => {
+                setSafetyTimeoutReached(false);
+                refetch();
+              }} 
+              className="px-6 py-3 border border-border rounded-lg hover:bg-accent transition-colors"
+            >
+              Try Again Without Reload
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading && !safetyTimeoutReached) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center space-y-4 animate-fade-in">
@@ -136,6 +185,9 @@ const Dashboard = () => {
           <div className="space-y-2">
             <p className="text-lg font-medium text-foreground">Loading Stock-X Dashboard</p>
             <p className="text-muted-foreground">Preparing your LPG management system...</p>
+            <p className="text-xs text-muted-foreground mt-2">
+              This may take up to 30 seconds on slow connections...
+            </p>
           </div>
         </div>
       </div>

@@ -503,6 +503,18 @@ export const useDashboardData = () => {
 
     } catch (error) {
       logger.error('Error fetching dashboard data', error, { component: 'Dashboard' });
+      
+      // On error, try to restore from cache if available
+      const snapshot = readSnapshot();
+      if (snapshot && snapshot.salesData && snapshot.salesData.length > 0) {
+        console.warn('[Dashboard] Using cached snapshot after fetch error');
+        setSalesData(snapshot.salesData || []);
+        setStockData(snapshot.stockData || []);
+        setCylinderStock(snapshot.cylinderStock || []);
+        setDrivers(snapshot.drivers || []);
+        setCustomers(snapshot.customers || []);
+        setOrders(snapshot.orders || []);
+      }
     } finally {
       if (isInitialLoadRef.current) {
         setLoading(false);
