@@ -53,6 +53,7 @@ import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
 import { getBrandMouthSizeMap, getLpgColorByValveSize } from "@/lib/brandConstants";
 import { supabase } from "@/integrations/supabase/client";
 import { parsePositiveNumber, sanitizeString } from "@/lib/validationSchemas";
+import { formatBDPhone } from "@/lib/phoneValidation";
 import { InvoiceDialog } from "@/components/invoice/InvoiceDialog";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -240,38 +241,79 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
   // Recent transactions removed - void system disabled
 
   // ============= PHONE-FIRST CUSTOMER LOOKUP =============
+  // Normalize phone for lookup - handles +880, 880, and 01 formats
+  const normalizePhoneForLookup = useCallback((phone: string): string[] => {
+    const cleaned = phone.replace(/[\s\-().]/g, '');
+    const normalized = formatBDPhone(cleaned);
+    
+    // Return multiple formats to search for (handles both old and new data)
+    const formats: string[] = [];
+    if (normalized.startsWith('01') && normalized.length === 11) {
+      formats.push(normalized); // 01XXXXXXXXX
+      formats.push(`+880${normalized.slice(1)}`); // +8801XXXXXXXXX
+      formats.push(`880${normalized.slice(1)}`); // 8801XXXXXXXXX
+    }
+    return formats.length > 0 ? formats : [cleaned];
+  }, []);
+
   useEffect(() => {
     // Only search when we have exactly 11 digits (complete BD phone)
     if (phoneQuery.length >= 11) {
       setCustomerStatus('searching');
       const timer = setTimeout(async () => {
-        const { data } = await supabase
-          .from('customers')
-          .select('*')
-          .eq('phone', phoneQuery)
-          .maybeSingle();
-        
-        if (data) {
-          // Old customer found - auto-fill all fields
-          setCustomerStatus('found');
-          setFoundCustomer(data);
-          setSelectedCustomerId(data.id);
-          setSelectedCustomer(data);
-          setCustomerName(data.name);
-          setCustomerPhone(data.phone || "");
-          setCustomerAddress(data.address || "");
-          // Auto-fill editable fields too
-          setNewCustomerName(data.name);
-          setNewCustomerAddress(data.address || "");
-        } else {
-          // New customer - phone not in system
+        try {
+          // Get all possible phone formats to search
+          const phoneFormats = normalizePhoneForLookup(phoneQuery);
+          
+          // Search for customer with any of the phone formats
+          // Use 'or' filter to match any format, get most recent if duplicates exist
+          const { data, error } = await supabase
+            .from('customers')
+            .select('*')
+            .or(phoneFormats.map(p => `phone.eq.${p}`).join(','))
+            .order('created_at', { ascending: false })
+            .limit(1);
+          
+          if (error) {
+            console.error('Customer lookup error:', error);
+            setCustomerStatus('new');
+            return;
+          }
+          
+          const customer = data && data.length > 0 ? data[0] : null;
+          
+          if (customer) {
+            // Old customer found - auto-fill all fields
+            setCustomerStatus('found');
+            setFoundCustomer(customer);
+            setSelectedCustomerId(customer.id);
+            setSelectedCustomer(customer);
+            setCustomerName(customer.name);
+            setCustomerPhone(customer.phone || "");
+            setCustomerAddress(customer.address || "");
+            // Auto-fill editable fields too
+            setNewCustomerName(customer.name);
+            setNewCustomerAddress(customer.address || "");
+            
+            logger.info('Old customer found', { 
+              component: 'POS', 
+              customerId: customer.id,
+              customerName: customer.name,
+              phone: customer.phone 
+            });
+          } else {
+            // New customer - phone not in system
+            setCustomerStatus('new');
+            setFoundCustomer(null);
+            setSelectedCustomerId(null);
+            setSelectedCustomer(null);
+            setCustomerPhone(phoneQuery);
+            setNewCustomerName("");
+            setNewCustomerAddress("");
+          }
+        } catch (err) {
+          console.error('Customer lookup failed:', err);
           setCustomerStatus('new');
-          setFoundCustomer(null);
-          setSelectedCustomerId(null);
-          setSelectedCustomer(null);
-          setCustomerPhone(phoneQuery);
-          setNewCustomerName("");
-          setNewCustomerAddress("");
         }
       }, 300);
       return () => clearTimeout(timer);
@@ -286,7 +328,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
       setNewCustomerName("");
       setNewCustomerAddress("");
     }
-  }, [phoneQuery]);
+  }, [phoneQuery, normalizePhoneForLookup]);
 
   // ============= HANDLE CUSTOM WEIGHT SELECTION =============
   useEffect(() => {
@@ -999,11 +1041,14 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
     const { data: { user } } = await supabase.auth.getUser();
     const { data: ownerId } = await supabase.rpc("get_owner_id");
     
+    // Normalize phone before saving
+    const normalizedPhone = customerPhone ? formatBDPhone(customerPhone) : null;
+    
     const { data, error } = await supabase
       .from('customers')
       .insert({
         name: sanitizeString(customerName),
-        phone: customerPhone || null,
+        phone: normalizedPhone,
         address: customerAddress || null,
         created_by: user?.id,
         owner_id: ownerId || user?.id
@@ -1082,12 +1127,15 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
       let customerId = selectedCustomerId;
 
       // Create customer if new (from phone-first flow)
+      // Always normalize phone to 01XXXXXXXXX format before saving
+      const normalizedPhone = phoneQuery ? formatBDPhone(phoneQuery) : null;
+      
       if (!customerId && customerStatus === 'new' && newCustomerName) {
         const { data: newCust } = await supabase
           .from('customers')
           .insert({ 
             name: sanitizeString(newCustomerName),
-            phone: phoneQuery || null,
+            phone: normalizedPhone,
             address: newCustomerAddress || null,
             created_by: user.id,
             owner_id: ownerId || user.id
