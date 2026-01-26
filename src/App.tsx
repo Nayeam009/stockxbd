@@ -8,6 +8,7 @@ import NotFound from "./pages/NotFound";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
+import { NetworkProvider } from "./contexts/NetworkContext";
 import { Loader2 } from "lucide-react";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { supabase } from "./integrations/supabase/client";
@@ -70,45 +71,47 @@ const AuthCleanupProvider = ({ children }: { children: React.ReactNode }) => {
 const App = () => (
   <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
-      <AuthCleanupProvider>
-        <ThemeProvider>
-          <LanguageProvider>
-            <TooltipProvider>
-              {/* Deferred non-critical toasters */}
-              <Suspense fallback={null}>
-                <Toaster />
-                <Sonner />
-              </Suspense>
-              <BrowserRouter>
-                <ErrorBoundary>
-                  <Suspense fallback={<PageLoader />}>
-                    <Routes>
-                      <Route path="/" element={<Welcome />} />
-                      <Route path="/auth" element={<Auth />} />
-                      <Route path="/dashboard" element={
-                        <ProtectedRoute>
-                          <Dashboard />
-                        </ProtectedRoute>
-                      } />
-                      
-                      {/* LPG Community E-Commerce Routes */}
-                      <Route path="/community" element={<Community />} />
-                      <Route path="/community/shop/:shopId" element={<ShopProfile />} />
-                      <Route path="/community/cart" element={<CustomerCart />} />
-                      <Route path="/community/checkout" element={<CustomerCheckout />} />
-                      <Route path="/community/orders" element={<CustomerOrders />} />
-                      <Route path="/community/profile" element={<CustomerProfile />} />
-                      
-                      {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                      <Route path="*" element={<NotFound />} />
-                    </Routes>
-                  </Suspense>
-                </ErrorBoundary>
-              </BrowserRouter>
-            </TooltipProvider>
-          </LanguageProvider>
-        </ThemeProvider>
-      </AuthCleanupProvider>
+      <NetworkProvider>
+        <AuthCleanupProvider>
+          <ThemeProvider>
+            <LanguageProvider>
+              <TooltipProvider>
+                {/* Deferred non-critical toasters */}
+                <Suspense fallback={null}>
+                  <Toaster />
+                  <Sonner />
+                </Suspense>
+                <BrowserRouter>
+                  <ErrorBoundary>
+                    <Suspense fallback={<PageLoader />}>
+                      <Routes>
+                        <Route path="/" element={<Welcome />} />
+                        <Route path="/auth" element={<Auth />} />
+                        <Route path="/dashboard" element={
+                          <ProtectedRoute>
+                            <Dashboard />
+                          </ProtectedRoute>
+                        } />
+                        
+                        {/* LPG Community E-Commerce Routes */}
+                        <Route path="/community" element={<Community />} />
+                        <Route path="/community/shop/:shopId" element={<ShopProfile />} />
+                        <Route path="/community/cart" element={<CustomerCart />} />
+                        <Route path="/community/checkout" element={<CustomerCheckout />} />
+                        <Route path="/community/orders" element={<CustomerOrders />} />
+                        <Route path="/community/profile" element={<CustomerProfile />} />
+                        
+                        {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                        <Route path="*" element={<NotFound />} />
+                      </Routes>
+                    </Suspense>
+                  </ErrorBoundary>
+                </BrowserRouter>
+              </TooltipProvider>
+            </LanguageProvider>
+          </ThemeProvider>
+        </AuthCleanupProvider>
+      </NetworkProvider>
     </QueryClientProvider>
   </ErrorBoundary>
 );
