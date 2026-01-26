@@ -21,6 +21,7 @@ interface DashboardHeaderProps {
   setSearchQuery: (query: string) => void;
   userRole: 'owner' | 'manager';
   userName: string;
+  isAdmin?: boolean;
   onSettingsClick?: () => void;
   onProfileClick?: () => void;
 }
@@ -30,6 +31,7 @@ export const DashboardHeader = ({
   setSearchQuery,
   userRole,
   userName,
+  isAdmin = false,
   onSettingsClick,
   onProfileClick
 }: DashboardHeaderProps) => {
@@ -201,9 +203,16 @@ export const DashboardHeader = ({
               <p className="text-xs sm:text-sm font-semibold text-foreground leading-none truncate max-w-[120px] lg:max-w-[150px]">
                 {userName}
               </p>
-              <Badge className={`mt-1 text-[9px] sm:text-[10px] px-1.5 sm:px-2 py-0 h-4 font-medium border ${getRoleColor(userRole)}`}>
-                {getRoleLabel(userRole)}
-              </Badge>
+              <div className="flex items-center gap-1 mt-1 justify-end">
+                {isAdmin && (
+                  <Badge className="text-[9px] sm:text-[10px] px-1.5 sm:px-2 py-0 h-4 font-medium border bg-gradient-to-r from-amber-500 to-orange-500 text-white border-amber-400/50">
+                    Admin
+                  </Badge>
+                )}
+                <Badge className={`text-[9px] sm:text-[10px] px-1.5 sm:px-2 py-0 h-4 font-medium border ${getRoleColor(userRole)}`}>
+                  {getRoleLabel(userRole)}
+                </Badge>
+              </div>
             </div>
             <div className="relative flex-shrink-0">
               <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg sm:rounded-xl bg-gradient-to-br from-primary via-primary-light to-secondary flex items-center justify-center text-primary-foreground text-xs sm:text-sm font-bold shadow-lg">
