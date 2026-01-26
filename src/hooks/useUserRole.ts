@@ -68,7 +68,7 @@ export const useUserRole = (): UserRoleData => {
       setError(null);
 
       // Use retry-protected session fetch with cache fallback
-      const { data: { session } } = await getSessionWithRetry(isSoftRefresh ? 1 : 2, true);
+      const { data: { session } } = await getSessionWithRetry(1, true); // Single retry always
       
       if (!session?.user) {
         // Only clear cache if we got a definitive "no session" response

@@ -147,7 +147,7 @@ const Dashboard = () => {
         console.error('[Dashboard] Safety timeout reached - loading took too long');
         setSafetyTimeoutReached(true);
       }
-    }, 45000); // 45 second safety net
+    }, 15000); // 15 second safety net - fail faster
 
     return () => clearTimeout(timeout);
   }, [authLoading, dataLoading, isOnline]);

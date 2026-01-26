@@ -315,9 +315,9 @@ export const useDashboardData = () => {
         stovesResult,
         userRolesResult
       ] = await withRetry(
-        () => withTimeout(fetchAllData(), 10000), // 10s timeout per attempt
-        3, // 3 retries
-        1000 // 1s initial delay
+        () => withTimeout(fetchAllData(), 5000), // 5s timeout per attempt
+        2, // 2 retries max
+        500 // 500ms initial delay
       );
 
       const transactions = transactionsResult.data;
