@@ -54,6 +54,10 @@ export const translations: Translations = {
   "export_started": { en: "Export started...", bn: "এক্সপোর্ট শুরু হয়েছে..." },
   "backup_created": { en: "Backup created successfully", bn: "ব্যাকআপ সফলভাবে তৈরি হয়েছে" },
 
+  // ==================== Admin Panel ====================
+  "admin_panel": { en: "Admin Panel", bn: "অ্যাডমিন প্যানেল" },
+  "admin_panel_desc": { en: "Manage all users, shops, and system settings.", bn: "সমস্ত ব্যবহারকারী, দোকান এবং সিস্টেম সেটিংস পরিচালনা করুন।" },
+
   // ==================== Profile Page ====================
   "profile": { en: "Profile", bn: "প্রোফাইল" },
   "profile_desc": { en: "Manage your personal information and account settings.", bn: "আপনার ব্যক্তিগত তথ্য এবং অ্যাকাউন্ট সেটিংস পরিচালনা করুন।" },

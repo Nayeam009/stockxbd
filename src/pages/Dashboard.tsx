@@ -12,6 +12,7 @@ import { getNextModule } from "@/hooks/useSwipeNavigation";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useNetwork } from "@/contexts/NetworkContext";
+import { supabase } from "@/integrations/supabase/client";
 import { Loader2, WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -29,7 +30,7 @@ const CustomerManagementModule = lazy(() => import("@/components/dashboard/modul
 const SettingsModule = lazy(() => import("@/components/dashboard/modules/SettingsModule").then(m => ({ default: m.SettingsModule })));
 const ProfileModule = lazy(() => import("@/components/dashboard/modules/ProfileModule").then(m => ({ default: m.ProfileModule })));
 const MyShopProfileModule = lazy(() => import("@/components/dashboard/modules/MyShopProfileModule").then(m => ({ default: m.MyShopProfileModule })));
-
+const AdminPanelModule = lazy(() => import("@/components/dashboard/modules/AdminPanelModule").then(m => ({ default: m.AdminPanelModule })));
 const Dashboard = () => {
   const [activeModule, setActiveModule] = useState("overview");
   const [searchQuery, setSearchQuery] = useState("");
@@ -53,8 +54,26 @@ const Dashboard = () => {
   }, []);
   
   // Use real authentication - fetch user role from database
-  const { userRole, userName, loading: authLoading, error: authError } = useUserRole();
+  const { userRole, userName, userId, loading: authLoading, error: authError } = useUserRole();
   
+  // Check if user is super admin
+  const [isAdmin, setIsAdmin] = useState(false);
+  
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      if (!userId) return;
+      
+      const { data } = await supabase
+        .from('admin_users')
+        .select('id')
+        .eq('user_id', userId)
+        .maybeSingle();
+      
+      setIsAdmin(!!data);
+    };
+    
+    checkAdminStatus();
+  }, [userId]);
   // Get network status for offline handling
   const { isOnline, pendingSyncCount } = useNetwork();
   
@@ -220,6 +239,8 @@ const Dashboard = () => {
           return <MyShopProfileModule />;
         case "community":
           return <CommunityModule />;
+        case "admin-panel":
+          return isAdmin ? <AdminPanelModule /> : null;
         case "utility-expense":
         case "staff-salary":
         case "vehicle-cost":
@@ -283,6 +304,7 @@ const Dashboard = () => {
           userRole={dashboardRole}
           userName={userName}
           analytics={analytics}
+          isAdmin={isAdmin}
         />
 
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
