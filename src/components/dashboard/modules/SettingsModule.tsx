@@ -4,8 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { 
   Settings, 
   Shield, 
@@ -18,7 +18,11 @@ import {
   Database,
   Bell,
   ChevronRight,
-  UserCircle
+  UserCircle,
+  ArrowLeft,
+  Check,
+  Eye,
+  EyeOff
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -44,6 +48,7 @@ import {
 import { BackupRestoreCard } from "@/components/settings/BackupRestoreCard";
 import { PushNotificationCard } from "@/components/settings/PushNotificationCard";
 import { AccountSettingsSection } from "@/components/settings/AccountSettingsSection";
+import { cn } from "@/lib/utils";
 
 interface SettingsSectionProps {
   icon: React.ReactNode;
@@ -51,41 +56,57 @@ interface SettingsSectionProps {
   description?: string;
   active?: boolean;
   onClick: () => void;
+  badge?: React.ReactNode;
 }
 
-const SettingsSection = ({ icon, title, description, active, onClick }: SettingsSectionProps) => (
+const SettingsSection = ({ icon, title, description, active, onClick, badge }: SettingsSectionProps) => (
   <button
     onClick={onClick}
-    className={`w-full flex items-center gap-3 p-3 rounded-lg text-left transition-all min-h-[56px] ${
+    className={cn(
+      "w-full flex items-center gap-3 p-4 rounded-xl text-left transition-all min-h-[64px] touch-target",
       active 
-        ? 'bg-primary/10 text-primary border border-primary/20' 
-        : 'hover:bg-muted/50 text-foreground'
-    }`}
+        ? 'bg-primary/10 text-primary border-2 border-primary/30 shadow-sm' 
+        : 'hover:bg-muted/60 text-foreground border-2 border-transparent'
+    )}
   >
-    <div className={`p-2 rounded-lg ${active ? 'bg-primary/20' : 'bg-muted'}`}>
+    <div className={cn(
+      "p-2.5 rounded-xl shrink-0 transition-colors",
+      active ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground'
+    )}>
       {icon}
     </div>
     <div className="flex-1 min-w-0">
-      <p className="font-medium text-sm truncate">{title}</p>
-      {description && <p className="text-xs text-muted-foreground truncate">{description}</p>}
+      <div className="flex items-center gap-2">
+        <p className="font-semibold text-sm truncate">{title}</p>
+        {badge}
+      </div>
+      {description && <p className="text-xs text-muted-foreground mt-0.5 truncate">{description}</p>}
     </div>
-    <ChevronRight className={`h-4 w-4 shrink-0 ${active ? 'text-primary' : 'text-muted-foreground'}`} />
+    <ChevronRight className={cn(
+      "h-5 w-5 shrink-0 transition-transform",
+      active ? 'text-primary translate-x-0.5' : 'text-muted-foreground'
+    )} />
   </button>
 );
 
 export const SettingsModule = () => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [activeSection, setActiveSection] = useState('account');
+  const [isMobileDetailView, setIsMobileDetailView] = useState(false);
   
   // Password change state
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [changingPassword, setChangingPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
   // User state for role check and account deletion
   const [userEmail, setUserEmail] = useState("");
+  const [userName, setUserName] = useState("");
   const [userRole, setUserRole] = useState<string>("owner");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   
   // Account deletion state
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -117,6 +138,20 @@ export const SettingsModule = () => {
         
         if (roleData) {
           setUserRole(roleData.role);
+        }
+
+        // Fetch profile for name and avatar
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('full_name, avatar_url')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        
+        if (profileData) {
+          setUserName(profileData.full_name || user.email?.split('@')[0] || 'User');
+          setAvatarUrl(profileData.avatar_url);
+        } else {
+          setUserName(user.email?.split('@')[0] || 'User');
         }
       }
     };
@@ -155,36 +190,31 @@ export const SettingsModule = () => {
 
   const handleChangePassword = async () => {
     if (!newPassword || !confirmPassword) {
-      toast({ title: "Please fill in both password fields", variant: "destructive" });
+      toast({ title: language === 'bn' ? 'উভয় পাসওয়ার্ড ফিল্ড পূরণ করুন' : "Please fill in both password fields", variant: "destructive" });
       return;
     }
     if (newPassword !== confirmPassword) {
-      toast({ title: "Passwords do not match", variant: "destructive" });
+      toast({ title: language === 'bn' ? 'পাসওয়ার্ড মিলছে না' : "Passwords do not match", variant: "destructive" });
       return;
     }
     if (newPassword.length < 6) {
-      toast({ title: "Password must be at least 6 characters", variant: "destructive" });
+      toast({ title: language === 'bn' ? 'পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে' : "Password must be at least 6 characters", variant: "destructive" });
       return;
     }
 
     setChangingPassword(true);
     try {
-      const { data, error } = await supabase.auth.updateUser({ password: newPassword });
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
       
-      if (error) {
-        console.error('[Password Change] Error:', error);
-        throw error;
-      }
+      if (error) throw error;
 
-      console.log('[Password Change] Success:', data);
-      toast({ title: "Password changed successfully" });
+      toast({ title: language === 'bn' ? 'পাসওয়ার্ড সফলভাবে পরিবর্তন হয়েছে' : "Password changed successfully" });
       setShowPasswordDialog(false);
       setNewPassword("");
       setConfirmPassword("");
     } catch (error: any) {
-      console.error('[Password Change] Caught error:', error);
       toast({ 
-        title: "Failed to change password", 
+        title: language === 'bn' ? 'পাসওয়ার্ড পরিবর্তন ব্যর্থ' : "Failed to change password", 
         description: error.message || "Please try again",
         variant: "destructive" 
       });
@@ -203,7 +233,7 @@ export const SettingsModule = () => {
 
   const handleDeleteAccount = async () => {
     if (userRole === 'owner' && deleteConfirmText !== 'DELETE') {
-      toast({ title: "Please type DELETE to confirm", variant: "destructive" });
+      toast({ title: language === 'bn' ? 'নিশ্চিত করতে DELETE টাইপ করুন' : "Please type DELETE to confirm", variant: "destructive" });
       return;
     }
 
@@ -218,7 +248,7 @@ export const SettingsModule = () => {
           password: deletePassword
         });
         if (signInError) {
-          toast({ title: "Incorrect password", variant: "destructive" });
+          toast({ title: language === 'bn' ? 'ভুল পাসওয়ার্ড' : "Incorrect password", variant: "destructive" });
           setDeletingAccount(false);
           return;
         }
@@ -233,7 +263,7 @@ export const SettingsModule = () => {
       }
 
       await supabase.auth.signOut();
-      toast({ title: 'Account deleted successfully' });
+      toast({ title: language === 'bn' ? 'অ্যাকাউন্ট সফলভাবে মুছে ফেলা হয়েছে' : 'Account deleted successfully' });
       window.location.href = '/';
     } catch (error: any) {
       toast({ title: error.message || "Failed to delete account", variant: "destructive" });
@@ -246,12 +276,52 @@ export const SettingsModule = () => {
     }
   };
 
-  // Simplified sections: Account (merged), Notifications, Security, Advanced
+  const handleSectionClick = (sectionId: string) => {
+    setActiveSection(sectionId);
+    setIsMobileDetailView(true);
+  };
+
+  const handleBackToList = () => {
+    setIsMobileDetailView(false);
+  };
+
+  const getInitials = (name: string) => {
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  };
+
+  const getRoleBadgeStyle = (role: string) => {
+    switch (role) {
+      case 'owner': return 'bg-gradient-to-r from-amber-500 to-orange-500 text-white border-0';
+      case 'manager': return 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white border-0';
+      default: return 'bg-muted text-muted-foreground';
+    }
+  };
+
   const sections = [
-    { id: 'account', icon: <UserCircle className="h-4 w-4" />, title: t('account_settings') || 'Account', description: t('account_settings_desc') || 'Profile, appearance & team' },
-    { id: 'notifications', icon: <Bell className="h-4 w-4" />, title: t('notifications'), description: t('notifications_desc') },
-    { id: 'security', icon: <Shield className="h-4 w-4" />, title: t('security'), description: t('security_desc') },
-    { id: 'advanced', icon: <Zap className="h-4 w-4" />, title: t('data_management') || 'Advanced', description: t('data_management_desc') },
+    { 
+      id: 'account', 
+      icon: <UserCircle className="h-5 w-5" />, 
+      title: language === 'bn' ? 'অ্যাকাউন্ট' : 'Account', 
+      description: language === 'bn' ? 'প্রোফাইল, থিম ও টিম' : 'Profile, theme & team' 
+    },
+    { 
+      id: 'notifications', 
+      icon: <Bell className="h-5 w-5" />, 
+      title: language === 'bn' ? 'বিজ্ঞপ্তি' : 'Notifications', 
+      description: language === 'bn' ? 'অ্যালার্ট সেটিংস' : 'Alert preferences' 
+    },
+    { 
+      id: 'security', 
+      icon: <Shield className="h-5 w-5" />, 
+      title: language === 'bn' ? 'নিরাপত্তা' : 'Security', 
+      description: language === 'bn' ? 'পাসওয়ার্ড ও অ্যাকাউন্ট' : 'Password & account' 
+    },
+    { 
+      id: 'advanced', 
+      icon: <Zap className="h-5 w-5" />, 
+      title: language === 'bn' ? 'উন্নত' : 'Advanced', 
+      description: language === 'bn' ? 'ব্যাকআপ ও ডেটা' : 'Backup & data' 
+    },
   ];
 
   const renderSectionContent = () => {
@@ -270,57 +340,83 @@ export const SettingsModule = () => {
       case 'security':
         return (
           <div className="space-y-4">
-            <Card>
+            <Card className="border-border/50 shadow-sm">
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Shield className="h-5 w-5 text-primary" />
-                  {t("security")}
+                  {language === 'bn' ? 'নিরাপত্তা সেটিংস' : 'Security Settings'}
                 </CardTitle>
-                <CardDescription>{t("security_desc")}</CardDescription>
+                <CardDescription>
+                  {language === 'bn' ? 'আপনার অ্যাকাউন্ট সুরক্ষিত রাখুন' : 'Keep your account secure'}
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                 <Button 
                   variant="outline" 
-                  className="w-full justify-start h-14" 
+                  className="w-full justify-start h-16 hover:bg-primary/5 hover:border-primary/30 transition-all" 
                   onClick={() => setShowPasswordDialog(true)}
                 >
-                  <Lock className="h-5 w-5 mr-3 text-primary" />
-                  <div className="text-left">
-                    <p className="font-medium">{t("change_password")}</p>
-                    <p className="text-xs text-muted-foreground">Update your account password</p>
+                  <div className="p-2 rounded-lg bg-primary/10 mr-3">
+                    <Lock className="h-5 w-5 text-primary" />
                   </div>
+                  <div className="text-left flex-1">
+                    <p className="font-medium">{language === 'bn' ? 'পাসওয়ার্ড পরিবর্তন' : 'Change Password'}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {language === 'bn' ? 'আপনার অ্যাকাউন্ট পাসওয়ার্ড আপডেট করুন' : 'Update your account password'}
+                    </p>
+                  </div>
+                  <ChevronRight className="h-5 w-5 text-muted-foreground" />
                 </Button>
-                <Button variant="outline" className="w-full justify-between h-14" disabled>
-                  <div className="flex items-center">
-                    <Shield className="h-5 w-5 mr-3 text-muted-foreground" />
-                    <div className="text-left">
-                      <p className="font-medium">{t("two_factor")}</p>
-                      <p className="text-xs text-muted-foreground">Add an extra layer of security</p>
-                    </div>
+                
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start h-16 opacity-60 cursor-not-allowed" 
+                  disabled
+                >
+                  <div className="p-2 rounded-lg bg-muted mr-3">
+                    <Shield className="h-5 w-5 text-muted-foreground" />
                   </div>
-                  <Badge variant="secondary">Coming Soon</Badge>
+                  <div className="text-left flex-1">
+                    <p className="font-medium">{language === 'bn' ? 'দুই-ধাপ যাচাইকরণ' : 'Two-Factor Auth'}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {language === 'bn' ? 'অতিরিক্ত নিরাপত্তা যোগ করুন' : 'Add extra security layer'}
+                    </p>
+                  </div>
+                  <Badge variant="secondary" className="text-xs">
+                    {language === 'bn' ? 'শীঘ্রই আসছে' : 'Coming Soon'}
+                  </Badge>
                 </Button>
               </CardContent>
             </Card>
 
             {/* Danger Zone */}
-            <Card className="border-destructive/30 bg-destructive/5">
+            <Card className="border-destructive/30 bg-destructive/5 shadow-sm">
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg flex items-center gap-2 text-destructive">
                   <AlertTriangle className="h-5 w-5" />
-                  Danger Zone
+                  {language === 'bn' ? 'ঝুঁকিপূর্ণ এলাকা' : 'Danger Zone'}
                 </CardTitle>
-                <CardDescription>Irreversible actions. Proceed with caution.</CardDescription>
+                <CardDescription>
+                  {language === 'bn' ? 'অপরিবর্তনীয় কার্যক্রম। সতর্কতার সাথে এগিয়ে যান।' : 'Irreversible actions. Proceed with caution.'}
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 border border-destructive/30 rounded-lg">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 border border-destructive/30 rounded-xl bg-background/50">
                   <div>
-                    <p className="font-medium text-foreground">Delete Account</p>
-                    <p className="text-sm text-muted-foreground">Permanently remove your account and data</p>
+                    <p className="font-medium text-foreground">
+                      {language === 'bn' ? 'অ্যাকাউন্ট মুছে ফেলুন' : 'Delete Account'}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {language === 'bn' ? 'স্থায়ীভাবে আপনার অ্যাকাউন্ট ও ডেটা মুছুন' : 'Permanently remove your account and data'}
+                    </p>
                   </div>
-                  <Button variant="destructive" onClick={handleDeleteAccountRequest} className="h-11">
+                  <Button 
+                    variant="destructive" 
+                    onClick={handleDeleteAccountRequest} 
+                    className="h-12 min-w-[160px] touch-target"
+                  >
                     <UserX className="h-4 w-4 mr-2" />
-                    Delete Account
+                    {language === 'bn' ? 'অ্যাকাউন্ট মুছুন' : 'Delete Account'}
                   </Button>
                 </div>
               </CardContent>
@@ -333,22 +429,24 @@ export const SettingsModule = () => {
           <div className="space-y-4">
             <BackupRestoreCard />
             
-            <Card>
+            <Card className="border-border/50 shadow-sm">
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Database className="h-5 w-5 text-primary" />
-                  {t("data_management")}
+                  {language === 'bn' ? 'ডেটা ম্যানেজমেন্ট' : 'Data Management'}
                 </CardTitle>
-                <CardDescription>{t("data_management_desc")}</CardDescription>
+                <CardDescription>
+                  {language === 'bn' ? 'ক্যাশ ও স্থানীয় ডেটা পরিচালনা' : 'Manage cache and local data'}
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <Button 
                   variant="outline" 
-                  className="w-full h-14 flex items-center justify-center gap-3"
+                  className="w-full h-14 flex items-center justify-center gap-3 hover:bg-destructive/5 hover:border-destructive/30 hover:text-destructive transition-all"
                   onClick={handleClearCache}
                 >
-                  <Trash2 className="h-5 w-5 text-muted-foreground" />
-                  <span>{t("clear_cache")}</span>
+                  <Trash2 className="h-5 w-5" />
+                  <span>{language === 'bn' ? 'ক্যাশ পরিষ্কার করুন' : 'Clear Cache'}</span>
                 </Button>
               </CardContent>
             </Card>
@@ -361,101 +459,257 @@ export const SettingsModule = () => {
   };
 
   return (
-    <div className="space-y-4 sm:space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="p-2 bg-primary/10 rounded-lg">
-          <Settings className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
-        </div>
-        <div>
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground">{t("settings")}</h1>
-          <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">{t("settings_desc")}</p>
-        </div>
-      </div>
-
-      {/* Mobile Tabs Layout */}
+    <div className="min-h-[calc(100vh-200px)]">
+      {/* Mobile Layout */}
       <div className="lg:hidden">
-        <Tabs value={activeSection} onValueChange={setActiveSection}>
-          <ScrollArea className="w-full">
-            <TabsList className="w-full justify-start px-1 h-12 flex-nowrap bg-muted/50">
-              {sections.map(section => (
-                <TabsTrigger 
-                  key={section.id} 
-                  value={section.id}
-                  className="flex items-center gap-2 px-3 py-2 shrink-0 min-h-[44px] data-[state=active]:bg-background"
-                >
-                  {section.icon}
-                  <span className="text-sm">{section.title.split(' ')[0]}</span>
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </ScrollArea>
-          <div className="mt-4">
+        {!isMobileDetailView ? (
+          // Mobile List View
+          <div className="space-y-4 animate-fade-in">
+            {/* Profile Card Header */}
+            <Card className="border-border/50 shadow-sm overflow-hidden">
+              <div className="bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-6">
+                <div className="flex items-center gap-4">
+                  <Avatar className="h-16 w-16 border-2 border-primary/20 shadow-lg">
+                    <AvatarImage src={avatarUrl || undefined} />
+                    <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground text-lg font-bold">
+                      {getInitials(userName)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <h2 className="font-bold text-lg text-foreground truncate">{userName}</h2>
+                    <p className="text-sm text-muted-foreground truncate">{userEmail}</p>
+                    <Badge className={`mt-2 text-xs ${getRoleBadgeStyle(userRole)}`}>
+                      {userRole === 'owner' ? (language === 'bn' ? 'মালিক' : 'Owner') : 
+                       userRole === 'manager' ? (language === 'bn' ? 'ম্যানেজার' : 'Manager') : userRole}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            {/* Settings List */}
+            <Card className="border-border/50 shadow-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Settings className="h-5 w-5 text-primary" />
+                  {language === 'bn' ? 'সেটিংস' : 'Settings'}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-2 space-y-1">
+                {sections.map(section => (
+                  <SettingsSection
+                    key={section.id}
+                    icon={section.icon}
+                    title={section.title}
+                    description={section.description}
+                    active={activeSection === section.id}
+                    onClick={() => handleSectionClick(section.id)}
+                  />
+                ))}
+              </CardContent>
+            </Card>
+          </div>
+        ) : (
+          // Mobile Detail View
+          <div className="space-y-4 animate-fade-in">
+            {/* Back Button */}
+            <Button 
+              variant="ghost" 
+              onClick={handleBackToList}
+              className="h-12 px-4 -ml-2 hover:bg-muted/50"
+            >
+              <ArrowLeft className="h-5 w-5 mr-2" />
+              {language === 'bn' ? 'সেটিংস' : 'Settings'}
+            </Button>
+
+            {/* Section Title */}
+            <div className="flex items-center gap-3 px-1">
+              <div className="p-2.5 rounded-xl bg-primary/10">
+                {sections.find(s => s.id === activeSection)?.icon}
+              </div>
+              <div>
+                <h2 className="font-bold text-lg text-foreground">
+                  {sections.find(s => s.id === activeSection)?.title}
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  {sections.find(s => s.id === activeSection)?.description}
+                </p>
+              </div>
+            </div>
+
+            {/* Content */}
             {renderSectionContent()}
           </div>
-        </Tabs>
+        )}
       </div>
 
       {/* Desktop Layout */}
-      <div className="hidden lg:grid lg:grid-cols-[260px_1fr] gap-6">
-        {/* Sidebar */}
-        <Card className="h-fit sticky top-6">
-          <CardContent className="p-3 space-y-1">
-            {sections.map(section => (
-              <SettingsSection
-                key={section.id}
-                icon={section.icon}
-                title={section.title}
-                description={section.description}
-                active={activeSection === section.id}
-                onClick={() => setActiveSection(section.id)}
-              />
-            ))}
-          </CardContent>
-        </Card>
+      <div className="hidden lg:block">
+        <div className="grid lg:grid-cols-[320px_1fr] gap-6">
+          {/* Sidebar */}
+          <div className="space-y-4">
+            {/* Profile Card */}
+            <Card className="border-border/50 shadow-sm overflow-hidden">
+              <div className="bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-6">
+                <div className="flex items-center gap-4">
+                  <Avatar className="h-14 w-14 border-2 border-primary/20 shadow-lg">
+                    <AvatarImage src={avatarUrl || undefined} />
+                    <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground text-base font-bold">
+                      {getInitials(userName)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-bold text-foreground truncate">{userName}</h3>
+                    <p className="text-xs text-muted-foreground truncate">{userEmail}</p>
+                    <Badge className={`mt-1.5 text-xs ${getRoleBadgeStyle(userRole)}`}>
+                      {userRole === 'owner' ? (language === 'bn' ? 'মালিক' : 'Owner') : 
+                       userRole === 'manager' ? (language === 'bn' ? 'ম্যানেজার' : 'Manager') : userRole}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+            </Card>
 
-        {/* Content */}
-        <div className="min-w-0">
-          {renderSectionContent()}
+            {/* Navigation */}
+            <Card className="sticky top-6 border-border/50 shadow-sm">
+              <CardContent className="p-2 space-y-1">
+                {sections.map(section => (
+                  <SettingsSection
+                    key={section.id}
+                    icon={section.icon}
+                    title={section.title}
+                    description={section.description}
+                    active={activeSection === section.id}
+                    onClick={() => setActiveSection(section.id)}
+                  />
+                ))}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Content */}
+          <div className="min-w-0">
+            {/* Section Header */}
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2.5 rounded-xl bg-primary/10">
+                {sections.find(s => s.id === activeSection)?.icon}
+              </div>
+              <div>
+                <h1 className="font-bold text-xl text-foreground">
+                  {sections.find(s => s.id === activeSection)?.title}
+                </h1>
+                <p className="text-sm text-muted-foreground">
+                  {sections.find(s => s.id === activeSection)?.description}
+                </p>
+              </div>
+            </div>
+
+            {renderSectionContent()}
+          </div>
         </div>
       </div>
 
       {/* Change Password Dialog */}
       <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{t("change_password")}</DialogTitle>
-            <DialogDescription>Enter your new password below.</DialogDescription>
+            <DialogTitle className="flex items-center gap-2">
+              <Lock className="h-5 w-5 text-primary" />
+              {language === 'bn' ? 'পাসওয়ার্ড পরিবর্তন' : 'Change Password'}
+            </DialogTitle>
+            <DialogDescription>
+              {language === 'bn' ? 'নতুন পাসওয়ার্ড দিন।' : 'Enter your new password below.'}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="newPassword">New Password</Label>
-              <Input
-                id="newPassword"
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Enter new password"
-                className="h-11"
-              />
+              <Label htmlFor="newPassword">
+                {language === 'bn' ? 'নতুন পাসওয়ার্ড' : 'New Password'}
+              </Label>
+              <div className="relative">
+                <Input
+                  id="newPassword"
+                  type={showNewPassword ? "text" : "password"}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder={language === 'bn' ? 'নতুন পাসওয়ার্ড লিখুন' : 'Enter new password'}
+                  className="h-12 pr-10 text-base"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                >
+                  {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm Password</Label>
-              <Input
-                id="confirmPassword"
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Confirm new password"
-                className="h-11"
-              />
+              <Label htmlFor="confirmPassword">
+                {language === 'bn' ? 'পাসওয়ার্ড নিশ্চিত করুন' : 'Confirm Password'}
+              </Label>
+              <div className="relative">
+                <Input
+                  id="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder={language === 'bn' ? 'পাসওয়ার্ড নিশ্চিত করুন' : 'Confirm new password'}
+                  className="h-12 pr-10 text-base"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                >
+                  {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
             </div>
+            {newPassword && confirmPassword && (
+              <div className={cn(
+                "flex items-center gap-2 text-sm p-3 rounded-lg",
+                newPassword === confirmPassword 
+                  ? "bg-green-500/10 text-green-600" 
+                  : "bg-destructive/10 text-destructive"
+              )}>
+                {newPassword === confirmPassword ? (
+                  <>
+                    <Check className="h-4 w-4" />
+                    {language === 'bn' ? 'পাসওয়ার্ড মিলেছে' : 'Passwords match'}
+                  </>
+                ) : (
+                  <>
+                    <AlertTriangle className="h-4 w-4" />
+                    {language === 'bn' ? 'পাসওয়ার্ড মিলছে না' : 'Passwords do not match'}
+                  </>
+                )}
+              </div>
+            )}
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPasswordDialog(false)}>{t("cancel")}</Button>
-            <Button onClick={handleChangePassword} disabled={changingPassword} className="h-11">
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowPasswordDialog(false);
+                setNewPassword("");
+                setConfirmPassword("");
+              }}
+              className="h-11"
+            >
+              {language === 'bn' ? 'বাতিল' : 'Cancel'}
+            </Button>
+            <Button 
+              onClick={handleChangePassword} 
+              disabled={changingPassword || !newPassword || !confirmPassword || newPassword !== confirmPassword} 
+              className="h-11"
+            >
               {changingPassword && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              {t("save")}
+              {language === 'bn' ? 'সংরক্ষণ করুন' : 'Save'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -467,21 +721,23 @@ export const SettingsModule = () => {
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2 text-destructive">
               <AlertTriangle className="h-5 w-5" />
-              Delete Account?
+              {language === 'bn' ? 'অ্যাকাউন্ট মুছে ফেলবেন?' : 'Delete Account?'}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. Your account and all associated data will be permanently deleted.
+              {language === 'bn' 
+                ? 'এই কাজটি পূর্বাবস্থায় ফেরানো যাবে না। আপনার অ্যাকাউন্ট এবং সমস্ত সম্পর্কিত ডেটা স্থায়ীভাবে মুছে ফেলা হবে।'
+                : 'This action cannot be undone. Your account and all associated data will be permanently deleted.'}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
+            <AlertDialogCancel className="h-11">{language === 'bn' ? 'বাতিল' : 'Cancel'}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteAccount}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 h-11"
               disabled={deletingAccount}
             >
               {deletingAccount && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Yes, Delete
+              {language === 'bn' ? 'হ্যাঁ, মুছুন' : 'Yes, Delete'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -489,54 +745,64 @@ export const SettingsModule = () => {
 
       {/* Delete Account with Password (Owner) */}
       <Dialog open={showDeletePasswordDialog} onOpenChange={setShowDeletePasswordDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-destructive">
               <AlertTriangle className="h-5 w-5" />
-              Delete Account
+              {language === 'bn' ? 'অ্যাকাউন্ট মুছে ফেলুন' : 'Delete Account'}
             </DialogTitle>
             <DialogDescription>
-              This action is permanent. Enter your password and type DELETE to confirm.
+              {language === 'bn' 
+                ? 'এই কাজটি স্থায়ী। আপনার পাসওয়ার্ড দিন এবং নিশ্চিত করতে DELETE টাইপ করুন।'
+                : 'This action is permanent. Enter your password and type DELETE to confirm.'}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="p-4 bg-destructive/10 rounded-lg text-sm border border-destructive/20">
-              <p className="font-medium text-destructive mb-2">Warning: This will delete:</p>
+            <div className="p-4 bg-destructive/10 rounded-xl text-sm border border-destructive/20">
+              <p className="font-medium text-destructive mb-2">
+                {language === 'bn' ? 'সতর্কতা: এটি মুছে ফেলবে:' : 'Warning: This will delete:'}
+              </p>
               <ul className="list-disc list-inside space-y-1 text-muted-foreground">
-                <li>Your account and profile</li>
-                <li>All team members and invites</li>
-                <li>Access to the application</li>
+                <li>{language === 'bn' ? 'আপনার অ্যাকাউন্ট এবং প্রোফাইল' : 'Your account and profile'}</li>
+                <li>{language === 'bn' ? 'সমস্ত টিম সদস্য এবং আমন্ত্রণ' : 'All team members and invites'}</li>
+                <li>{language === 'bn' ? 'অ্যাপ্লিকেশনে অ্যাক্সেস' : 'Access to the application'}</li>
               </ul>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="deletePassword">Password</Label>
+              <Label htmlFor="deletePassword">{language === 'bn' ? 'পাসওয়ার্ড' : 'Password'}</Label>
               <Input
                 id="deletePassword"
                 type="password"
                 value={deletePassword}
                 onChange={(e) => setDeletePassword(e.target.value)}
-                placeholder="Enter your password"
-                className="h-11"
+                placeholder={language === 'bn' ? 'আপনার পাসওয়ার্ড লিখুন' : 'Enter your password'}
+                className="h-12 text-base"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="deleteConfirm">Type DELETE to confirm</Label>
+              <Label htmlFor="deleteConfirm">
+                {language === 'bn' ? 'নিশ্চিত করতে DELETE টাইপ করুন' : 'Type DELETE to confirm'}
+              </Label>
               <Input
                 id="deleteConfirm"
                 value={deleteConfirmText}
                 onChange={(e) => setDeleteConfirmText(e.target.value.toUpperCase())}
-                className="font-mono h-11"
+                className="font-mono h-12 text-base"
                 placeholder="DELETE"
               />
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => {
-              setShowDeletePasswordDialog(false);
-              setDeletePassword("");
-              setDeleteConfirmText("");
-            }}>
-              {t("cancel")}
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowDeletePasswordDialog(false);
+                setDeletePassword("");
+                setDeleteConfirmText("");
+              }}
+              className="h-11"
+            >
+              {language === 'bn' ? 'বাতিল' : 'Cancel'}
             </Button>
             <Button 
               variant="destructive"
@@ -545,7 +811,7 @@ export const SettingsModule = () => {
               className="h-11"
             >
               {deletingAccount && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Permanently Delete
+              {language === 'bn' ? 'স্থায়ীভাবে মুছুন' : 'Permanently Delete'}
             </Button>
           </DialogFooter>
         </DialogContent>
