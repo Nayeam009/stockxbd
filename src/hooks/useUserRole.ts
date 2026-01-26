@@ -18,7 +18,7 @@ let cachedRole: UserRole | null = null;
 let cachedName: string | null = null;
 let cachedUserId: string | null = null;
 let lastFetchTime = 0;
-const CACHE_DURATION = 120000; // 2 minutes cache (extended from 1 minute)
+const CACHE_DURATION = 300000; // 5 minutes cache - be aggressive about using cache
 
 export const useUserRole = (): UserRoleData => {
   const [userRole, setUserRole] = useState<UserRole>(cachedRole || 'customer');
@@ -27,11 +27,21 @@ export const useUserRole = (): UserRoleData => {
   const [loading, setLoading] = useState(!cachedRole); // No loading if we have cache
   const [error, setError] = useState<string | null>(null);
   const isInitialLoadRef = useRef(!cachedRole);
+  const isFetchingRef = useRef(false);
 
   const fetchUserData = useCallback(async (isSoftRefresh = false) => {
+    // Prevent concurrent fetches
+    if (isFetchingRef.current) {
+      console.log('[UserRole] Fetch already in progress, skipping');
+      return;
+    }
+    
     try {
+      isFetchingRef.current = true;
+      
       // Network-aware: if offline and we have cache, use it immediately
       if (!isOnline() && cachedRole && cachedName) {
+        console.log('[UserRole] Offline - using cached data');
         setUserRole(cachedRole);
         setUserName(cachedName);
         setUserId(cachedUserId);
@@ -45,16 +55,19 @@ export const useUserRole = (): UserRoleData => {
       }
       setError(null);
 
-      // Use retry-protected session fetch for better resilience
-      const { data: { session } } = await getSessionWithRetry(isSoftRefresh ? 1 : 3);
+      // Use retry-protected session fetch with cache fallback
+      const { data: { session } } = await getSessionWithRetry(isSoftRefresh ? 1 : 2, true);
       
       if (!session?.user) {
+        // Only clear cache if we got a definitive "no session" response
+        if (!isSoftRefresh) {
+          cachedRole = null;
+          cachedName = null;
+          cachedUserId = null;
+        }
         setUserRole('customer');
         setUserName('Guest');
         setUserId(null);
-        cachedRole = null;
-        cachedName = null;
-        cachedUserId = null;
         return;
       }
 
@@ -79,8 +92,8 @@ export const useUserRole = (): UserRoleData => {
         new Promise(resolve => setTimeout(() => resolve(null), ms));
 
       const [roleResult, profileResult] = await Promise.all([
-        Promise.race([rolePromise, timeoutPromise<typeof rolePromise>(5000)]),
-        Promise.race([profilePromise, timeoutPromise<typeof profilePromise>(5000)])
+        Promise.race([rolePromise, timeoutPromise<typeof rolePromise>(8000)]),
+        Promise.race([profilePromise, timeoutPromise<typeof profilePromise>(8000)])
       ]);
 
       // Handle role result
@@ -88,15 +101,20 @@ export const useUserRole = (): UserRoleData => {
         const role = roleResult.data.role as UserRole;
         setUserRole(role);
         cachedRole = role;
-      } else if (roleResult && 'error' in roleResult && roleResult.error) {
-        console.error('Error fetching role:', roleResult.error);
-        setError('Failed to fetch user role');
+      } else {
+        // If role fetch failed but we have cache, use it
+        if (cachedRole && isSoftRefresh) {
+          setUserRole(cachedRole);
+        } else {
+          console.warn('[UserRole] No role data, using customer default');
+        }
       }
 
       // Use full name from profile, or email prefix, or 'User'
       const profileData = profileResult && 'data' in profileResult ? profileResult.data : null;
       const displayName = profileData?.full_name || 
                          session.user.email?.split('@')[0] || 
+                         cachedName || // Fallback to cached name
                          'User';
       setUserName(displayName);
       cachedName = displayName;
@@ -110,18 +128,25 @@ export const useUserRole = (): UserRoleData => {
       // On timeout, use cache if available, otherwise set defaults
       if (err instanceof AuthTimeoutError) {
         if (cachedRole && cachedName) {
+          console.warn('[UserRole] Timeout - using cached data');
           setUserRole(cachedRole);
           setUserName(cachedName);
           setUserId(cachedUserId);
         } else {
-          setError('Connection timed out');
+          // Only set error on initial load
+          if (!isSoftRefresh) {
+            setError('Connection timed out');
+          }
           setUserRole('customer');
           setUserName('Guest');
         }
       } else {
-        setError('An error occurred while fetching user data');
+        if (!isSoftRefresh && !cachedRole) {
+          setError('An error occurred while fetching user data');
+        }
       }
     } finally {
+      isFetchingRef.current = false;
       if (isInitialLoadRef.current) {
         setLoading(false);
         isInitialLoadRef.current = false;

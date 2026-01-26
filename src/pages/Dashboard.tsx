@@ -128,14 +128,14 @@ const Dashboard = () => {
     setOrders,
   } = useDashboardData();
 
-  // Safety timeout: if loading takes more than 30 seconds, force show error
+  // Safety timeout: if loading takes more than 45 seconds, force show error
   useEffect(() => {
     const timeout = setTimeout(() => {
       if (authLoading || dataLoading) {
         console.error('[Dashboard] Safety timeout reached - loading took too long');
         setSafetyTimeoutReached(true);
       }
-    }, 30000); // 30 second safety net
+    }, 45000); // 45 second safety net
 
     return () => clearTimeout(timeout);
   }, [authLoading, dataLoading]);
@@ -153,7 +153,7 @@ const Dashboard = () => {
           </div>
           <h2 className="text-xl font-semibold text-foreground">Loading is Taking Longer Than Expected</h2>
           <p className="text-muted-foreground">
-            This might be due to slow network conditions. Please check your internet connection and try again.
+            This might be due to slow network conditions or temporary server issues. Please check your internet connection and try again.
           </p>
           <div className="flex flex-col gap-3">
             <button 
@@ -171,6 +171,17 @@ const Dashboard = () => {
             >
               Try Again Without Reload
             </button>
+            <button 
+              onClick={() => {
+                // Clear all caches and reload
+                sessionStorage.clear();
+                localStorage.clear();
+                window.location.reload();
+              }} 
+              className="px-6 py-3 text-sm text-destructive border border-destructive rounded-lg hover:bg-destructive/10 transition-colors"
+            >
+              Clear Cache & Reload
+            </button>
           </div>
         </div>
       </div>
@@ -186,7 +197,7 @@ const Dashboard = () => {
             <p className="text-lg font-medium text-foreground">Loading Stock-X Dashboard</p>
             <p className="text-muted-foreground">Preparing your LPG management system...</p>
             <p className="text-xs text-muted-foreground mt-2">
-              This may take up to 30 seconds on slow connections...
+              This may take up to 45 seconds on slow connections...
             </p>
           </div>
         </div>
