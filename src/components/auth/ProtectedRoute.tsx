@@ -1,10 +1,11 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, RefreshCw, LogIn } from "lucide-react";
-import { getSessionWithTimeout, AuthTimeoutError } from "@/lib/authUtils";
+import { Loader2, RefreshCw, LogIn, WifiOff, Clock } from "lucide-react";
+import { getSessionWithRetry, AuthTimeoutError, isOnline } from "@/lib/authUtils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -14,23 +15,33 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   const [loading, setLoading] = useState(true);
   const [authenticated, setAuthenticated] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
-  const [authError, setAuthError] = useState<'timeout' | 'expired' | null>(null);
+  const [authError, setAuthError] = useState<'timeout' | 'expired' | 'offline' | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const location = useLocation();
   const navigate = useNavigate();
   
-  // Cache for quick visibility recovery
+  // Cache for quick visibility recovery - extended to 60 seconds
   const lastAuthCheckRef = useRef<number>(0);
   const cachedAuthRef = useRef<boolean>(false);
   const cachedRoleRef = useRef<string | null>(null);
 
   const checkAuthAndRole = useCallback(async (isVisibilityCheck = false) => {
     try {
-      // If visibility check and we have recent cache (within 30s), use cache
+      // Offline detection - use cache immediately if offline
+      if (!isOnline() && cachedAuthRef.current) {
+        console.log('[Auth] Offline - using cached auth');
+        setAuthenticated(true);
+        setUserRole(cachedRoleRef.current);
+        setLoading(false);
+        return;
+      }
+
+      // If visibility check and we have recent cache (within 60s), use cache
       if (isVisibilityCheck && cachedAuthRef.current) {
         const timeSinceLastCheck = Date.now() - lastAuthCheckRef.current;
-        if (timeSinceLastCheck < 30000) {
+        if (timeSinceLastCheck < 60000) { // Extended from 30s to 60s
           // Still validate session in background without blocking
-          getSessionWithTimeout().then(({ data: { session } }) => {
+          getSessionWithRetry(1).then(({ data: { session } }) => {
             if (!session && cachedAuthRef.current) {
               setAuthenticated(false);
               cachedAuthRef.current = false;
@@ -45,7 +56,8 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
       // Reset error state
       setAuthError(null);
 
-      const { data: { session } } = await getSessionWithTimeout();
+      // Use retry logic for session check
+      const { data: { session } } = await getSessionWithRetry();
       
       if (!session) {
         setAuthenticated(false);
@@ -88,9 +100,23 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     } catch (error) {
       console.error('Auth check error:', error);
       
+      // Increment retry count for UI feedback
+      setRetryCount(prev => prev + 1);
+      
+      // If offline and we have cache, use it
+      if (!isOnline() && cachedAuthRef.current) {
+        setAuthError('offline');
+        setAuthenticated(true);
+        setUserRole(cachedRoleRef.current);
+        setLoading(false);
+        return;
+      }
+      
       // Determine error type
       if (error instanceof AuthTimeoutError) {
         setAuthError('timeout');
+      } else if (!isOnline()) {
+        setAuthError('offline');
       } else {
         setAuthError('expired');
       }
@@ -162,28 +188,55 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
 
   // Session Expired / Timeout Recovery Screen
   if (authError) {
+    const errorConfig = {
+      timeout: {
+        icon: <Clock className="h-8 w-8 text-amber-500" />,
+        title: 'Connection Slow',
+        description: `Connection attempt ${retryCount}/3 timed out. Check your internet and try again.`,
+        bgColor: 'bg-amber-500/10'
+      },
+      offline: {
+        icon: <WifiOff className="h-8 w-8 text-muted-foreground" />,
+        title: 'You\'re Offline',
+        description: 'No internet connection detected. Please check your network.',
+        bgColor: 'bg-muted'
+      },
+      expired: {
+        icon: <RefreshCw className="h-8 w-8 text-primary" />,
+        title: 'Session Expired',
+        description: 'Your session has expired. Please sign in again to continue.',
+        bgColor: 'bg-primary/10'
+      }
+    };
+    
+    const config = errorConfig[authError];
+    
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="max-w-md w-full shadow-lg">
           <CardHeader className="text-center space-y-2">
-            <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-2">
-              <RefreshCw className="h-8 w-8 text-primary" />
+            <div className={`mx-auto w-16 h-16 rounded-full ${config.bgColor} flex items-center justify-center mb-2`}>
+              {config.icon}
             </div>
-            <CardTitle className="text-xl">
-              {authError === 'timeout' ? 'Connection Timeout' : 'Session Expired'}
-            </CardTitle>
-            <CardDescription>
-              {authError === 'timeout' 
-                ? 'The connection is taking too long. Please try again.'
-                : 'Your session has expired. Please sign in again to continue.'
-              }
-            </CardDescription>
+            <CardTitle className="text-xl">{config.title}</CardTitle>
+            <CardDescription>{config.description}</CardDescription>
+            
+            {/* Retry progress indicator */}
+            {authError === 'timeout' && retryCount > 0 && (
+              <div className="pt-2">
+                <Progress value={(retryCount / 3) * 100} className="h-2" />
+                <p className="text-xs text-muted-foreground mt-1">
+                  {retryCount < 3 ? 'Auto-retrying...' : 'Max retries reached'}
+                </p>
+              </div>
+            )}
           </CardHeader>
           <CardContent className="space-y-3">
             <Button 
               onClick={() => {
                 setLoading(true);
                 setAuthError(null);
+                setRetryCount(0);
                 checkAuthAndRole();
               }} 
               variant="outline"

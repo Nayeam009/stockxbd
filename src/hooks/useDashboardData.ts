@@ -155,7 +155,7 @@ export const useDashboardData = () => {
   // Persist a lightweight snapshot so if the browser discards the tab,
   // the dashboard can render instantly on restore.
   const DASHBOARD_CACHE_KEY = 'stockx.dashboard.snapshot.v1';
-  const DASHBOARD_CACHE_TTL_MS = 1000 * 60 * 10; // 10 minutes
+  const DASHBOARD_CACHE_TTL_MS = 1000 * 60 * 30; // 30 minutes (extended from 10 for better offline support)
 
   type DashboardSnapshot = {
     ts: number;
@@ -200,7 +200,29 @@ export const useDashboardData = () => {
     }
   }, []);
 
+  // Retry wrapper for data fetches
+  const withRetry = useCallback(async <T,>(
+    fetchFn: () => Promise<T>, 
+    retries = 3, 
+    delayMs = 1000
+  ): Promise<T> => {
+    let lastError: Error | null = null;
+    for (let attempt = 0; attempt < retries; attempt++) {
+      try {
+        return await fetchFn();
+      } catch (error) {
+        lastError = error as Error;
+        logger.warn(`Data fetch attempt ${attempt + 1}/${retries} failed`, { error });
+        if (attempt < retries - 1) {
+          await new Promise(resolve => setTimeout(resolve, delayMs * Math.pow(2, attempt)));
+        }
+      }
+    }
+    throw lastError;
+  }, []);
+
   // Soft fetch - background refresh without loading spinner
+  // Now with retry logic for better resilience
   const fetchData = useCallback(async (isSoftRefresh = false) => {
     try {
       if (isSoftRefresh) {
@@ -211,15 +233,8 @@ export const useDashboardData = () => {
       const now = new Date();
       const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-      // Parallel fetch all data for faster loading
-      const [
-        transactionsResult,
-        customerDataResult,
-        ordersDataResult,
-        lpgBrandsResult,
-        stovesResult,
-        userRolesResult
-      ] = await withTimeout(Promise.all([
+      // Parallel fetch all data for faster loading - with retry wrapper
+      const fetchAllData = () => Promise.all([
         supabase
           .from('pos_transactions')
           .select(`
@@ -266,8 +281,22 @@ export const useDashboardData = () => {
           .limit(500),
         supabase.from('lpg_brands').select('*').eq('is_active', true),
         supabase.from('stoves').select('*').eq('is_active', true),
-        supabase.from('user_roles').select('user_id, role').eq('role', 'driver')
-      ]), 15000);
+        supabase.from('user_roles').select('user_id, role').eq('role', 'manager') // Updated: no more driver role
+      ]);
+
+      // Apply retry and timeout
+      const [
+        transactionsResult,
+        customerDataResult,
+        ordersDataResult,
+        lpgBrandsResult,
+        stovesResult,
+        userRolesResult
+      ] = await withRetry(
+        () => withTimeout(fetchAllData(), 10000), // 10s timeout per attempt
+        3, // 3 retries
+        1000 // 1s initial delay
+      );
 
       const transactions = transactionsResult.data;
       const customerData = customerDataResult.data;
@@ -520,10 +549,19 @@ export const useDashboardData = () => {
   }, [debouncedRefetch]);
 
   // Handle page visibility changes for instant tab-switch recovery
+  // Extended stale threshold for better performance
   const handleVisibilityChange = useCallback(() => {
     if (document.visibilityState === 'visible') {
       const timeSinceLastFetch = Date.now() - lastFetchTimeRef.current;
-      const isStale = timeSinceLastFetch > 30000; // 30 seconds
+      const isStale = timeSinceLastFetch > 60000; // 60 seconds (extended from 30s)
+      
+      // Check if online before attempting refresh
+      const online = typeof navigator !== 'undefined' ? navigator.onLine : true;
+      
+      if (!online) {
+        // Offline - don't attempt refresh, just rely on cache
+        return;
+      }
       
       // Always check channel health on return
       if (!channelHealthyRef.current) {
