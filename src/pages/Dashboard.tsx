@@ -78,8 +78,8 @@ const Dashboard = () => {
     const isLeftSwipe = distance > minSwipeDistance;
     const isRightSwipe = distance < -minSwipeDistance;
 
-    // Use actual role for swipe navigation (staff and customer use limited nav)
-    const swipeRole = userRole === 'customer' ? 'staff' : userRole;
+    // Only owner and manager can use swipe navigation on dashboard
+    const swipeRole = userRole === 'owner' ? 'owner' : 'manager';
 
     if (isLeftSwipe) {
       const nextModule = getNextModule(activeModule, 'left', swipeRole);
@@ -163,8 +163,9 @@ const Dashboard = () => {
     );
   }
 
-  // Get sanitized role for components that expect specific types
-  const dashboardRole = (userRole === 'customer' ? 'driver' : userRole) as 'owner' | 'manager' | 'driver' | 'staff';
+  // Get sanitized role for components - customers should not reach here (redirected by ProtectedRoute)
+  // Managers and owners are the only valid dashboard roles
+  const dashboardRole: 'owner' | 'manager' = userRole === 'owner' ? 'owner' : 'manager';
   const navRole = dashboardRole;
 
   const renderActiveModule = () => {
@@ -179,13 +180,13 @@ const Dashboard = () => {
               analytics={analytics}
               drivers={drivers}
               cylinderStock={cylinderStock}
-              userRole={dashboardRole as 'owner' | 'manager' | 'driver'}
+              userRole={dashboardRole}
               setActiveModule={handleModuleChange}
               onRefresh={refetch}
             />
           );
         case "pos":
-          return <POSModule userRole={dashboardRole as 'owner' | 'manager' | 'driver'} userName={userName} />;
+          return <POSModule userRole={dashboardRole} userName={userName} />;
         case "inventory":
         case "pob":
           return <InventoryModule />;
@@ -221,7 +222,7 @@ const Dashboard = () => {
               customers={customers}
               stockData={stockData}
               drivers={drivers}
-              userRole={dashboardRole as 'owner' | 'manager' | 'driver'}
+              userRole={dashboardRole}
             />
           );
         default:
@@ -230,7 +231,7 @@ const Dashboard = () => {
               analytics={analytics}
               drivers={drivers}
               cylinderStock={cylinderStock}
-              userRole={dashboardRole as 'owner' | 'manager' | 'driver'}
+              userRole={dashboardRole}
               setActiveModule={handleModuleChange}
               onRefresh={refetch}
             />
@@ -276,7 +277,7 @@ const Dashboard = () => {
           <DashboardHeader
             searchQuery={searchQuery}
             setSearchQuery={setSearchQuery}
-            userRole={dashboardRole as 'owner' | 'manager' | 'driver'}
+            userRole={dashboardRole}
             userName={userName}
             onSettingsClick={() => handleModuleChange("settings")}
             onProfileClick={() => handleModuleChange("profile")}
@@ -307,7 +308,7 @@ const Dashboard = () => {
         
         {/* Global Command Palette */}
         <GlobalCommandPalette 
-          userRole={dashboardRole as 'owner' | 'manager' | 'driver'}
+          userRole={dashboardRole}
           setActiveModule={handleModuleChange}
         />
       </div>

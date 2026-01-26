@@ -39,7 +39,7 @@ interface TeamMember {
   id: string;
   member_user_id: string;
   member_email: string;
-  role: 'owner' | 'manager' | 'driver' | 'customer';
+  role: 'owner' | 'manager' | 'customer';
   created_at: string;
   profile?: {
     full_name: string | null;
@@ -51,7 +51,7 @@ interface TeamMember {
 interface PendingInvite {
   id: string;
   code: string;
-  role: 'owner' | 'manager' | 'driver' | 'customer';
+  role: 'owner' | 'manager' | 'customer';
   expires_at: string;
   created_at: string;
 }
@@ -112,20 +112,26 @@ export const TeamManagementCard = () => {
       return;
     }
 
-    // Fetch profiles for team members
+    // Fetch profiles for team members and filter to only managers
     const membersWithProfiles = await Promise.all(
-      (data || []).map(async (member) => {
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('full_name, avatar_url, phone')
-          .eq('user_id', member.member_user_id)
-          .single();
+      (data || [])
+        .filter(member => member.role === 'manager') // Only show managers
+        .map(async (member) => {
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('full_name, avatar_url, phone')
+            .eq('user_id', member.member_user_id)
+            .single();
 
-        return {
-          ...member,
-          profile: profileData || undefined
-        };
-      })
+          return {
+            id: member.id,
+            member_user_id: member.member_user_id,
+            member_email: member.member_email,
+            role: 'manager' as const,
+            created_at: member.created_at,
+            profile: profileData || undefined
+          };
+        })
     );
 
     setTeamMembers(membersWithProfiles);
@@ -148,10 +154,21 @@ export const TeamManagementCard = () => {
       return;
     }
 
-    setPendingInvites(data || []);
+    // Filter to only manager invites and map to proper type
+    const managerInvites = (data || [])
+      .filter(invite => invite.role === 'manager')
+      .map(invite => ({
+        id: invite.id,
+        code: invite.code,
+        role: 'manager' as const,
+        expires_at: invite.expires_at,
+        created_at: invite.created_at
+      }));
+
+    setPendingInvites(managerInvites);
   };
 
-  const handleRoleChange = async (member: TeamMember, newRole: 'manager' | 'driver') => {
+  const handleRoleChange = async (member: TeamMember, newRole: 'manager') => {
     if (member.role === newRole) return;
 
     setChangingRole(member.id);
@@ -227,7 +244,6 @@ export const TeamManagementCard = () => {
     switch (role) {
       case 'owner': return 'bg-gradient-to-r from-amber-500 to-orange-500 text-white border-0';
       case 'manager': return 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white border-0';
-      case 'driver': return 'bg-gradient-to-r from-green-500 to-emerald-500 text-white border-0';
       default: return 'bg-muted text-muted-foreground';
     }
   };
@@ -235,7 +251,6 @@ export const TeamManagementCard = () => {
   const getRoleLabel = (role: string) => {
     switch (role) {
       case 'manager': return t("manager");
-      case 'driver': return t("driver");
       default: return role;
     }
   };
@@ -344,15 +359,6 @@ export const TeamManagementCard = () => {
                               {t("manager")}
                             </Badge>
                             {t("full_access")}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            onClick={() => handleRoleChange(member, 'driver')}
-                            className={member.role === 'driver' ? 'bg-accent' : ''}
-                          >
-                            <Badge className={`${getRoleBadgeColor('driver')} mr-2`}>
-                              {t("driver")}
-                            </Badge>
-                            {t("limited_access")}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>

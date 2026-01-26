@@ -17,7 +17,7 @@ import {
 interface DashboardHeaderProps {
   searchQuery: string;
   setSearchQuery: (query: string) => void;
-  userRole: 'owner' | 'manager' | 'driver' | 'staff';
+  userRole: 'owner' | 'manager';
   userName: string;
   onSettingsClick?: () => void;
   onProfileClick?: () => void;
@@ -64,10 +64,6 @@ export const DashboardHeader = ({
         return 'bg-primary/15 text-primary border-primary/30';
       case 'manager':
         return 'bg-secondary/15 text-secondary border-secondary/30';
-      case 'driver':
-        return 'bg-accent/15 text-accent border-accent/30';
-      case 'staff':
-        return 'bg-muted/50 text-muted-foreground border-border';
       default:
         return 'bg-muted text-muted-foreground border-border';
     }
@@ -79,10 +75,6 @@ export const DashboardHeader = ({
         return language === 'bn' ? 'মালিক' : 'Owner';
       case 'manager':
         return language === 'bn' ? 'ম্যানেজার' : 'Manager';
-      case 'driver':
-        return language === 'bn' ? 'ড্রাইভার' : 'Driver';
-      case 'staff':
-        return language === 'bn' ? 'স্টাফ' : 'Staff';
       default:
         return role;
     }

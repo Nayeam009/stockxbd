@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Shield, Truck, Loader2, Users, Crown, AlertCircle, UserPlus, LogIn, ShoppingCart, Package, Globe, CheckCircle2, Building2, Eye, EyeOff, RefreshCcw } from "lucide-react";
+import { ArrowLeft, Shield, Loader2, Users, Crown, AlertCircle, UserPlus, LogIn, ShoppingCart, Package, Globe, CheckCircle2, Building2, Eye, EyeOff, RefreshCcw } from "lucide-react";
 import stockXLogo from "@/assets/stock-x-logo.png";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -20,7 +20,7 @@ import {
 import { validateBDPhone, getPhoneValidationError } from "@/lib/phoneValidation";
 
 type AuthMode = 'signin' | 'signup' | 'invite' | 'team-signup';
-type UserRole = 'owner' | 'manager' | 'driver' | 'customer' | 'staff';
+type UserRole = 'owner' | 'manager' | 'customer';
 type SignupCategory = 'customer' | 'owner' | 'team';
 
 interface RoleOption {
@@ -104,23 +104,12 @@ const roleOptions: RoleOption[] = [
     bgColor: 'bg-primary/5',
     borderColor: 'border-primary',
     features: ['Inventory management', 'Sales & POS access', 'Customer management']
-  },
-  {
-    id: 'driver',
-    label: 'Driver',
-    description: 'Delivery access',
-    icon: Truck,
-    color: 'text-slate-600',
-    bgColor: 'bg-slate-50 dark:bg-slate-950/30',
-    borderColor: 'border-slate-500',
-    features: ['Delivery tracking', 'Customer updates', 'Route management']
   }
 ];
 
+// Only manager role is available for team members
 const teamRoleOptions = [
-  { value: 'manager', label: 'Manager', description: 'Inventory & sales access' },
-  { value: 'driver', label: 'Driver', description: 'Delivery & route access' },
-  { value: 'staff', label: 'Staff', description: 'Basic POS access' }
+  { value: 'manager', label: 'Manager', description: 'Full inventory & sales access' }
 ];
 
 const Auth = () => {
@@ -570,9 +559,7 @@ const Auth = () => {
     switch (role) {
       case 'owner': return 'Owner';
       case 'manager': return 'Manager';
-      case 'driver': return 'Driver';
       case 'customer': return 'Customer';
-      case 'staff': return 'Staff';
       default: return role;
     }
   };
@@ -582,7 +569,7 @@ const Auth = () => {
       case 'owner': return Crown;
       case 'manager': return Users;
       case 'customer': return ShoppingCart;
-      default: return Truck;
+      default: return Users;
     }
   };
 

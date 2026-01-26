@@ -7,15 +7,15 @@ import { useState } from "react";
 interface MobileBottomNavProps {
   activeModule: string;
   setActiveModule: (module: string) => void;
-  userRole: 'owner' | 'manager' | 'driver' | 'staff';
+  userRole: 'owner' | 'manager';
 }
 
-// Primary bottom nav items - most accessed modules
+// Primary bottom nav items - most accessed modules (owner and manager only)
 const navItems = [{
   id: 'overview',
   labelKey: 'overview',
   icon: Home,
-  roles: ['owner', 'manager', 'driver', 'staff']
+  roles: ['owner', 'manager']
 }, {
   id: 'business-diary',
   labelKey: 'business_diary',
@@ -25,7 +25,7 @@ const navItems = [{
   id: 'pos',
   labelKey: 'pos',
   icon: Receipt,
-  roles: ['owner', 'manager', 'driver', 'staff']
+  roles: ['owner', 'manager']
 }, {
   id: 'my-shop',
   labelKey: 'my_shop',
@@ -33,7 +33,7 @@ const navItems = [{
   roles: ['owner', 'manager']
 }];
 
-// More menu items - secondary access
+// More menu items - secondary access (owner and manager only)
 const moreItems = [{
   id: 'inventory',
   labelKey: 'inventory',
@@ -48,7 +48,7 @@ const moreItems = [{
   id: 'customers',
   labelKey: 'customers',
   icon: Users,
-  roles: ['owner', 'manager', 'driver']
+  roles: ['owner', 'manager']
 }, {
   id: 'utility-expense',
   labelKey: 'utility_expense',
@@ -63,7 +63,7 @@ const moreItems = [{
   id: 'settings',
   labelKey: 'settings',
   icon: Settings,
-  roles: ['owner', 'manager', 'driver', 'staff']
+  roles: ['owner', 'manager']
 }];
 
 export const MobileBottomNav = ({
