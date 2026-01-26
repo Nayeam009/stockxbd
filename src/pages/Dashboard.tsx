@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, TouchEvent, Suspense, lazy, useTransition } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/dashboard/AppSidebar";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
@@ -32,7 +33,14 @@ const ProfileModule = lazy(() => import("@/components/dashboard/modules/ProfileM
 const MyShopProfileModule = lazy(() => import("@/components/dashboard/modules/MyShopProfileModule").then(m => ({ default: m.MyShopProfileModule })));
 const AdminPanelModule = lazy(() => import("@/components/dashboard/modules/AdminPanelModule").then(m => ({ default: m.AdminPanelModule })));
 const Dashboard = () => {
-  const [activeModule, setActiveModule] = useState("overview");
+  const location = useLocation();
+  const navigate = useNavigate();
+  
+  // Get module from URL or default to overview
+  const params = new URLSearchParams(location.search);
+  const moduleFromUrl = params.get('module') || 'overview';
+  
+  const [activeModule, setActiveModule] = useState(moduleFromUrl);
   const [searchQuery, setSearchQuery] = useState("");
   
   // Performance: React 18 transitions for non-blocking module switches
@@ -42,6 +50,15 @@ const Dashboard = () => {
   const [loadedModules, setLoadedModules] = useState<Set<string>>(new Set(['overview']));
   const [hasInitiallyLoaded, setHasInitiallyLoaded] = useState(false);
   
+  // Sync activeModule with URL changes
+  useEffect(() => {
+    const param = params.get('module');
+    if (param && param !== activeModule) {
+      setActiveModule(param);
+      setLoadedModules(prev => new Set([...prev, param]));
+    }
+  }, [location.search]);
+  
   // Safety timeout to prevent infinite loading
   const [safetyTimeoutReached, setSafetyTimeoutReached] = useState(false);
   
@@ -50,8 +67,10 @@ const Dashboard = () => {
     startTransition(() => {
       setActiveModule(module);
       setLoadedModules(prev => new Set([...prev, module]));
+      // Update URL
+      navigate(`/dashboard?module=${module}`, { replace: true });
     });
-  }, []);
+  }, [navigate]);
   
   // Use real authentication - fetch user role from database
   const { userRole, userName, userId, loading: authLoading, error: authError } = useUserRole();
@@ -62,23 +81,16 @@ const Dashboard = () => {
   useEffect(() => {
     const checkAdminStatus = async () => {
       if (!userId) {
-        console.log('❌ Admin check: No userId yet');
         return;
       }
       
-      console.log('🔍 Checking admin status for user:', userId);
       const { data, error } = await supabase
         .from('admin_users')
         .select('id')
         .eq('user_id', userId)
         .maybeSingle();
       
-      if (error) {
-        console.error('❌ Admin check error:', error);
-      }
-      
       const isAdminUser = !!data;
-      console.log('✅ Admin check result:', isAdminUser, data);
       setIsAdmin(isAdminUser);
     };
     

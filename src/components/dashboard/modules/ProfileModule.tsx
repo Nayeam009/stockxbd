@@ -67,19 +67,13 @@ export const ProfileModule = () => {
         }
 
         // Check if user is admin
-        console.log('🔍 ProfileModule: Checking admin status for user:', user.id);
         const { data: adminData, error: adminError } = await supabase
           .from('admin_users')
           .select('id')
           .eq('user_id', user.id)
           .maybeSingle();
 
-        if (adminError) {
-          console.error('❌ ProfileModule: Admin check error:', adminError);
-        }
-
         const isAdminUser = !!adminData;
-        console.log('✅ ProfileModule: Admin status =', isAdminUser, adminData);
         setIsAdmin(isAdminUser);
 
         // Fetch profile
@@ -291,15 +285,12 @@ export const ProfileModule = () => {
   };
 
   if (loading) {
-    console.log('⏳ ProfileModule loading...');
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
-
-  console.log('🎨 ProfileModule render: isAdmin =', isAdmin, 'userRole =', userRole, 'profile =', profile?.full_name);
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
@@ -379,8 +370,8 @@ export const ProfileModule = () => {
       </Card>
 
       {/* Quick Access Buttons */}
-      {(isAdmin || userRole === 'owner') && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      {isAdmin && (
+        <div className="grid grid-cols-1 gap-4">
           {/* Admin Panel Button - Primary for khnayeam009@gmail.com */}
           <Card 
             className="border-2 border-amber-200 dark:border-amber-800 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20 hover:shadow-xl transition-all cursor-pointer group"
@@ -399,26 +390,6 @@ export const ProfileModule = () => {
               </div>
             </CardContent>
           </Card>
-          
-          {userRole === 'owner' && (
-            <Card 
-              className="border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-secondary/5 hover:shadow-xl transition-all cursor-pointer group"
-              onClick={() => navigate('/dashboard?module=my-shop')}
-            >
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="h-14 w-14 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
-                    <Store className="h-7 w-7 text-white" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-lg text-foreground mb-1">My Shop</h3>
-                    <p className="text-sm text-muted-foreground">Manage marketplace</p>
-                  </div>
-                  <ArrowRight className="h-5 w-5 text-muted-foreground group-hover:translate-x-1 transition-transform" />
-                </div>
-              </CardContent>
-            </Card>
-          )}
         </div>
       )}
 
