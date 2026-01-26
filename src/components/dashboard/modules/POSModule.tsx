@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -59,6 +59,10 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { logger } from "@/lib/logger";
 import { useNetwork } from "@/contexts/NetworkContext";
+import { getCombinedCache, setCombinedCache } from "@/hooks/useModuleCache";
+
+// Cache key for POS module
+const POS_CACHE_KEY = 'pos_module_data';
 
 // ============= INTERFACES =============
 interface LPGBrand {
@@ -339,59 +343,101 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
     }
   }, [weight, mouthSize]);
 
-  // ============= DATA FETCHING =============
-  const fetchData = useCallback(async () => {
-    const [brandsRes, stovesRes, regulatorsRes, customersRes, pricesRes] = await Promise.all([
-      supabase.from('lpg_brands').select('*').eq('is_active', true),
-      supabase.from('stoves').select('*').eq('is_active', true),
-      supabase.from('regulators').select('*').eq('is_active', true),
-      supabase.from('customers').select('*').order('name'),
-      supabase.from('product_prices').select('*').eq('is_active', true)
-    ]);
+  // ============= DATA FETCHING WITH CACHE =============
+  const hasFetchedRef = useRef(false);
+  
+  const fetchData = useCallback(async (isBackgroundRefresh = false) => {
+    try {
+      const [brandsRes, stovesRes, regulatorsRes, customersRes, pricesRes] = await Promise.all([
+        supabase.from('lpg_brands').select('*').eq('is_active', true),
+        supabase.from('stoves').select('*').eq('is_active', true),
+        supabase.from('regulators').select('*').eq('is_active', true),
+        supabase.from('customers').select('*').order('name'),
+        supabase.from('product_prices').select('*').eq('is_active', true)
+      ]);
 
-    if (brandsRes.data) setLpgBrands(brandsRes.data);
-    if (stovesRes.data) setStoves(stovesRes.data);
-    if (regulatorsRes.data) setRegulators(regulatorsRes.data);
-    if (customersRes.data) setCustomers(customersRes.data);
-    if (pricesRes.data) setProductPrices(pricesRes.data);
-
-    // Void system removed - no recent transactions tracking needed
+      if (brandsRes.data) setLpgBrands(brandsRes.data);
+      if (stovesRes.data) setStoves(stovesRes.data);
+      if (regulatorsRes.data) setRegulators(regulatorsRes.data);
+      if (customersRes.data) setCustomers(customersRes.data);
+      if (pricesRes.data) setProductPrices(pricesRes.data);
+      
+      // Save to cache for instant future loads
+      setCombinedCache(POS_CACHE_KEY, {
+        lpgBrands: brandsRes.data || [],
+        stoves: stovesRes.data || [],
+        regulators: regulatorsRes.data || [],
+        customers: customersRes.data || [],
+        productPrices: pricesRes.data || []
+      });
+    } catch (error) {
+      logger.error('Error fetching POS data', error, { component: 'POS' });
+    }
   }, []);
 
+  // Initial load with cache-first strategy
   useEffect(() => {
+    if (hasFetchedRef.current) return;
+    hasFetchedRef.current = true;
+    
     const initData = async () => {
-      setLoading(true);
-      await fetchData();
-      setLoading(false);
+      // Try cache first for instant rendering
+      const cached = getCombinedCache<{
+        lpgBrands: any[];
+        stoves: any[];
+        regulators: any[];
+        customers: any[];
+        productPrices: any[];
+      }>(POS_CACHE_KEY);
+      
+      if (cached) {
+        // Instant restore from cache
+        setLpgBrands(cached.lpgBrands || []);
+        setStoves(cached.stoves || []);
+        setRegulators(cached.regulators || []);
+        setCustomers(cached.customers || []);
+        setProductPrices(cached.productPrices || []);
+        setLoading(false);
+        
+        // Background refresh if online
+        if (isOnline) {
+          fetchData(true);
+        }
+      } else {
+        // No cache - fetch and show loading
+        setLoading(true);
+        await fetchData();
+        setLoading(false);
+      }
     };
     initData();
-  }, [fetchData]);
+  }, [fetchData, isOnline]);
 
-  // Real-time subscriptions - only when online
+  // Real-time subscriptions - debounced to prevent excessive refetches
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  
   useEffect(() => {
     // Skip subscriptions when offline to prevent connection errors
     if (!isOnline) return;
     
+    const debouncedFetch = () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => fetchData(true), 1000);
+    };
+    
     const channels = [
-      supabase.channel('pos-lpg').on('postgres_changes', { event: '*', schema: 'public', table: 'lpg_brands' }, () => {
-        supabase.from('lpg_brands').select('*').eq('is_active', true).then(({ data }) => data && setLpgBrands(data));
-      }).subscribe(),
-      supabase.channel('pos-stoves').on('postgres_changes', { event: '*', schema: 'public', table: 'stoves' }, () => {
-        supabase.from('stoves').select('*').eq('is_active', true).then(({ data }) => data && setStoves(data));
-      }).subscribe(),
-      supabase.channel('pos-regulators').on('postgres_changes', { event: '*', schema: 'public', table: 'regulators' }, () => {
-        supabase.from('regulators').select('*').eq('is_active', true).then(({ data }) => data && setRegulators(data));
-      }).subscribe(),
-      supabase.channel('pos-customers').on('postgres_changes', { event: '*', schema: 'public', table: 'customers' }, () => {
-        supabase.from('customers').select('*').order('name').then(({ data }) => data && setCustomers(data));
-      }).subscribe(),
-      supabase.channel('pos-prices').on('postgres_changes', { event: '*', schema: 'public', table: 'product_prices' }, () => {
-        supabase.from('product_prices').select('*').eq('is_active', true).then(({ data }) => data && setProductPrices(data));
-      }).subscribe()
+      supabase.channel('pos-lpg-v2').on('postgres_changes', { event: '*', schema: 'public', table: 'lpg_brands' }, debouncedFetch).subscribe(),
+      supabase.channel('pos-stoves-v2').on('postgres_changes', { event: '*', schema: 'public', table: 'stoves' }, debouncedFetch).subscribe(),
+      supabase.channel('pos-regulators-v2').on('postgres_changes', { event: '*', schema: 'public', table: 'regulators' }, debouncedFetch).subscribe(),
+      supabase.channel('pos-customers-v2').on('postgres_changes', { event: '*', schema: 'public', table: 'customers' }, debouncedFetch).subscribe(),
+      supabase.channel('pos-prices-v2').on('postgres_changes', { event: '*', schema: 'public', table: 'product_prices' }, debouncedFetch).subscribe()
     ];
 
-    return () => channels.forEach(ch => supabase.removeChannel(ch));
-  }, [isOnline]);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      channels.forEach(ch => supabase.removeChannel(ch));
+    };
+  }, [isOnline, fetchData]);
 
   // ============= PRICE HELPERS =============
   // Enhanced price lookup based on cylinder type (refill/package) and sale type (retail/wholesale)

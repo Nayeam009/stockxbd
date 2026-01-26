@@ -1,7 +1,11 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { logger } from "@/lib/logger";
 import { format, startOfMonth, endOfMonth, subMonths, subDays, startOfWeek, endOfWeek, startOfYear, endOfYear } from "date-fns";
+import { getCombinedCache, setCombinedCache } from "./useModuleCache";
+
+// Cache key for Business Diary
+const DIARY_CACHE_KEY = 'business_diary_data';
 
 export interface SaleEntry {
   id: string;
@@ -542,57 +546,68 @@ export const useBusinessDiaryData = (): UseBusinessDiaryDataReturn => {
     }
   }, []);
 
-  const refetch = useCallback(async () => {
-    setLoading(true);
+  const refetch = useCallback(async (isBackgroundRefresh = false) => {
+    if (!isBackgroundRefresh) setLoading(true);
     await Promise.all([fetchSalesData(), fetchExpensesData()]);
-    setLoading(false);
+    if (!isBackgroundRefresh) setLoading(false);
   }, [fetchSalesData, fetchExpensesData]);
 
+  // Cache sales and expenses after fetch
+  const hasFetchedRef = useRef(false);
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  
   useEffect(() => {
-    refetch();
+    if (sales.length > 0 || expenses.length > 0) {
+      setCombinedCache(DIARY_CACHE_KEY, { sales, expenses });
+    }
+  }, [sales, expenses]);
 
-    // Set up real-time subscriptions for instant updates
+  useEffect(() => {
+    if (hasFetchedRef.current) return;
+    hasFetchedRef.current = true;
+    
+    // Try cache first for instant rendering
+    const cached = getCombinedCache<{ sales: SaleEntry[]; expenses: ExpenseEntry[] }>(DIARY_CACHE_KEY);
+    
+    if (cached) {
+      setSales(cached.sales || []);
+      setExpenses(cached.expenses || []);
+      setLoading(false);
+      // Background refresh
+      refetch(true);
+    } else {
+      refetch(false);
+    }
+
+    // Set up real-time subscriptions with debouncing
+    const debouncedSalesFetch = () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => fetchSalesData(), 1000);
+    };
+    
+    const debouncedExpensesFetch = () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => fetchExpensesData(), 1000);
+    };
+    
     const salesChannel = supabase
-      .channel('diary-sales-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pos_transactions' }, () => {
-        logger.debug('POS transaction changed - refreshing sales', null, { component: 'BusinessDiary' });
-        fetchSalesData();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pos_transaction_items' }, () => {
-        logger.debug('POS items changed - refreshing sales', null, { component: 'BusinessDiary' });
-        fetchSalesData();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'customer_payments' }, () => {
-        logger.debug('Customer payment changed - refreshing sales', null, { component: 'BusinessDiary' });
-        fetchSalesData();
-      })
+      .channel('diary-sales-realtime-v2')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pos_transactions' }, debouncedSalesFetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pos_transaction_items' }, debouncedSalesFetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'customer_payments' }, debouncedSalesFetch)
       .subscribe();
 
     const expensesChannel = supabase
-      .channel('diary-expenses-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pob_transactions' }, () => {
-        logger.debug('POB transaction changed - refreshing expenses', null, { component: 'BusinessDiary' });
-        fetchExpensesData();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pob_transaction_items' }, () => {
-        logger.debug('POB items changed - refreshing expenses', null, { component: 'BusinessDiary' });
-        fetchExpensesData();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'staff_payments' }, () => {
-        logger.debug('Staff payment changed - refreshing expenses', null, { component: 'BusinessDiary' });
-        fetchExpensesData();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicle_costs' }, () => {
-        logger.debug('Vehicle cost changed - refreshing expenses', null, { component: 'BusinessDiary' });
-        fetchExpensesData();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_expenses' }, () => {
-        logger.debug('Daily expense changed - refreshing expenses', null, { component: 'BusinessDiary' });
-        fetchExpensesData();
-      })
+      .channel('diary-expenses-realtime-v2')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pob_transactions' }, debouncedExpensesFetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pob_transaction_items' }, debouncedExpensesFetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'staff_payments' }, debouncedExpensesFetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicle_costs' }, debouncedExpensesFetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_expenses' }, debouncedExpensesFetch)
       .subscribe();
 
     return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
       supabase.removeChannel(salesChannel);
       supabase.removeChannel(expensesChannel);
     };
