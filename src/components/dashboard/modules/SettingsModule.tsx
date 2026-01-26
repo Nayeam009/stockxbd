@@ -85,7 +85,7 @@ export const SettingsModule = () => {
   
   // User state for role check and account deletion
   const [userEmail, setUserEmail] = useState("");
-  const [userRole, setUserRole] = useState<string>("driver");
+  const [userRole, setUserRole] = useState<string>("owner");
   
   // Account deletion state
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -113,9 +113,9 @@ export const SettingsModule = () => {
           .from('user_roles')
           .select('role')
           .eq('user_id', user.id)
-          .single();
+          .maybeSingle();
         
-        if (roleData?.role) {
+        if (roleData) {
           setUserRole(roleData.role);
         }
       }
