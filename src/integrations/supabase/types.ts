@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_users: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       community_order_items: {
         Row: {
           brand_name: string | null
@@ -1755,6 +1776,36 @@ export type Database = {
         }
         Relationships: []
       }
+      user_status: {
+        Row: {
+          block_reason: string | null
+          blocked_at: string | null
+          blocked_by: string | null
+          created_at: string | null
+          id: string
+          is_blocked: boolean | null
+          user_id: string
+        }
+        Insert: {
+          block_reason?: string | null
+          blocked_at?: string | null
+          blocked_by?: string | null
+          created_at?: string | null
+          id?: string
+          is_blocked?: boolean | null
+          user_id: string
+        }
+        Update: {
+          block_reason?: string | null
+          blocked_at?: string | null
+          blocked_by?: string | null
+          created_at?: string | null
+          id?: string
+          is_blocked?: boolean | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       vehicle_costs: {
         Row: {
           amount: number
@@ -1977,6 +2028,7 @@ export type Database = {
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_same_team: { Args: { _owner_id: string }; Returns: boolean }
+      is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       mark_invite_used: {
         Args: { _code: string; _email: string; _user_id: string }
         Returns: string
@@ -2016,7 +2068,7 @@ export type Database = {
       validate_invite_secure: { Args: { _code: string }; Returns: boolean }
     }
     Enums: {
-      app_role: "owner" | "manager" | "driver" | "customer"
+      app_role: "owner" | "manager" | "driver" | "customer" | "admin"
       payment_method: "cash" | "bkash" | "nagad" | "rocket" | "card"
       product_category: "lpg_cylinder" | "stove" | "regulator" | "accessory"
     }
@@ -2146,7 +2198,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["owner", "manager", "driver", "customer"],
+      app_role: ["owner", "manager", "driver", "customer", "admin"],
       payment_method: ["cash", "bkash", "nagad", "rocket", "card"],
       product_category: ["lpg_cylinder", "stove", "regulator", "accessory"],
     },

@@ -2,7 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar, SidebarHeader, SidebarFooter } from "@/components/ui/sidebar";
-import { BarChart3, Users, Search, Home, Receipt, Tag, Settings, LogOut, Package, ChevronRight, Store, Wallet } from "lucide-react";
+import { BarChart3, Users, Search, Home, Receipt, Tag, Settings, LogOut, Package, ChevronRight, Store, Wallet, Shield } from "lucide-react";
 import stockXLogo from "@/assets/stock-x-logo.png";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -19,6 +19,7 @@ interface AppSidebarProps {
     lowStockItems: any[];
     activeOrders: number;
   };
+  isAdmin?: boolean;
 }
 
 export const AppSidebar = ({
@@ -26,7 +27,8 @@ export const AppSidebar = ({
   setActiveModule,
   userRole,
   userName,
-  analytics
+  analytics,
+  isAdmin = false
 }: AppSidebarProps) => {
   const { state, isMobile, setOpenMobile } = useSidebar();
   const { t } = useLanguage();
@@ -46,6 +48,7 @@ export const AppSidebar = ({
     { id: 'customers', titleKey: 'customers', icon: Users, roles: ['owner', 'manager'] },
     { id: 'utility-expense', titleKey: 'utility_expense', icon: Wallet, roles: ['owner', 'manager'] },
     { id: 'analysis-search', titleKey: 'analysis_search', icon: Search, roles: ['owner', 'manager'] },
+    ...(isAdmin ? [{ id: 'admin-panel', titleKey: 'admin_panel', icon: Shield, roles: ['owner'] }] : []),
     { id: 'settings', titleKey: 'settings', icon: Settings, roles: ['owner', 'manager'] },
   ];
   const handleModuleChange = (moduleId: string) => {
