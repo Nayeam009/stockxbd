@@ -56,11 +56,11 @@ serve(async (req) => {
       );
     }
 
-    // Validate role
-    const validRoles = ['manager', 'driver', 'staff'];
+    // Validate role - only manager is allowed for team members
+    const validRoles = ['manager'];
     if (!validRoles.includes(member_role)) {
       return new Response(
-        JSON.stringify({ success: false, error: 'Invalid role. Must be manager, driver, or staff' }),
+        JSON.stringify({ success: false, error: 'Invalid role. Team members can only be managers.' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       );
     }

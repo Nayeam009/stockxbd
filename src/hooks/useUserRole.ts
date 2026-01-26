@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { getSessionWithTimeout, AuthTimeoutError } from "@/lib/authUtils";
 
-export type UserRole = 'owner' | 'manager' | 'driver' | 'staff' | 'customer';
+export type UserRole = 'owner' | 'manager' | 'customer';
 
 interface UserRoleData {
   userRole: UserRole;
@@ -21,7 +21,7 @@ let lastFetchTime = 0;
 const CACHE_DURATION = 60000; // 1 minute cache
 
 export const useUserRole = (): UserRoleData => {
-  const [userRole, setUserRole] = useState<UserRole>(cachedRole || 'driver');
+  const [userRole, setUserRole] = useState<UserRole>(cachedRole || 'customer');
   const [userName, setUserName] = useState<string>(cachedName || 'User');
   const [userId, setUserId] = useState<string | null>(cachedUserId);
   const [loading, setLoading] = useState(!cachedRole); // No loading if we have cache
@@ -40,7 +40,7 @@ export const useUserRole = (): UserRoleData => {
       const { data: { session } } = await getSessionWithTimeout();
       
       if (!session?.user) {
-        setUserRole('driver');
+        setUserRole('customer');
         setUserName('Guest');
         setUserId(null);
         cachedRole = null;
@@ -106,7 +106,7 @@ export const useUserRole = (): UserRoleData => {
           setUserId(cachedUserId);
         } else {
           setError('Connection timed out');
-          setUserRole('driver');
+          setUserRole('customer');
           setUserName('Guest');
         }
       } else {

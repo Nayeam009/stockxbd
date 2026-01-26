@@ -40,7 +40,7 @@ interface TeamMember {
   id: string;
   member_user_id: string;
   member_email: string;
-  role: 'manager' | 'driver';
+  role: 'manager';
   created_at: string;
 }
 
@@ -49,7 +49,7 @@ export const ProfileSharingCard = () => {
   const [loading, setLoading] = useState(false);
   const [showQRDialog, setShowQRDialog] = useState(false);
   const [inviteCode, setInviteCode] = useState("");
-  const [inviteRole, setInviteRole] = useState<'manager' | 'driver'>('driver');
+  const [inviteRole] = useState<'manager'>('manager'); // Only manager role available
   const [copied, setCopied] = useState(false);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [userRole, setUserRole] = useState<string>('');
@@ -170,16 +170,15 @@ export const ProfileSharingCard = () => {
   const getRoleBadgeColor = (role: string) => {
     switch (role) {
       case 'manager': return 'bg-blue-500/10 text-blue-500 border-blue-500/20';
-      case 'driver': return 'bg-green-500/10 text-green-500 border-green-500/20';
       default: return 'bg-muted text-muted-foreground';
     }
   };
 
   const getRoleLabel = (role: string) => {
     if (language === 'bn') {
-      return role === 'manager' ? 'ম্যানেজার' : 'ড্রাইভার';
+      return 'ম্যানেজার';
     }
-    return role.charAt(0).toUpperCase() + role.slice(1);
+    return 'Manager';
   };
 
   // Only owners can share profiles
@@ -206,21 +205,16 @@ export const ProfileSharingCard = () => {
         <CardContent className="space-y-4">
           {/* Invite Section */}
           <div className="space-y-3">
-            <Label>{language === 'bn' ? 'নতুন সদস্য আমন্ত্রণ' : 'Invite Team Member'}</Label>
+            <Label>{language === 'bn' ? 'নতুন ম্যানেজার আমন্ত্রণ' : 'Invite Manager'}</Label>
             <div className="flex flex-col sm:flex-row gap-3">
-              <Select value={inviteRole} onValueChange={(v: 'manager' | 'driver') => setInviteRole(v)}>
-                <SelectTrigger className="w-full sm:w-40">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="manager">
-                    {language === 'bn' ? 'ম্যানেজার' : 'Manager'}
-                  </SelectItem>
-                  <SelectItem value="driver">
-                    {language === 'bn' ? 'ড্রাইভার' : 'Driver'}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex-1 flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-lg border">
+                <Badge className={`${getRoleBadgeColor('manager')} text-xs`}>
+                  {language === 'bn' ? 'ম্যানেজার' : 'Manager'}
+                </Badge>
+                <span className="text-sm text-muted-foreground">
+                  {language === 'bn' ? 'পূর্ণ অ্যাক্সেস' : 'Full access'}
+                </span>
+              </div>
               <Button 
                 onClick={generateInviteCode} 
                 disabled={loading}
