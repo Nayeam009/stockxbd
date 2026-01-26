@@ -211,36 +211,6 @@ export const DashboardHeader = ({
             <Settings className="h-4 w-4" aria-hidden="true" />
           </Button>
 
-          {/* Divider */}
-          <div className="h-6 sm:h-8 w-px bg-gradient-to-b from-transparent via-border to-transparent mx-1 sm:mx-2 hidden sm:block" />
-
-          {/* User Profile */}
-          <div 
-            className="flex items-center gap-2 sm:gap-3 cursor-pointer hover:opacity-90 transition-all duration-300 pl-1 sm:pl-2" 
-            onClick={onProfileClick}
-          >
-            <div className="hidden md:block text-right min-w-0">
-              <p className="text-xs sm:text-sm font-semibold text-foreground leading-none truncate max-w-[120px] lg:max-w-[150px]">
-                {userName}
-              </p>
-              <div className="flex items-center gap-1 mt-1 justify-end">
-                {isAdmin && (
-                  <Badge className="text-[9px] sm:text-[10px] px-1.5 sm:px-2 py-0 h-4 font-medium border bg-gradient-to-r from-amber-500 to-orange-500 text-white border-amber-400/50">
-                    Admin
-                  </Badge>
-                )}
-                <Badge className={`text-[9px] sm:text-[10px] px-1.5 sm:px-2 py-0 h-4 font-medium border ${getRoleColor(userRole)}`}>
-                  {getRoleLabel(userRole)}
-                </Badge>
-              </div>
-            </div>
-            <div className="relative flex-shrink-0">
-              <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg sm:rounded-xl bg-gradient-to-br from-primary via-primary-light to-secondary flex items-center justify-center text-primary-foreground text-xs sm:text-sm font-bold shadow-lg">
-                {getInitials(userName)}
-              </div>
-              <div className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 sm:h-3 sm:w-3 bg-success rounded-full border-2 border-card shadow-sm" />
-            </div>
-          </div>
         </div>
       </div>
     </header>
