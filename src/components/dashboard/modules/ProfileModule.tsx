@@ -381,25 +381,24 @@ export const ProfileModule = () => {
       {/* Quick Access Buttons */}
       {(isAdmin || userRole === 'owner') && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {isAdmin && (
-            <Card 
-              className="border-2 border-amber-200 dark:border-amber-800 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20 hover:shadow-xl transition-all cursor-pointer group"
-              onClick={() => navigate('/dashboard?module=admin-panel')}
-            >
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="h-14 w-14 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
-                    <Shield className="h-7 w-7 text-white" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-lg text-foreground mb-1">Admin Panel</h3>
-                    <p className="text-sm text-muted-foreground">Manage users & system</p>
-                  </div>
-                  <ArrowRight className="h-5 w-5 text-muted-foreground group-hover:translate-x-1 transition-transform" />
+          {/* Admin Panel Button - Primary for khnayeam009@gmail.com */}
+          <Card 
+            className="border-2 border-amber-200 dark:border-amber-800 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20 hover:shadow-xl transition-all cursor-pointer group"
+            onClick={() => navigate('/dashboard?module=admin-panel')}
+          >
+            <CardContent className="p-6">
+              <div className="flex items-center gap-4">
+                <div className="h-14 w-14 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                  <Shield className="h-7 w-7 text-white" />
                 </div>
-              </CardContent>
-            </Card>
-          )}
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-bold text-lg text-foreground mb-1">Admin Panel</h3>
+                  <p className="text-sm text-muted-foreground">Manage users & system</p>
+                </div>
+                <ArrowRight className="h-5 w-5 text-muted-foreground group-hover:translate-x-1 transition-transform" />
+              </div>
+            </CardContent>
+          </Card>
           
           {userRole === 'owner' && (
             <Card 
