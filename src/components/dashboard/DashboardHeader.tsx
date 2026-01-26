@@ -3,8 +3,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { UniversalNotificationCenter } from "@/components/notifications/UniversalNotificationCenter";
+import { OfflineIndicator } from "@/components/shared/OfflineIndicator";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useNetwork } from "@/contexts/NetworkContext";
 import { Search, Settings, Command, Store, Globe } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -33,6 +35,7 @@ export const DashboardHeader = ({
 }: DashboardHeaderProps) => {
   const { t, language } = useLanguage();
   const { theme, toggleTheme } = useTheme();
+  const { isOnline, pendingSyncCount } = useNetwork();
   const navigate = useNavigate();
   const [shopId, setShopId] = useState<string | null>(null);
 
@@ -127,8 +130,11 @@ export const DashboardHeader = ({
             aria-label="Search"
             className="sm:hidden h-9 w-9 rounded-lg hover:bg-primary/10 hover:text-primary transition-all duration-300 touch-target-44"
           >
-            <Search className="h-4 w-4" aria-hidden="true" />
+          <Search className="h-4 w-4" aria-hidden="true" />
           </Button>
+
+          {/* Offline Status Indicator */}
+          <OfflineIndicator />
 
           {/* Notifications */}
           <UniversalNotificationCenter userRole={userRole} />

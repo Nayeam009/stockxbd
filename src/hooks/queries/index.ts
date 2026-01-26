@@ -40,3 +40,8 @@ export {
   type SaleEntry,
   type ExpenseEntry,
 } from './useBusinessDiaryQueries';
+
+// Offline-first hooks
+export { usePOSOfflineData } from '../usePOSOfflineData';
+export { useInventoryOfflineData } from '../useInventoryOfflineData';
+export { useDashboardOfflineData } from '../useDashboardOfflineData';
