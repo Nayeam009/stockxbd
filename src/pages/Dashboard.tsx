@@ -61,15 +61,25 @@ const Dashboard = () => {
   
   useEffect(() => {
     const checkAdminStatus = async () => {
-      if (!userId) return;
+      if (!userId) {
+        console.log('❌ Admin check: No userId yet');
+        return;
+      }
       
-      const { data } = await supabase
+      console.log('🔍 Checking admin status for user:', userId);
+      const { data, error } = await supabase
         .from('admin_users')
         .select('id')
         .eq('user_id', userId)
         .maybeSingle();
       
-      setIsAdmin(!!data);
+      if (error) {
+        console.error('❌ Admin check error:', error);
+      }
+      
+      const isAdminUser = !!data;
+      console.log('✅ Admin check result:', isAdminUser, data);
+      setIsAdmin(isAdminUser);
     };
     
     checkAdminStatus();

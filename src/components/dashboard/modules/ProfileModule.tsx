@@ -65,13 +65,20 @@ export const ProfileModule = () => {
         }
 
         // Check if user is admin
-        const { data: adminData } = await supabase
+        console.log('🔍 ProfileModule: Checking admin status for user:', user.id);
+        const { data: adminData, error: adminError } = await supabase
           .from('admin_users')
           .select('id')
           .eq('user_id', user.id)
           .maybeSingle();
 
-        setIsAdmin(!!adminData);
+        if (adminError) {
+          console.error('❌ ProfileModule: Admin check error:', adminError);
+        }
+
+        const isAdminUser = !!adminData;
+        console.log('✅ ProfileModule: Admin status =', isAdminUser, adminData);
+        setIsAdmin(isAdminUser);
 
         // Fetch profile
         const { data: profileData, error } = await supabase
@@ -282,12 +289,15 @@ export const ProfileModule = () => {
   };
 
   if (loading) {
+    console.log('⏳ ProfileModule loading...');
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
+
+  console.log('🎨 ProfileModule render: isAdmin =', isAdmin, 'userRole =', userRole, 'profile =', profile?.full_name);
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto">

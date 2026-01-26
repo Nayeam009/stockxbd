@@ -38,6 +38,7 @@ export const AppSidebar = ({
   const isCollapsed = state === "collapsed" && !isMobile;
   
   // All navigation items - only owner and manager access dashboard
+  console.log('🎨 AppSidebar render: isAdmin =', isAdmin, 'userRole =', userRole);
   const allNavItems = [
     { id: 'overview', titleKey: 'overview', icon: Home, roles: ['owner', 'manager'] },
     { id: 'business-diary', titleKey: 'business_diary', icon: BarChart3, roles: ['owner', 'manager'] },
@@ -51,6 +52,7 @@ export const AppSidebar = ({
     ...(isAdmin ? [{ id: 'admin-panel', titleKey: 'admin_panel', icon: Shield, roles: ['owner', 'manager'] }] : []),
     { id: 'settings', titleKey: 'settings', icon: Settings, roles: ['owner', 'manager'] },
   ];
+  console.log('📋 Nav items count:', allNavItems.length, 'Includes admin?', allNavItems.some(item => item.id === 'admin-panel'));
   const handleModuleChange = (moduleId: string) => {
     setActiveModule(moduleId);
     if (isMobile) setOpenMobile(false);
