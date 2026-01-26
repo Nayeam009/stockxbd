@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { getSessionWithTimeout, AuthTimeoutError } from "@/lib/authUtils";
+import { getSessionWithRetry, AuthTimeoutError, isOnline } from "@/lib/authUtils";
 
 export type UserRole = 'owner' | 'manager' | 'customer';
 
@@ -18,7 +18,7 @@ let cachedRole: UserRole | null = null;
 let cachedName: string | null = null;
 let cachedUserId: string | null = null;
 let lastFetchTime = 0;
-const CACHE_DURATION = 60000; // 1 minute cache
+const CACHE_DURATION = 120000; // 2 minutes cache (extended from 1 minute)
 
 export const useUserRole = (): UserRoleData => {
   const [userRole, setUserRole] = useState<UserRole>(cachedRole || 'customer');
@@ -30,14 +30,23 @@ export const useUserRole = (): UserRoleData => {
 
   const fetchUserData = useCallback(async (isSoftRefresh = false) => {
     try {
+      // Network-aware: if offline and we have cache, use it immediately
+      if (!isOnline() && cachedRole && cachedName) {
+        setUserRole(cachedRole);
+        setUserName(cachedName);
+        setUserId(cachedUserId);
+        setLoading(false);
+        return;
+      }
+
       // Only show loading on initial load, not soft refreshes
       if (!isSoftRefresh && isInitialLoadRef.current) {
         setLoading(true);
       }
       setError(null);
 
-      // Use timeout-protected session fetch
-      const { data: { session } } = await getSessionWithTimeout();
+      // Use retry-protected session fetch for better resilience
+      const { data: { session } } = await getSessionWithRetry(isSoftRefresh ? 1 : 3);
       
       if (!session?.user) {
         setUserRole('customer');
@@ -124,6 +133,11 @@ export const useUserRole = (): UserRoleData => {
   useEffect(() => {
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
+        // Network-aware: if offline, use cache without refresh
+        if (!isOnline() && cachedRole) {
+          return;
+        }
+        
         const timeSinceLastFetch = Date.now() - lastFetchTime;
         
         // Use cache if fresh, otherwise soft refresh
@@ -137,12 +151,22 @@ export const useUserRole = (): UserRoleData => {
       }
     };
     
+    // Also listen for online event to refresh when connection is restored
+    const handleOnline = () => {
+      const timeSinceLastFetch = Date.now() - lastFetchTime;
+      if (timeSinceLastFetch > CACHE_DURATION / 2) { // Refresh if stale by half the cache time
+        fetchUserData(true);
+      }
+    };
+    
     document.addEventListener('visibilitychange', handleVisibility);
     window.addEventListener('focus', handleVisibility);
+    window.addEventListener('online', handleOnline);
     
     return () => {
       document.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('focus', handleVisibility);
+      window.removeEventListener('online', handleOnline);
     };
   }, [fetchUserData]);
 
