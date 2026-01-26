@@ -221,6 +221,26 @@ export const useDashboardData = () => {
     throw lastError;
   }, []);
 
+  // CRITICAL: Restore from cache IMMEDIATELY on mount (cache-first strategy)
+  // This ensures instant UI rendering on page refresh
+  useEffect(() => {
+    const snapshot = readSnapshot();
+    if (snapshot) {
+      logger.info('[Dashboard] Instant restore from cache', { 
+        age: Math.round((Date.now() - snapshot.ts) / 1000) + 's'
+      });
+      setSalesData(snapshot.salesData || []);
+      setStockData(snapshot.stockData || []);
+      setCylinderStock(snapshot.cylinderStock || []);
+      setDrivers(snapshot.drivers || []);
+      setCustomers(snapshot.customers || []);
+      setOrders(snapshot.orders || []);
+      // Mark as loaded immediately - network refresh happens in background
+      setLoading(false);
+      isInitialLoadRef.current = false;
+    }
+  }, [readSnapshot]); // Only run once on mount
+
   // Soft fetch - background refresh without loading spinner
   // Now with retry logic for better resilience
   const fetchData = useCallback(async (isSoftRefresh = false) => {
@@ -315,9 +335,9 @@ export const useDashboardData = () => {
         stovesResult,
         userRolesResult
       ] = await withRetry(
-        () => withTimeout(fetchAllData(), 15000), // 15s timeout per attempt
+        () => withTimeout(fetchAllData(), 30000), // 30s timeout per attempt (increased for reliability)
         2, // 2 retries max
-        300 // 300ms initial delay
+        500 // 500ms initial delay
       );
 
       const transactions = transactionsResult.data;
