@@ -1,11 +1,12 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, RefreshCw, LogIn, WifiOff, Clock } from "lucide-react";
-import { getSessionWithRetry, AuthTimeoutError, isOnline } from "@/lib/authUtils";
+import { Loader2, RefreshCw, LogIn, WifiOff, Clock, ShieldAlert } from "lucide-react";
+import { getSessionWithRetry, AuthTimeoutError, isOnline, clearAuthCache } from "@/lib/authUtils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -15,8 +16,9 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   const [loading, setLoading] = useState(true);
   const [authenticated, setAuthenticated] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
-  const [authError, setAuthError] = useState<'timeout' | 'expired' | 'offline' | null>(null);
+  const [authError, setAuthError] = useState<'timeout' | 'expired' | 'offline' | 'fatal' | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [usingCache, setUsingCache] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   
@@ -59,9 +61,14 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
       // Use retry logic for session check
       const { data: { session } } = await getSessionWithRetry();
       
+      // Check if we're using cached session (indicated by lack of recent timestamp)
+      const isCached = session && !session.access_token;
+      setUsingCache(isCached);
+      
       if (!session) {
         setAuthenticated(false);
         cachedAuthRef.current = false;
+        setAuthError('expired');
         setLoading(false);
         return;
       }
@@ -108,13 +115,15 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
         setAuthError('offline');
         setAuthenticated(true);
         setUserRole(cachedRoleRef.current);
+        setUsingCache(true);
         setLoading(false);
         return;
       }
       
       // Determine error type
       if (error instanceof AuthTimeoutError) {
-        setAuthError('timeout');
+        // After 2 failed attempts, consider it fatal
+        setAuthError(retryCount >= 2 ? 'fatal' : 'timeout');
       } else if (!isOnline()) {
         setAuthError('offline');
       } else {
@@ -128,6 +137,16 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
       setLoading(false);
     }
   }, []);
+
+  const handleClearCacheAndRetry = async () => {
+    console.log('[Auth] Clearing cache and retrying...');
+    clearAuthCache();
+    await supabase.auth.signOut();
+    setRetryCount(0);
+    setAuthError(null);
+    setLoading(true);
+    checkAuthAndRole();
+  };
 
   // Handle visibility changes for instant tab recovery
   useEffect(() => {
@@ -192,8 +211,14 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
       timeout: {
         icon: <Clock className="h-8 w-8 text-amber-500" />,
         title: 'Connection Slow',
-        description: `Connection attempt ${retryCount}/3 timed out. Check your internet and try again.`,
+        description: `Connection attempt ${retryCount}/2 timed out. Check your internet and try again.`,
         bgColor: 'bg-amber-500/10'
+      },
+      fatal: {
+        icon: <ShieldAlert className="h-8 w-8 text-destructive" />,
+        title: 'Cannot Connect',
+        description: 'Unable to reach the server after multiple attempts. Your session may have expired.',
+        bgColor: 'bg-destructive/10'
       },
       offline: {
         icon: <WifiOff className="h-8 w-8 text-muted-foreground" />,
@@ -222,16 +247,24 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
             <CardDescription>{config.description}</CardDescription>
             
             {/* Retry progress indicator */}
-            {authError === 'timeout' && retryCount > 0 && (
+            {(authError === 'timeout' || authError === 'fatal') && retryCount > 0 && (
               <div className="pt-2">
-                <Progress value={(retryCount / 3) * 100} className="h-2" />
+                <Progress value={(retryCount / 2) * 100} className="h-2" />
                 <p className="text-xs text-muted-foreground mt-1">
-                  {retryCount < 3 ? 'Auto-retrying...' : 'Max retries reached'}
+                  {retryCount < 2 ? 'Auto-retrying...' : 'Max retries reached'}
                 </p>
               </div>
             )}
           </CardHeader>
           <CardContent className="space-y-3">
+            {authError === 'fatal' && (
+              <Alert variant="destructive" className="mb-3">
+                <AlertDescription>
+                  Try clearing your session and signing in again. This often resolves connection issues.
+                </AlertDescription>
+              </Alert>
+            )}
+            
             <Button 
               onClick={() => {
                 setLoading(true);
@@ -245,6 +278,18 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
               <RefreshCw className="h-4 w-4 mr-2" />
               Try Again
             </Button>
+            
+            {authError === 'fatal' && (
+              <Button 
+                onClick={handleClearCacheAndRetry}
+                variant="outline"
+                className="w-full h-12 touch-target"
+              >
+                <ShieldAlert className="h-4 w-4 mr-2" />
+                Clear Session & Retry
+              </Button>
+            )}
+            
             <Button 
               onClick={() => navigate('/auth')} 
               className="w-full h-12 touch-target"
@@ -263,7 +308,14 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center space-y-4 animate-fade-in">
           <Loader2 className="h-10 w-10 animate-spin text-primary mx-auto" aria-label="Loading" />
-          <p className="text-muted-foreground">Loading your dashboard...</p>
+          <p className="text-muted-foreground">
+            {retryCount > 0 ? `Retrying connection (${retryCount}/2)...` : 'Loading your dashboard...'}
+          </p>
+          {retryCount > 0 && (
+            <p className="text-xs text-muted-foreground">
+              Slow connection detected. Please wait...
+            </p>
+          )}
         </div>
       </div>
     );
@@ -276,6 +328,23 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   // Redirect customers away from dashboard to community
   if (userRole === 'customer' && location.pathname.startsWith('/dashboard')) {
     return <Navigate to="/community" replace />;
+  }
+
+  // Show banner if using cached auth
+  if (usingCache && authenticated) {
+    return (
+      <>
+        <div className="fixed top-0 left-0 right-0 z-50 bg-amber-500/10 border-b border-amber-500/20 p-2">
+          <p className="text-center text-sm text-amber-700 dark:text-amber-400">
+            <WifiOff className="inline h-4 w-4 mr-1" />
+            Using offline mode - Some features may be limited
+          </p>
+        </div>
+        <div className="pt-10">
+          {children}
+        </div>
+      </>
+    );
   }
 
   return <>{children}</>;
