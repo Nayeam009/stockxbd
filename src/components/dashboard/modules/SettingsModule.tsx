@@ -154,6 +154,10 @@ export const SettingsModule = () => {
   };
 
   const handleChangePassword = async () => {
+    if (!newPassword || !confirmPassword) {
+      toast({ title: "Please fill in both password fields", variant: "destructive" });
+      return;
+    }
     if (newPassword !== confirmPassword) {
       toast({ title: "Passwords do not match", variant: "destructive" });
       return;
@@ -165,15 +169,25 @@ export const SettingsModule = () => {
 
     setChangingPassword(true);
     try {
-      const { error } = await supabase.auth.updateUser({ password: newPassword });
-      if (error) throw error;
+      const { data, error } = await supabase.auth.updateUser({ password: newPassword });
+      
+      if (error) {
+        console.error('[Password Change] Error:', error);
+        throw error;
+      }
 
+      console.log('[Password Change] Success:', data);
       toast({ title: "Password changed successfully" });
       setShowPasswordDialog(false);
       setNewPassword("");
       setConfirmPassword("");
     } catch (error: any) {
-      toast({ title: error.message || "Failed to change password", variant: "destructive" });
+      console.error('[Password Change] Caught error:', error);
+      toast({ 
+        title: "Failed to change password", 
+        description: error.message || "Please try again",
+        variant: "destructive" 
+      });
     } finally {
       setChangingPassword(false);
     }
