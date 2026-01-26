@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { 
   Settings, 
@@ -22,7 +21,10 @@ import {
   ArrowLeft,
   Check,
   Eye,
-  EyeOff
+  EyeOff,
+  HardDrive,
+  Download,
+  Upload
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -49,6 +51,7 @@ import { BackupRestoreCard } from "@/components/settings/BackupRestoreCard";
 import { PushNotificationCard } from "@/components/settings/PushNotificationCard";
 import { AccountSettingsSection } from "@/components/settings/AccountSettingsSection";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface SettingsSectionProps {
   icon: React.ReactNode;
@@ -65,8 +68,8 @@ const SettingsSection = ({ icon, title, description, active, onClick, badge }: S
     className={cn(
       "w-full flex items-center gap-3 p-4 rounded-xl text-left transition-all min-h-[64px] touch-target",
       active 
-        ? 'bg-primary/10 text-primary border-2 border-primary/30 shadow-sm' 
-        : 'hover:bg-muted/60 text-foreground border-2 border-transparent'
+        ? 'bg-primary/10 border-l-4 border-primary shadow-sm' 
+        : 'hover:bg-muted/60 text-foreground border-l-4 border-transparent'
     )}
   >
     <div className={cn(
@@ -77,7 +80,7 @@ const SettingsSection = ({ icon, title, description, active, onClick, badge }: S
     </div>
     <div className="flex-1 min-w-0">
       <div className="flex items-center gap-2">
-        <p className="font-semibold text-sm truncate">{title}</p>
+        <p className={cn("font-semibold text-sm truncate", active && "text-primary")}>{title}</p>
         {badge}
       </div>
       {description && <p className="text-xs text-muted-foreground mt-0.5 truncate">{description}</p>}
@@ -91,6 +94,7 @@ const SettingsSection = ({ icon, title, description, active, onClick, badge }: S
 
 export const SettingsModule = () => {
   const { t, language } = useLanguage();
+  const isMobile = useIsMobile();
   const [activeSection, setActiveSection] = useState('account');
   const [isMobileDetailView, setIsMobileDetailView] = useState(false);
   
@@ -278,7 +282,9 @@ export const SettingsModule = () => {
 
   const handleSectionClick = (sectionId: string) => {
     setActiveSection(sectionId);
-    setIsMobileDetailView(true);
+    if (isMobile) {
+      setIsMobileDetailView(true);
+    }
   };
 
   const handleBackToList = () => {
@@ -289,12 +295,22 @@ export const SettingsModule = () => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
-  const getRoleBadgeStyle = (role: string) => {
-    switch (role) {
-      case 'owner': return 'bg-gradient-to-r from-amber-500 to-orange-500 text-white border-0';
-      case 'manager': return 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white border-0';
-      default: return 'bg-muted text-muted-foreground';
-    }
+  const getRoleBadge = (role: string) => {
+    const styles: Record<string, string> = {
+      owner: 'bg-gradient-to-r from-amber-500 to-orange-500 text-white border-0 shadow-md',
+      manager: 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white border-0 shadow-md',
+      customer: 'bg-gradient-to-r from-green-500 to-emerald-500 text-white border-0 shadow-md'
+    };
+    const labels: Record<string, Record<string, string>> = {
+      owner: { en: 'Owner', bn: 'মালিক' },
+      manager: { en: 'Manager', bn: 'ম্যানেজার' },
+      customer: { en: 'Customer', bn: 'গ্রাহক' }
+    };
+    return (
+      <Badge className={cn("text-xs font-semibold", styles[role] || 'bg-muted')}>
+        {labels[role]?.[language] || role}
+      </Badge>
+    );
   };
 
   const sections = [
@@ -339,69 +355,83 @@ export const SettingsModule = () => {
 
       case 'security':
         return (
-          <div className="space-y-4">
-            <Card className="border-border/50 shadow-sm">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Shield className="h-5 w-5 text-primary" />
-                  {language === 'bn' ? 'নিরাপত্তা সেটিংস' : 'Security Settings'}
-                </CardTitle>
-                <CardDescription>
-                  {language === 'bn' ? 'আপনার অ্যাকাউন্ট সুরক্ষিত রাখুন' : 'Keep your account secure'}
-                </CardDescription>
+          <div className="space-y-6">
+            {/* Security Settings Card */}
+            <Card className="border-border/50 shadow-sm bg-card">
+              <CardHeader className="pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-primary/10">
+                    <Shield className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg">
+                      {language === 'bn' ? 'নিরাপত্তা সেটিংস' : 'Security Settings'}
+                    </CardTitle>
+                    <CardDescription>
+                      {language === 'bn' ? 'আপনার অ্যাকাউন্ট সুরক্ষিত রাখুন' : 'Keep your account secure'}
+                    </CardDescription>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent className="space-y-3">
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start h-16 hover:bg-primary/5 hover:border-primary/30 transition-all" 
+                {/* Change Password */}
+                <button 
                   onClick={() => setShowPasswordDialog(true)}
+                  className="w-full flex items-center gap-4 p-4 rounded-xl border border-border/50 hover:bg-muted/50 hover:border-primary/30 transition-all group"
                 >
-                  <div className="p-2 rounded-lg bg-primary/10 mr-3">
-                    <Lock className="h-5 w-5 text-primary" />
+                  <div className="p-2.5 rounded-lg bg-muted group-hover:bg-primary/10 transition-colors">
+                    <Lock className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
                   </div>
-                  <div className="text-left flex-1">
-                    <p className="font-medium">{language === 'bn' ? 'পাসওয়ার্ড পরিবর্তন' : 'Change Password'}</p>
-                    <p className="text-xs text-muted-foreground">
+                  <div className="flex-1 text-left">
+                    <p className="font-medium text-foreground">
+                      {language === 'bn' ? 'পাসওয়ার্ড পরিবর্তন' : 'Change Password'}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
                       {language === 'bn' ? 'আপনার অ্যাকাউন্ট পাসওয়ার্ড আপডেট করুন' : 'Update your account password'}
                     </p>
                   </div>
-                  <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                </Button>
-                
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start h-16 opacity-60 cursor-not-allowed" 
-                  disabled
-                >
-                  <div className="p-2 rounded-lg bg-muted mr-3">
+                  <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                </button>
+
+                {/* Two-Factor Auth - Coming Soon */}
+                <div className="flex items-center gap-4 p-4 rounded-xl border border-border/50 bg-muted/30 opacity-60">
+                  <div className="p-2.5 rounded-lg bg-muted">
                     <Shield className="h-5 w-5 text-muted-foreground" />
                   </div>
-                  <div className="text-left flex-1">
-                    <p className="font-medium">{language === 'bn' ? 'দুই-ধাপ যাচাইকরণ' : 'Two-Factor Auth'}</p>
-                    <p className="text-xs text-muted-foreground">
+                  <div className="flex-1">
+                    <p className="font-medium text-muted-foreground">
+                      {language === 'bn' ? 'দুই-ধাপ যাচাইকরণ' : 'Two-Factor Auth'}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
                       {language === 'bn' ? 'অতিরিক্ত নিরাপত্তা যোগ করুন' : 'Add extra security layer'}
                     </p>
                   </div>
-                  <Badge variant="secondary" className="text-xs">
+                  <Badge variant="secondary" className="bg-orange-100 text-orange-700 border-orange-200">
                     {language === 'bn' ? 'শীঘ্রই আসছে' : 'Coming Soon'}
                   </Badge>
-                </Button>
+                </div>
               </CardContent>
             </Card>
 
             {/* Danger Zone */}
             <Card className="border-destructive/30 bg-destructive/5 shadow-sm">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg flex items-center gap-2 text-destructive">
-                  <AlertTriangle className="h-5 w-5" />
-                  {language === 'bn' ? 'ঝুঁকিপূর্ণ এলাকা' : 'Danger Zone'}
-                </CardTitle>
-                <CardDescription>
-                  {language === 'bn' ? 'অপরিবর্তনীয় কার্যক্রম। সতর্কতার সাথে এগিয়ে যান।' : 'Irreversible actions. Proceed with caution.'}
-                </CardDescription>
+              <CardHeader className="pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-destructive/10">
+                    <AlertTriangle className="h-5 w-5 text-destructive" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg text-destructive">
+                      {language === 'bn' ? 'ঝুঁকিপূর্ণ এলাকা' : 'Danger Zone'}
+                    </CardTitle>
+                    <CardDescription>
+                      {language === 'bn' ? 'অপরিবর্তনীয় কার্যক্রম। সতর্কতার সাথে এগিয়ে যান।' : 'Irreversible actions. Proceed with caution.'}
+                    </CardDescription>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 border border-destructive/30 rounded-xl bg-background/50">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 border border-destructive/20 rounded-xl bg-background/80">
                   <div>
                     <p className="font-medium text-foreground">
                       {language === 'bn' ? 'অ্যাকাউন্ট মুছে ফেলুন' : 'Delete Account'}
@@ -413,9 +443,9 @@ export const SettingsModule = () => {
                   <Button 
                     variant="destructive" 
                     onClick={handleDeleteAccountRequest} 
-                    className="h-12 min-w-[160px] touch-target"
+                    className="h-11 min-w-[160px] gap-2 shadow-md"
                   >
-                    <UserX className="h-4 w-4 mr-2" />
+                    <UserX className="h-4 w-4" />
                     {language === 'bn' ? 'অ্যাকাউন্ট মুছুন' : 'Delete Account'}
                   </Button>
                 </div>
@@ -426,27 +456,56 @@ export const SettingsModule = () => {
 
       case 'advanced':
         return (
-          <div className="space-y-4">
-            <BackupRestoreCard />
+          <div className="space-y-6">
+            {/* Backup & Restore Card */}
+            <Card className="border-border/50 shadow-sm bg-card">
+              <CardHeader className="pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-primary/10">
+                    <HardDrive className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg">
+                      {language === 'bn' ? 'ব্যাকআপ ও রিস্টোর' : 'Backup & Restore'}
+                    </CardTitle>
+                    <CardDescription>
+                      {language === 'bn' 
+                        ? 'আপনার ব্যবসায়িক ডেটা সুরক্ষিতভাবে সংরক্ষণ করুন'
+                        : 'Securely save your business data and restore when needed'}
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <BackupRestoreCard />
+              </CardContent>
+            </Card>
             
-            <Card className="border-border/50 shadow-sm">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Database className="h-5 w-5 text-primary" />
-                  {language === 'bn' ? 'ডেটা ম্যানেজমেন্ট' : 'Data Management'}
-                </CardTitle>
-                <CardDescription>
-                  {language === 'bn' ? 'ক্যাশ ও স্থানীয় ডেটা পরিচালনা' : 'Manage cache and local data'}
-                </CardDescription>
+            {/* Data Management */}
+            <Card className="border-border/50 shadow-sm bg-card">
+              <CardHeader className="pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-muted">
+                    <Database className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg">
+                      {language === 'bn' ? 'ডেটা ম্যানেজমেন্ট' : 'Data Management'}
+                    </CardTitle>
+                    <CardDescription>
+                      {language === 'bn' ? 'ক্যাশ ও স্থানীয় ডেটা পরিচালনা' : 'Manage cache and local data'}
+                    </CardDescription>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
                 <Button 
-                  variant="outline" 
+                  variant="outline"
                   className="w-full h-14 flex items-center justify-center gap-3 hover:bg-destructive/5 hover:border-destructive/30 hover:text-destructive transition-all"
                   onClick={handleClearCache}
                 >
                   <Trash2 className="h-5 w-5" />
-                  <span>{language === 'bn' ? 'ক্যাশ পরিষ্কার করুন' : 'Clear Cache'}</span>
+                  <span className="font-medium">{language === 'bn' ? 'ক্যাশ পরিষ্কার করুন' : 'Clear Cache'}</span>
                 </Button>
               </CardContent>
             </Card>
@@ -458,6 +517,47 @@ export const SettingsModule = () => {
     }
   };
 
+  // Profile Header Component
+  const ProfileHeader = ({ compact = false }: { compact?: boolean }) => (
+    <Card className="border-border/50 shadow-sm overflow-hidden bg-card">
+      <div className="p-6">
+        <div className="flex items-center gap-4">
+          <Avatar className={cn(
+            "border-2 border-primary/20 shadow-lg ring-4 ring-primary/5",
+            compact ? "h-14 w-14" : "h-16 w-16"
+          )}>
+            <AvatarImage src={avatarUrl || undefined} />
+            <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground text-lg font-bold">
+              {getInitials(userName)}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex-1 min-w-0">
+            <h2 className={cn("font-bold text-foreground truncate", compact ? "text-base" : "text-lg")}>
+              {userName}
+            </h2>
+            <p className="text-sm text-muted-foreground truncate">{userEmail}</p>
+            <div className="mt-2">
+              {getRoleBadge(userRole)}
+            </div>
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+
+  // Section Header Component
+  const SectionHeader = ({ section }: { section: typeof sections[0] }) => (
+    <div className="flex items-center gap-3 mb-6">
+      <div className="p-2.5 rounded-xl bg-primary/10">
+        {section.icon}
+      </div>
+      <div>
+        <h1 className="font-bold text-xl text-foreground">{section.title}</h1>
+        <p className="text-sm text-muted-foreground">{section.description}</p>
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-[calc(100vh-200px)]">
       {/* Mobile Layout */}
@@ -465,37 +565,11 @@ export const SettingsModule = () => {
         {!isMobileDetailView ? (
           // Mobile List View
           <div className="space-y-4 animate-fade-in">
-            {/* Profile Card Header */}
-            <Card className="border-border/50 shadow-sm overflow-hidden">
-              <div className="bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-6">
-                <div className="flex items-center gap-4">
-                  <Avatar className="h-16 w-16 border-2 border-primary/20 shadow-lg">
-                    <AvatarImage src={avatarUrl || undefined} />
-                    <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground text-lg font-bold">
-                      {getInitials(userName)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <h2 className="font-bold text-lg text-foreground truncate">{userName}</h2>
-                    <p className="text-sm text-muted-foreground truncate">{userEmail}</p>
-                    <Badge className={`mt-2 text-xs ${getRoleBadgeStyle(userRole)}`}>
-                      {userRole === 'owner' ? (language === 'bn' ? 'মালিক' : 'Owner') : 
-                       userRole === 'manager' ? (language === 'bn' ? 'ম্যানেজার' : 'Manager') : userRole}
-                    </Badge>
-                  </div>
-                </div>
-              </div>
-            </Card>
+            <ProfileHeader />
 
-            {/* Settings List */}
-            <Card className="border-border/50 shadow-sm">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Settings className="h-5 w-5 text-primary" />
-                  {language === 'bn' ? 'সেটিংস' : 'Settings'}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-2 space-y-1">
+            {/* Settings Navigation */}
+            <Card className="border-border/50 shadow-sm bg-card">
+              <CardContent className="p-3 space-y-1">
                 {sections.map(section => (
                   <SettingsSection
                     key={section.id}
@@ -516,26 +590,14 @@ export const SettingsModule = () => {
             <Button 
               variant="ghost" 
               onClick={handleBackToList}
-              className="h-12 px-4 -ml-2 hover:bg-muted/50"
+              className="h-12 px-4 -ml-2 hover:bg-muted/50 gap-2"
             >
-              <ArrowLeft className="h-5 w-5 mr-2" />
-              {language === 'bn' ? 'সেটিংস' : 'Settings'}
+              <ArrowLeft className="h-5 w-5" />
+              <span>{language === 'bn' ? 'সেটিংস' : 'Settings'}</span>
             </Button>
 
-            {/* Section Title */}
-            <div className="flex items-center gap-3 px-1">
-              <div className="p-2.5 rounded-xl bg-primary/10">
-                {sections.find(s => s.id === activeSection)?.icon}
-              </div>
-              <div>
-                <h2 className="font-bold text-lg text-foreground">
-                  {sections.find(s => s.id === activeSection)?.title}
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  {sections.find(s => s.id === activeSection)?.description}
-                </p>
-              </div>
-            </div>
+            {/* Section Header */}
+            <SectionHeader section={sections.find(s => s.id === activeSection)!} />
 
             {/* Content */}
             {renderSectionContent()}
@@ -545,34 +607,14 @@ export const SettingsModule = () => {
 
       {/* Desktop Layout */}
       <div className="hidden lg:block">
-        <div className="grid lg:grid-cols-[320px_1fr] gap-6">
+        <div className="grid lg:grid-cols-[340px_1fr] gap-6">
           {/* Sidebar */}
           <div className="space-y-4">
-            {/* Profile Card */}
-            <Card className="border-border/50 shadow-sm overflow-hidden">
-              <div className="bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-6">
-                <div className="flex items-center gap-4">
-                  <Avatar className="h-14 w-14 border-2 border-primary/20 shadow-lg">
-                    <AvatarImage src={avatarUrl || undefined} />
-                    <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground text-base font-bold">
-                      {getInitials(userName)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-foreground truncate">{userName}</h3>
-                    <p className="text-xs text-muted-foreground truncate">{userEmail}</p>
-                    <Badge className={`mt-1.5 text-xs ${getRoleBadgeStyle(userRole)}`}>
-                      {userRole === 'owner' ? (language === 'bn' ? 'মালিক' : 'Owner') : 
-                       userRole === 'manager' ? (language === 'bn' ? 'ম্যানেজার' : 'Manager') : userRole}
-                    </Badge>
-                  </div>
-                </div>
-              </div>
-            </Card>
+            <ProfileHeader compact />
 
             {/* Navigation */}
-            <Card className="sticky top-6 border-border/50 shadow-sm">
-              <CardContent className="p-2 space-y-1">
+            <Card className="sticky top-6 border-border/50 shadow-sm bg-card">
+              <CardContent className="p-3 space-y-1">
                 {sections.map(section => (
                   <SettingsSection
                     key={section.id}
@@ -589,21 +631,7 @@ export const SettingsModule = () => {
 
           {/* Content */}
           <div className="min-w-0">
-            {/* Section Header */}
-            <div className="flex items-center gap-3 mb-6">
-              <div className="p-2.5 rounded-xl bg-primary/10">
-                {sections.find(s => s.id === activeSection)?.icon}
-              </div>
-              <div>
-                <h1 className="font-bold text-xl text-foreground">
-                  {sections.find(s => s.id === activeSection)?.title}
-                </h1>
-                <p className="text-sm text-muted-foreground">
-                  {sections.find(s => s.id === activeSection)?.description}
-                </p>
-              </div>
-            </div>
-
+            <SectionHeader section={sections.find(s => s.id === activeSection)!} />
             {renderSectionContent()}
           </div>
         </div>

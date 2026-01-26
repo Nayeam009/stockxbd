@@ -96,98 +96,83 @@ export const BackupRestoreCard = () => {
 
   return (
     <>
-      <Card className="bg-card border-border">
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <HardDrive className="h-5 w-5 text-primary" />
-            <CardTitle className="text-foreground">
-              {language === "bn" ? "ব্যাকআপ ও রিস্টোর" : "Backup & Restore"}
-            </CardTitle>
-          </div>
-          <CardDescription>
-            {language === "bn" 
-              ? "আপনার ব্যবসায়িক ডেটা সুরক্ষিতভাবে সংরক্ষণ করুন এবং প্রয়োজনে পুনরুদ্ধার করুন"
-              : "Securely save your business data and restore when needed"}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Progress indicator */}
-          {loading && (
-            <div className="space-y-2 p-4 bg-muted/50 rounded-lg">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">{status}</span>
-                <span className="font-medium">{progress}%</span>
-              </div>
-              <Progress value={progress} className="h-2" />
+      <div className="space-y-4">
+        {/* Progress indicator */}
+        {loading && (
+          <div className="space-y-2 p-4 bg-muted/50 rounded-lg">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">{status}</span>
+              <span className="font-medium tabular-nums">{progress}%</span>
             </div>
-          )}
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {/* Download Backup */}
-            <Button
-              variant="outline"
-              className="h-24 flex flex-col items-center justify-center gap-2 hover:border-primary hover:bg-primary/5"
-              onClick={downloadBackup}
-              disabled={loading}
-            >
-              {loading ? (
-                <Loader2 className="h-6 w-6 animate-spin text-primary" />
-              ) : (
-                <Download className="h-6 w-6 text-primary" />
-              )}
-              <div className="text-center">
-                <p className="font-medium">
-                  {language === "bn" ? "ব্যাকআপ ডাউনলোড" : "Download Backup"}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {language === "bn" ? "JSON ফাইল হিসাবে" : "As JSON file"}
-                </p>
-              </div>
-            </Button>
-
-            {/* Restore Backup */}
-            <Button
-              variant="outline"
-              className="h-24 flex flex-col items-center justify-center gap-2 hover:border-primary hover:bg-primary/5"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={loading}
-            >
-              {loading ? (
-                <Loader2 className="h-6 w-6 animate-spin text-primary" />
-              ) : (
-                <Upload className="h-6 w-6 text-primary" />
-              )}
-              <div className="text-center">
-                <p className="font-medium">
-                  {language === "bn" ? "ব্যাকআপ রিস্টোর" : "Restore Backup"}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {language === "bn" ? "ফাইল থেকে" : "From file"}
-                </p>
-              </div>
-            </Button>
+            <Progress value={progress} className="h-2" />
           </div>
+        )}
 
-          {/* Hidden file input */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".json"
-            onChange={handleFileSelect}
-            className="hidden"
-          />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Download Backup */}
+          <Button
+            variant="outline"
+            className="h-20 flex flex-col items-center justify-center gap-2 hover:border-primary hover:bg-primary/5 transition-all"
+            onClick={downloadBackup}
+            disabled={loading}
+          >
+            {loading ? (
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            ) : (
+              <Download className="h-5 w-5 text-primary" />
+            )}
+            <div className="text-center">
+              <p className="font-medium text-sm">
+                {language === "bn" ? "ব্যাকআপ ডাউনলোড" : "Download Backup"}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {language === "bn" ? "JSON ফাইল হিসাবে" : "As JSON file"}
+              </p>
+            </div>
+          </Button>
 
-          {/* Info */}
-          <div className="flex items-start gap-2 p-3 bg-muted/50 rounded-lg text-sm">
-            <Cloud className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-            <p className="text-muted-foreground">
-              {language === "bn"
-                ? "ব্যাকআপ ফাইলে সমস্ত ইনভেন্টরি, গ্রাহক, অর্ডার, খরচ এবং সেটিংস ডেটা থাকে। নিয়মিত ব্যাকআপ নিতে ভুলবেন না!"
-                : "Backup includes all inventory, customers, orders, expenses, and settings data. Remember to backup regularly!"}
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+          {/* Restore Backup */}
+          <Button
+            variant="outline"
+            className="h-20 flex flex-col items-center justify-center gap-2 hover:border-primary hover:bg-primary/5 transition-all"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={loading}
+          >
+            {loading ? (
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            ) : (
+              <Upload className="h-5 w-5 text-primary" />
+            )}
+            <div className="text-center">
+              <p className="font-medium text-sm">
+                {language === "bn" ? "ব্যাকআপ রিস্টোর" : "Restore Backup"}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {language === "bn" ? "ফাইল থেকে" : "From file"}
+              </p>
+            </div>
+          </Button>
+        </div>
+
+        {/* Hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".json"
+          onChange={handleFileSelect}
+          className="hidden"
+        />
+
+        {/* Info */}
+        <div className="flex items-start gap-2 p-3 bg-muted/50 rounded-lg text-sm">
+          <Cloud className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+          <p className="text-muted-foreground">
+            {language === "bn"
+              ? "ব্যাকআপ ফাইলে সমস্ত ইনভেন্টরি, গ্রাহক, অর্ডার, খরচ এবং সেটিংস ডেটা থাকে। নিয়মিত ব্যাকআপ নিতে ভুলবেন না!"
+              : "Backup includes all inventory, customers, orders, expenses, and settings data. Remember to backup regularly!"}
+          </p>
+        </div>
+      </div>
 
       {/* Restore Dialog */}
       <Dialog open={showRestoreDialog} onOpenChange={setShowRestoreDialog}>
