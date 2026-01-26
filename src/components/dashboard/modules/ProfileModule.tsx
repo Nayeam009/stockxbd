@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +13,8 @@ import {
   Camera, 
   Loader2,
   Save,
-  Shield
+  Shield,
+  Settings
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -35,7 +37,9 @@ export const ProfileModule = () => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [userEmail, setUserEmail] = useState("");
   const [userRole, setUserRole] = useState<string>("owner");
+  const [isAdmin, setIsAdmin] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
     full_name: "",
@@ -60,6 +64,15 @@ export const ProfileModule = () => {
         if (roleData) {
           setUserRole(roleData.role);
         }
+
+        // Check if user is admin
+        const { data: adminData } = await supabase
+          .from('admin_users')
+          .select('id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        setIsAdmin(!!adminData);
 
         // Fetch profile
         const { data: profileData, error } = await supabase
@@ -322,21 +335,40 @@ export const ProfileModule = () => {
 
           {/* User Info */}
           <div className="pt-20 space-y-2">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <h3 className="text-2xl font-bold text-foreground">
                 {profile?.full_name || t('unnamed_user')}
               </h3>
-              {userRole && (
-                <Badge className={`${getRoleBadgeColor(userRole)} capitalize`}>
-                  <Shield className="h-3 w-3 mr-1" />
-                  {userRole}
-                </Badge>
-              )}
+              <div className="flex items-center gap-2">
+                {isAdmin && (
+                  <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 text-white border-amber-400/50">
+                    <Shield className="h-3 w-3 mr-1" />
+                    Admin
+                  </Badge>
+                )}
+                {userRole && (
+                  <Badge className={`${getRoleBadgeColor(userRole)} capitalize`}>
+                    <Shield className="h-3 w-3 mr-1" />
+                    {userRole}
+                  </Badge>
+                )}
+              </div>
             </div>
             <p className="text-muted-foreground flex items-center gap-2">
               <Mail className="h-4 w-4" />
               {userEmail}
             </p>
+            {isAdmin && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate('/dashboard?module=admin-panel')}
+                className="mt-2 border-amber-500/50 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30"
+              >
+                <Settings className="h-4 w-4 mr-2" />
+                Open Admin Panel
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
