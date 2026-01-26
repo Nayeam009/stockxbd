@@ -467,9 +467,17 @@
     padding-bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px));
   }
 
+  /* Position above mobile bottom nav */
+  .bottom-mobile-nav {
+    bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
+  }
+
   @media (min-width: 768px) {
     .pb-mobile-nav {
       padding-bottom: 0;
+    }
+    .bottom-mobile-nav {
+      bottom: 0;
     }
   }
 
