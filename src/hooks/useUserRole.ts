@@ -40,12 +40,24 @@ export const useUserRole = (): UserRoleData => {
       isFetchingRef.current = true;
       
       // Network-aware: if offline and we have cache, use it immediately
-      if (!isOnline() && cachedRole && cachedName) {
-        console.log('[UserRole] Offline - using cached data');
-        setUserRole(cachedRole);
-        setUserName(cachedName);
-        setUserId(cachedUserId);
+      const online = typeof navigator !== 'undefined' ? navigator.onLine : true;
+      if (!online || !isOnline()) {
+        console.log('[UserRole] Offline mode detected');
+        if (cachedRole && cachedName) {
+          console.log('[UserRole] Using cached data for offline mode');
+          setUserRole(cachedRole);
+          setUserName(cachedName);
+          setUserId(cachedUserId);
+          setLoading(false);
+          isInitialLoadRef.current = false;
+          return;
+        }
+        // No cache available - set defaults for offline
+        console.log('[UserRole] No cache available for offline, using defaults');
+        setUserRole('customer');
+        setUserName('Guest');
         setLoading(false);
+        isInitialLoadRef.current = false;
         return;
       }
 

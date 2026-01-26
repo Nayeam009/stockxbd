@@ -5,11 +5,13 @@ import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { GlobalCommandPalette } from "@/components/dashboard/GlobalCommandPalette";
 import { MobileBottomNav } from "@/components/dashboard/MobileBottomNav";
 import { ModuleSkeleton, QuickLoader } from "@/components/dashboard/ModuleSkeleton";
+import { OfflineIndicator } from "@/components/shared/OfflineIndicator";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { getNextModule } from "@/hooks/useSwipeNavigation";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useUserRole } from "@/hooks/useUserRole";
-import { Loader2 } from "lucide-react";
+import { useNetwork } from "@/contexts/NetworkContext";
+import { Loader2, WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // Lazy load heavy modules for faster initial render
@@ -51,6 +53,9 @@ const Dashboard = () => {
   
   // Use real authentication - fetch user role from database
   const { userRole, userName, loading: authLoading, error: authError } = useUserRole();
+  
+  // Get network status for offline handling
+  const { isOnline, pendingSyncCount } = useNetwork();
   
   const isMobile = useIsMobile();
 
@@ -129,7 +134,13 @@ const Dashboard = () => {
   } = useDashboardData();
 
   // Safety timeout: if loading takes more than 45 seconds, force show error
+  // Skip timeout in offline mode - rely on cached data instead
   useEffect(() => {
+    // In offline mode, don't set safety timeout - cached data will load quickly
+    if (!isOnline) {
+      return;
+    }
+    
     const timeout = setTimeout(() => {
       if (authLoading || dataLoading) {
         console.error('[Dashboard] Safety timeout reached - loading took too long');
@@ -138,7 +149,7 @@ const Dashboard = () => {
     }, 45000); // 45 second safety net
 
     return () => clearTimeout(timeout);
-  }, [authLoading, dataLoading]);
+  }, [authLoading, dataLoading, isOnline]);
 
   // Combined loading state
   const loading = authLoading || dataLoading;
@@ -192,14 +203,28 @@ const Dashboard = () => {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center space-y-4 animate-fade-in">
-          <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" aria-label="Loading dashboard" />
-          <div className="space-y-2">
-            <p className="text-lg font-medium text-foreground">Loading Stock-X Dashboard</p>
-            <p className="text-muted-foreground">Preparing your LPG management system...</p>
-            <p className="text-xs text-muted-foreground mt-2">
-              This may take up to 45 seconds on slow connections...
-            </p>
-          </div>
+          {!isOnline ? (
+            <>
+              <div className="h-12 w-12 rounded-full bg-warning/10 flex items-center justify-center mx-auto">
+                <WifiOff className="h-6 w-6 text-warning" />
+              </div>
+              <div className="space-y-2">
+                <p className="text-lg font-medium text-foreground">Loading Offline Data</p>
+                <p className="text-muted-foreground">Restoring your cached dashboard...</p>
+              </div>
+            </>
+          ) : (
+            <>
+              <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" aria-label="Loading dashboard" />
+              <div className="space-y-2">
+                <p className="text-lg font-medium text-foreground">Loading Stock-X Dashboard</p>
+                <p className="text-muted-foreground">Preparing your LPG management system...</p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  This may take up to 45 seconds on slow connections...
+                </p>
+              </div>
+            </>
+          )}
         </div>
       </div>
     );
@@ -367,6 +392,9 @@ const Dashboard = () => {
             setActiveModule={handleModuleChange}
             userRole={navRole}
           />
+          
+          {/* Offline Status Indicator */}
+          <OfflineIndicator />
         </div>
         
         {/* Global Command Palette */}

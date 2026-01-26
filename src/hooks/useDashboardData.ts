@@ -224,6 +224,28 @@ export const useDashboardData = () => {
   // Soft fetch - background refresh without loading spinner
   // Now with retry logic for better resilience
   const fetchData = useCallback(async (isSoftRefresh = false) => {
+    // Check if online before fetching
+    const online = typeof navigator !== 'undefined' ? navigator.onLine : true;
+    
+    if (!online) {
+      // Offline mode - restore from cache and skip network
+      const snapshot = readSnapshot();
+      if (snapshot) {
+        setSalesData(snapshot.salesData || []);
+        setStockData(snapshot.stockData || []);
+        setCylinderStock(snapshot.cylinderStock || []);
+        setDrivers(snapshot.drivers || []);
+        setCustomers(snapshot.customers || []);
+        setOrders(snapshot.orders || []);
+        logger.info('Using cached data (offline mode)', { component: 'Dashboard' });
+      }
+      if (isInitialLoadRef.current) {
+        setLoading(false);
+        isInitialLoadRef.current = false;
+      }
+      return;
+    }
+    
     try {
       if (isSoftRefresh) {
         setSoftLoading(true);
@@ -572,6 +594,20 @@ export const useDashboardData = () => {
       
       if (!online) {
         // Offline - don't attempt refresh, just rely on cache
+        // Ensure loading is false so UI doesn't freeze
+        if (isInitialLoadRef.current) {
+          const snapshot = readSnapshot();
+          if (snapshot) {
+            setSalesData(snapshot.salesData || []);
+            setStockData(snapshot.stockData || []);
+            setCylinderStock(snapshot.cylinderStock || []);
+            setDrivers(snapshot.drivers || []);
+            setCustomers(snapshot.customers || []);
+            setOrders(snapshot.orders || []);
+            setLoading(false);
+            isInitialLoadRef.current = false;
+          }
+        }
         return;
       }
       
@@ -583,7 +619,7 @@ export const useDashboardData = () => {
         fetchData(true); // Soft refresh only if stale
       }
     }
-  }, [fetchData, reconnectChannel]);
+  }, [fetchData, reconnectChannel, readSnapshot]);
 
   // Setup visibility listener and initial channel
   useEffect(() => {

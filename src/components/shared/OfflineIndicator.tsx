@@ -61,21 +61,22 @@ export const OfflineIndicator = ({ className, compact = false }: OfflineIndicato
   return (
     <div
       className={cn(
-        'fixed bottom-0 left-0 right-0 z-50 transition-all duration-300',
-        'safe-area-inset-bottom',
+        'fixed left-0 right-0 z-40 transition-all duration-300',
+        // Position above mobile bottom nav when on mobile
+        'bottom-mobile-nav md:bottom-0',
         className
       )}
     >
       {/* Offline Banner */}
       {!isOnline && (
-        <div className="bg-warning/95 backdrop-blur-sm text-warning-foreground px-4 py-3 flex items-center justify-between gap-4 shadow-lg">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-full bg-warning-foreground/10">
+        <div className="bg-warning/95 backdrop-blur-sm text-warning-foreground px-4 py-2.5 flex items-center justify-between gap-3 shadow-lg">
+          <div className="flex items-center gap-2.5">
+            <div className="p-1.5 rounded-full bg-warning-foreground/10">
               <WifiOff className="h-4 w-4" />
             </div>
             <div>
               <p className="font-medium text-sm">You're offline</p>
-              <p className="text-xs opacity-80">
+              <p className="text-xs opacity-80 hidden sm:block">
                 Changes will sync when you're back online
                 {pendingSyncCount > 0 && ` (${pendingSyncCount} pending)`}
               </p>
