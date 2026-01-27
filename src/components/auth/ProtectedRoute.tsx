@@ -17,10 +17,34 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   const location = useLocation();
   const navigate = useNavigate();
   const mountedRef = useRef(true);
+  const loadingRef = useRef(true);
+
+  useEffect(() => {
+    loadingRef.current = loading;
+  }, [loading]);
+
+  const withTimeout = useCallback(async <T,>(promiseLike: PromiseLike<T>, ms: number, label: string): Promise<T> => {
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+    });
+
+    try {
+      // Supabase query builders are PromiseLike (thenable) but not full Promises.
+      // Normalize to a real Promise so Promise.race works reliably.
+      return await Promise.race([Promise.resolve(promiseLike), timeoutPromise]);
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
+    }
+  }, []);
 
   const checkAuthAndRole = useCallback(async () => {
     try {
       setAuthError(null);
+
+      // Always enter a known loading state (prevents stale UI on refresh)
+      setLoading(true);
 
       // Check if offline
       if (!navigator.onLine) {
@@ -29,8 +53,12 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
         return;
       }
 
-      // Get session directly from Supabase
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      // Get session with hard timeout protection
+      const { data: { session }, error: sessionError } = await withTimeout(
+        supabase.auth.getSession(),
+        8000,
+        'Auth session check'
+      );
       
       if (sessionError || !session) {
         setAuthenticated(false);
@@ -39,11 +67,15 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
       }
 
       // Fetch user role
-      const { data: roleData } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', session.user.id)
-        .maybeSingle();
+      const { data: roleData } = await withTimeout(
+        supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', session.user.id)
+          .maybeSingle(),
+        8000,
+        'Role fetch'
+      );
 
       if (mountedRef.current) {
         setAuthenticated(true);
@@ -62,7 +94,7 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
       setAuthenticated(false);
       setLoading(false);
     }
-  }, []);
+  }, [withTimeout]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -70,32 +102,57 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
 
     // Safety timeout - prevent infinite loading
     const safetyTimeout = setTimeout(() => {
-      if (mountedRef.current && loading) {
+      if (!mountedRef.current) return;
+
+      // Only fire if we're still loading.
+      if (!loadingRef.current) return;
+
+      // If we're still loading after the max wait, force an error recovery UI.
+      // This prevents refresh freezes even when the auth SDK/network hangs.
+      if (mountedRef.current) {
         console.warn('[ProtectedRoute] Safety timeout reached');
+        setAuthError(navigator.onLine ? 'error' : 'offline');
+        setAuthenticated(false);
+        setUserRole(null);
         setLoading(false);
       }
     }, 10000); // 10 second max wait
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (!mountedRef.current) return;
-      
-      if (!session) {
+
+      try {
+        setAuthError(null);
+        setLoading(true);
+
+        if (!session) {
+          setAuthenticated(false);
+          setUserRole(null);
+          setLoading(false);
+          return;
+        }
+
+        const { data: roleData } = await withTimeout(
+          supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', session.user.id)
+            .maybeSingle(),
+          8000,
+          'Role fetch (auth change)'
+        );
+
+        if (mountedRef.current) {
+          setAuthenticated(true);
+          setUserRole(roleData?.role || null);
+          setLoading(false);
+        }
+      } catch (e) {
+        console.error('[ProtectedRoute] Auth state change error:', e);
+        if (!mountedRef.current) return;
+        setAuthError(navigator.onLine ? 'error' : 'offline');
         setAuthenticated(false);
         setUserRole(null);
-        setLoading(false);
-        return;
-      }
-
-      // Fetch role on auth state change
-      const { data: roleData } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', session.user.id)
-        .maybeSingle();
-
-      if (mountedRef.current) {
-        setAuthenticated(true);
-        setUserRole(roleData?.role || null);
         setLoading(false);
       }
     });
@@ -105,7 +162,7 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
       clearTimeout(safetyTimeout);
       subscription.unsubscribe();
     };
-  }, [checkAuthAndRole, loading]);
+  }, [checkAuthAndRole, withTimeout]);
 
   // Error Recovery Screen
   if (authError) {
