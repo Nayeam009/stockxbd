@@ -1,24 +1,26 @@
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
 import { 
-  Plus, Trash2, Clock, History, Gift, Banknote, Users, Truck, Gauge, 
-  AlertTriangle, Fuel, Wallet, TrendingUp 
+  Plus, Trash2, History, Gift, Banknote, Users, Truck, 
+  Fuel, Wallet, TrendingUp, Calendar, Receipt, Wrench,
+  ChevronRight, ArrowUpRight, ArrowDownRight
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { PremiumStatCard } from "@/components/shared/PremiumStatCard";
+import { cn } from "@/lib/utils";
 
 // ==================== Types ====================
 interface Staff {
@@ -67,11 +69,36 @@ interface VehicleCost {
 }
 
 const COST_TYPES = ["Fuel", "Maintenance", "Repairs", "Insurance", "Registration", "Other"];
-const FUEL_EFFICIENCY_THRESHOLD = 3;
 
+// ==================== Skeleton Component ====================
+const UtilityExpenseSkeleton = () => (
+  <div className="space-y-4 sm:space-y-6 animate-pulse">
+    <div className="flex items-center gap-3">
+      <Skeleton className="h-12 w-12 rounded-xl" />
+      <div className="space-y-2">
+        <Skeleton className="h-6 w-40" />
+        <Skeleton className="h-4 w-56" />
+      </div>
+    </div>
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      {[...Array(4)].map((_, i) => (
+        <Skeleton key={i} className="h-24 rounded-xl" />
+      ))}
+    </div>
+    <Skeleton className="h-12 w-full rounded-lg" />
+    <div className="space-y-3">
+      {[...Array(3)].map((_, i) => (
+        <Skeleton key={i} className="h-24 rounded-xl" />
+      ))}
+    </div>
+  </div>
+);
+
+// ==================== Main Component ====================
 export const UtilityExpenseModule = () => {
   const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState("staff");
+  const mountedRef = useRef(true);
   
   // Staff State
   const [staffList, setStaffList] = useState<StaffWithPayments[]>([]);
@@ -105,40 +132,7 @@ export const UtilityExpenseModule = () => {
   const [loading, setLoading] = useState(true);
 
   // ==================== Data Fetching ====================
-  useEffect(() => {
-    fetchAllData();
-  }, []);
-
-  useEffect(() => {
-    const channels = [
-      supabase.channel('staff-utility-realtime').on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'staff' }, 
-        () => fetchStaffData()
-      ).subscribe(),
-      supabase.channel('staff-payments-utility-realtime').on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'staff_payments' }, 
-        () => fetchStaffData()
-      ).subscribe(),
-      supabase.channel('vehicles-utility-realtime').on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'vehicles' }, 
-        () => fetchVehicleData()
-      ).subscribe(),
-      supabase.channel('vehicle-costs-utility-realtime').on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'vehicle_costs' }, 
-        () => fetchVehicleData()
-      ).subscribe(),
-    ];
-    
-    return () => channels.forEach(ch => supabase.removeChannel(ch));
-  }, []);
-
-  const fetchAllData = async () => {
-    setLoading(true);
-    await Promise.all([fetchStaffData(), fetchVehicleData()]);
-    setLoading(false);
-  };
-
-  const fetchStaffData = async () => {
+  const fetchStaffData = useCallback(async () => {
     const currentMonth = startOfMonth(new Date());
     const monthEnd = endOfMonth(new Date());
 
@@ -148,6 +142,8 @@ export const UtilityExpenseModule = () => {
         .gte("payment_date", format(currentMonth, "yyyy-MM-dd"))
         .lte("payment_date", format(monthEnd, "yyyy-MM-dd")),
     ]);
+
+    if (!mountedRef.current) return;
 
     if (staffRes.data && paymentsRes.data) {
       const staffWithPayments: StaffWithPayments[] = staffRes.data.map(staff => {
@@ -166,17 +162,45 @@ export const UtilityExpenseModule = () => {
       });
       setStaffList(staffWithPayments);
     }
-  };
+  }, []);
 
-  const fetchVehicleData = async () => {
+  const fetchVehicleData = useCallback(async () => {
     const [vehiclesRes, costsRes] = await Promise.all([
       supabase.from("vehicles").select("*").eq("is_active", true).order("name"),
       supabase.from("vehicle_costs").select("*, vehicle:vehicles(*)").order("cost_date", { ascending: false }),
     ]);
 
+    if (!mountedRef.current) return;
+
     if (vehiclesRes.data) setVehicles(vehiclesRes.data);
     if (costsRes.data) setCosts(costsRes.data as VehicleCost[]);
-  };
+  }, []);
+
+  const fetchAllData = useCallback(async () => {
+    setLoading(true);
+    await Promise.all([fetchStaffData(), fetchVehicleData()]);
+    if (mountedRef.current) setLoading(false);
+  }, [fetchStaffData, fetchVehicleData]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    fetchAllData();
+    return () => { mountedRef.current = false; };
+  }, [fetchAllData]);
+
+  // Real-time subscriptions
+  useEffect(() => {
+    const channel = supabase
+      .channel('utility-expense-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'staff' }, fetchStaffData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'staff_payments' }, fetchStaffData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicles' }, fetchVehicleData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicle_costs' }, fetchVehicleData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_expenses' }, fetchAllData)
+      .subscribe();
+    
+    return () => { supabase.removeChannel(channel); };
+  }, [fetchStaffData, fetchVehicleData, fetchAllData]);
 
   // ==================== Staff Actions ====================
   const handleAddStaff = async () => {
@@ -216,6 +240,7 @@ export const UtilityExpenseModule = () => {
     if (error) {
       toast({ title: "Error processing payment", description: error.message, variant: "destructive" });
     } else {
+      // Auto-sync to daily expenses
       await supabase.from("daily_expenses").insert({
         expense_date: format(new Date(), "yyyy-MM-dd"),
         category: "Staff",
@@ -323,6 +348,7 @@ export const UtilityExpenseModule = () => {
       if (newCost.cost_type === "Fuel" && newCost.odometer_reading > 0) {
         await supabase.from("vehicles").update({ last_odometer: newCost.odometer_reading }).eq("id", newCost.vehicle_id);
       }
+      // Auto-sync to daily expenses
       await supabase.from("daily_expenses").insert({
         expense_date: newCost.cost_date,
         category: "Transport",
@@ -359,91 +385,155 @@ export const UtilityExpenseModule = () => {
   };
 
   const getTotalMonthlyExpense = () => getTotalStaffPaidThisMonth() + getThisMonthVehicleTotal();
+  const getInitials = (name: string) => name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case "Paid": return <Badge className="bg-success hover:bg-success text-white text-[10px] sm:text-xs">Paid</Badge>;
-      case "Partial": return <Badge className="bg-warning hover:bg-warning text-white text-[10px] sm:text-xs">Partial</Badge>;
-      default: return <Badge variant="destructive" className="text-[10px] sm:text-xs">Unpaid</Badge>;
+      case "Paid": return <Badge className="bg-emerald-500/90 hover:bg-emerald-500 text-white text-[10px] font-medium px-2 py-0.5">Paid</Badge>;
+      case "Partial": return <Badge className="bg-amber-500/90 hover:bg-amber-500 text-white text-[10px] font-medium px-2 py-0.5">Partial</Badge>;
+      default: return <Badge className="bg-rose-500/90 hover:bg-rose-500 text-white text-[10px] font-medium px-2 py-0.5">Unpaid</Badge>;
     }
   };
 
-  const getInitials = (name: string) => name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
+  const getCostTypeIcon = (type: string) => {
+    switch (type) {
+      case "Fuel": return <Fuel className="h-3.5 w-3.5" />;
+      case "Maintenance": return <Wrench className="h-3.5 w-3.5" />;
+      case "Repairs": return <Wrench className="h-3.5 w-3.5" />;
+      default: return <Receipt className="h-3.5 w-3.5" />;
+    }
+  };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
+  if (loading) return <UtilityExpenseSkeleton />;
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      {/* Professional Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-lg">
-            <Wallet className="h-6 w-6 text-primary-foreground" />
+          <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg">
+            <Wallet className="h-6 w-6 text-white" />
           </div>
           <div>
-            <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground">{t('utility_expense')}</h2>
+            <h2 className="text-xl sm:text-2xl font-bold text-foreground">{t('utility_expense')}</h2>
             <p className="text-xs sm:text-sm text-muted-foreground">Manage staff salary and vehicle costs</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="flex items-center gap-1 px-2 py-1 bg-muted/50 rounded-full">
+            <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span>Real-time sync</span>
           </div>
         </div>
       </div>
 
-      {/* Summary Cards */}
+      {/* KPI Cards - Premium Design */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <PremiumStatCard
-          title="Monthly Total"
-          value={`${BANGLADESHI_CURRENCY_SYMBOL}${getTotalMonthlyExpense().toLocaleString()}`}
-          subtitle="Staff + Vehicle"
-          icon={<TrendingUp className="h-5 w-5" />}
-          colorScheme="rose"
-        />
-        <PremiumStatCard
-          title="Staff Paid"
-          value={`${BANGLADESHI_CURRENCY_SYMBOL}${getTotalStaffPaidThisMonth().toLocaleString()}`}
-          subtitle={`${staffList.length} staff members`}
-          icon={<Users className="h-5 w-5" />}
-          colorScheme="emerald"
-        />
-        <PremiumStatCard
-          title="Staff Due"
-          value={`${BANGLADESHI_CURRENCY_SYMBOL}${getTotalStaffDue().toLocaleString()}`}
-          subtitle="Remaining salary"
-          icon={<Banknote className="h-5 w-5" />}
-          colorScheme="amber"
-        />
-        <PremiumStatCard
-          title="Vehicle Cost"
-          value={`${BANGLADESHI_CURRENCY_SYMBOL}${getThisMonthVehicleTotal().toLocaleString()}`}
-          subtitle={`${vehicles.length} vehicles`}
-          icon={<Truck className="h-5 w-5" />}
-          colorScheme="purple"
-        />
+        {/* Monthly Total */}
+        <Card className="relative overflow-hidden border-0 shadow-md bg-gradient-to-br from-rose-50 to-pink-50 dark:from-rose-950/30 dark:to-pink-950/30">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-rose-400 to-pink-500" />
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <div className="h-10 w-10 rounded-xl bg-rose-100 dark:bg-rose-900/50 flex items-center justify-center">
+                <TrendingUp className="h-5 w-5 text-rose-600 dark:text-rose-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-2xl sm:text-3xl font-bold text-rose-600 dark:text-rose-400 tabular-nums">
+                  {BANGLADESHI_CURRENCY_SYMBOL}{getTotalMonthlyExpense().toLocaleString()}
+                </p>
+                <p className="text-xs font-medium text-rose-600/70 dark:text-rose-400/70 uppercase tracking-wide">Monthly Total</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Staff + Vehicle</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Staff Paid */}
+        <Card className="relative overflow-hidden border-0 shadow-md bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-400 to-teal-500" />
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <div className="h-10 w-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center">
+                <Users className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-2xl sm:text-3xl font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                  {BANGLADESHI_CURRENCY_SYMBOL}{getTotalStaffPaidThisMonth().toLocaleString()}
+                </p>
+                <p className="text-xs font-medium text-emerald-600/70 dark:text-emerald-400/70 uppercase tracking-wide">Staff Paid</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">{staffList.length} staff members</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Staff Due */}
+        <Card className="relative overflow-hidden border-0 shadow-md bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-400 to-orange-500" />
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <div className="h-10 w-10 rounded-xl bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center">
+                <Banknote className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-2xl sm:text-3xl font-bold text-amber-600 dark:text-amber-400 tabular-nums">
+                  {BANGLADESHI_CURRENCY_SYMBOL}{getTotalStaffDue().toLocaleString()}
+                </p>
+                <p className="text-xs font-medium text-amber-600/70 dark:text-amber-400/70 uppercase tracking-wide">Staff Due</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Remaining salary</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Vehicle Cost */}
+        <Card className="relative overflow-hidden border-0 shadow-md bg-gradient-to-br from-violet-50 to-purple-50 dark:from-violet-950/30 dark:to-purple-950/30">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-violet-400 to-purple-500" />
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <div className="h-10 w-10 rounded-xl bg-violet-100 dark:bg-violet-900/50 flex items-center justify-center">
+                <Truck className="h-5 w-5 text-violet-600 dark:text-violet-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-2xl sm:text-3xl font-bold text-violet-600 dark:text-violet-400 tabular-nums">
+                  {BANGLADESHI_CURRENCY_SYMBOL}{getThisMonthVehicleTotal().toLocaleString()}
+                </p>
+                <p className="text-xs font-medium text-violet-600/70 dark:text-violet-400/70 uppercase tracking-wide">Vehicle Cost</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">{vehicles.length} vehicles</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Tabs */}
+      {/* Tabs - Modern Design */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 h-11">
-          <TabsTrigger value="staff" className="gap-2 h-10">
+        <TabsList className="grid w-full grid-cols-2 h-12 bg-muted/50 p-1 rounded-xl">
+          <TabsTrigger 
+            value="staff" 
+            className="gap-2 h-10 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm font-medium"
+          >
             <Users className="h-4 w-4" />
-            Staff Salary
+            <span className="hidden sm:inline">Staff Salary</span>
+            <span className="sm:hidden">Staff</span>
           </TabsTrigger>
-          <TabsTrigger value="vehicles" className="gap-2 h-10">
+          <TabsTrigger 
+            value="vehicles" 
+            className="gap-2 h-10 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm font-medium"
+          >
             <Truck className="h-4 w-4" />
-            Vehicles
+            <span className="hidden sm:inline">Vehicles</span>
+            <span className="sm:hidden">Vehicles</span>
           </TabsTrigger>
         </TabsList>
 
-        {/* Staff Tab */}
+        {/* Staff Tab Content */}
         <TabsContent value="staff" className="mt-4 space-y-4">
+          {/* Action Button */}
           <div className="flex justify-end">
             <Dialog open={staffDialogOpen} onOpenChange={setStaffDialogOpen}>
               <DialogTrigger asChild>
-                <Button size="sm" className="gap-2 h-10">
+                <Button className="gap-2 h-11 shadow-md">
                   <Plus className="h-4 w-4" /> Add Staff
                 </Button>
               </DialogTrigger>
@@ -451,274 +541,291 @@ export const UtilityExpenseModule = () => {
                 <DialogHeader><DialogTitle>Add New Staff Member</DialogTitle></DialogHeader>
                 <div className="space-y-4 py-4">
                   <div className="space-y-2">
-                    <Label>Name</Label>
-                    <Input value={newStaff.name} onChange={e => setNewStaff({...newStaff, name: e.target.value})} placeholder="e.g., Md. Razu" />
+                    <Label className="text-sm font-medium">Name</Label>
+                    <Input className="h-11 text-base" value={newStaff.name} onChange={e => setNewStaff({...newStaff, name: e.target.value})} placeholder="e.g., Md. Razu" />
                   </div>
                   <div className="space-y-2">
-                    <Label>Role</Label>
-                    <Input value={newStaff.role} onChange={e => setNewStaff({...newStaff, role: e.target.value})} placeholder="e.g., Manager, Driver" />
+                    <Label className="text-sm font-medium">Role</Label>
+                    <Input className="h-11 text-base" value={newStaff.role} onChange={e => setNewStaff({...newStaff, role: e.target.value})} placeholder="e.g., Manager, Driver" />
                   </div>
                   <div className="space-y-2">
-                    <Label>Monthly Salary ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
-                    <Input type="number" inputMode="numeric" value={newStaff.salary || ""} onChange={e => setNewStaff({...newStaff, salary: Number(e.target.value)})} />
+                    <Label className="text-sm font-medium">Monthly Salary ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
+                    <Input className="h-11 text-base" type="number" inputMode="numeric" value={newStaff.salary || ""} onChange={e => setNewStaff({...newStaff, salary: Number(e.target.value)})} />
                   </div>
                   <div className="space-y-2">
-                    <Label>Phone (Optional)</Label>
-                    <Input value={newStaff.phone} onChange={e => setNewStaff({...newStaff, phone: e.target.value})} placeholder="e.g., 01XXXXXXXXX" />
+                    <Label className="text-sm font-medium">Phone (Optional)</Label>
+                    <Input className="h-11 text-base" value={newStaff.phone} onChange={e => setNewStaff({...newStaff, phone: e.target.value})} placeholder="e.g., 01XXXXXXXXX" />
                   </div>
-                  <Button onClick={handleAddStaff} className="w-full">Add Staff</Button>
+                  <Button onClick={handleAddStaff} className="w-full h-11">Add Staff</Button>
                 </div>
               </DialogContent>
             </Dialog>
           </div>
 
-          {/* Staff Cards (Mobile) / Table (Desktop) */}
-          <Card className="border-border">
-            <CardContent className="p-0 sm:p-4">
-              {/* Mobile Card View */}
-              <div className="sm:hidden space-y-3 p-3">
-                {staffList.map(staff => (
-                  <div key={staff.id} className="p-3 border border-border rounded-xl space-y-3">
-                    <div className="flex items-center justify-between">
+          {/* Staff Cards - Mobile Optimized */}
+          {staffList.length === 0 ? (
+            <Card className="border-dashed">
+              <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                <Users className="h-12 w-12 text-muted-foreground/40 mb-4" />
+                <p className="text-muted-foreground font-medium">No staff members yet</p>
+                <p className="text-sm text-muted-foreground/70">Add your first staff member to get started</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {staffList.map(staff => (
+                <Card key={staff.id} className="overflow-hidden hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3">
-                        <Avatar className="h-10 w-10 bg-muted"><AvatarFallback className="text-sm">{getInitials(staff.name)}</AvatarFallback></Avatar>
-                        <div>
-                          <p className="font-medium text-sm">{staff.name}</p>
+                        <Avatar className="h-11 w-11 border-2 border-background shadow-sm">
+                          <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/10 text-primary font-semibold text-sm">
+                            {getInitials(staff.name)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-sm truncate">{staff.name}</p>
                           <p className="text-xs text-muted-foreground">{staff.role}</p>
                         </div>
                       </div>
                       {getStatusBadge(staff.status)}
                     </div>
-                    <div className="grid grid-cols-3 gap-2 text-center">
-                      <div className="p-2 bg-muted/50 rounded-lg">
-                        <p className="text-xs text-muted-foreground">Salary</p>
-                        <p className="text-sm font-medium">{BANGLADESHI_CURRENCY_SYMBOL}{Number(staff.salary).toLocaleString()}</p>
+                    
+                    {/* Stats Grid */}
+                    <div className="grid grid-cols-3 gap-2 mt-4">
+                      <div className="p-2.5 bg-muted/50 rounded-lg text-center">
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Salary</p>
+                        <p className="text-sm font-bold tabular-nums">{BANGLADESHI_CURRENCY_SYMBOL}{Number(staff.salary).toLocaleString()}</p>
                       </div>
-                      <div className="p-2 bg-success/10 rounded-lg">
-                        <p className="text-xs text-muted-foreground">Paid</p>
-                        <p className="text-sm font-medium text-success">{BANGLADESHI_CURRENCY_SYMBOL}{staff.totalPaid.toLocaleString()}</p>
+                      <div className="p-2.5 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg text-center">
+                        <p className="text-[10px] text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">Paid</p>
+                        <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{BANGLADESHI_CURRENCY_SYMBOL}{staff.totalPaid.toLocaleString()}</p>
                       </div>
-                      <div className="p-2 bg-destructive/10 rounded-lg">
-                        <p className="text-xs text-muted-foreground">Due</p>
-                        <p className="text-sm font-medium text-destructive">{BANGLADESHI_CURRENCY_SYMBOL}{staff.remaining.toLocaleString()}</p>
+                      <div className="p-2.5 bg-rose-50 dark:bg-rose-950/30 rounded-lg text-center">
+                        <p className="text-[10px] text-rose-600 dark:text-rose-400 uppercase tracking-wide">Due</p>
+                        <p className="text-sm font-bold text-rose-600 dark:text-rose-400 tabular-nums">{BANGLADESHI_CURRENCY_SYMBOL}{staff.remaining.toLocaleString()}</p>
                       </div>
                     </div>
-                    <div className="flex gap-2">
-                      <Button size="sm" className="flex-1 h-10" onClick={() => { setSelectedStaff(staff); setPayAmount(staff.remaining); setPayDialogOpen(true); }} disabled={staff.status === "Paid"}>Pay Salary</Button>
-                      <Button variant="outline" size="sm" className="h-10" onClick={() => { setSelectedStaff(staff); setBonusDialogOpen(true); }} aria-label={`Add bonus for ${staff.name}`}><Gift className="h-4 w-4" aria-hidden="true" /></Button>
-                      <Button variant="ghost" size="sm" className="h-10" onClick={() => { setSelectedStaff(staff); setHistoryDialogOpen(true); }} aria-label={`View payment history for ${staff.name}`}><History className="h-4 w-4" aria-hidden="true" /></Button>
-                    </div>
-                  </div>
-                ))}
-                {staffList.length === 0 && (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Users className="h-12 w-12 mx-auto mb-3 opacity-30" />
-                    <p>No staff members yet</p>
-                    <p className="text-xs">Add your first staff member to get started</p>
-                  </div>
-                )}
-              </div>
 
-              {/* Desktop Table View */}
-              <div className="hidden sm:block">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead className="text-right">Salary</TableHead>
-                      <TableHead className="text-right">Paid</TableHead>
-                      <TableHead className="text-right">Remaining</TableHead>
-                      <TableHead className="text-center">Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {staffList.map(staff => (
-                      <TableRow key={staff.id}>
-                        <TableCell className="font-medium">{staff.name}</TableCell>
-                        <TableCell>{staff.role}</TableCell>
-                        <TableCell className="text-right">{BANGLADESHI_CURRENCY_SYMBOL}{Number(staff.salary).toLocaleString()}</TableCell>
-                        <TableCell className="text-right text-success">{BANGLADESHI_CURRENCY_SYMBOL}{staff.totalPaid.toLocaleString()}</TableCell>
-                        <TableCell className="text-right text-destructive">{BANGLADESHI_CURRENCY_SYMBOL}{staff.remaining.toLocaleString()}</TableCell>
-                        <TableCell className="text-center">{getStatusBadge(staff.status)}</TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-1">
-                            <Button size="sm" variant="ghost" onClick={() => { setSelectedStaff(staff); setPayAmount(staff.remaining); setPayDialogOpen(true); }} disabled={staff.status === "Paid"} aria-label={`Pay salary to ${staff.name}`}><Banknote className="h-4 w-4" aria-hidden="true" /></Button>
-                            <Button size="sm" variant="ghost" onClick={() => { setSelectedStaff(staff); setBonusDialogOpen(true); }} aria-label={`Add bonus for ${staff.name}`}><Gift className="h-4 w-4" aria-hidden="true" /></Button>
-                            <Button size="sm" variant="ghost" onClick={() => { setSelectedStaff(staff); setHistoryDialogOpen(true); }} aria-label={`View payment history for ${staff.name}`}><History className="h-4 w-4" aria-hidden="true" /></Button>
-                            <Button size="sm" variant="ghost" className="text-destructive" onClick={() => handleDeleteStaff(staff.id)} aria-label={`Delete ${staff.name}`}><Trash2 className="h-4 w-4" aria-hidden="true" /></Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
+                    {/* Action Buttons */}
+                    <div className="flex gap-2 mt-4">
+                      <Button 
+                        size="sm"
+                        className="flex-1 h-10"
+                        onClick={() => { setSelectedStaff(staff); setPayAmount(staff.remaining); setPayDialogOpen(true); }}
+                        disabled={staff.status === "Paid"}
+                      >
+                        <Banknote className="h-4 w-4 mr-1.5" />
+                        Pay Salary
+                      </Button>
+                      <Button 
+                        variant="outline"
+                        size="sm"
+                        className="h-10 w-10 p-0"
+                        onClick={() => { setSelectedStaff(staff); setBonusDialogOpen(true); }}
+                      >
+                        <Gift className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        className="h-10 w-10 p-0"
+                        onClick={() => { setSelectedStaff(staff); setHistoryDialogOpen(true); }}
+                      >
+                        <History className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        className="h-10 w-10 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => handleDeleteStaff(staff.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </TabsContent>
 
-        {/* Vehicles Tab */}
+        {/* Vehicles Tab Content */}
         <TabsContent value="vehicles" className="mt-4 space-y-4">
+          {/* Action Buttons */}
           <div className="flex justify-end gap-2">
             <Dialog open={vehicleDialogOpen} onOpenChange={setVehicleDialogOpen}>
               <DialogTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-2 h-10"><Truck className="h-4 w-4" /> Add Vehicle</Button>
+                <Button variant="outline" className="gap-2 h-11">
+                  <Truck className="h-4 w-4" />
+                  <span className="hidden sm:inline">Add Vehicle</span>
+                  <span className="sm:hidden">Vehicle</span>
+                </Button>
               </DialogTrigger>
               <DialogContent className="max-w-[95vw] sm:max-w-md">
                 <DialogHeader><DialogTitle>Add New Vehicle</DialogTitle></DialogHeader>
                 <div className="space-y-4 py-4">
                   <div className="space-y-2">
-                    <Label>Vehicle Name</Label>
-                    <Input value={newVehicle.name} onChange={e => setNewVehicle({...newVehicle, name: e.target.value})} placeholder="e.g., Truck 1" />
+                    <Label className="text-sm font-medium">Vehicle Name</Label>
+                    <Input className="h-11 text-base" value={newVehicle.name} onChange={e => setNewVehicle({...newVehicle, name: e.target.value})} placeholder="e.g., Truck 01" />
                   </div>
                   <div className="space-y-2">
-                    <Label>License Plate (Optional)</Label>
-                    <Input value={newVehicle.license_plate} onChange={e => setNewVehicle({...newVehicle, license_plate: e.target.value})} placeholder="e.g., DHA-1234" />
+                    <Label className="text-sm font-medium">License Plate (Optional)</Label>
+                    <Input className="h-11 text-base" value={newVehicle.license_plate} onChange={e => setNewVehicle({...newVehicle, license_plate: e.target.value})} placeholder="e.g., DHA-1234" />
                   </div>
-                  <Button onClick={handleAddVehicle} className="w-full">Add Vehicle</Button>
+                  <Button onClick={handleAddVehicle} className="w-full h-11">Add Vehicle</Button>
                 </div>
               </DialogContent>
             </Dialog>
             <Dialog open={costDialogOpen} onOpenChange={setCostDialogOpen}>
               <DialogTrigger asChild>
-                <Button size="sm" className="gap-2 h-10"><Plus className="h-4 w-4" /> Add Cost</Button>
+                <Button className="gap-2 h-11 shadow-md">
+                  <Plus className="h-4 w-4" /> Add Cost
+                </Button>
               </DialogTrigger>
               <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto">
                 <DialogHeader><DialogTitle>Add Vehicle Cost</DialogTitle></DialogHeader>
                 <div className="space-y-4 py-4">
                   <div className="space-y-2">
-                    <Label>Vehicle</Label>
+                    <Label className="text-sm font-medium">Vehicle</Label>
                     <Select value={newCost.vehicle_id} onValueChange={v => setNewCost({...newCost, vehicle_id: v})}>
-                      <SelectTrigger><SelectValue placeholder="Select vehicle" /></SelectTrigger>
-                      <SelectContent>{vehicles.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}</SelectContent>
+                      <SelectTrigger className="h-11"><SelectValue placeholder="Select vehicle" /></SelectTrigger>
+                      <SelectContent>
+                        {vehicles.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
+                      </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>Cost Type</Label>
+                    <Label className="text-sm font-medium">Cost Type</Label>
                     <Select value={newCost.cost_type} onValueChange={v => setNewCost({...newCost, cost_type: v})}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>{COST_TYPES.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}</SelectContent>
+                      <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {COST_TYPES.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}
+                      </SelectContent>
                     </Select>
                   </div>
                   {newCost.cost_type === "Fuel" && (
-                    <div className="p-3 bg-muted/50 rounded-lg space-y-3">
-                      <div className="flex items-center gap-2 text-sm font-medium"><Fuel className="h-4 w-4 text-primary" /> Fuel Details</div>
+                    <div className="p-3 bg-muted/50 rounded-xl space-y-3">
+                      <div className="flex items-center gap-2 text-sm font-medium">
+                        <Fuel className="h-4 w-4 text-primary" />
+                        Fuel Details
+                      </div>
                       <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1">
                           <Label className="text-xs">Liters Filled</Label>
-                          <Input type="number" inputMode="decimal" value={newCost.liters_filled || ""} onChange={e => setNewCost({...newCost, liters_filled: Number(e.target.value)})} className="h-10" />
+                          <Input className="h-10" type="number" inputMode="decimal" value={newCost.liters_filled || ""} onChange={e => setNewCost({...newCost, liters_filled: Number(e.target.value)})} placeholder="0" />
                         </div>
                         <div className="space-y-1">
                           <Label className="text-xs">Odometer (km)</Label>
-                          <Input type="number" inputMode="numeric" value={newCost.odometer_reading || ""} onChange={e => setNewCost({...newCost, odometer_reading: Number(e.target.value)})} className="h-10" />
+                          <Input className="h-10" type="number" inputMode="numeric" value={newCost.odometer_reading || ""} onChange={e => setNewCost({...newCost, odometer_reading: Number(e.target.value)})} placeholder="0" />
                         </div>
                       </div>
                     </div>
                   )}
                   <div className="space-y-2">
-                    <Label>Description</Label>
-                    <Input value={newCost.description} onChange={e => setNewCost({...newCost, description: e.target.value})} placeholder="e.g., Diesel top-up" />
+                    <Label className="text-sm font-medium">Description</Label>
+                    <Input className="h-11 text-base" value={newCost.description} onChange={e => setNewCost({...newCost, description: e.target.value})} placeholder="e.g., Diesel top-up" />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
-                      <Label>Amount ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
-                      <Input type="number" inputMode="numeric" value={newCost.amount || ""} onChange={e => setNewCost({...newCost, amount: Number(e.target.value)})} />
+                      <Label className="text-sm font-medium">Amount ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
+                      <Input className="h-11 text-base" type="number" inputMode="numeric" value={newCost.amount || ""} onChange={e => setNewCost({...newCost, amount: Number(e.target.value)})} />
                     </div>
                     <div className="space-y-2">
-                      <Label>Date</Label>
-                      <Input type="date" value={newCost.cost_date} onChange={e => setNewCost({...newCost, cost_date: e.target.value})} />
+                      <Label className="text-sm font-medium">Date</Label>
+                      <Input className="h-11" type="date" value={newCost.cost_date} onChange={e => setNewCost({...newCost, cost_date: e.target.value})} />
                     </div>
                   </div>
-                  <Button onClick={handleAddCost} className="w-full">Add Cost</Button>
+                  <Button onClick={handleAddCost} className="w-full h-11">Add Cost</Button>
                 </div>
               </DialogContent>
             </Dialog>
           </div>
 
-          {/* Vehicle Costs Table */}
-          <Card className="border-border">
-            <CardContent className="p-0 sm:p-4">
-              {/* Mobile Card View */}
-              <div className="sm:hidden space-y-3 p-3">
-                {costs.slice(0, 10).map(cost => (
-                  <div key={cost.id} className="p-3 border border-border rounded-xl space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Badge variant={cost.cost_type === "Fuel" ? "default" : "secondary"}>{cost.cost_type}</Badge>
-                        <span className="text-sm font-medium">{cost.vehicle?.name || 'Unknown'}</span>
+          {/* Vehicle Costs List */}
+          {costs.length === 0 ? (
+            <Card className="border-dashed">
+              <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                <Truck className="h-12 w-12 text-muted-foreground/40 mb-4" />
+                <p className="text-muted-foreground font-medium">No vehicle costs yet</p>
+                <p className="text-sm text-muted-foreground/70">Add a vehicle and log your first cost</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {costs.slice(0, 20).map(cost => (
+                <Card key={cost.id} className="overflow-hidden hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className={cn(
+                          "h-10 w-10 rounded-xl flex items-center justify-center",
+                          cost.cost_type === "Fuel" ? "bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400" :
+                          cost.cost_type === "Maintenance" ? "bg-amber-100 dark:bg-amber-900/50 text-amber-600 dark:text-amber-400" :
+                          "bg-muted text-muted-foreground"
+                        )}>
+                          {getCostTypeIcon(cost.cost_type)}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="font-semibold text-sm">{cost.vehicle?.name || 'Unknown Vehicle'}</p>
+                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{cost.cost_type}</Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground truncate">{cost.description || 'No description'}</p>
+                          <div className="flex items-center gap-1 mt-1 text-[10px] text-muted-foreground">
+                            <Calendar className="h-3 w-3" />
+                            {format(new Date(cost.cost_date), 'dd MMM yyyy')}
+                          </div>
+                        </div>
                       </div>
-                      <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive" onClick={() => handleDeleteCost(cost.id)}><Trash2 className="h-4 w-4" /></Button>
+                      <div className="flex items-center gap-2">
+                        <p className="font-bold text-base tabular-nums">{BANGLADESHI_CURRENCY_SYMBOL}{Number(cost.amount).toLocaleString()}</p>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => handleDeleteCost(cost.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
-                    <p className="text-xs text-muted-foreground">{cost.description || 'No description'}</p>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">{format(new Date(cost.cost_date), "dd MMM yyyy")}</span>
-                      <span className="text-base font-bold text-destructive">{BANGLADESHI_CURRENCY_SYMBOL}{Number(cost.amount).toLocaleString()}</span>
-                    </div>
-                  </div>
-                ))}
-                {costs.length === 0 && (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Truck className="h-12 w-12 mx-auto mb-3 opacity-30" />
-                    <p>No vehicle costs recorded</p>
-                    <p className="text-xs">Start by adding vehicles and logging costs</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Desktop Table View */}
-              <div className="hidden sm:block">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Vehicle</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Description</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {costs.slice(0, 20).map(cost => (
-                      <TableRow key={cost.id}>
-                        <TableCell>{format(new Date(cost.cost_date), "dd MMM yyyy")}</TableCell>
-                        <TableCell className="font-medium">{cost.vehicle?.name || 'Unknown'}</TableCell>
-                        <TableCell><Badge variant={cost.cost_type === "Fuel" ? "default" : "secondary"}>{cost.cost_type}</Badge></TableCell>
-                        <TableCell className="text-muted-foreground">{cost.description || '-'}</TableCell>
-                        <TableCell className="text-right font-bold">{BANGLADESHI_CURRENCY_SYMBOL}{Number(cost.amount).toLocaleString()}</TableCell>
-                        <TableCell className="text-right">
-                          <Button size="sm" variant="ghost" className="text-destructive" onClick={() => handleDeleteCost(cost.id)}><Trash2 className="h-4 w-4" /></Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </TabsContent>
       </Tabs>
 
-      {/* Pay Dialog */}
+      {/* Payment Dialog */}
       <Dialog open={payDialogOpen} onOpenChange={setPayDialogOpen}>
         <DialogContent className="max-w-[95vw] sm:max-w-md">
           <DialogHeader><DialogTitle>Pay Salary - {selectedStaff?.name}</DialogTitle></DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="p-3 bg-muted/50 rounded-lg">
-              <p className="text-sm text-muted-foreground">Remaining Due</p>
-              <p className="text-2xl font-bold text-destructive">{BANGLADESHI_CURRENCY_SYMBOL}{selectedStaff?.remaining.toLocaleString()}</p>
+            <div className="p-4 bg-muted/50 rounded-xl space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Monthly Salary</span>
+                <span className="font-medium tabular-nums">{BANGLADESHI_CURRENCY_SYMBOL}{Number(selectedStaff?.salary || 0).toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Already Paid</span>
+                <span className="font-medium text-emerald-600 tabular-nums">{BANGLADESHI_CURRENCY_SYMBOL}{(selectedStaff?.totalPaid || 0).toLocaleString()}</span>
+              </div>
+              <div className="border-t pt-2 flex justify-between text-sm">
+                <span className="font-medium">Remaining Due</span>
+                <span className="font-bold text-rose-600 tabular-nums">{BANGLADESHI_CURRENCY_SYMBOL}{(selectedStaff?.remaining || 0).toLocaleString()}</span>
+              </div>
             </div>
             <div className="space-y-2">
-              <Label>Amount ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
-              <Input type="number" inputMode="numeric" value={payAmount || ""} onChange={e => setPayAmount(Number(e.target.value))} />
+              <Label className="text-sm font-medium">Payment Amount ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
+              <Input className="h-12 text-lg text-center font-bold" type="number" inputMode="numeric" value={payAmount || ""} onChange={e => setPayAmount(Number(e.target.value))} />
             </div>
             <div className="space-y-2">
-              <Label>Note (Optional)</Label>
-              <Input value={payNote} onChange={e => setPayNote(e.target.value)} placeholder="e.g., Advance payment" />
+              <Label className="text-sm font-medium">Note (Optional)</Label>
+              <Input className="h-11 text-base" value={payNote} onChange={e => setPayNote(e.target.value)} placeholder="e.g., January salary" />
             </div>
-            <Button onClick={handlePay} className="w-full">Confirm Payment</Button>
+            <Button onClick={handlePay} className="w-full h-11">Confirm Payment</Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -726,37 +833,47 @@ export const UtilityExpenseModule = () => {
       {/* Bonus Dialog */}
       <Dialog open={bonusDialogOpen} onOpenChange={setBonusDialogOpen}>
         <DialogContent className="max-w-[95vw] sm:max-w-md">
-          <DialogHeader><DialogTitle>Add Bonus - {selectedStaff?.name}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Give Bonus - {selectedStaff?.name}</DialogTitle></DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Bonus Amount ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
-              <Input type="number" inputMode="numeric" value={bonusAmount || ""} onChange={e => setBonusAmount(Number(e.target.value))} />
+              <Label className="text-sm font-medium">Bonus Amount ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
+              <Input className="h-12 text-lg text-center font-bold" type="number" inputMode="numeric" value={bonusAmount || ""} onChange={e => setBonusAmount(Number(e.target.value))} />
             </div>
             <div className="space-y-2">
-              <Label>Reason (Optional)</Label>
-              <Input value={bonusNote} onChange={e => setBonusNote(e.target.value)} placeholder="e.g., Eid bonus" />
+              <Label className="text-sm font-medium">Reason</Label>
+              <Input className="h-11 text-base" value={bonusNote} onChange={e => setBonusNote(e.target.value)} placeholder="e.g., Performance bonus" />
             </div>
-            <Button onClick={handleBonus} className="w-full">Add Bonus</Button>
+            <Button onClick={handleBonus} className="w-full h-11">Give Bonus</Button>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* History Dialog */}
+      {/* Payment History Dialog */}
       <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
-        <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-[95vw] sm:max-w-lg">
           <DialogHeader><DialogTitle>Payment History - {selectedStaff?.name}</DialogTitle></DialogHeader>
-          <div className="space-y-3 py-4">
-            {selectedStaff?.payments.length === 0 && <p className="text-center text-muted-foreground py-4">No payments yet</p>}
-            {selectedStaff?.payments.map(payment => (
-              <div key={payment.id} className="p-3 border border-border rounded-lg flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground">{format(new Date(payment.payment_date), "dd MMM yyyy")}</p>
-                  <p className="text-sm">{payment.notes || 'Salary payment'}</p>
-                </div>
-                <p className="text-base font-bold text-success">{BANGLADESHI_CURRENCY_SYMBOL}{Number(payment.amount).toLocaleString()}</p>
-              </div>
-            ))}
-          </div>
+          <ScrollArea className="max-h-[60vh]">
+            <div className="space-y-3 py-4">
+              {selectedStaff?.payments.length === 0 ? (
+                <p className="text-center text-muted-foreground py-8">No payments recorded this month</p>
+              ) : (
+                selectedStaff?.payments.map(payment => (
+                  <div key={payment.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-xl">
+                    <div className="flex items-center gap-3">
+                      <div className="h-9 w-9 rounded-lg bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center">
+                        <ArrowUpRight className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">{format(new Date(payment.payment_date), 'dd MMM yyyy')}</p>
+                        <p className="text-xs text-muted-foreground">{payment.notes || 'Salary payment'}</p>
+                      </div>
+                    </div>
+                    <p className="font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{BANGLADESHI_CURRENCY_SYMBOL}{Number(payment.amount).toLocaleString()}</p>
+                  </div>
+                ))
+              )}
+            </div>
+          </ScrollArea>
         </DialogContent>
       </Dialog>
     </div>
