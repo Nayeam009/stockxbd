@@ -68,6 +68,14 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     mountedRef.current = true;
     checkAuthAndRole();
 
+    // Safety timeout - prevent infinite loading
+    const safetyTimeout = setTimeout(() => {
+      if (mountedRef.current && loading) {
+        console.warn('[ProtectedRoute] Safety timeout reached');
+        setLoading(false);
+      }
+    }, 10000); // 10 second max wait
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (!mountedRef.current) return;
       
@@ -94,9 +102,10 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
 
     return () => {
       mountedRef.current = false;
+      clearTimeout(safetyTimeout);
       subscription.unsubscribe();
     };
-  }, [checkAuthAndRole]);
+  }, [checkAuthAndRole, loading]);
 
   // Error Recovery Screen
   if (authError) {
