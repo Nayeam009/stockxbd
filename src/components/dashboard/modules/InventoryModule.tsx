@@ -30,10 +30,6 @@ import { toast } from "sonner";
 import { logger } from "@/lib/logger";
 import { getLpgColorByValveSize } from "@/lib/brandConstants";
 import { useNetwork } from "@/contexts/NetworkContext";
-import { getCombinedCache, setCombinedCache } from "@/hooks/useModuleCache";
-
-// Cache key for Inventory module
-const INVENTORY_CACHE_KEY = 'inventory_module_data';
 
 // Interfaces
 interface LPGBrand {
@@ -143,8 +139,8 @@ export const InventoryModule = () => {
   const hasFetchedRef = useRef(false);
   const lastFetchKey = useRef('');
   
-  const fetchData = useCallback(async (isBackgroundRefresh = false) => {
-    if (!isBackgroundRefresh) setLoading(true);
+  const fetchData = useCallback(async () => {
+    setLoading(true);
     
     try {
       const [lpgRes, stovesRes, regulatorsRes] = await Promise.all([
@@ -166,56 +162,25 @@ export const InventoryModule = () => {
       setLpgBrands(lpgRes.data ?? []);
       setStoves(stovesRes.data ?? []);
       setRegulators(regulatorsRes.data ?? []);
-      
-      // Save to cache
-      const cacheKey = `${INVENTORY_CACHE_KEY}_${sizeTab}_${selectedWeight}`;
-      setCombinedCache(cacheKey, {
-        lpgBrands: lpgRes.data ?? [],
-        stoves: stovesRes.data ?? [],
-        regulators: regulatorsRes.data ?? []
-      });
     } catch (error: any) {
       logger.error('Failed to load inventory data', error, { component: 'Inventory' });
-      if (!isBackgroundRefresh) {
-        toast.error(error?.message || "Failed to load inventory data");
-      }
+      toast.error(error?.message || "Failed to load inventory data");
     } finally {
-      if (!isBackgroundRefresh) setLoading(false);
+      setLoading(false);
     }
   }, [sizeTab, selectedWeight]);
 
-  // Initial load and filter changes with cache-first strategy
+  // Initial load and filter changes
   useEffect(() => {
-    const cacheKey = `${INVENTORY_CACHE_KEY}_${sizeTab}_${selectedWeight}`;
+    const fetchKey = `${sizeTab}_${selectedWeight}`;
     
     // Prevent duplicate fetches for same key
-    if (lastFetchKey.current === cacheKey && hasFetchedRef.current) return;
-    lastFetchKey.current = cacheKey;
+    if (lastFetchKey.current === fetchKey && hasFetchedRef.current) return;
+    lastFetchKey.current = fetchKey;
     hasFetchedRef.current = true;
     
-    // Try cache first
-    const cached = getCombinedCache<{
-      lpgBrands: LPGBrand[];
-      stoves: Stove[];
-      regulators: Regulator[];
-    }>(cacheKey);
-    
-    if (cached) {
-      // Instant restore
-      setLpgBrands(cached.lpgBrands || []);
-      setStoves(cached.stoves || []);
-      setRegulators(cached.regulators || []);
-      setLoading(false);
-      
-      // Background refresh if online
-      if (isOnline) {
-        fetchData(true);
-      }
-    } else {
-      // No cache - show loading and fetch
-      fetchData(false);
-    }
-  }, [sizeTab, selectedWeight, fetchData, isOnline]);
+    fetchData();
+  }, [sizeTab, selectedWeight, fetchData]);
 
   // Real-time inventory sync - debounced
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
@@ -226,7 +191,7 @@ export const InventoryModule = () => {
     
     const debouncedFetch = () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => fetchData(true), 1000);
+      debounceRef.current = setTimeout(() => fetchData(), 1000);
     };
     
     const channels = [

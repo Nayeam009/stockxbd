@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, RefreshCw, LogIn, WifiOff, Clock, ShieldAlert } from "lucide-react";
-import { getSessionWithRetry, AuthTimeoutError, isOnline, clearAuthCache, getCachedUserId } from "@/lib/authUtils";
+import { getSessionWithRetry, AuthTimeoutError, isOnline, clearAuthCache } from "@/lib/authUtils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -65,14 +65,14 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
         
         // Do background validation only if stale by half TTL
         if (timeSinceVerified > AUTH_STATE_TTL / 2 && !isVisibilityCheck) {
-          getSessionWithRetry(1, true).catch(() => {});
+          getSessionWithRetry().catch(() => {});
         }
         return;
       }
 
       // PRIORITY 2: Offline detection - use cache immediately if offline
       if (!isOnline()) {
-        if (cachedAuthRef.current || getCachedUserId()) {
+        if (cachedAuthRef.current) {
           console.log('[Auth] Offline - using cached auth');
           setAuthenticated(true);
           setUserRole(cachedRoleRef.current);
@@ -94,8 +94,8 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
       // Reset error state
       setAuthError(null);
 
-      // PRIORITY 4: Fetch fresh session with retry
-      const { data: { session } } = await getSessionWithRetry(2, true); // 2 retries with cache fallback
+      // PRIORITY 4: Fetch fresh session
+      const { data: { session } } = await getSessionWithRetry();
       
       // Check if we're using cached session
       const isCached = session && !session.access_token;
@@ -174,7 +174,7 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
       setRetryCount(prev => prev + 1);
       
       // FALLBACK: If we have ANY cached auth, use it
-      if (cachedAuthRef.current || persistentAuthState.authenticated || getCachedUserId()) {
+      if (cachedAuthRef.current || persistentAuthState.authenticated) {
         console.log('[Auth] Error occurred but using cached auth');
         setAuthenticated(true);
         setUserRole(cachedRoleRef.current || persistentAuthState.userRole);

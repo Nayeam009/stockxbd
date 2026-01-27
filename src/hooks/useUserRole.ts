@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { getSessionWithRetry, AuthTimeoutError, isOnline, getCachedUserId } from "@/lib/authUtils";
+import { getSessionWithRetry, AuthTimeoutError, isOnline } from "@/lib/authUtils";
 
 export type UserRole = 'owner' | 'manager' | 'customer';
 
@@ -43,7 +43,7 @@ try {
 export const useUserRole = (): UserRoleData => {
   const [userRole, setUserRole] = useState<UserRole>(cachedRole || 'customer');
   const [userName, setUserName] = useState<string>(cachedName || 'User');
-  const [userId, setUserId] = useState<string | null>(cachedUserId || getCachedUserId());
+  const [userId, setUserId] = useState<string | null>(cachedUserId);
   const [loading, setLoading] = useState(!cachedRole); // No loading if we have cache
   const [error, setError] = useState<string | null>(null);
   const isInitialLoadRef = useRef(!cachedRole);
@@ -99,8 +99,8 @@ export const useUserRole = (): UserRoleData => {
       }
       setError(null);
 
-      // Use retry-protected session fetch with cache fallback
-      const { data: { session } } = await getSessionWithRetry(2, true); // 2 retries with cache
+      // Fetch session
+      const { data: { session } } = await getSessionWithRetry();
       
       if (!session?.user) {
         // Only clear cache if we got a definitive "no session" response

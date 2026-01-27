@@ -164,11 +164,10 @@ export const SyncStatusBadge = ({
   );
 };
 
-// Hook to use in transaction cards
+// Hook to check sync status (simplified - always synced now)
 export const useSyncStatus = (id: string) => {
-  const { isOfflineId } = require('@/lib/offlineDB');
   return {
-    isPending: isOfflineId(id),
-    isSynced: !isOfflineId(id),
+    isPending: false,
+    isSynced: true,
   };
 };

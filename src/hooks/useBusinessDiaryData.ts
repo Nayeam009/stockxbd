@@ -2,10 +2,6 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { logger } from "@/lib/logger";
 import { format, startOfMonth, endOfMonth, subMonths, subDays, startOfWeek, endOfWeek, startOfYear, endOfYear } from "date-fns";
-import { getCombinedCache, setCombinedCache } from "./useModuleCache";
-
-// Cache key for Business Diary
-const DIARY_CACHE_KEY = 'business_diary_data';
 
 export interface SaleEntry {
   id: string;
@@ -552,32 +548,15 @@ export const useBusinessDiaryData = (): UseBusinessDiaryDataReturn => {
     if (!isBackgroundRefresh) setLoading(false);
   }, [fetchSalesData, fetchExpensesData]);
 
-  // Cache sales and expenses after fetch
+  // Initial load
   const hasFetchedRef = useRef(false);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
-  
-  useEffect(() => {
-    if (sales.length > 0 || expenses.length > 0) {
-      setCombinedCache(DIARY_CACHE_KEY, { sales, expenses });
-    }
-  }, [sales, expenses]);
 
   useEffect(() => {
     if (hasFetchedRef.current) return;
     hasFetchedRef.current = true;
     
-    // Try cache first for instant rendering
-    const cached = getCombinedCache<{ sales: SaleEntry[]; expenses: ExpenseEntry[] }>(DIARY_CACHE_KEY);
-    
-    if (cached) {
-      setSales(cached.sales || []);
-      setExpenses(cached.expenses || []);
-      setLoading(false);
-      // Background refresh
-      refetch(true);
-    } else {
-      refetch(false);
-    }
+    refetch(false);
 
     // Set up real-time subscriptions with debouncing
     const debouncedSalesFetch = () => {

@@ -60,50 +60,6 @@ import { LPG_BRANDS } from "@/lib/brandConstants";
 const CYLINDER_WEIGHTS = ['5.5kg', '12kg', '25kg', '35kg', '45kg'];
 const VALVE_SIZES = ['22mm', '20mm'] as const;
 
-// Profile cache for instant tab recovery
-const PROFILE_CACHE_KEY = 'stock-x-profile-snapshot';
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-
-interface ProfileSnapshot {
-  ts: number;
-  profile: {
-    fullName: string;
-    email: string;
-    phone: string;
-    avatarUrl: string | null;
-  };
-  orders: CommunityOrder[];
-}
-
-const readProfileSnapshot = (): ProfileSnapshot | null => {
-  try {
-    const cached = sessionStorage.getItem(PROFILE_CACHE_KEY);
-    if (!cached) return null;
-    
-    const snapshot: ProfileSnapshot = JSON.parse(cached);
-    const age = Date.now() - snapshot.ts;
-    
-    if (age > CACHE_TTL) {
-      sessionStorage.removeItem(PROFILE_CACHE_KEY);
-      return null;
-    }
-    
-    return snapshot;
-  } catch {
-    return null;
-  }
-};
-
-const writeProfileSnapshot = (snapshot: Omit<ProfileSnapshot, 'ts'>) => {
-  try {
-    sessionStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify({
-      ...snapshot,
-      ts: Date.now()
-    }));
-  } catch (error) {
-    console.warn('Failed to cache profile:', error);
-  }
-};
 
 const CustomerProfile = () => {
   const navigate = useNavigate();
@@ -162,21 +118,8 @@ const CustomerProfile = () => {
   const newAvailableDistricts = newDivision ? getDistricts(newDivision) : [];
   const newAvailableThanas = newDistrict ? getThanas(newDistrict) : [];
 
-  const fetchProfileAndOrders = useCallback(async (useCache = false) => {
-    // Try to restore from cache immediately
-    if (useCache) {
-      const snapshot = readProfileSnapshot();
-      if (snapshot) {
-        setFullName(snapshot.profile.fullName);
-        setEmail(snapshot.profile.email);
-        setPhone(snapshot.profile.phone);
-        setAvatarUrl(snapshot.profile.avatarUrl);
-        setOrders(snapshot.orders);
-        setLoading(false);
-        // Continue to refresh in background
-      }
-    }
-
+  const fetchProfileAndOrders = useCallback(async () => {
+    setLoading(true);
     try {
       const { data: { user } } = await getUserWithTimeout();
       if (!user) {
@@ -203,17 +146,6 @@ const CustomerProfile = () => {
       }
 
       setOrders(ordersData);
-
-      // Save to cache
-      writeProfileSnapshot({
-        profile: {
-          fullName: profileResult.data?.full_name || '',
-          email: user.email || '',
-          phone: profileResult.data?.phone || '',
-          avatarUrl: profileResult.data?.avatar_url || null
-        },
-        orders: ordersData
-      });
     } catch (error) {
       console.error('Error fetching profile:', error);
       if (error instanceof AuthTimeoutError) {
@@ -229,7 +161,7 @@ const CustomerProfile = () => {
   }, [navigate, fetchCustomerOrders]);
 
   useEffect(() => {
-    fetchProfileAndOrders(true); // Try cache first
+    fetchProfileAndOrders();
     loadCart();
   }, [fetchProfileAndOrders]);
 
