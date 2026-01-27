@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, RefreshCw, LogIn, WifiOff, ShieldAlert } from "lucide-react";
@@ -46,26 +46,14 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   const navigate = useNavigate();
   const mountedRef = useRef(true);
   const roleLoadedRef = useRef(false);
+  const initRef = useRef(false);
 
   useEffect(() => {
     mountedRef.current = true;
     
-    // Safety timeout - if still loading after 12s, force recovery
-    const safetyTimeout = setTimeout(() => {
-      if (!mountedRef.current) return;
-      if (loading) {
-        console.warn('[ProtectedRoute] Safety timeout reached');
-        // If we had a stored session, trust it and proceed
-        if (hasStoredSession) {
-          setLoading(false);
-          setAuthenticated(true);
-        } else {
-          setAuthError(navigator.onLine ? 'error' : 'offline');
-          setAuthenticated(false);
-          setLoading(false);
-        }
-      }
-    }, 12000);
+    // Only run once
+    if (initRef.current) return;
+    initRef.current = true;
 
     // Listen to auth state changes - this is the PRIMARY source of truth
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -118,13 +106,12 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
 
     return () => {
       mountedRef.current = false;
-      clearTimeout(safetyTimeout);
       subscription.unsubscribe();
     };
-  }, [loading, hasStoredSession]);
+  }, []);
 
   // Retry handler
-  const handleRetry = () => {
+  const handleRetry = useCallback(() => {
     setLoading(true);
     setAuthError(null);
     roleLoadedRef.current = false;
@@ -160,7 +147,7 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
         setLoading(false);
       }
     });
-  };
+  }, []);
 
   // Error Recovery Screen
   if (authError) {

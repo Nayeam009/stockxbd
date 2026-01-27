@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { 
@@ -41,16 +42,60 @@ interface CommunityHeaderProps {
   onCartClick?: () => void;
 }
 
+/**
+ * Fast check for owner/manager role from localStorage
+ */
+const getStoredRole = (): string | null => {
+  try {
+    const storageKey = `sb-xupvteigmqcrfluuadte-auth-token`;
+    const stored = localStorage.getItem(storageKey);
+    if (!stored) return null;
+    
+    const parsed = JSON.parse(stored);
+    const userId = parsed?.user?.id;
+    
+    // Check cached role
+    const roleCache = sessionStorage.getItem(`user-role-${userId}`);
+    return roleCache || null;
+  } catch {
+    return null;
+  }
+};
+
 export const CommunityHeader = ({ 
   cartItemCount = 0, 
-  userRole, 
+  userRole: propUserRole, 
   userName,
   onCartClick 
 }: CommunityHeaderProps) => {
   const navigate = useNavigate();
+  const [localRole, setLocalRole] = useState<string | null>(getStoredRole());
+  
+  // Use prop role if available, otherwise fall back to local check
+  const userRole = propUserRole || localRole;
   const isOwnerOrManager = userRole === 'owner' || userRole === 'manager';
 
+  // Cache role when it changes
+  useEffect(() => {
+    if (propUserRole) {
+      try {
+        const storageKey = `sb-xupvteigmqcrfluuadte-auth-token`;
+        const stored = localStorage.getItem(storageKey);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          const userId = parsed?.user?.id;
+          if (userId) {
+            sessionStorage.setItem(`user-role-${userId}`, propUserRole);
+            setLocalRole(propUserRole);
+          }
+        }
+      } catch {}
+    }
+  }, [propUserRole]);
+
   const handleLogout = async () => {
+    // Clear role cache
+    sessionStorage.clear();
     await supabase.auth.signOut();
     toast({ title: "Logged out successfully" });
     navigate('/auth');
