@@ -492,7 +492,7 @@ export const useBusinessDiaryRealtime = () => {
     debounceRef.current = setTimeout(() => {
       queryClient.invalidateQueries({ queryKey: ['business-diary-sales'] });
       queryClient.invalidateQueries({ queryKey: ['business-diary-expenses'] });
-    }, 2000); // 2 second debounce
+    }, 1000); // Reduced to 1 second for faster sync
   }, [queryClient]);
   
   useEffect(() => {
