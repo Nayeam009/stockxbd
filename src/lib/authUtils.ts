@@ -1,65 +1,21 @@
 /**
- * Auth Utilities - Simple timeout protection
+ * Auth Utilities - Simple helpers
  */
 
 import { supabase } from "@/integrations/supabase/client";
 
-// Maximum time to wait for auth operations
-const AUTH_TIMEOUT = 10000; // 10 seconds
-
-export class AuthTimeoutError extends Error {
-  constructor() {
-    super('Authentication timed out');
-    this.name = 'AuthTimeoutError';
-  }
-}
-
 /**
- * Wraps supabase.auth.getSession() with a timeout
+ * Get current session - simple wrapper
  */
-export const getSessionWithTimeout = async () => {
-  const sessionPromise = supabase.auth.getSession();
-  const timeoutPromise = new Promise<never>((_, reject) => 
-    setTimeout(() => reject(new AuthTimeoutError()), AUTH_TIMEOUT)
-  );
-  
-  return Promise.race([sessionPromise, timeoutPromise]);
+export const getSessionWithRetry = async () => {
+  return supabase.auth.getSession();
 };
 
 /**
- * Simple session fetch with timeout
+ * Get current user - simple wrapper
  */
-export const getSessionWithRetry = async (): Promise<{ data: { session: any } }> => {
-  try {
-    return await getSessionWithTimeout();
-  } catch (error) {
-    console.warn('[Auth] Session fetch failed:', error instanceof AuthTimeoutError ? 'timeout' : error);
-    throw error;
-  }
-};
-
-/**
- * Wraps supabase.auth.getUser() with a timeout
- */
-export const getUserWithTimeout = async () => {
-  const userPromise = supabase.auth.getUser();
-  const timeoutPromise = new Promise<never>((_, reject) => 
-    setTimeout(() => reject(new AuthTimeoutError()), AUTH_TIMEOUT)
-  );
-  
-  return Promise.race([userPromise, timeoutPromise]);
-};
-
-/**
- * Simple user fetch with timeout
- */
-export const getUserWithRetry = async (): Promise<{ data: { user: any } }> => {
-  try {
-    return await getUserWithTimeout();
-  } catch (error) {
-    console.warn('[Auth] User fetch failed:', error instanceof AuthTimeoutError ? 'timeout' : error);
-    throw error;
-  }
+export const getUserWithRetry = async () => {
+  return supabase.auth.getUser();
 };
 
 /**
@@ -67,10 +23,10 @@ export const getUserWithRetry = async (): Promise<{ data: { user: any } }> => {
  */
 export const safeGetSession = async () => {
   try {
-    const { data: { session } } = await getSessionWithTimeout();
+    const { data: { session } } = await supabase.auth.getSession();
     return session;
   } catch (error) {
-    console.warn('[Auth] Session check failed:', error instanceof AuthTimeoutError ? 'timeout' : error);
+    console.warn('[Auth] Session check failed:', error);
     return null;
   }
 };
@@ -80,10 +36,10 @@ export const safeGetSession = async () => {
  */
 export const safeGetUser = async () => {
   try {
-    const { data: { user } } = await getUserWithTimeout();
+    const { data: { user } } = await supabase.auth.getUser();
     return user;
   } catch (error) {
-    console.warn('[Auth] User check failed:', error instanceof AuthTimeoutError ? 'timeout' : error);
+    console.warn('[Auth] User check failed:', error);
     return null;
   }
 };
@@ -92,7 +48,7 @@ export const safeGetUser = async () => {
  * Clear auth cache (stub for compatibility)
  */
 export const clearAuthCache = (): void => {
-  // No-op - caching removed
+  // No-op
 };
 
 /**
@@ -108,3 +64,11 @@ export const getCachedUserId = (): string | null => {
 export const isOnline = (): boolean => {
   return typeof navigator !== 'undefined' ? navigator.onLine : true;
 };
+
+// For backward compatibility
+export class AuthTimeoutError extends Error {
+  constructor() {
+    super('Authentication timed out');
+    this.name = 'AuthTimeoutError';
+  }
+}

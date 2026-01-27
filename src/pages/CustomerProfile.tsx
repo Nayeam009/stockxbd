@@ -52,7 +52,7 @@ import { useCommunityData, CommunityOrder } from "@/hooks/useCommunityData";
 import { useCustomerData, SavedAddress } from "@/hooks/useCustomerData";
 import { useCylinderProfile } from "@/hooks/useCylinderProfile";
 import { supabase } from "@/integrations/supabase/client";
-import { getUserWithTimeout, AuthTimeoutError } from "@/lib/authUtils";
+import { getUserWithRetry } from "@/lib/authUtils";
 import { toast } from "@/hooks/use-toast";
 import { DIVISIONS, getDistricts, getThanas } from "@/lib/bangladeshConstants";
 import { LPG_BRANDS } from "@/lib/brandConstants";
@@ -121,7 +121,7 @@ const CustomerProfile = () => {
   const fetchProfileAndOrders = useCallback(async () => {
     setLoading(true);
     try {
-      const { data: { user } } = await getUserWithTimeout();
+      const { data: { user } } = await getUserWithRetry();
       if (!user) {
         navigate('/auth');
         return;
@@ -148,13 +148,11 @@ const CustomerProfile = () => {
       setOrders(ordersData);
     } catch (error) {
       console.error('Error fetching profile:', error);
-      if (error instanceof AuthTimeoutError) {
-        toast({ 
-          title: "Connection timeout", 
-          description: "Please check your connection and try again",
-          variant: "destructive" 
-        });
-      }
+      toast({ 
+        title: "Error loading profile", 
+        description: "Please try again",
+        variant: "destructive" 
+      });
     } finally {
       setLoading(false);
     }

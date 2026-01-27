@@ -120,7 +120,7 @@ const Dashboard = () => {
     checkAdminStatus();
   }, [userId]);
   // Get network status for offline handling
-  const { isOnline, pendingSyncCount } = useNetwork();
+  const { isOnline } = useNetwork();
   
   const isMobile = useIsMobile();
 
