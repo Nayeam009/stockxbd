@@ -400,7 +400,7 @@ export const useDashboardData = () => {
     }
   }, []);
 
-  // Debounce ref for real-time updates
+  // Debounce ref for real-time updates - reduced to 1s for faster sync
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
   
   const debouncedRefetch = useCallback(() => {
@@ -409,7 +409,7 @@ export const useDashboardData = () => {
     }
     debounceRef.current = setTimeout(() => {
       fetchData(true);
-    }, 2000);
+    }, 1000); // Reduced from 2s to 1s for faster updates
   }, [fetchData]);
 
   // Setup real-time subscriptions

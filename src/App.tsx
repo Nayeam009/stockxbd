@@ -27,12 +27,16 @@ const CustomerProfile = lazy(() => import("./pages/CustomerProfile"));
 const Toaster = lazy(() => import("@/components/ui/toaster").then(m => ({ default: m.Toaster })));
 const Sonner = lazy(() => import("@/components/ui/sonner").then(m => ({ default: m.Toaster })));
 
-// Simple QueryClient with standard defaults
+// Optimized QueryClient for fast, reliable connections
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 1,
-      refetchOnWindowFocus: true,
+      retry: 2, // Retry failed requests twice
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000), // Exponential backoff: 1s, 2s, 4s (max 5s)
+      staleTime: 1000 * 30, // Data stays fresh for 30 seconds
+      gcTime: 1000 * 60 * 5, // Keep unused data for 5 minutes
+      refetchOnWindowFocus: true, // Refetch when user returns to tab
+      refetchOnReconnect: true, // Refetch when connection restored
     },
   },
 });
