@@ -1,10 +1,7 @@
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import {
   Accordion,
@@ -25,7 +22,7 @@ import {
   Check,
   Building2,
   Users,
-  Camera
+  QrCode
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -40,13 +37,10 @@ export const AccountSettingsSection = () => {
   
   // Profile state
   const [userEmail, setUserEmail] = useState("");
-  const [userRole, setUserRole] = useState<string>("driver");
-  const [userCreatedAt, setUserCreatedAt] = useState("");
+  const [userRole, setUserRole] = useState<string>("customer");
   const [fullName, setFullName] = useState("");
   const [userPhone, setUserPhone] = useState("");
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [savingProfile, setSavingProfile] = useState(false);
-  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   
   // Business state
   const [businessName, setBusinessName] = useState("Stock-X LPG Distribution");
@@ -62,14 +56,13 @@ export const AccountSettingsSection = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setUserEmail(user.email || "");
-        setUserCreatedAt(user.created_at || "");
         
         // Fetch role
         const { data: roleData } = await supabase
           .from('user_roles')
           .select('role')
           .eq('user_id', user.id)
-          .single();
+          .maybeSingle();
         
         if (roleData?.role) {
           setUserRole(roleData.role);
@@ -80,12 +73,11 @@ export const AccountSettingsSection = () => {
           .from('profiles')
           .select('*')
           .eq('user_id', user.id)
-          .single();
+          .maybeSingle();
         
         if (profileData) {
           setFullName(profileData.full_name || "");
           setUserPhone(profileData.phone || "");
-          setAvatarUrl(profileData.avatar_url);
         }
       }
     };
@@ -145,88 +137,22 @@ export const AccountSettingsSection = () => {
     }
   };
 
-  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith('image/')) {
-      toast({ title: t("invalid_image"), variant: "destructive" });
-      return;
-    }
-
-    if (file.size > 2 * 1024 * 1024) {
-      toast({ title: t("image_too_large"), variant: "destructive" });
-      return;
-    }
-
-    setUploadingAvatar(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("No user found");
-
-      const fileExt = file.name.split('.').pop();
-      const filePath = `${user.id}/avatar.${fileExt}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, file, { upsert: true });
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(filePath);
-
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .upsert({
-          user_id: user.id,
-          avatar_url: publicUrl,
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'user_id' });
-
-      if (updateError) throw updateError;
-
-      setAvatarUrl(publicUrl);
-      toast({ title: t("avatar_updated") });
-    } catch (error: any) {
-      toast({ title: error.message || t("error_uploading_avatar"), variant: "destructive" });
-    } finally {
-      setUploadingAvatar(false);
-    }
-  };
-
-  const getRoleBadgeStyle = (role: string) => {
-    switch (role) {
-      case 'owner': return 'bg-gradient-to-r from-amber-500 to-orange-500 text-white border-0';
-      case 'manager': return 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white border-0';
-      case 'driver': return 'bg-gradient-to-r from-green-500 to-emerald-500 text-white border-0';
-      default: return 'bg-muted text-muted-foreground';
-    }
-  };
-
-  const getInitials = (name: string) => {
-    if (!name) return "U";
-    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-  };
-
   return (
     <div className="space-y-4">
-      {/* Accordion Sections - Profile hero is in ProfileModule */}
       <Accordion
         type="multiple" 
         defaultValue={["profile", "appearance"]} 
         className="space-y-3"
       >
         {/* Personal Profile Section */}
-        <AccordionItem value="profile" className="border rounded-lg bg-card overflow-hidden">
-          <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50 [&[data-state=open]]:bg-muted/30">
+        <AccordionItem value="profile" className="border rounded-xl bg-card overflow-hidden shadow-sm">
+          <AccordionTrigger className="px-4 py-4 hover:no-underline hover:bg-muted/50 [&[data-state=open]]:bg-muted/30">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <User className="h-4 w-4 text-primary" />
+              <div className="p-2.5 rounded-xl bg-primary/10">
+                <User className="h-5 w-5 text-primary" />
               </div>
               <div className="text-left">
-                <p className="font-medium text-sm">{t("profile")}</p>
+                <p className="font-semibold text-sm">{t("profile")}</p>
                 <p className="text-xs text-muted-foreground">{t("edit_profile_desc")}</p>
               </div>
             </div>
@@ -244,7 +170,7 @@ export const AccountSettingsSection = () => {
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     placeholder={t("enter_full_name")}
-                    className="h-11"
+                    className="h-11 text-base"
                   />
                 </div>
                 <div className="space-y-2">
@@ -257,7 +183,7 @@ export const AccountSettingsSection = () => {
                     value={userPhone}
                     onChange={(e) => setUserPhone(e.target.value)}
                     placeholder={t("enter_phone")}
-                    className="h-11"
+                    className="h-11 text-base"
                   />
                 </div>
               </div>
@@ -266,10 +192,10 @@ export const AccountSettingsSection = () => {
                   <Mail className="h-3.5 w-3.5 text-muted-foreground" />
                   {t("email")}
                 </Label>
-                <Input id="userEmail" value={userEmail} disabled className="bg-muted/50 h-11" />
+                <Input id="userEmail" value={userEmail} disabled className="bg-muted/50 h-11 text-base" />
                 <p className="text-xs text-muted-foreground">{t("email_readonly")}</p>
               </div>
-              <Button onClick={handleSaveProfile} disabled={savingProfile} className="w-full h-11">
+              <Button onClick={handleSaveProfile} disabled={savingProfile} className="w-full h-11 text-base">
                 {savingProfile ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
                 {t("save_changes")}
               </Button>
@@ -278,14 +204,14 @@ export const AccountSettingsSection = () => {
         </AccordionItem>
 
         {/* Appearance Section */}
-        <AccordionItem value="appearance" className="border rounded-lg bg-card overflow-hidden">
-          <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50 [&[data-state=open]]:bg-muted/30">
+        <AccordionItem value="appearance" className="border rounded-xl bg-card overflow-hidden shadow-sm">
+          <AccordionTrigger className="px-4 py-4 hover:no-underline hover:bg-muted/50 [&[data-state=open]]:bg-muted/30">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-secondary/20">
-                <Palette className="h-4 w-4 text-secondary-foreground" />
+              <div className="p-2.5 rounded-xl bg-violet-500/10">
+                <Palette className="h-5 w-5 text-violet-500" />
               </div>
               <div className="text-left">
-                <p className="font-medium text-sm">{t("appearance")}</p>
+                <p className="font-semibold text-sm">{t("appearance")}</p>
                 <p className="text-xs text-muted-foreground">{t("appearance_desc")}</p>
               </div>
             </div>
@@ -351,98 +277,100 @@ export const AccountSettingsSection = () => {
           </AccordionContent>
         </AccordionItem>
 
-        {/* Business Info Section */}
-        <AccordionItem value="business" className="border rounded-lg bg-card overflow-hidden">
-          <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50 [&[data-state=open]]:bg-muted/30">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-accent">
-                <Building2 className="h-4 w-4 text-accent-foreground" />
-              </div>
-              <div className="text-left">
-                <p className="font-medium text-sm">{t("business_info")}</p>
-                <p className="text-xs text-muted-foreground">{t("business_info_desc")}</p>
-              </div>
-            </div>
-          </AccordionTrigger>
-          <AccordionContent className="px-4 pb-4">
-            <div className="space-y-4 pt-2">
-              <div className="space-y-2">
-                <Label htmlFor="businessName" className="text-sm">{t("business_name")}</Label>
-                <Input
-                  id="businessName"
-                  value={businessName}
-                  onChange={(e) => setBusinessName(e.target.value)}
-                  className="h-11"
-                />
-              </div>
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="businessPhone" className="text-sm">{t("phone_number")}</Label>
-                  <Input
-                    id="businessPhone"
-                    value={businessPhone}
-                    onChange={(e) => setBusinessPhone(e.target.value)}
-                    className="h-11"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="businessAddress" className="text-sm">{t("address")}</Label>
-                  <Input
-                    id="businessAddress"
-                    value={businessAddress}
-                    onChange={(e) => setBusinessAddress(e.target.value)}
-                    className="h-11"
-                  />
-                </div>
-              </div>
-              <Button onClick={handleSaveBusinessSettings} disabled={savingBusiness} className="w-full h-11">
-                {savingBusiness ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-                {t("save_changes")}
-              </Button>
-            </div>
-          </AccordionContent>
-        </AccordionItem>
-
-        {/* Team Management Section (Owner only) */}
+        {/* Business Info Section - Owner only */}
         {isOwner && (
-          <AccordionItem value="team" className="border rounded-lg bg-card overflow-hidden">
-          <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50 [&[data-state=open]]:bg-muted/30">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-muted">
-                <Users className="h-4 w-4 text-muted-foreground" />
+          <AccordionItem value="business" className="border rounded-xl bg-card overflow-hidden shadow-sm">
+            <AccordionTrigger className="px-4 py-4 hover:no-underline hover:bg-muted/50 [&[data-state=open]]:bg-muted/30">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-emerald-500/10">
+                  <Building2 className="h-5 w-5 text-emerald-500" />
+                </div>
+                <div className="text-left">
+                  <p className="font-semibold text-sm">{t("business_info")}</p>
+                  <p className="text-xs text-muted-foreground">{t("business_info_desc")}</p>
+                </div>
               </div>
-              <div className="text-left">
-                <p className="font-medium text-sm">{t("team_management")}</p>
-                <p className="text-xs text-muted-foreground">{t("team_management_desc")}</p>
-              </div>
-            </div>
             </AccordionTrigger>
-            <AccordionContent className="p-0">
-              <div className="border-t">
-                <TeamManagementCard />
+            <AccordionContent className="px-4 pb-4">
+              <div className="space-y-4 pt-2">
+                <div className="space-y-2">
+                  <Label htmlFor="businessName" className="text-sm">{t("business_name")}</Label>
+                  <Input
+                    id="businessName"
+                    value={businessName}
+                    onChange={(e) => setBusinessName(e.target.value)}
+                    className="h-11 text-base"
+                  />
+                </div>
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="businessPhone" className="text-sm">{t("phone_number")}</Label>
+                    <Input
+                      id="businessPhone"
+                      value={businessPhone}
+                      onChange={(e) => setBusinessPhone(e.target.value)}
+                      className="h-11 text-base"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="businessAddress" className="text-sm">{t("address")}</Label>
+                    <Input
+                      id="businessAddress"
+                      value={businessAddress}
+                      onChange={(e) => setBusinessAddress(e.target.value)}
+                      className="h-11 text-base"
+                    />
+                  </div>
+                </div>
+                <Button onClick={handleSaveBusinessSettings} disabled={savingBusiness} className="w-full h-11 text-base">
+                  {savingBusiness ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                  {t("save_changes")}
+                </Button>
               </div>
             </AccordionContent>
           </AccordionItem>
         )}
 
-        {/* Profile Sharing Section (Owner only) */}
+        {/* Manager Invite Section - Owner only */}
         {isOwner && (
-          <AccordionItem value="sharing" className="border rounded-lg bg-card overflow-hidden">
-          <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50 [&[data-state=open]]:bg-muted/30">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <Mail className="h-4 w-4 text-primary" />
+          <AccordionItem value="invite" className="border rounded-xl bg-card overflow-hidden shadow-sm">
+            <AccordionTrigger className="px-4 py-4 hover:no-underline hover:bg-muted/50 [&[data-state=open]]:bg-muted/30">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-blue-500/10">
+                  <QrCode className="h-5 w-5 text-blue-500" />
+                </div>
+                <div className="text-left">
+                  <p className="font-semibold text-sm">
+                    {language === 'bn' ? 'ম্যানেজার আমন্ত্রণ' : 'Manager Invite'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {language === 'bn' ? 'QR কোড বা লিঙ্ক দিয়ে ম্যানেজার যোগ করুন' : 'Add managers via QR code or link'}
+                  </p>
+                </div>
               </div>
-              <div className="text-left">
-                <p className="font-medium text-sm">{t("profile_sharing") || "Profile Sharing"}</p>
-                <p className="text-xs text-muted-foreground">{t("profile_sharing_desc") || "Share your profile with others"}</p>
-              </div>
-            </div>
             </AccordionTrigger>
             <AccordionContent className="p-0">
-              <div className="border-t">
-                <ProfileSharingCard />
+              <ProfileSharingCard />
+            </AccordionContent>
+          </AccordionItem>
+        )}
+
+        {/* Team Management Section - Owner only */}
+        {isOwner && (
+          <AccordionItem value="team" className="border rounded-xl bg-card overflow-hidden shadow-sm">
+            <AccordionTrigger className="px-4 py-4 hover:no-underline hover:bg-muted/50 [&[data-state=open]]:bg-muted/30">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-orange-500/10">
+                  <Users className="h-5 w-5 text-orange-500" />
+                </div>
+                <div className="text-left">
+                  <p className="font-semibold text-sm">{t("team_management")}</p>
+                  <p className="text-xs text-muted-foreground">{t("team_management_desc")}</p>
+                </div>
               </div>
+            </AccordionTrigger>
+            <AccordionContent className="p-0">
+              <TeamManagementCard />
             </AccordionContent>
           </AccordionItem>
         )}
