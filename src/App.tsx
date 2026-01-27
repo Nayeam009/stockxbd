@@ -27,14 +27,12 @@ const CustomerProfile = lazy(() => import("./pages/CustomerProfile"));
 const Toaster = lazy(() => import("@/components/ui/toaster").then(m => ({ default: m.Toaster })));
 const Sonner = lazy(() => import("@/components/ui/sonner").then(m => ({ default: m.Toaster })));
 
-// Optimized QueryClient with aggressive caching for production
+// Simple QueryClient with standard defaults
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes default
-      gcTime: 1000 * 60 * 30, // 30 minutes garbage collection
-      retry: 2,
-      refetchOnWindowFocus: false, // Reduce unnecessary refetches
+      retry: 1,
+      refetchOnWindowFocus: true,
     },
   },
 });

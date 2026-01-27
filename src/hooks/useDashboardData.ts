@@ -47,7 +47,7 @@ export interface Driver {
   todaySales: number;
   todayDeliveries: number;
   status: 'active' | 'break' | 'offline';
-  stockInHand: number; // Cylinders currently with driver
+  stockInHand: number;
   cashCollected: number;
 }
 
@@ -60,7 +60,7 @@ export interface Customer {
   lastOrder: string;
   outstanding: number;
   loyaltyPoints: number;
-  isActive: boolean; // Ordered in last 30 days
+  isActive: boolean;
 }
 
 export interface Order {
@@ -106,31 +106,22 @@ export interface Staff {
 }
 
 export interface DashboardAnalytics {
-  // Revenue metrics
   todayRevenue: number;
   todayCashRevenue: number;
   todayDueRevenue: number;
   monthlyRevenue: number;
   lastMonthRevenue: number;
   monthlyGrowthPercent: number;
-  
-  // Stock metrics
   lowStockItems: any[];
   totalFullCylinders: number;
   totalEmptyCylinders: number;
   cylinderStockHealth: 'critical' | 'warning' | 'good';
-  
-  // Order metrics
   activeOrders: number;
   pendingOrders: number;
   dispatchedOrders: number;
-  
-  // Customer metrics
   totalCustomers: number;
   activeCustomers: number;
   lostCustomers: number;
-  
-  // Driver metrics
   activeDrivers: number;
 }
 
@@ -146,126 +137,9 @@ export const useDashboardData = () => {
   const [loading, setLoading] = useState(true);
   const [softLoading, setSoftLoading] = useState(false);
   
-  // Track data freshness and channel health
-  const lastFetchTimeRef = useRef<number>(Date.now());
-  const channelHealthyRef = useRef<boolean>(true);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
-  const isInitialLoadRef = useRef<boolean>(true);
 
-  // Persist a lightweight snapshot so if the browser discards the tab,
-  // the dashboard can render instantly on restore.
-  const DASHBOARD_CACHE_KEY = 'stockx.dashboard.snapshot.v1';
-  const DASHBOARD_CACHE_TTL_MS = 1000 * 60 * 30; // 30 minutes (extended from 10 for better offline support)
-
-  type DashboardSnapshot = {
-    ts: number;
-    salesData: SalesData[];
-    stockData: StockItem[];
-    cylinderStock: CylinderStock[];
-    drivers: Driver[];
-    customers: Customer[];
-    orders: Order[];
-  };
-
-  const readSnapshot = useCallback((): DashboardSnapshot | null => {
-    try {
-      const raw = sessionStorage.getItem(DASHBOARD_CACHE_KEY);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw) as DashboardSnapshot;
-      if (!parsed?.ts) return null;
-      if (Date.now() - parsed.ts > DASHBOARD_CACHE_TTL_MS) return null;
-      return parsed;
-    } catch {
-      return null;
-    }
-  }, []);
-
-  const writeSnapshot = useCallback((snapshot: DashboardSnapshot) => {
-    try {
-      sessionStorage.setItem(DASHBOARD_CACHE_KEY, JSON.stringify(snapshot));
-    } catch {
-      // ignore quota/serialization errors
-    }
-  }, []);
-
-  const withTimeout = useCallback(async <T,>(promise: Promise<T>, ms: number): Promise<T> => {
-    let t: number | undefined;
-    const timeout = new Promise<never>((_, reject) => {
-      t = window.setTimeout(() => reject(new Error('Dashboard fetch timeout')), ms);
-    });
-    try {
-      return await Promise.race([promise, timeout]);
-    } finally {
-      if (t) window.clearTimeout(t);
-    }
-  }, []);
-
-  // Retry wrapper for data fetches - more resilient
-  const withRetry = useCallback(async <T,>(
-    fetchFn: () => Promise<T>, 
-    retries = 2, 
-    delayMs = 500
-  ): Promise<T> => {
-    let lastError: Error | null = null;
-    for (let attempt = 0; attempt < retries; attempt++) {
-      try {
-        return await fetchFn();
-      } catch (error) {
-        lastError = error as Error;
-        logger.warn(`Data fetch attempt ${attempt + 1}/${retries} failed`, { error });
-        if (attempt < retries - 1) {
-          await new Promise(resolve => setTimeout(resolve, delayMs * Math.pow(1.5, attempt)));
-        }
-      }
-    }
-    throw lastError;
-  }, []);
-
-  // CRITICAL: Restore from cache IMMEDIATELY on mount (cache-first strategy)
-  // This ensures instant UI rendering on page refresh
-  useEffect(() => {
-    const snapshot = readSnapshot();
-    if (snapshot) {
-      logger.info('[Dashboard] Instant restore from cache', { 
-        age: Math.round((Date.now() - snapshot.ts) / 1000) + 's'
-      });
-      setSalesData(snapshot.salesData || []);
-      setStockData(snapshot.stockData || []);
-      setCylinderStock(snapshot.cylinderStock || []);
-      setDrivers(snapshot.drivers || []);
-      setCustomers(snapshot.customers || []);
-      setOrders(snapshot.orders || []);
-      // Mark as loaded immediately - network refresh happens in background
-      setLoading(false);
-      isInitialLoadRef.current = false;
-    }
-  }, [readSnapshot]); // Only run once on mount
-
-  // Soft fetch - background refresh without loading spinner
-  // Now with retry logic for better resilience
   const fetchData = useCallback(async (isSoftRefresh = false) => {
-    // Check if online before fetching
-    const online = typeof navigator !== 'undefined' ? navigator.onLine : true;
-    
-    if (!online) {
-      // Offline mode - restore from cache and skip network
-      const snapshot = readSnapshot();
-      if (snapshot) {
-        setSalesData(snapshot.salesData || []);
-        setStockData(snapshot.stockData || []);
-        setCylinderStock(snapshot.cylinderStock || []);
-        setDrivers(snapshot.drivers || []);
-        setCustomers(snapshot.customers || []);
-        setOrders(snapshot.orders || []);
-        logger.info('Using cached data (offline mode)', { component: 'Dashboard' });
-      }
-      if (isInitialLoadRef.current) {
-        setLoading(false);
-        isInitialLoadRef.current = false;
-      }
-      return;
-    }
-    
     try {
       if (isSoftRefresh) {
         setSoftLoading(true);
@@ -275,8 +149,15 @@ export const useDashboardData = () => {
       const now = new Date();
       const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-      // Parallel fetch all data for faster loading - with retry wrapper
-      const fetchAllData = () => Promise.all([
+      // Parallel fetch all data
+      const [
+        transactionsResult,
+        customerDataResult,
+        ordersDataResult,
+        lpgBrandsResult,
+        stovesResult,
+        userRolesResult
+      ] = await Promise.all([
         supabase
           .from('pos_transactions')
           .select(`
@@ -323,22 +204,8 @@ export const useDashboardData = () => {
           .limit(500),
         supabase.from('lpg_brands').select('*').eq('is_active', true),
         supabase.from('stoves').select('*').eq('is_active', true),
-        supabase.from('user_roles').select('user_id, role').eq('role', 'manager') // Updated: no more driver role
+        supabase.from('user_roles').select('user_id, role').eq('role', 'manager')
       ]);
-
-      // Apply retry and timeout - increased timeout for reliability
-      const [
-        transactionsResult,
-        customerDataResult,
-        ordersDataResult,
-        lpgBrandsResult,
-        stovesResult,
-        userRolesResult
-      ] = await withRetry(
-        () => withTimeout(fetchAllData(), 30000), // 30s timeout per attempt (increased for reliability)
-        2, // 2 retries max
-        500 // 500ms initial delay
-      );
 
       const transactions = transactionsResult.data;
       const customerData = customerDataResult.data;
@@ -367,7 +234,7 @@ export const useDashboardData = () => {
         : [];
       setSalesData(formattedSales);
 
-      // Build customer activity from the orders we already fetched (no extra query)
+      // Build customer activity from orders
       const customerOrderMap: Record<string, { count: number; lastOrder: string }> = {};
       (ordersData || []).forEach(o => {
         if (o.customer_id) {
@@ -375,7 +242,6 @@ export const useDashboardData = () => {
             customerOrderMap[o.customer_id] = { count: 0, lastOrder: o.order_date };
           }
           customerOrderMap[o.customer_id].count += 1;
-          // orders are sorted desc, so first seen is last order
         }
       });
 
@@ -467,7 +333,6 @@ export const useDashboardData = () => {
       setCylinderStock(cylinderItems);
 
       // Process drivers
-      let formattedDrivers: Driver[] = [];
       if (userRoles && userRoles.length > 0) {
         const driverUserIds = userRoles.map(ur => ur.user_id);
         const { data: driverProfiles } = await supabase
@@ -490,7 +355,6 @@ export const useDashboardData = () => {
           cashCollected: number;
         }> = {};
         
-        // Use already-fetched ordersData for today's driver stats (no extra query)
         const todaysOrders = (ordersData || []).filter(o => {
           const d = new Date(o.order_date).toISOString().split('T')[0];
           return d === today;
@@ -514,7 +378,7 @@ export const useDashboardData = () => {
           }
         });
 
-        formattedDrivers = userRoles.map((ur, index) => ({
+        const formattedDrivers = userRoles.map((ur, index) => ({
           id: ur.user_id,
           name: profileMap[ur.user_id]?.name || `Driver ${index + 1}`,
           phone: profileMap[ur.user_id]?.phone || '01700-000000',
@@ -528,45 +392,15 @@ export const useDashboardData = () => {
         setDrivers(formattedDrivers);
       }
 
-      // Update freshness tracking
-      lastFetchTimeRef.current = Date.now();
-      channelHealthyRef.current = true;
-
-      // Persist snapshot for instant restore (tab discard / memory reclaim)
-      writeSnapshot({
-        ts: Date.now(),
-        salesData: formattedSales,
-        stockData: stockItems,
-        cylinderStock: cylinderItems,
-        drivers: formattedDrivers,
-        customers: formattedCustomers,
-        orders: formattedOrders,
-      });
-
     } catch (error) {
       logger.error('Error fetching dashboard data', error, { component: 'Dashboard' });
-      
-      // On error, try to restore from cache if available
-      const snapshot = readSnapshot();
-      if (snapshot && snapshot.salesData && snapshot.salesData.length > 0) {
-        console.warn('[Dashboard] Using cached snapshot after fetch error');
-        setSalesData(snapshot.salesData || []);
-        setStockData(snapshot.stockData || []);
-        setCylinderStock(snapshot.cylinderStock || []);
-        setDrivers(snapshot.drivers || []);
-        setCustomers(snapshot.customers || []);
-        setOrders(snapshot.orders || []);
-      }
     } finally {
-      if (isInitialLoadRef.current) {
-        setLoading(false);
-        isInitialLoadRef.current = false;
-      }
+      setLoading(false);
       setSoftLoading(false);
     }
   }, []);
 
-  // Debounce ref for real-time updates - prevents excessive refetches
+  // Debounce ref for real-time updates
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
   
   const debouncedRefetch = useCallback(() => {
@@ -574,116 +408,37 @@ export const useDashboardData = () => {
       clearTimeout(debounceRef.current);
     }
     debounceRef.current = setTimeout(() => {
-      fetchData(true); // Soft refresh
-    }, 2000); // 2-second debounce for smooth performance
+      fetchData(true);
+    }, 2000);
   }, [fetchData]);
 
-  // Reconnect channel if needed
-  const reconnectChannel = useCallback(() => {
-    if (channelRef.current) {
-      supabase.removeChannel(channelRef.current);
-    }
+  // Setup real-time subscriptions
+  useEffect(() => {
+    fetchData();
     
     const channel = supabase
-      .channel('dashboard-combined-realtime-' + Date.now()) // Unique name for fresh connection
+      .channel('dashboard-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, debouncedRefetch)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pos_transactions' }, debouncedRefetch)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'lpg_brands' }, debouncedRefetch)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'customers' }, debouncedRefetch)
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          channelHealthyRef.current = true;
-        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          channelHealthyRef.current = false;
-        }
-      });
+      .subscribe();
     
     channelRef.current = channel;
-    return channel;
-  }, [debouncedRefetch]);
-
-  // Handle page visibility changes for instant tab-switch recovery
-  // Extended stale threshold for better performance
-  const handleVisibilityChange = useCallback(() => {
-    if (document.visibilityState === 'visible') {
-      const timeSinceLastFetch = Date.now() - lastFetchTimeRef.current;
-      const isStale = timeSinceLastFetch > 60000; // 60 seconds (extended from 30s)
-      
-      // Check if online before attempting refresh
-      const online = typeof navigator !== 'undefined' ? navigator.onLine : true;
-      
-      if (!online) {
-        // Offline - don't attempt refresh, just rely on cache
-        // Ensure loading is false so UI doesn't freeze
-        if (isInitialLoadRef.current) {
-          const snapshot = readSnapshot();
-          if (snapshot) {
-            setSalesData(snapshot.salesData || []);
-            setStockData(snapshot.stockData || []);
-            setCylinderStock(snapshot.cylinderStock || []);
-            setDrivers(snapshot.drivers || []);
-            setCustomers(snapshot.customers || []);
-            setOrders(snapshot.orders || []);
-            setLoading(false);
-            isInitialLoadRef.current = false;
-          }
-        }
-        return;
-      }
-      
-      // Always check channel health on return
-      if (!channelHealthyRef.current) {
-        reconnectChannel();
-        fetchData(true); // Soft refresh
-      } else if (isStale) {
-        fetchData(true); // Soft refresh only if stale
-      }
-    }
-  }, [fetchData, reconnectChannel, readSnapshot]);
-
-  // Setup visibility listener and initial channel
-  useEffect(() => {
-    // Restore cached snapshot immediately if available (prevents blank / stuck loader)
-    const snapshot = readSnapshot();
-    if (snapshot) {
-      setSalesData(snapshot.salesData || []);
-      setStockData(snapshot.stockData || []);
-      setCylinderStock(snapshot.cylinderStock || []);
-      setDrivers(snapshot.drivers || []);
-      setCustomers(snapshot.customers || []);
-      setOrders(snapshot.orders || []);
-      lastFetchTimeRef.current = snapshot.ts;
-      setLoading(false);
-      isInitialLoadRef.current = false;
-      fetchData(true); // background refresh
-    } else {
-      // Initial fetch
-      fetchData();
-    }
-    
-    // Create channel
-    const channel = reconnectChannel();
-
-    // Listen for visibility changes
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('focus', handleVisibilityChange);
 
     return () => {
       if (debounceRef.current) {
         clearTimeout(debounceRef.current);
       }
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', handleVisibilityChange);
       supabase.removeChannel(channel);
     };
-  }, [fetchData, reconnectChannel, handleVisibilityChange]);
+  }, [fetchData, debouncedRefetch]);
 
-  // MEMOIZED Analytics calculations - prevents expensive recalculation on every render
+  // Analytics calculations
   const analytics = useMemo((): DashboardAnalytics => {
     const today = new Date().toISOString().split('T')[0];
     const now = new Date();
     
-    // Calculate today's revenue - Cash only (not credit/due)
     const todaysSales = salesData.filter(sale => sale.date === today);
     const todayCashRevenue = todaysSales
       .filter(sale => sale.paymentStatus === 'paid' || sale.paymentStatus === 'completed')
@@ -692,7 +447,6 @@ export const useDashboardData = () => {
       .filter(sale => sale.paymentStatus === 'pending' || sale.paymentStatus === 'partial')
       .reduce((sum, sale) => sum + sale.totalAmount, 0);
 
-    // Monthly revenue calculations
     const monthlyRevenue = salesData
       .filter(sale => {
         const saleDate = new Date(sale.date);
@@ -712,18 +466,15 @@ export const useDashboardData = () => {
       ? Math.round(((monthlyRevenue - lastMonthRevenue) / lastMonthRevenue) * 100)
       : 0;
 
-    // Cylinder stock health
     const totalFullCylinders = cylinderStock.reduce((sum, c) => sum + (c.fullCylinders || 0), 0);
     const totalEmptyCylinders = cylinderStock.reduce((sum, c) => sum + (c.emptyCylinders || 0), 0);
     const cylinderStockHealth: 'critical' | 'warning' | 'good' = 
       totalEmptyCylinders > totalFullCylinders ? 'critical' :
       totalFullCylinders < 20 ? 'warning' : 'good';
 
-    // Customer metrics
     const activeCustomers = customers.filter(c => c.isActive).length;
     const lostCustomers = customers.filter(c => !c.isActive && c.totalOrders > 0).length;
 
-    // Order metrics
     const pendingOrders = orders.filter(o => o.status === 'pending').length;
     const dispatchedOrders = orders.filter(o => o.status === 'dispatched').length;
 
@@ -734,20 +485,16 @@ export const useDashboardData = () => {
       monthlyRevenue: monthlyRevenue || 0,
       lastMonthRevenue: lastMonthRevenue || 0,
       monthlyGrowthPercent: isNaN(monthlyGrowthPercent) ? 0 : monthlyGrowthPercent,
-      
       lowStockItems: stockData.filter(item => item.currentStock <= item.minStock),
       totalFullCylinders: totalFullCylinders || 0,
       totalEmptyCylinders: totalEmptyCylinders || 0,
       cylinderStockHealth,
-      
       activeOrders: orders.filter(order => ['pending', 'confirmed', 'dispatched'].includes(order.status)).length,
       pendingOrders: pendingOrders || 0,
       dispatchedOrders: dispatchedOrders || 0,
-      
       totalCustomers: customers.length || 0,
       activeCustomers: activeCustomers || 0,
       lostCustomers: lostCustomers || 0,
-      
       activeDrivers: drivers.filter(driver => driver.status === 'active').length,
     };
   }, [salesData, stockData, cylinderStock, customers, orders, drivers]);
