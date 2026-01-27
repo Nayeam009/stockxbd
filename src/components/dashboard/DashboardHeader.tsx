@@ -19,7 +19,7 @@ import {
 interface DashboardHeaderProps {
   searchQuery: string;
   setSearchQuery: (query: string) => void;
-  userRole: 'owner' | 'manager';
+  userRole: 'owner' | 'manager' | 'super_admin';
   userName: string;
   isAdmin?: boolean;
   onSettingsClick?: () => void;
@@ -44,8 +44,8 @@ export const DashboardHeader = ({
   // Fetch shop ID for owner
   useEffect(() => {
     const fetchShopId = async () => {
-      if (userRole !== 'owner') return;
-      
+      if (userRole !== 'owner' && userRole !== 'super_admin') return;
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
@@ -66,6 +66,7 @@ export const DashboardHeader = ({
   const getRoleColor = (role: string) => {
     switch (role) {
       case 'owner':
+      case 'super_admin':
         return 'bg-primary/15 text-primary border-primary/30';
       case 'manager':
         return 'bg-secondary/15 text-secondary border-secondary/30';
@@ -78,6 +79,8 @@ export const DashboardHeader = ({
     switch (role) {
       case 'owner':
         return language === 'bn' ? 'মালিক' : 'Owner';
+      case 'super_admin':
+        return language === 'bn' ? 'সুপার অ্যাডমিন' : 'Super Admin';
       case 'manager':
         return language === 'bn' ? 'ম্যানেজার' : 'Manager';
       default:
@@ -125,14 +128,14 @@ export const DashboardHeader = ({
         {/* Right Section */}
         <div className="flex items-center gap-1 sm:gap-1.5">
           {/* Mobile Search */}
-          <Button 
-            variant="ghost" 
-            size="icon" 
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={openCommandPalette}
             aria-label="Search"
             className="sm:hidden h-9 w-9 rounded-lg hover:bg-primary/10 hover:text-primary transition-all duration-300 touch-target-44"
           >
-          <Search className="h-4 w-4" aria-hidden="true" />
+            <Search className="h-4 w-4" aria-hidden="true" />
           </Button>
 
           {/* Offline Status Indicator */}
@@ -145,9 +148,9 @@ export const DashboardHeader = ({
           {isAdmin && (
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={() => navigate('/dashboard?module=admin-panel')}
                   aria-label="Admin Panel"
                   className="hidden sm:flex h-8 w-8 sm:h-9 sm:w-9 rounded-lg sm:rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 transition-all duration-300"
@@ -166,9 +169,9 @@ export const DashboardHeader = ({
             <>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     onClick={() => navigate('/community')}
                     aria-label="Browse Marketplace"
                     className="hidden sm:flex h-8 w-8 sm:h-9 sm:w-9 rounded-lg sm:rounded-xl hover:bg-secondary/20 hover:text-secondary transition-all duration-300"
@@ -180,12 +183,12 @@ export const DashboardHeader = ({
                   <p>Browse Marketplace</p>
                 </TooltipContent>
               </Tooltip>
-              
+
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     onClick={() => navigate(shopId ? `/community/shop/${shopId}` : '/community')}
                     aria-label="View My Shop"
                     className="hidden sm:flex h-8 w-8 sm:h-9 sm:w-9 rounded-lg sm:rounded-xl hover:bg-primary/10 hover:text-primary transition-all duration-300"
@@ -201,10 +204,10 @@ export const DashboardHeader = ({
           )}
 
           {/* Settings - Hidden on mobile */}
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={onSettingsClick} 
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onSettingsClick}
             aria-label="Settings"
             className="hidden sm:flex h-8 w-8 sm:h-9 sm:w-9 rounded-lg sm:rounded-xl hover:bg-primary/10 hover:text-primary transition-all duration-300"
           >

@@ -28,6 +28,8 @@ export interface SaleEntry {
   quantity: number;
   unitPrice: number;
   totalAmount: number;
+  amountPaid: number; // Actual amount received
+  remainingDue: number; // Amount still owed
   paymentMethod: string;
   paymentStatus: 'paid' | 'due' | 'partial';
   customerName: string;
@@ -39,8 +41,10 @@ export interface SaleEntry {
   sourceId: string;
   isOnlineOrder?: boolean;
   communityOrderId?: string | null;
+  cogs?: number; // Cost of Goods Sold
 }
 
+// ... existing ExpenseEntry interface ...
 export interface ExpenseEntry {
   id: string;
   type: 'pob' | 'salary' | 'vehicle' | 'manual';
@@ -110,11 +114,48 @@ const parseReturnCylinders = (productName: string): { brand: string; quantity: n
   return [];
 };
 
+// Helper to parse partial payment amounts from notes
+const parsePartialPaymentFromNotes = (notes: string | null, total: number): { amountPaid: number; remainingDue: number } => {
+  if (!notes) return { amountPaid: 0, remainingDue: total };
+  const paidMatch = notes.match(/Paid:\s*৳?(\d+(?:,\d+)*(?:\.\d+)?)/i);
+  if (paidMatch) {
+    const amountPaid = parseFloat(paidMatch[1].replace(/,/g, '')) || 0;
+    const remainingDue = Math.max(0, total - amountPaid);
+    return { amountPaid, remainingDue };
+  }
+  return { amountPaid: 0, remainingDue: total };
+};
+
+// Calculate payment amounts based on status and notes
+const getPaymentAmounts = (paymentStatus: string, total: number, notes: string | null): { amountPaid: number; remainingDue: number } => {
+  if (paymentStatus === 'paid' || paymentStatus === 'completed') {
+    return { amountPaid: total, remainingDue: 0 };
+  }
+  if (paymentStatus === 'partial') {
+    return parsePartialPaymentFromNotes(notes, total);
+  }
+  return { amountPaid: 0, remainingDue: total };
+};
+
 // ===== Fetch Functions =====
-async function fetchSalesData(): Promise<SaleEntry[]> {
+async function fetchSalesData(date: string): Promise<SaleEntry[]> {
   try {
-    // Parallel fetch: user_roles, pos_transactions, customer_payments, customers
-    const [userRolesResult, posResult, paymentsResult, customersResult] = await Promise.all([
+    const startOfDay = `${date}T00:00:00.000Z`; // Assuming local time handling or UTC standard
+    const endOfDay = `${date}T23:59:59.999Z`;
+
+    // Ideally we should handle timezone offset, but for now we'll fetch a slightly wider window 
+    // or rely on the client-side date string if the DB stores simplified dates.
+    // However, timestampz columns need range.
+    // For simplicity/robustness with Supabase default UTC:
+    // We will query the 24h range. Note: If user is +6 desc, this might miss hours if not adjusted.
+    // For now, let's fetch by the specific date string if possible, or using a generous range?
+    // Actually, 'daily_expenses' has 'expense_date' (date type), 'pos_transactions' has 'created_at' (timestamptz).
+    // Let's use a simpler approach for 'pos': fetch slightly more effectively? 
+    // Or better: Use the database's date truncation if possible. 
+    // Safest client-side: Filter strictly by range.
+
+    // Parallel fetch: user_roles, pos_transactions, customer_payments, customers, product_prices
+    const [userRolesResult, posResult, paymentsResult, customersResult, pricesResult] = await Promise.all([
       supabase.from('user_roles').select('user_id, role'),
       supabase
         .from('pos_transactions')
@@ -142,8 +183,9 @@ async function fetchSalesData(): Promise<SaleEntry[]> {
           )
         `)
         .eq('is_voided', false)
-        .order('created_at', { ascending: false })
-        .limit(500),
+        .gte('created_at', format(new Date(date), "yyyy-MM-dd'T'00:00:00")) // Broad filter, we refine in JS
+        .lte('created_at', format(new Date(date), "yyyy-MM-dd'T'23:59:59.999")) // Adjust logic if TZ matters criticaly
+        .order('created_at', { ascending: false }),
       supabase
         .from('customer_payments')
         .select(`
@@ -160,24 +202,39 @@ async function fetchSalesData(): Promise<SaleEntry[]> {
             phone
           )
         `)
-        .order('created_at', { ascending: false })
-        .limit(200),
-      supabase.from('customers').select('id, name, phone')
+        .eq('payment_date', date) // payment_date is usually strictly a Date column
+        .order('created_at', { ascending: false }),
+      supabase.from('customers').select('id, name, phone'),
+      supabase.from('product_prices').select('product_name, company_price, is_active')
     ]);
 
     const roleMap = new Map<string, string>(userRolesResult.data?.map(r => [r.user_id, r.role]) || []);
     const customerMap = new Map(customersResult.data?.map(c => [c.id, c]) || []);
 
+    // Create price map for COGS calculation
+    const priceMap = new Map<string, number>();
+    if (pricesResult.data) {
+      pricesResult.data.forEach(p => {
+        if (p.product_name) {
+          priceMap.set(p.product_name.toLowerCase().trim(), Number(p.company_price) || 0);
+        }
+      });
+    }
+
     // Process POS transactions
     const posEntries: SaleEntry[] = (posResult.data || []).flatMap(txn => {
+      // Precise Date Filter Client-Side to handle any TZ offsets safe-guard
+      if (format(new Date(txn.created_at), 'yyyy-MM-dd') !== date) return [];
+
       const customer = txn.customer_id ? customerMap.get(txn.customer_id) : null;
       const items = txn.pos_transaction_items || [];
       const isWholesale = items.length > 1;
       const staffRole = getStaffRole(roleMap, txn.created_by);
       const isOnlineOrder = txn.is_online_order || false;
       const communityOrderId = txn.community_order_id || null;
-      
+
       if (items.length === 0 && Number(txn.total) > 0) {
+        const paymentAmounts = getPaymentAmounts(txn.payment_status, Number(txn.total), txn.notes);
         return [{
           id: txn.id,
           type: 'pos' as const,
@@ -192,6 +249,8 @@ async function fetchSalesData(): Promise<SaleEntry[]> {
           quantity: 1,
           unitPrice: Number(txn.total),
           totalAmount: Number(txn.total),
+          amountPaid: paymentAmounts.amountPaid,
+          remainingDue: paymentAmounts.remainingDue,
           paymentMethod: txn.payment_method,
           paymentStatus: (txn.payment_status === 'completed' || txn.payment_status === 'paid' ? 'paid' : txn.payment_status === 'partial' ? 'partial' : 'due') as 'paid' | 'due' | 'partial',
           customerName: customer?.name || 'Walk-in Customer',
@@ -202,41 +261,62 @@ async function fetchSalesData(): Promise<SaleEntry[]> {
           source: isOnlineOrder ? 'Online Order' : 'POS',
           sourceId: txn.id,
           isOnlineOrder,
-          communityOrderId
+          communityOrderId,
+          cogs: 0
         }];
       }
-      
-      return items.map((item: any) => ({
-        id: item.id,
-        type: 'pos' as const,
-        date: format(new Date(txn.created_at), 'yyyy-MM-dd'),
-        timestamp: txn.created_at,
-        staffName: getStaffName(staffRole),
-        staffRole,
-        staffId: txn.created_by,
-        productName: item.product_name || 'Unknown Product',
-        productDetails: `${item.quantity} x ৳${item.unit_price}`,
-        returnCylinders: parseReturnCylinders(item.product_name || ''),
-        quantity: item.quantity,
-        unitPrice: Number(item.unit_price),
-        totalAmount: Number(item.total_price),
-        paymentMethod: txn.payment_method,
-        paymentStatus: (txn.payment_status === 'completed' || txn.payment_status === 'paid' ? 'paid' : txn.payment_status === 'partial' ? 'partial' : 'due') as 'paid' | 'due' | 'partial',
-        customerName: customer?.name || 'Walk-in Customer',
-        customerPhone: customer?.phone || null,
-        customerId: txn.customer_id,
-        transactionType: isWholesale ? 'wholesale' : 'retail' as 'retail' | 'wholesale',
-        transactionNumber: txn.transaction_number,
-        source: isOnlineOrder ? 'Online Order' : 'POS',
-        sourceId: txn.id,
-        isOnlineOrder,
-        communityOrderId
-      }));
+
+      const txnTotal = Number(txn.total);
+      const paymentAmounts = getPaymentAmounts(txn.payment_status, txnTotal, txn.notes);
+      const itemsTotal = items.reduce((sum: number, item: any) => sum + Number(item.total_price), 0);
+
+      return items.map((item: any) => {
+        const itemTotal = Number(item.total_price);
+        const itemProportion = itemsTotal > 0 ? itemTotal / itemsTotal : 0;
+        const itemAmountPaid = paymentAmounts.amountPaid * itemProportion;
+        const itemRemainingDue = paymentAmounts.remainingDue * itemProportion;
+
+        // Calculate COGS
+        const productNameNormalized = (item.product_name || '').toLowerCase().trim();
+        const buyPrice = priceMap.get(productNameNormalized) || 0;
+        const itemCogs = buyPrice * Number(item.quantity || 0);
+
+        return {
+          id: item.id,
+          type: 'pos' as const,
+          date: format(new Date(txn.created_at), 'yyyy-MM-dd'),
+          timestamp: txn.created_at,
+          staffName: getStaffName(staffRole),
+          staffRole,
+          staffId: txn.created_by,
+          productName: item.product_name || 'Unknown Product',
+          productDetails: `${item.quantity} x ৳${item.unit_price}`,
+          returnCylinders: parseReturnCylinders(item.product_name || ''),
+          quantity: item.quantity,
+          unitPrice: Number(item.unit_price),
+          totalAmount: itemTotal,
+          amountPaid: itemAmountPaid,
+          remainingDue: itemRemainingDue,
+          paymentMethod: txn.payment_method,
+          paymentStatus: (txn.payment_status === 'completed' || txn.payment_status === 'paid' ? 'paid' : txn.payment_status === 'partial' ? 'partial' : 'due') as 'paid' | 'due' | 'partial',
+          customerName: customer?.name || 'Walk-in Customer',
+          customerPhone: customer?.phone || null,
+          customerId: txn.customer_id,
+          transactionType: isWholesale ? 'wholesale' : 'retail' as 'retail' | 'wholesale',
+          transactionNumber: txn.transaction_number,
+          source: isOnlineOrder ? 'Online Order' : 'POS',
+          sourceId: txn.id,
+          isOnlineOrder,
+          communityOrderId,
+          cogs: itemCogs
+        };
+      });
     });
 
     // Process customer payments
     const paymentEntries: SaleEntry[] = (paymentsResult.data || []).map(payment => {
       const staffRole = getStaffRole(roleMap, payment.created_by);
+      const paymentAmount = Number(payment.amount);
       return {
         id: payment.id,
         type: 'payment' as const,
@@ -249,8 +329,10 @@ async function fetchSalesData(): Promise<SaleEntry[]> {
         productDetails: payment.cylinders_collected ? `+ ${payment.cylinders_collected} cylinders returned` : '',
         returnCylinders: [],
         quantity: 1,
-        unitPrice: Number(payment.amount),
-        totalAmount: Number(payment.amount),
+        unitPrice: paymentAmount,
+        totalAmount: paymentAmount,
+        amountPaid: paymentAmount, // Due collections are fully paid
+        remainingDue: 0,
         paymentMethod: 'cash',
         paymentStatus: 'paid' as const,
         customerName: (payment.customers as any)?.name || 'Unknown Customer',
@@ -259,11 +341,12 @@ async function fetchSalesData(): Promise<SaleEntry[]> {
         transactionType: 'retail' as const,
         transactionNumber: `PAY-${payment.id.slice(0, 8)}`,
         source: 'Customer Payment',
-        sourceId: payment.id
+        sourceId: payment.id,
+        cogs: 0
       };
     });
 
-    return [...posEntries, ...paymentEntries].sort((a, b) => 
+    return [...posEntries, ...paymentEntries].sort((a, b) =>
       new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
     );
   } catch (error) {
@@ -272,10 +355,10 @@ async function fetchSalesData(): Promise<SaleEntry[]> {
   }
 }
 
-async function fetchExpensesData(): Promise<ExpenseEntry[]> {
+async function fetchExpensesData(date: string): Promise<ExpenseEntry[]> {
   try {
-    // Parallel fetch: user_roles + all expense sources
-    const [userRolesResult, pobResult, staffPaymentsResult, vehicleCostsResult, manualExpensesResult] = await Promise.all([
+    // Parallel fetch: user_roles, pob_transactions, daily_expenses
+    const [userRolesResult, pobResult, manualExpensesResult] = await Promise.all([
       supabase.from('user_roles').select('user_id, role'),
       supabase
         .from('pob_transactions')
@@ -298,66 +381,33 @@ async function fetchExpensesData(): Promise<ExpenseEntry[]> {
           )
         `)
         .eq('is_voided', false)
-        .order('created_at', { ascending: false })
-        .limit(300),
-      supabase
-        .from('staff_payments')
-        .select(`
-          id,
-          staff_id,
-          amount,
-          payment_date,
-          notes,
-          created_at,
-          created_by,
-          staff (
-            name,
-            role
-          )
-        `)
-        .order('created_at', { ascending: false })
-        .limit(200),
-      supabase
-        .from('vehicle_costs')
-        .select(`
-          id,
-          vehicle_id,
-          amount,
-          cost_type,
-          cost_date,
-          description,
-          liters_filled,
-          odometer_reading,
-          created_at,
-          created_by,
-          vehicles (
-            name,
-            license_plate
-          )
-        `)
-        .order('created_at', { ascending: false })
-        .limit(200),
+        .gte('created_at', format(new Date(date), "yyyy-MM-dd'T'00:00:00"))
+        .lte('created_at', format(new Date(date), "yyyy-MM-dd'T'23:59:59.999"))
+        .order('created_at', { ascending: false }),
       supabase
         .from('daily_expenses')
         .select('*')
+        .eq('expense_date', date)
         .order('expense_date', { ascending: false })
-        .limit(300)
     ]);
 
     const roleMap = new Map<string, string>(userRolesResult.data?.map(r => [r.user_id, r.role]) || []);
 
-    // Process POB transactions
-    const pobEntries: ExpenseEntry[] = (pobResult.data || []).map(txn => {
+    // Process POB transactions (Filtered by Date via Query)
+    const pobEntries: ExpenseEntry[] = (pobResult.data || []).flatMap(txn => {
+      // Client-side date check safety 
+      if (format(new Date(txn.created_at), 'yyyy-MM-dd') !== date) return [];
+
       const items = txn.pob_transaction_items || [];
       const mainItem = items[0];
       const productType = mainItem?.product_type || 'Other';
-      const categoryName = productType === 'lpg_cylinder' ? 'LPG Purchase' : 
-                          productType === 'stove' ? 'Gas Stove Purchase' : 
-                          productType === 'regulator' ? 'Regulator Purchase' : 'Other';
+      const categoryName = productType === 'lpg_cylinder' ? 'LPG Purchase' :
+        productType === 'stove' ? 'Gas Stove Purchase' :
+          productType === 'regulator' ? 'Regulator Purchase' : 'Other';
       const catInfo = getCategoryInfo(categoryName);
       const staffRole = getStaffRole(roleMap, txn.created_by);
-      
-      return {
+
+      return [{
         id: txn.id,
         type: 'pob' as const,
         date: format(new Date(txn.created_at), 'yyyy-MM-dd'),
@@ -374,65 +424,21 @@ async function fetchExpensesData(): Promise<ExpenseEntry[]> {
         source: 'POB',
         sourceId: txn.id,
         supplierName: txn.supplier_name
-      };
+      }];
     });
 
-    // Process staff payments
-    const salaryEntries: ExpenseEntry[] = (staffPaymentsResult.data || []).map(payment => {
-      const catInfo = getCategoryInfo('Staff Salary');
-      const staffRole = getStaffRole(roleMap, payment.created_by);
-      return {
-        id: payment.id,
-        type: 'salary' as const,
-        date: format(new Date(payment.payment_date), 'yyyy-MM-dd'),
-        timestamp: payment.created_at,
-        staffName: getStaffName(staffRole),
-        staffRole,
-        staffId: payment.created_by,
-        category: 'Staff Salary',
-        categoryIcon: catInfo.icon,
-        categoryColor: catInfo.color,
-        description: payment.notes || `Salary payment to ${(payment.staff as any)?.name || 'Staff'}`,
-        whySpent: 'Staff salary payment',
-        amount: Number(payment.amount),
-        source: 'Staff Salary',
-        sourceId: payment.id,
-        staffPayeeName: (payment.staff as any)?.name
-      };
-    });
-
-    // Process vehicle costs
-    const vehicleEntries: ExpenseEntry[] = (vehicleCostsResult.data || []).map(cost => {
-      const catName = cost.cost_type === 'fuel' ? 'Vehicle Fuel' : 'Vehicle Maintenance';
-      const catInfo = getCategoryInfo(catName);
-      const staffRole = getStaffRole(roleMap, cost.created_by);
-      return {
-        id: cost.id,
-        type: 'vehicle' as const,
-        date: format(new Date(cost.cost_date), 'yyyy-MM-dd'),
-        timestamp: cost.created_at,
-        staffName: getStaffName(staffRole),
-        staffRole,
-        staffId: cost.created_by,
-        category: catName,
-        categoryIcon: catInfo.icon,
-        categoryColor: catInfo.color,
-        description: cost.description || `${cost.cost_type} for ${(cost.vehicles as any)?.name || 'Vehicle'}${cost.liters_filled ? ` (${cost.liters_filled}L)` : ''}`,
-        whySpent: 'Vehicle operational cost',
-        amount: Number(cost.amount),
-        source: 'Vehicle Cost',
-        sourceId: cost.id,
-        vehicleName: (cost.vehicles as any)?.name
-      };
-    });
-
-    // Process manual expenses
-    const manualEntries: ExpenseEntry[] = (manualExpensesResult.data || []).map(expense => {
+    // Process daily expenses (Includes Manual + Synced Staff/Vehicle) - Filtered by eq('expense_date', date)
+    const dailyEntries: ExpenseEntry[] = (manualExpensesResult.data || []).map(expense => {
       const catInfo = getCategoryInfo(expense.category);
       const staffRole = getStaffRole(roleMap, expense.created_by);
+
+      let type: ExpenseEntry['type'] = 'manual';
+      if (expense.category === 'Staff' || expense.category === 'Staff Salary') type = 'salary';
+      else if (expense.category === 'Transport' || expense.category === 'Vehicle' || expense.category.includes('Vehicle')) type = 'vehicle';
+
       return {
         id: expense.id,
-        type: 'manual' as const,
+        type,
         date: expense.expense_date,
         timestamp: expense.created_at,
         staffName: getStaffName(staffRole),
@@ -442,18 +448,18 @@ async function fetchExpensesData(): Promise<ExpenseEntry[]> {
         categoryIcon: catInfo.icon,
         categoryColor: catInfo.color,
         description: expense.description || expense.category,
-        whySpent: expense.category === 'Utilities' ? 'Utility bill payment' : 
-                  expense.category === 'Rent' ? 'Shop rent payment' :
-                  expense.category === 'Loading' ? 'Loading/labor cost' :
-                  expense.category === 'Entertainment' ? 'Business entertainment' :
-                  'General expense',
+        whySpent: expense.category === 'Utilities' ? 'Utility bill payment' :
+          expense.category === 'Rent' ? 'Shop rent payment' :
+            expense.category === 'Loading' ? 'Loading/labor cost' :
+              expense.category === 'Entertainment' ? 'Business entertainment' :
+                'General expense',
         amount: Number(expense.amount),
-        source: 'Manual Entry',
+        source: type === 'manual' ? 'Manual Entry' : type === 'salary' ? 'Staff Salary Module' : 'Vehicle Module',
         sourceId: expense.id
       };
     });
 
-    return [...pobEntries, ...salaryEntries, ...vehicleEntries, ...manualEntries].sort((a, b) => 
+    return [...pobEntries, ...dailyEntries].sort((a, b) =>
       new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
     );
   } catch (error) {
@@ -463,42 +469,43 @@ async function fetchExpensesData(): Promise<ExpenseEntry[]> {
 }
 
 // ===== Query Hooks =====
-export const useBusinessSales = () => {
+export const useBusinessSales = (date: string) => {
   return useQuery({
-    queryKey: ['business-diary-sales'],
-    queryFn: fetchSalesData,
-    staleTime: 1000 * 30, // 30 seconds - fresh but cached
-    gcTime: 1000 * 60 * 5, // 5 minutes garbage collection
+    queryKey: ['business-diary-sales', date],
+    queryFn: () => fetchSalesData(date),
+    staleTime: 1000 * 30, // 30 seconds
+    gcTime: 1000 * 60 * 5,
   });
 };
 
-export const useBusinessExpenses = () => {
+export const useBusinessExpenses = (date: string) => {
   return useQuery({
-    queryKey: ['business-diary-expenses'],
-    queryFn: fetchExpensesData,
+    queryKey: ['business-diary-expenses', date],
+    queryFn: () => fetchExpensesData(date),
     staleTime: 1000 * 30,
     gcTime: 1000 * 60 * 5,
   });
 };
 
 // ===== Real-time Subscription Hook with Debouncing =====
-export const useBusinessDiaryRealtime = () => {
+export const useBusinessDiaryRealtime = (date: string) => {
   const queryClient = useQueryClient();
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
   const isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
-  
+
   const debouncedInvalidate = useCallback(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      queryClient.invalidateQueries({ queryKey: ['business-diary-sales'] });
-      queryClient.invalidateQueries({ queryKey: ['business-diary-expenses'] });
-    }, 1000); // Reduced to 1 second for faster sync
-  }, [queryClient]);
-  
+      queryClient.invalidateQueries({ queryKey: ['business-diary-sales', date] });
+      queryClient.invalidateQueries({ queryKey: ['business-diary-expenses', date] });
+    }, 1000);
+  }, [queryClient, date]);
+  // ...
+
   useEffect(() => {
     // Skip subscriptions when offline to prevent connection errors
     if (!isOnline) return;
-    
+
     // Single consolidated channel for all diary-related tables
     const channel = supabase
       .channel('diary-combined-realtime-v2')
@@ -511,7 +518,7 @@ export const useBusinessDiaryRealtime = () => {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicle_costs' }, debouncedInvalidate)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_expenses' }, debouncedInvalidate)
       .subscribe();
-    
+
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
       supabase.removeChannel(channel);

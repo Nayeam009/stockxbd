@@ -1,12 +1,12 @@
 import { useState, useMemo } from "react";
-import { 
-  Bell, 
-  Package, 
-  ShoppingCart, 
-  CreditCard, 
-  Info, 
-  Check, 
-  Trash2, 
+import {
+  Bell,
+  Package,
+  ShoppingCart,
+  CreditCard,
+  Info,
+  Check,
+  Trash2,
   AlertTriangle,
   AlertCircle,
   Flame,
@@ -31,7 +31,7 @@ import {
 } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
+import {
   Sheet,
   SheetContent,
   SheetDescription,
@@ -39,11 +39,11 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { 
-  useUniversalNotifications, 
-  UniversalNotification, 
+import {
+  useUniversalNotifications,
+  UniversalNotification,
   NotificationType,
-  NotificationPriority 
+  NotificationPriority
 } from "@/hooks/useUniversalNotifications";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -53,19 +53,19 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 interface UniversalNotificationCenterProps {
-  userRole: 'owner' | 'manager' | 'driver' | 'staff';
+  userRole: 'owner' | 'manager' | 'super_admin';
 }
 
 export const UniversalNotificationCenter = ({ userRole }: UniversalNotificationCenterProps) => {
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("all");
-  const { 
-    notifications, 
-    unreadCount, 
+  const {
+    notifications,
+    unreadCount,
     criticalCount,
     highPriorityCount,
-    markAsRead, 
-    markAllAsRead, 
+    markAsRead,
+    markAllAsRead,
     clearNotifications,
     refresh,
     loading,
@@ -126,20 +126,20 @@ export const UniversalNotificationCenter = ({ userRole }: UniversalNotificationC
   const getPriorityStyles = (priority: NotificationPriority, isIcon = false) => {
     switch (priority) {
       case "critical":
-        return isIcon 
-          ? "bg-destructive/15 text-destructive border-destructive/30" 
+        return isIcon
+          ? "bg-destructive/15 text-destructive border-destructive/30"
           : "border-l-destructive bg-destructive/5";
       case "high":
-        return isIcon 
-          ? "bg-warning/15 text-warning border-warning/30" 
+        return isIcon
+          ? "bg-warning/15 text-warning border-warning/30"
           : "border-l-warning bg-warning/5";
       case "medium":
-        return isIcon 
-          ? "bg-primary/15 text-primary border-primary/30" 
+        return isIcon
+          ? "bg-primary/15 text-primary border-primary/30"
           : "border-l-primary bg-primary/5";
       case "low":
-        return isIcon 
-          ? "bg-muted text-muted-foreground border-muted" 
+        return isIcon
+          ? "bg-muted text-muted-foreground border-muted"
           : "border-l-muted-foreground/30 bg-transparent";
     }
   };
@@ -359,11 +359,11 @@ export const UniversalNotificationCenter = ({ userRole }: UniversalNotificationC
           <Button variant="ghost" size="icon" className="relative h-8 w-8 md:h-9 md:w-9">
             <Bell className="h-4 w-4 md:h-5 md:w-5" />
             {unreadCount > 0 && (
-              <Badge 
+              <Badge
                 className={cn(
                   "absolute -top-1 -right-1 h-4 w-4 md:h-5 md:w-5 p-0 flex items-center justify-center text-[10px] md:text-xs",
-                  criticalCount > 0 
-                    ? "bg-destructive text-destructive-foreground animate-pulse" 
+                  criticalCount > 0
+                    ? "bg-destructive text-destructive-foreground animate-pulse"
                     : "bg-primary text-primary-foreground"
                 )}
               >
@@ -377,17 +377,17 @@ export const UniversalNotificationCenter = ({ userRole }: UniversalNotificationC
             <SheetTitle>Notifications</SheetTitle>
             <SheetDescription>Your notifications</SheetDescription>
           </SheetHeader>
-          
+
           <HeaderContent />
-          
+
           <div className="px-2 py-2 border-b">
             <TabsContent_ />
           </div>
-          
+
           <ScrollArea className="flex-1">
             <NotificationList />
           </ScrollArea>
-          
+
           <FooterContent />
         </SheetContent>
       </Sheet>
@@ -401,11 +401,11 @@ export const UniversalNotificationCenter = ({ userRole }: UniversalNotificationC
         <Button variant="ghost" size="icon" className="relative h-8 w-8 md:h-9 md:w-9">
           <Bell className="h-4 w-4 md:h-5 md:w-5" />
           {unreadCount > 0 && (
-            <Badge 
+            <Badge
               className={cn(
                 "absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs",
-                criticalCount > 0 
-                  ? "bg-destructive text-destructive-foreground animate-pulse" 
+                criticalCount > 0
+                  ? "bg-destructive text-destructive-foreground animate-pulse"
                   : "bg-primary text-primary-foreground"
               )}
             >
@@ -416,15 +416,15 @@ export const UniversalNotificationCenter = ({ userRole }: UniversalNotificationC
       </PopoverTrigger>
       <PopoverContent className="w-[380px] md:w-[420px] p-0" align="end">
         <HeaderContent />
-        
+
         <div className="px-2 py-2 border-b">
           <TabsContent_ />
         </div>
-        
+
         <ScrollArea className="h-[350px] md:h-[400px]">
           <NotificationList />
         </ScrollArea>
-        
+
         <FooterContent />
       </PopoverContent>
     </Popover>

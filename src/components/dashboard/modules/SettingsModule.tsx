@@ -5,9 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { 
-  Settings, 
-  Shield, 
+import {
+  Settings,
+  Shield,
   Trash2,
   Loader2,
   Lock,
@@ -51,6 +51,7 @@ import { BackupRestoreCard } from "@/components/settings/BackupRestoreCard";
 import { PushNotificationCard } from "@/components/settings/PushNotificationCard";
 import { AccountSettingsSection } from "@/components/settings/AccountSettingsSection";
 import { TeamSettingsSection } from "@/components/settings/TeamSettingsSection";
+import { PrinterSettingsSection } from "@/components/settings/PrinterSettingsSection";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -68,8 +69,8 @@ const SettingsSection = ({ icon, title, description, active, onClick, badge }: S
     onClick={onClick}
     className={cn(
       "w-full flex items-center gap-3 p-4 rounded-xl text-left transition-all min-h-[64px] touch-target",
-      active 
-        ? 'bg-primary/10 border-l-4 border-primary shadow-sm' 
+      active
+        ? 'bg-primary/10 border-l-4 border-primary shadow-sm'
         : 'hover:bg-muted/60 text-foreground border-l-4 border-transparent'
     )}
   >
@@ -98,7 +99,7 @@ export const SettingsModule = () => {
   const isMobile = useIsMobile();
   const [activeSection, setActiveSection] = useState('account');
   const [isMobileDetailView, setIsMobileDetailView] = useState(false);
-  
+
   // Password change state
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [newPassword, setNewPassword] = useState("");
@@ -106,20 +107,20 @@ export const SettingsModule = () => {
   const [changingPassword, setChangingPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  
+
   // User state for role check and account deletion
   const [userEmail, setUserEmail] = useState("");
   const [userName, setUserName] = useState("");
   const [userRole, setUserRole] = useState<string>("owner");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  
+
   // Account deletion state
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showDeletePasswordDialog, setShowDeletePasswordDialog] = useState(false);
   const [deletePassword, setDeletePassword] = useState("");
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
-  
+
   // Notification settings
   const [notifications, setNotifications] = useState({
     lowStock: true,
@@ -134,13 +135,13 @@ export const SettingsModule = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setUserEmail(user.email || "");
-        
+
         const { data: roleData } = await supabase
           .from('user_roles')
           .select('role')
           .eq('user_id', user.id)
           .maybeSingle();
-        
+
         if (roleData) {
           setUserRole(roleData.role);
         }
@@ -151,7 +152,7 @@ export const SettingsModule = () => {
           .select('full_name, avatar_url')
           .eq('user_id', user.id)
           .maybeSingle();
-        
+
         if (profileData) {
           setUserName(profileData.full_name || user.email?.split('@')[0] || 'User');
           setAvatarUrl(profileData.avatar_url);
@@ -160,7 +161,7 @@ export const SettingsModule = () => {
         }
       }
     };
-    
+
     fetchUserRole();
   }, []);
 
@@ -210,7 +211,7 @@ export const SettingsModule = () => {
     setChangingPassword(true);
     try {
       const { error } = await supabase.auth.updateUser({ password: newPassword });
-      
+
       if (error) throw error;
 
       toast({ title: language === 'bn' ? 'পাসওয়ার্ড সফলভাবে পরিবর্তন হয়েছে' : "Password changed successfully" });
@@ -218,10 +219,10 @@ export const SettingsModule = () => {
       setNewPassword("");
       setConfirmPassword("");
     } catch (error: any) {
-      toast({ 
-        title: language === 'bn' ? 'পাসওয়ার্ড পরিবর্তন ব্যর্থ' : "Failed to change password", 
+      toast({
+        title: language === 'bn' ? 'পাসওয়ার্ড পরিবর্তন ব্যর্থ' : "Failed to change password",
         description: error.message || "Please try again",
-        variant: "destructive" 
+        variant: "destructive"
       });
     } finally {
       setChangingPassword(false);
@@ -315,39 +316,46 @@ export const SettingsModule = () => {
   };
 
   const sections = [
-    { 
-      id: 'account', 
-      icon: <UserCircle className="h-5 w-5" />, 
-      title: language === 'bn' ? 'অ্যাকাউন্ট' : 'Account', 
+    {
+      id: 'account',
+      icon: <UserCircle className="h-5 w-5" />,
+      title: language === 'bn' ? 'অ্যাকাউন্ট' : 'Account',
       description: language === 'bn' ? 'প্রোফাইল ও থিম' : 'Profile & theme',
       ownerOnly: false
     },
-    { 
-      id: 'team', 
-      icon: <Settings className="h-5 w-5" />, 
-      title: language === 'bn' ? 'টিম ও ব্যবসা' : 'Team & Business', 
+    {
+      id: 'team',
+      icon: <Settings className="h-5 w-5" />,
+      title: language === 'bn' ? 'টিম ও ব্যবসা' : 'Team & Business',
       description: language === 'bn' ? 'ম্যানেজার ও ব্যবসা' : 'Managers & business',
       ownerOnly: true
     },
-    { 
-      id: 'notifications', 
-      icon: <Bell className="h-5 w-5" />, 
-      title: language === 'bn' ? 'বিজ্ঞপ্তি' : 'Notifications', 
+    {
+      id: 'notifications',
+      icon: <Bell className="h-5 w-5" />,
+      title: language === 'bn' ? 'বিজ্ঞপ্তি' : 'Notifications',
       description: language === 'bn' ? 'অ্যালার্ট সেটিংস' : 'Alert preferences',
       ownerOnly: false
     },
-    { 
-      id: 'security', 
-      icon: <Shield className="h-5 w-5" />, 
-      title: language === 'bn' ? 'নিরাপত্তা' : 'Security', 
+    {
+      id: 'security',
+      icon: <Shield className="h-5 w-5" />,
+      title: language === 'bn' ? 'নিরাপত্তা' : 'Security',
       description: language === 'bn' ? 'পাসওয়ার্ড ও অ্যাকাউন্ট' : 'Password & account',
       ownerOnly: false
     },
-    { 
-      id: 'advanced', 
-      icon: <Zap className="h-5 w-5" />, 
-      title: language === 'bn' ? 'উন্নত' : 'Advanced', 
+    {
+      id: 'advanced',
+      icon: <Zap className="h-5 w-5" />,
+      title: language === 'bn' ? 'উন্নত' : 'Advanced',
       description: language === 'bn' ? 'ব্যাকআপ ও ডেটা' : 'Backup & data',
+      ownerOnly: false
+    },
+    {
+      id: 'printer',
+      icon: <Settings className="h-5 w-5" />,
+      title: language === 'bn' ? 'প্রিন্টার' : 'Printer',
+      description: language === 'bn' ? 'রসিদ প্রিন্টিং' : 'Receipt printing',
       ownerOnly: false
     },
   ];
@@ -393,7 +401,7 @@ export const SettingsModule = () => {
               </CardHeader>
               <CardContent className="space-y-3">
                 {/* Change Password */}
-                <button 
+                <button
                   onClick={() => setShowPasswordDialog(true)}
                   className="w-full flex items-center gap-4 p-4 rounded-xl border border-border/50 hover:bg-muted/50 hover:border-primary/30 transition-all group"
                 >
@@ -458,9 +466,9 @@ export const SettingsModule = () => {
                       {language === 'bn' ? 'স্থায়ীভাবে আপনার অ্যাকাউন্ট ও ডেটা মুছুন' : 'Permanently remove your account and data'}
                     </p>
                   </div>
-                  <Button 
-                    variant="destructive" 
-                    onClick={handleDeleteAccountRequest} 
+                  <Button
+                    variant="destructive"
+                    onClick={handleDeleteAccountRequest}
                     className="h-11 min-w-[160px] gap-2 shadow-md"
                   >
                     <UserX className="h-4 w-4" />
@@ -487,7 +495,7 @@ export const SettingsModule = () => {
                       {language === 'bn' ? 'ব্যাকআপ ও রিস্টোর' : 'Backup & Restore'}
                     </CardTitle>
                     <CardDescription>
-                      {language === 'bn' 
+                      {language === 'bn'
                         ? 'আপনার ব্যবসায়িক ডেটা সুরক্ষিতভাবে সংরক্ষণ করুন'
                         : 'Securely save your business data and restore when needed'}
                     </CardDescription>
@@ -498,7 +506,7 @@ export const SettingsModule = () => {
                 <BackupRestoreCard />
               </CardContent>
             </Card>
-            
+
             {/* Data Management */}
             <Card className="border-border/50 shadow-sm bg-card">
               <CardHeader className="pb-4">
@@ -517,7 +525,7 @@ export const SettingsModule = () => {
                 </div>
               </CardHeader>
               <CardContent>
-                <Button 
+                <Button
                   variant="outline"
                   className="w-full h-14 flex items-center justify-center gap-3 hover:bg-destructive/5 hover:border-destructive/30 hover:text-destructive transition-all"
                   onClick={handleClearCache}
@@ -529,6 +537,11 @@ export const SettingsModule = () => {
             </Card>
           </div>
         );
+
+
+
+      case 'printer':
+        return <PrinterSettingsSection />;
 
       default:
         return null;
@@ -605,8 +618,8 @@ export const SettingsModule = () => {
           // Mobile Detail View
           <div className="space-y-4 animate-fade-in">
             {/* Back Button */}
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               onClick={handleBackToList}
               className="h-12 px-4 -ml-2 hover:bg-muted/50 gap-2"
             >
@@ -719,8 +732,8 @@ export const SettingsModule = () => {
             {newPassword && confirmPassword && (
               <div className={cn(
                 "flex items-center gap-2 text-sm p-3 rounded-lg",
-                newPassword === confirmPassword 
-                  ? "bg-green-500/10 text-green-600" 
+                newPassword === confirmPassword
+                  ? "bg-green-500/10 text-green-600"
                   : "bg-destructive/10 text-destructive"
               )}>
                 {newPassword === confirmPassword ? (
@@ -738,8 +751,8 @@ export const SettingsModule = () => {
             )}
           </div>
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => {
                 setShowPasswordDialog(false);
                 setNewPassword("");
@@ -749,9 +762,9 @@ export const SettingsModule = () => {
             >
               {language === 'bn' ? 'বাতিল' : 'Cancel'}
             </Button>
-            <Button 
-              onClick={handleChangePassword} 
-              disabled={changingPassword || !newPassword || !confirmPassword || newPassword !== confirmPassword} 
+            <Button
+              onClick={handleChangePassword}
+              disabled={changingPassword || !newPassword || !confirmPassword || newPassword !== confirmPassword}
               className="h-11"
             >
               {changingPassword && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
@@ -770,7 +783,7 @@ export const SettingsModule = () => {
               {language === 'bn' ? 'অ্যাকাউন্ট মুছে ফেলবেন?' : 'Delete Account?'}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {language === 'bn' 
+              {language === 'bn'
                 ? 'এই কাজটি পূর্বাবস্থায় ফেরানো যাবে না। আপনার অ্যাকাউন্ট এবং সমস্ত সম্পর্কিত ডেটা স্থায়ীভাবে মুছে ফেলা হবে।'
                 : 'This action cannot be undone. Your account and all associated data will be permanently deleted.'}
             </AlertDialogDescription>
@@ -798,7 +811,7 @@ export const SettingsModule = () => {
               {language === 'bn' ? 'অ্যাকাউন্ট মুছে ফেলুন' : 'Delete Account'}
             </DialogTitle>
             <DialogDescription>
-              {language === 'bn' 
+              {language === 'bn'
                 ? 'এই কাজটি স্থায়ী। আপনার পাসওয়ার্ড দিন এবং নিশ্চিত করতে DELETE টাইপ করুন।'
                 : 'This action is permanent. Enter your password and type DELETE to confirm.'}
             </DialogDescription>
@@ -839,8 +852,8 @@ export const SettingsModule = () => {
             </div>
           </div>
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => {
                 setShowDeletePasswordDialog(false);
                 setDeletePassword("");
@@ -850,7 +863,7 @@ export const SettingsModule = () => {
             >
               {language === 'bn' ? 'বাতিল' : 'Cancel'}
             </Button>
-            <Button 
+            <Button
               variant="destructive"
               onClick={handleDeleteAccount}
               disabled={deletingAccount || deleteConfirmText !== 'DELETE' || !deletePassword}

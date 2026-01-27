@@ -20,14 +20,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  UserX, 
-  UserCheck, 
-  Search, 
-  ArrowRight, 
-  Users, 
-  Banknote, 
-  Package, 
+import {
+  UserX,
+  UserCheck,
+  Search,
+  ArrowRight,
+  Users,
+  Banknote,
+  Package,
   History,
   Plus,
   ShoppingCart,
@@ -289,7 +289,7 @@ export const CustomerManagementModule = () => {
       if (transactions) {
         // Fetch customer names for transactions
         const customerIds = transactions.filter(t => t.customer_id).map(t => t.customer_id) as string[];
-        const { data: txCustomers } = customerIds.length > 0 
+        const { data: txCustomers } = customerIds.length > 0
           ? await supabase.from('customers').select('id, name').in('id', customerIds)
           : { data: [] };
 
@@ -297,8 +297,8 @@ export const CustomerManagementModule = () => {
         txCustomers?.forEach(c => customerMap.set(c.id, c.name));
 
         transactions.forEach(t => {
-          results.push({ 
-            type: 'transaction', 
+          results.push({
+            type: 'transaction',
             transaction: {
               ...t,
               customer_name: t.customer_id ? customerMap.get(t.customer_id) || 'Walk-in' : 'Walk-in',
@@ -348,14 +348,14 @@ export const CustomerManagementModule = () => {
       let customerName = 'Walk-in Customer';
       let customerPhone = '';
       let customerAddress = '';
-      
+
       if (data.customer_id) {
         const { data: customer } = await supabase
           .from('customers')
           .select('name, phone, address')
           .eq('id', data.customer_id)
           .single();
-        
+
         if (customer) {
           customerName = customer.name;
           customerPhone = customer.phone || '';
@@ -397,15 +397,16 @@ export const CustomerManagementModule = () => {
     const cylinders = parseInt(cylindersToCollect) || 0;
 
     const { data: { user } } = await supabase.auth.getUser();
-    
-    // Record the payment
+
+    // Record the payment with today's date
     const { error: paymentError } = await supabase
       .from('customer_payments')
       .insert({
         customer_id: selectedCustomer.id,
         amount: amount,
         cylinders_collected: cylinders,
-        created_by: user?.id
+        created_by: user?.id,
+        payment_date: new Date().toISOString().split('T')[0] // Today's date for Business Diary filtering
       });
 
     if (paymentError) {
@@ -417,8 +418,8 @@ export const CustomerManagementModule = () => {
     // Update customer record
     const newTotalDue = Math.max(0, selectedCustomer.total_due - amount);
     const newCylindersDue = Math.max(0, selectedCustomer.cylinders_due - cylinders);
-    const newStatus = newTotalDue === 0 && newCylindersDue === 0 ? 'clear' : 
-                      newTotalDue > 0 ? 'pending' : 'pending';
+    const newStatus = newTotalDue === 0 && newCylindersDue === 0 ? 'clear' :
+      newTotalDue > 0 ? 'pending' : 'pending';
 
     const { error: updateError } = await supabase
       .from('customers')
@@ -451,22 +452,25 @@ export const CustomerManagementModule = () => {
       phone: newCustomer.phone || null,
       address: newCustomer.address || null,
     });
-    
+
     if (!result.success) {
-      toast({ 
-        title: "Invalid input", 
+      toast({
+        title: "Invalid input",
         description: result.error.errors[0]?.message || "Please check your input",
-        variant: "destructive" 
+        variant: "destructive"
       });
       return;
     }
-    
+
     const { data: { user } } = await supabase.auth.getUser();
-    
+
+    // Get shop owner ID (handles both Owner and Manager)
+    const { data: ownerId } = await supabase.rpc("get_owner_id");
+
     const totalDue = parseFloat(newCustomer.total_due) || 0;
     const cylindersDue = parseInt(newCustomer.cylinders_due) || 0;
     const creditLimit = parseFloat(newCustomer.credit_limit) || 10000;
-    
+
     const { error } = await supabase
       .from('customers')
       .insert({
@@ -478,7 +482,8 @@ export const CustomerManagementModule = () => {
         cylinders_due: cylindersDue,
         credit_limit: creditLimit,
         billing_status: totalDue > 0 || cylindersDue > 0 ? 'pending' : 'clear',
-        created_by: user?.id
+        created_by: user?.id,
+        owner_id: ownerId || user?.id // Ensure owner_id is set
       });
 
     if (error) {
@@ -560,9 +565,9 @@ export const CustomerManagementModule = () => {
                 </p>
               </div>
             </div>
-            <Button 
-              onClick={() => setAddCustomerDialogOpen(true)} 
-              size="sm" 
+            <Button
+              onClick={() => setAddCustomerDialogOpen(true)}
+              size="sm"
               className="h-11 w-full sm:w-auto bg-primary hover:bg-primary/90 shadow-lg touch-manipulation"
             >
               <Plus className="h-4 w-4 mr-2" />
@@ -584,7 +589,7 @@ export const CustomerManagementModule = () => {
                 <p className="text-xs text-muted-foreground">Search by Phone, Name, or Memo ID</p>
               </div>
             </div>
-            
+
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -620,8 +625,8 @@ export const CustomerManagementModule = () => {
             {!memoSearchLoading && memoSearchResults.length > 0 && (
               <div className="mt-4 space-y-2 max-h-80 overflow-y-auto">
                 {memoSearchResults.map((result, idx) => (
-                  <Card 
-                    key={idx} 
+                  <Card
+                    key={idx}
                     className="border border-border/50 shadow-sm hover:shadow-md transition-all cursor-pointer"
                     onClick={() => {
                       if (result.type === 'customer' && result.customer) {
@@ -690,9 +695,9 @@ export const CustomerManagementModule = () => {
                             <p className="font-bold text-foreground tabular-nums">
                               {BANGLADESHI_CURRENCY_SYMBOL}{result.transaction.total.toLocaleString()}
                             </p>
-                            <Badge 
+                            <Badge
                               className={(result.transaction.payment_status === 'paid' || result.transaction.payment_status === 'completed')
-                                ? 'bg-emerald-500/20 text-emerald-600 border-emerald-500/30' 
+                                ? 'bg-emerald-500/20 text-emerald-600 border-emerald-500/30'
                                 : 'bg-amber-500/20 text-amber-600 border-amber-500/30'
                               }
                             >
@@ -813,7 +818,7 @@ export const CustomerManagementModule = () => {
                   </div>
                 </div>
               </div>
-              <Button 
+              <Button
                 className="w-full bg-rose-500 hover:bg-rose-600 text-white h-11 text-sm font-medium shadow-lg touch-manipulation"
                 onClick={() => setViewMode('due')}
               >
@@ -843,7 +848,7 @@ export const CustomerManagementModule = () => {
                   </div>
                 </div>
               </div>
-              <Button 
+              <Button
                 variant="outline"
                 className="w-full border-emerald-500/30 hover:bg-emerald-500/10 hover:border-emerald-500/50 h-11 text-sm font-medium touch-manipulation"
                 onClick={() => setViewMode('paid')}
@@ -935,7 +940,7 @@ export const CustomerManagementModule = () => {
             </div>
             <DialogFooter className="gap-2 sm:gap-0">
               <Button variant="outline" onClick={() => setAddCustomerDialogOpen(false)} className="h-11">Cancel</Button>
-              <Button 
+              <Button
                 onClick={handleAddCustomer}
                 disabled={!newCustomer.name.trim()}
                 className="h-11 bg-primary hover:bg-primary/90"
@@ -960,7 +965,7 @@ export const CustomerManagementModule = () => {
                 </div>
               </div>
             </DialogHeader>
-            
+
             <Tabs defaultValue="sales" className="flex-1 overflow-hidden flex flex-col">
               <TabsList className="grid w-full grid-cols-2 shrink-0">
                 <TabsTrigger value="sales" className="gap-2">
@@ -972,13 +977,13 @@ export const CustomerManagementModule = () => {
                   Payments
                 </TabsTrigger>
               </TabsList>
-              
+
               <TabsContent value="sales" className="flex-1 overflow-auto mt-4">
                 {salesHistory.length > 0 ? (
                   <div className="space-y-2">
                     {salesHistory.map((tx) => (
-                      <Card 
-                        key={tx.id} 
+                      <Card
+                        key={tx.id}
                         className="border border-border/50 shadow-sm hover:shadow-md transition-all cursor-pointer"
                         onClick={() => handleViewTransaction(tx)}
                       >
@@ -1004,9 +1009,9 @@ export const CustomerManagementModule = () => {
                               <p className="font-bold text-foreground tabular-nums">
                                 {BANGLADESHI_CURRENCY_SYMBOL}{tx.total.toLocaleString()}
                               </p>
-                              <Badge 
-                                className={tx.payment_status === 'paid' 
-                                  ? 'bg-emerald-500/20 text-emerald-600 border-emerald-500/30' 
+                              <Badge
+                                className={tx.payment_status === 'paid'
+                                  ? 'bg-emerald-500/20 text-emerald-600 border-emerald-500/30'
                                   : 'bg-amber-500/20 text-amber-600 border-amber-500/30'
                                 }
                               >
@@ -1030,7 +1035,7 @@ export const CustomerManagementModule = () => {
                   </div>
                 )}
               </TabsContent>
-              
+
               <TabsContent value="payments" className="flex-1 overflow-auto mt-4">
                 <Table>
                   <TableHeader>
@@ -1094,8 +1099,8 @@ export const CustomerManagementModule = () => {
         <div className="relative">
           <div className="absolute inset-0 bg-gradient-to-r from-rose-500/5 via-transparent to-rose-500/5 rounded-xl -z-10" />
           <div className="p-4 sm:p-0">
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               onClick={() => setViewMode('main')}
               className="mb-3 -ml-2 text-muted-foreground hover:text-foreground h-9 px-3 text-sm touch-manipulation"
             >
@@ -1223,7 +1228,7 @@ export const CustomerManagementModule = () => {
                       </div>
                       {getBillingBadge(customer.billing_status, customer.total_due)}
                     </div>
-                    
+
                     <div className="grid grid-cols-2 gap-3 mb-4">
                       <div className="bg-rose-500/5 rounded-lg p-2.5">
                         <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Amount Due</p>
@@ -1238,7 +1243,7 @@ export const CustomerManagementModule = () => {
                         </p>
                       </div>
                     </div>
-                    
+
                     <div className="flex gap-2">
                       <Button
                         size="sm"
@@ -1424,7 +1429,7 @@ export const CustomerManagementModule = () => {
               <Button variant="outline" onClick={() => setSettleDialogOpen(false)} className="h-11">
                 Cancel
               </Button>
-              <Button 
+              <Button
                 className="h-11 bg-rose-500 hover:bg-rose-600 text-white font-medium"
                 onClick={handleSettleAccount}
               >
@@ -1448,7 +1453,7 @@ export const CustomerManagementModule = () => {
                 </div>
               </div>
             </DialogHeader>
-            
+
             <Tabs defaultValue="sales" className="flex-1 overflow-hidden flex flex-col">
               <TabsList className="grid w-full grid-cols-2 shrink-0">
                 <TabsTrigger value="sales" className="gap-2">
@@ -1460,13 +1465,13 @@ export const CustomerManagementModule = () => {
                   Payments
                 </TabsTrigger>
               </TabsList>
-              
+
               <TabsContent value="sales" className="flex-1 overflow-auto mt-4">
                 {salesHistory.length > 0 ? (
                   <div className="space-y-2">
                     {salesHistory.map((tx) => (
-                      <Card 
-                        key={tx.id} 
+                      <Card
+                        key={tx.id}
                         className="border border-border/50 shadow-sm hover:shadow-md transition-all cursor-pointer"
                         onClick={() => handleViewTransaction(tx)}
                       >
@@ -1492,9 +1497,9 @@ export const CustomerManagementModule = () => {
                               <p className="font-bold text-foreground tabular-nums">
                                 {BANGLADESHI_CURRENCY_SYMBOL}{tx.total.toLocaleString()}
                               </p>
-                              <Badge 
-                                className={tx.payment_status === 'paid' 
-                                  ? 'bg-emerald-500/20 text-emerald-600 border-emerald-500/30' 
+                              <Badge
+                                className={tx.payment_status === 'paid'
+                                  ? 'bg-emerald-500/20 text-emerald-600 border-emerald-500/30'
                                   : 'bg-amber-500/20 text-amber-600 border-amber-500/30'
                                 }
                               >
@@ -1518,7 +1523,7 @@ export const CustomerManagementModule = () => {
                   </div>
                 )}
               </TabsContent>
-              
+
               <TabsContent value="payments" className="flex-1 overflow-auto mt-4">
                 <Table>
                   <TableHeader>
@@ -1581,8 +1586,8 @@ export const CustomerManagementModule = () => {
       <div className="relative">
         <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 via-transparent to-emerald-500/5 rounded-xl -z-10" />
         <div className="p-4 sm:p-0">
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
             onClick={() => setViewMode('main')}
             className="mb-3 -ml-2 text-muted-foreground hover:text-foreground h-9 px-3 text-sm touch-manipulation"
           >
@@ -1635,8 +1640,8 @@ export const CustomerManagementModule = () => {
           {/* Mobile Card View */}
           <div className="sm:hidden space-y-3">
             {filteredPaidCustomers.map((customer, index) => (
-              <Card 
-                key={customer.id} 
+              <Card
+                key={customer.id}
                 className="border border-border/50 shadow-sm cursor-pointer hover:shadow-md transition-all"
                 onClick={() => {
                   setSelectedCustomer(customer);
@@ -1664,7 +1669,7 @@ export const CustomerManagementModule = () => {
                       <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
                         <span className="font-medium">ID: CUST-{String(index + 1).padStart(3, '0')}</span>
                         <span>
-                          {customer.last_order_date 
+                          {customer.last_order_date
                             ? `Last: ${format(new Date(customer.last_order_date), 'MMM dd, yyyy')}`
                             : 'No orders yet'}
                         </span>
@@ -1718,7 +1723,7 @@ export const CustomerManagementModule = () => {
                       {customer.phone || customer.email || 'N/A'}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {customer.last_order_date 
+                      {customer.last_order_date
                         ? format(new Date(customer.last_order_date), 'MMM dd, yyyy')
                         : 'N/A'}
                     </TableCell>
@@ -1775,7 +1780,7 @@ export const CustomerManagementModule = () => {
               </div>
             </div>
           </DialogHeader>
-          
+
           <Tabs defaultValue="sales" className="flex-1 overflow-hidden flex flex-col">
             <TabsList className="grid w-full grid-cols-2 shrink-0">
               <TabsTrigger value="sales" className="gap-2">
@@ -1787,13 +1792,13 @@ export const CustomerManagementModule = () => {
                 Payments
               </TabsTrigger>
             </TabsList>
-            
+
             <TabsContent value="sales" className="flex-1 overflow-auto mt-4">
               {salesHistory.length > 0 ? (
                 <div className="space-y-2">
                   {salesHistory.map((tx) => (
-                    <Card 
-                      key={tx.id} 
+                    <Card
+                      key={tx.id}
                       className="border border-border/50 shadow-sm hover:shadow-md transition-all cursor-pointer"
                       onClick={() => handleViewTransaction(tx)}
                     >
@@ -1819,9 +1824,9 @@ export const CustomerManagementModule = () => {
                             <p className="font-bold text-foreground tabular-nums">
                               {BANGLADESHI_CURRENCY_SYMBOL}{tx.total.toLocaleString()}
                             </p>
-                            <Badge 
-                              className={tx.payment_status === 'paid' 
-                                ? 'bg-emerald-500/20 text-emerald-600 border-emerald-500/30' 
+                            <Badge
+                              className={tx.payment_status === 'paid'
+                                ? 'bg-emerald-500/20 text-emerald-600 border-emerald-500/30'
                                 : 'bg-amber-500/20 text-amber-600 border-amber-500/30'
                               }
                             >
@@ -1845,7 +1850,7 @@ export const CustomerManagementModule = () => {
                 </div>
               )}
             </TabsContent>
-            
+
             <TabsContent value="payments" className="flex-1 overflow-auto mt-4">
               <Table>
                 <TableHeader>

@@ -1,12 +1,12 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { 
-  Receipt, 
-  CreditCard, 
-  Banknote, 
-  Smartphone, 
-  User, 
+import {
+  Receipt,
+  CreditCard,
+  Banknote,
+  Smartphone,
+  User,
   Clock,
   ArrowUpRight,
   Eye,
@@ -54,12 +54,12 @@ export const SaleEntryCard = ({ entry, onViewDetails }: SaleEntryCardProps) => {
   // Safely get payment config with fallback
   const paymentConfig = paymentMethodConfig[entry.paymentMethod] || paymentMethodConfig.cash;
   const PaymentIcon = paymentConfig.icon;
-  
+
   // Status is already normalized by the hook - trust it directly
   const statusConf = statusConfig[entry.paymentStatus] || statusConfig.paid;
   const roleConf = staffRoleConfig[entry.staffRole] || staffRoleConfig.unknown;
   const RoleIcon = roleConf.icon;
-  
+
   const isPayment = entry.type === 'payment';
   const hasReturnCylinders = entry.returnCylinders && entry.returnCylinders.length > 0;
 
@@ -73,14 +73,14 @@ export const SaleEntryCard = ({ entry, onViewDetails }: SaleEntryCardProps) => {
   return (
     <Card className={`
       border overflow-hidden transition-all duration-300 hover:shadow-lg group
-      ${isPayment 
-        ? 'bg-gradient-to-r from-emerald-50/80 to-card dark:from-emerald-950/30 dark:to-card border-emerald-200/60 dark:border-emerald-800/40' 
+      ${isPayment
+        ? 'bg-gradient-to-r from-emerald-50/80 to-card dark:from-emerald-950/30 dark:to-card border-emerald-200/60 dark:border-emerald-800/40'
         : 'bg-card hover:bg-gradient-to-r hover:from-muted/30 hover:to-card border-border/60'
       }
     `}>
       {/* Top Color Bar - Based on Payment Status */}
       <div className={`h-1 ${getStatusBarColor()}`} />
-      
+
       <CardContent className="p-3.5 sm:p-4">
         <div className="flex items-start justify-between gap-3">
           {/* Left: Product/Transaction Info */}
@@ -171,12 +171,19 @@ export const SaleEntryCard = ({ entry, onViewDetails }: SaleEntryCardProps) => {
               <RoleIcon className="h-3 w-3 mr-1" />
               {roleConf.label}
             </Badge>
-            
+
             {/* Amount with Emphasis */}
             <div className="text-right">
+              {/* Show amountPaid (actual received) for accurate income tracking */}
               <p className="text-lg sm:text-xl lg:text-2xl font-bold text-success tabular-nums">
-                +{BANGLADESHI_CURRENCY_SYMBOL}{entry.totalAmount.toLocaleString()}
+                +{BANGLADESHI_CURRENCY_SYMBOL}{(entry.amountPaid ?? entry.totalAmount).toLocaleString()}
               </p>
+              {/* For partial payments, show the total bill for context */}
+              {entry.paymentStatus === 'partial' && entry.remainingDue > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Total: {BANGLADESHI_CURRENCY_SYMBOL}{entry.totalAmount.toLocaleString()}
+                </p>
+              )}
             </div>
 
             {/* Payment Method Badge */}
@@ -187,9 +194,9 @@ export const SaleEntryCard = ({ entry, onViewDetails }: SaleEntryCardProps) => {
 
             {/* View Details Button */}
             {onViewDetails && (
-              <Button 
-                variant="ghost" 
-                size="sm" 
+              <Button
+                variant="ghost"
+                size="sm"
                 className="h-10 w-10 sm:h-8 sm:w-auto sm:px-3 text-xs hover:bg-primary/10 hover:text-primary touch-manipulation"
                 onClick={() => onViewDetails(entry)}
                 aria-label={`View details for transaction ${entry.transactionNumber}`}

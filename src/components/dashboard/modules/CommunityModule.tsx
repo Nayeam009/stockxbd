@@ -4,9 +4,9 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { logger } from "@/lib/logger";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { 
-  ShoppingBag, 
-  MessageSquare, 
+import {
+  ShoppingBag,
+  MessageSquare,
   Store,
   Plus,
   Search,
@@ -136,12 +136,12 @@ interface ShopProfile {
 
 export const CommunityModule = () => {
   const { t } = useLanguage();
-  const [activeTab, setActiveTab] = useState("orders");
+  const [activeTab, setActiveTab] = useState("posts");
   const [loading, setLoading] = useState(true);
   const [shopId, setShopId] = useState<string | null>(null);
   const [shopProfile, setShopProfile] = useState<ShopProfile | null>(null);
   const [currentUser, setCurrentUser] = useState<{ id: string; name: string; avatar: string | null } | null>(null);
-  
+
   // Orders state
   const [orders, setOrders] = useState<CommunityOrder[]>([]);
   const [orderItems, setOrderItems] = useState<Record<string, OrderItem[]>>({});
@@ -150,7 +150,7 @@ export const CommunityModule = () => {
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [rejectingOrderId, setRejectingOrderId] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
-  
+
   // Posts state
   const [posts, setPosts] = useState<Post[]>([]);
   const [postSearch, setPostSearch] = useState("");
@@ -160,7 +160,7 @@ export const CommunityModule = () => {
   const [expandedComments, setExpandedComments] = useState<Record<string, boolean>>({});
   const [comments, setComments] = useState<Record<string, Comment[]>>({});
   const [newComment, setNewComment] = useState<Record<string, string>>({});
-  
+
   // Exchange state
   const [exchanges, setExchanges] = useState<Exchange[]>([]);
   const [brands, setBrands] = useState<LPGBrand[]>([]);
@@ -190,17 +190,20 @@ export const CommunityModule = () => {
         avatar: profile?.avatar_url
       });
 
+      // Get shop owner ID (handles both Owner and Manager)
+      const { data: ownerId } = await supabase.rpc("get_owner_id");
+
       // Get user's shop
       const { data: shop } = await supabase
         .from('shop_profiles')
         .select('id, shop_name, is_open, total_orders, rating')
-        .eq('owner_id', user.id)
+        .eq('owner_id', ownerId || user.id)
         .single();
 
       if (shop) {
         setShopId(shop.id);
         setShopProfile(shop as ShopProfile);
-        
+
         // Fetch orders for shop
         const { data: ordersData } = await supabase
           .from('community_orders')
@@ -209,7 +212,7 @@ export const CommunityModule = () => {
           .order('created_at', { ascending: false });
 
         setOrders((ordersData || []) as CommunityOrder[]);
-        
+
         // Fetch order items
         if (ordersData && ordersData.length > 0) {
           const orderIds = ordersData.map(o => o.id);
@@ -217,7 +220,7 @@ export const CommunityModule = () => {
             .from('community_order_items')
             .select('*')
             .in('order_id', orderIds);
-          
+
           const itemsByOrder: Record<string, OrderItem[]> = {};
           (items || []).forEach((item: any) => {
             if (!itemsByOrder[item.order_id]) {
@@ -325,11 +328,11 @@ export const CommunityModule = () => {
   // Order handlers
   const updateOrderStatus = useCallback(async (orderId: string, status: CommunityOrder['status'], reason?: string) => {
     try {
-      const updateData: Record<string, any> = { 
-        status, 
-        updated_at: new Date().toISOString() 
+      const updateData: Record<string, any> = {
+        status,
+        updated_at: new Date().toISOString()
       };
-      
+
       if (status === 'confirmed') updateData.confirmed_at = new Date().toISOString();
       if (status === 'dispatched') updateData.dispatched_at = new Date().toISOString();
       if (status === 'delivered') {
@@ -344,7 +347,7 @@ export const CommunityModule = () => {
         .eq('id', orderId);
 
       if (error) throw error;
-      
+
       toast.success(`Order ${status}`);
       setRejectDialogOpen(false);
       setRejectingOrderId(null);
@@ -411,8 +414,8 @@ export const CommunityModule = () => {
           .eq('id', postId);
       }
 
-      setPosts(prev => prev.map(p => 
-        p.id === postId 
+      setPosts(prev => prev.map(p =>
+        p.id === postId
           ? { ...p, is_liked: !isLiked, likes_count: isLiked ? Math.max(0, p.likes_count - 1) : p.likes_count + 1 }
           : p
       ));
@@ -449,8 +452,8 @@ export const CommunityModule = () => {
 
       setNewComment(prev => ({ ...prev, [postId]: '' }));
       fetchComments(postId);
-      
-      setPosts(prev => prev.map(p => 
+
+      setPosts(prev => prev.map(p =>
         p.id === postId ? { ...p, comments_count: p.comments_count + 1 } : p
       ));
     } catch (error) {
@@ -526,27 +529,27 @@ export const CommunityModule = () => {
   // Filtered data
   const filteredOrders = useMemo(() => {
     let result = orders;
-    
+
     if (orderFilter !== 'all') {
       result = result.filter(o => o.status === orderFilter);
     }
-    
+
     if (orderSearch.trim()) {
       const search = orderSearch.toLowerCase();
-      result = result.filter(o => 
+      result = result.filter(o =>
         o.order_number.toLowerCase().includes(search) ||
         o.customer_name.toLowerCase().includes(search) ||
         o.customer_phone.includes(search)
       );
     }
-    
+
     return result;
   }, [orders, orderFilter, orderSearch]);
 
   const filteredPosts = useMemo(() => {
     if (!postSearch.trim()) return posts;
     const search = postSearch.toLowerCase();
-    return posts.filter(p => 
+    return posts.filter(p =>
       p.title.toLowerCase().includes(search) ||
       p.content.toLowerCase().includes(search) ||
       p.author_name.toLowerCase().includes(search)
@@ -655,34 +658,23 @@ export const CommunityModule = () => {
         <div className="px-1">
           <ScrollArea className="w-full">
             <TabsList className="inline-flex h-12 w-full md:w-auto bg-muted/50 p-1 rounded-xl gap-1">
-              <TabsTrigger 
-                value="orders" 
-                className="flex-1 md:flex-none min-w-[80px] h-10 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm gap-1.5 px-3"
-              >
-                <ShoppingBag className="h-4 w-4" />
-                <span className="text-xs sm:text-sm">Orders</span>
-                {stats.pendingOrders > 0 && (
-                  <Badge variant="destructive" className="h-5 min-w-[20px] px-1.5 text-xs ml-1">
-                    {stats.pendingOrders}
-                  </Badge>
-                )}
-              </TabsTrigger>
-              <TabsTrigger 
-                value="posts" 
+              {/* Orders Tab Removed - Use MarketplaceOrdersModule */}
+              <TabsTrigger
+                value="posts"
                 className="flex-1 md:flex-none min-w-[80px] h-10 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm gap-1.5 px-3"
               >
                 <MessageSquare className="h-4 w-4" />
                 <span className="text-xs sm:text-sm">Posts</span>
               </TabsTrigger>
-              <TabsTrigger 
-                value="exchange" 
+              <TabsTrigger
+                value="exchange"
                 className="flex-1 md:flex-none min-w-[80px] h-10 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm gap-1.5 px-3"
               >
                 <ArrowLeftRight className="h-4 w-4" />
                 <span className="text-xs sm:text-sm">Exchange</span>
               </TabsTrigger>
-              <TabsTrigger 
-                value="shop" 
+              <TabsTrigger
+                value="shop"
                 className="flex-1 md:flex-none min-w-[80px] h-10 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm gap-1.5 px-3"
               >
                 <Store className="h-4 w-4" />
@@ -693,165 +685,7 @@ export const CommunityModule = () => {
           </ScrollArea>
         </div>
 
-        {/* Orders Tab */}
-        <TabsContent value="orders" className="mt-4 space-y-4 px-1">
-          {/* Search & Filter */}
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search orders..."
-                value={orderSearch}
-                onChange={(e) => setOrderSearch(e.target.value)}
-                className="pl-10 h-11"
-              />
-            </div>
-            <Select value={orderFilter} onValueChange={setOrderFilter}>
-              <SelectTrigger className="w-full sm:w-[160px] h-11">
-                <Filter className="h-4 w-4 mr-2" />
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Orders</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="confirmed">Confirmed</SelectItem>
-                <SelectItem value="dispatched">Dispatched</SelectItem>
-                <SelectItem value="delivered">Delivered</SelectItem>
-                <SelectItem value="rejected">Rejected</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Order List */}
-          {filteredOrders.length === 0 ? (
-            <EmptyStateCard
-              icon={<ShoppingBag className="h-8 w-8" />}
-              title="No Orders Found"
-              subtitle={shopId ? "You'll see customer orders here when they place them." : "Create a shop profile to start receiving orders."}
-              actionLabel={!shopId ? "Create Shop" : undefined}
-              onAction={!shopId ? () => setActiveTab('shop') : undefined}
-            />
-          ) : (
-            <div className="space-y-3">
-              {filteredOrders.map(order => {
-                const statusConfig = getStatusConfig(order.status);
-                const StatusIcon = statusConfig.icon;
-                const items = orderItems[order.id] || [];
-
-                return (
-                  <Card key={order.id} className="overflow-hidden">
-                    <CardHeader className="p-4 pb-2">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-semibold text-sm">{order.order_number}</span>
-                            <Badge className={cn("text-xs border", statusConfig.color)}>
-                              <StatusIcon className="h-3 w-3 mr-1" />
-                              {statusConfig.label}
-                            </Badge>
-                          </div>
-                          <p className="text-xs text-muted-foreground">{formatTime(order.created_at)}</p>
-                        </div>
-                        <span className="font-bold text-lg tabular-nums shrink-0">৳{order.total_amount}</span>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="p-4 pt-0 space-y-3">
-                      {/* Customer Info */}
-                      <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
-                        <Avatar className="h-10 w-10 shrink-0">
-                          <AvatarFallback className="bg-primary/10 text-primary text-sm">
-                            {getInitials(order.customer_name)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm truncate">{order.customer_name}</p>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <Phone className="h-3 w-3 shrink-0" />
-                            <span className="truncate">{order.customer_phone}</span>
-                          </div>
-                        </div>
-                        <a href={`tel:${order.customer_phone}`} className="p-2 hover:bg-muted rounded-full shrink-0">
-                          <Phone className="h-4 w-4 text-primary" />
-                        </a>
-                      </div>
-
-                      {/* Address */}
-                      <div className="flex items-start gap-2 text-sm">
-                        <MapPin className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
-                        <span className="text-muted-foreground">{order.delivery_address}, {order.district}</span>
-                      </div>
-
-                      {/* Items */}
-                      {items.length > 0 && (
-                        <div className="space-y-1 p-2 bg-muted/20 rounded-lg">
-                          {items.slice(0, 2).map(item => (
-                            <div key={item.id} className="flex justify-between text-sm">
-                              <span className="truncate mr-2">{item.quantity}x {item.product_name}</span>
-                              <span className="tabular-nums shrink-0">৳{item.price * item.quantity}</span>
-                            </div>
-                          ))}
-                          {items.length > 2 && (
-                            <p className="text-xs text-muted-foreground">+{items.length - 2} more items</p>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Rejection Reason */}
-                      {order.rejection_reason && (
-                        <p className="text-sm text-rose-600 bg-rose-50 dark:bg-rose-950/30 p-2 rounded">
-                          Reason: {order.rejection_reason}
-                        </p>
-                      )}
-
-                      {/* Actions */}
-                      {order.status === 'pending' && (
-                        <div className="flex gap-2 pt-2">
-                          <Button 
-                            size="sm" 
-                            className="flex-1 h-11"
-                            onClick={() => updateOrderStatus(order.id, 'confirmed')}
-                          >
-                            <CheckCircle2 className="h-4 w-4 mr-2" />
-                            Accept
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            variant="outline"
-                            className="flex-1 h-11 text-rose-600 border-rose-200 hover:bg-rose-50 dark:hover:bg-rose-950/30"
-                            onClick={() => { setRejectingOrderId(order.id); setRejectDialogOpen(true); }}
-                          >
-                            <XCircle className="h-4 w-4 mr-2" />
-                            Reject
-                          </Button>
-                        </div>
-                      )}
-                      {order.status === 'confirmed' && (
-                        <Button 
-                          size="sm" 
-                          className="w-full h-11"
-                          onClick={() => updateOrderStatus(order.id, 'dispatched')}
-                        >
-                          <Truck className="h-4 w-4 mr-2" />
-                          Mark as Dispatched
-                        </Button>
-                      )}
-                      {order.status === 'dispatched' && (
-                        <Button 
-                          size="sm" 
-                          className="w-full h-11 bg-emerald-600 hover:bg-emerald-700"
-                          onClick={() => updateOrderStatus(order.id, 'delivered')}
-                        >
-                          <CheckCircle2 className="h-4 w-4 mr-2" />
-                          Mark as Delivered
-                        </Button>
-                      )}
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
-        </TabsContent>
+        {/* Orders Tab Removed - Logic moved to MarketplaceOrdersModule */}
 
         {/* Posts Tab */}
         <TabsContent value="posts" className="mt-4 space-y-4 px-1">
@@ -930,11 +764,12 @@ export const CommunityModule = () => {
                         <p className="text-xs text-muted-foreground">{formatTime(post.created_at)}</p>
                       </div>
                       {currentUser?.id === post.user_id && (
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           className="h-8 w-8 text-muted-foreground hover:text-rose-600 shrink-0"
                           onClick={() => handleDeletePost(post.id)}
+                          aria-label="Delete post"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -949,7 +784,7 @@ export const CommunityModule = () => {
 
                     {/* Actions */}
                     <div className="flex items-center gap-4 pt-2 border-t">
-                      <button 
+                      <button
                         onClick={() => handleLike(post.id, post.is_liked)}
                         className={cn(
                           "flex items-center gap-1.5 text-sm transition-colors min-h-[44px] px-2",
@@ -959,7 +794,7 @@ export const CommunityModule = () => {
                         <Heart className={cn("h-4 w-4", post.is_liked && "fill-current")} />
                         <span>{post.likes_count}</span>
                       </button>
-                      <button 
+                      <button
                         onClick={() => {
                           setExpandedComments(prev => ({ ...prev, [post.id]: !prev[post.id] }));
                           if (!comments[post.id]) fetchComments(post.id);
@@ -995,7 +830,7 @@ export const CommunityModule = () => {
                             className="h-11 flex-1"
                             onKeyDown={(e) => e.key === 'Enter' && handleAddComment(post.id)}
                           />
-                          <Button size="icon" className="h-11 w-11 shrink-0" onClick={() => handleAddComment(post.id)}>
+                          <Button size="icon" className="h-11 w-11 shrink-0" onClick={() => handleAddComment(post.id)} aria-label="Post comment">
                             <Send className="h-4 w-4" />
                           </Button>
                         </div>
@@ -1068,8 +903,8 @@ export const CommunityModule = () => {
                 onChange={(e) => setExchangeNotes(e.target.value)}
                 className="h-11"
               />
-              <Button 
-                className="w-full h-11" 
+              <Button
+                className="w-full h-11"
                 onClick={handleCreateExchange}
                 disabled={!exchangeFromBrand || !exchangeToBrand || !exchangeQty}
               >
@@ -1104,11 +939,12 @@ export const CommunityModule = () => {
                         </div>
                       </div>
                       {currentUser?.id === exchange.created_by && (
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           size="icon"
                           className="h-10 w-10 text-muted-foreground hover:text-rose-600 shrink-0"
                           onClick={() => handleDeleteExchange(exchange.id)}
+                          aria-label="Delete exchange history"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -1155,8 +991,8 @@ export const CommunityModule = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     className="w-full h-11 justify-between"
                     onClick={() => window.dispatchEvent(new CustomEvent('navigate-module', { detail: 'settings' }))}
                   >
@@ -1166,8 +1002,8 @@ export const CommunityModule = () => {
                     </span>
                     <ExternalLink className="h-4 w-4" />
                   </Button>
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     className="w-full h-11 justify-between"
                     onClick={() => window.open(`/shop/${shopProfile.id}`, '_blank')}
                   >

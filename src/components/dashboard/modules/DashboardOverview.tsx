@@ -2,8 +2,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
-import { 
-  Users, Banknote, TrendingUp, TrendingDown, Truck, Receipt, Wallet, 
+import {
+  Users, Banknote, TrendingUp, TrendingDown, Truck, Receipt, Wallet,
   ClipboardList, Settings, Package, AlertTriangle, Cylinder, Store, BarChart3
 } from "lucide-react";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
@@ -16,7 +16,7 @@ interface DashboardOverviewProps {
   analytics: DashboardAnalytics;
   drivers: Driver[];
   cylinderStock?: CylinderStock[];
-  userRole: string;
+  userRole: 'owner' | 'manager' | 'super_admin'; // Keep as string to accept flexible roles, or update to specific union
   setActiveModule?: (module: string) => void;
   onRefresh?: () => void;
 }
@@ -30,7 +30,7 @@ export const DashboardOverview = ({
   onRefresh
 }: DashboardOverviewProps) => {
   const { t } = useLanguage();
-  
+
   // Use analytics data directly
   const todaySales = analytics.todayCashRevenue || 0;
   const todayExpenses = 0; // Will be calculated from expenses module
@@ -40,9 +40,9 @@ export const DashboardOverview = ({
     pending_count: analytics.pendingOrders || 0,
     dispatched_count: analytics.dispatchedOrders || 0,
   };
-  
-  const isOwnerOrManager = userRole === 'owner' || userRole === 'manager';
-  const isOwner = userRole === 'owner';
+
+  const isOwnerOrManager = userRole === 'owner' || userRole === 'manager' || userRole === 'super_admin';
+  const isOwner = userRole === 'owner' || userRole === 'super_admin';
 
   const profitMargin = useMemo(() => {
     return todaySales > 0 ? Math.round((todayProfit / todaySales) * 100) : 0;
@@ -86,7 +86,7 @@ export const DashboardOverview = ({
   // KPI Cards
   const getKpiCards = () => {
     const cards = [];
-    
+
     if (isOwnerOrManager) {
       cards.push({
         id: 'total-sale',
@@ -133,7 +133,7 @@ export const DashboardOverview = ({
       changeType: (activeOrders.total_active || 0) > 0 ? "warning" as const : "positive" as const,
       icon: ClipboardList,
       clickable: true,
-      onClick: () => setActiveModule?.('community')
+      onClick: () => setActiveModule?.('orders')
     });
 
     return cards;
@@ -175,7 +175,7 @@ export const DashboardOverview = ({
     <div className="space-y-4 sm:space-y-6 px-1 sm:px-2 md:px-0">
       {/* Critical Alert Banner */}
       {analytics.cylinderStockHealth === 'critical' && (
-        <div 
+        <div
           className="bg-destructive/10 border border-destructive/30 rounded-xl p-3 sm:p-4 flex items-center gap-3 animate-pulse"
           role="alert"
           aria-live="assertive"
@@ -185,9 +185,9 @@ export const DashboardOverview = ({
             <p className="font-semibold text-destructive text-sm sm:text-base">Critical: Low Gas Stock!</p>
             <p className="text-xs sm:text-sm text-destructive/80">Empty cylinders ({analytics.totalEmptyCylinders}) exceed full cylinders ({analytics.totalFullCylinders}). Send truck to refill immediately.</p>
           </div>
-          <Button 
-            size="sm" 
-            variant="destructive" 
+          <Button
+            size="sm"
+            variant="destructive"
             className="flex-shrink-0 ml-auto h-10 touch-target"
             onClick={() => setActiveModule?.('inventory')}
           >
@@ -197,7 +197,7 @@ export const DashboardOverview = ({
       )}
 
       {/* KPI Cards Grid */}
-      <div 
+      <div
         className={`grid gap-3 sm:gap-4 ${kpiCards.length === 4 ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-2 lg:grid-cols-3'}`}
         role="region"
         aria-label="Key performance indicators"
@@ -206,10 +206,10 @@ export const DashboardOverview = ({
           const Icon = card.icon;
           const isNegative = card.changeType === 'negative';
           const isWarning = card.changeType === 'warning';
-          
+
           return (
-            <Card 
-              key={card.id} 
+            <Card
+              key={card.id}
               className={`group relative overflow-hidden border border-border/40 shadow-md hover:shadow-xl transition-all duration-300 bg-card min-h-[120px] ${card.clickable ? 'cursor-pointer hover:-translate-y-1 focus-visible:ring-2 focus-visible:ring-primary' : ''} ${card.warning ? 'border-destructive/30' : ''}`}
               onClick={card.clickable ? card.onClick : undefined}
               tabIndex={card.clickable ? 0 : undefined}
@@ -218,31 +218,29 @@ export const DashboardOverview = ({
               aria-label={card.clickable ? `${card.title}: ${card.value}. Click to view details.` : undefined}
             >
               <div className="absolute top-0 right-0 h-20 w-20 bg-gradient-to-bl from-primary/5 to-transparent rounded-bl-full" aria-hidden="true" />
-              
+
               <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-4 pb-1 sm:pb-2">
                 <CardTitle className="text-[10px] sm:text-xs font-medium text-muted-foreground truncate pr-2 flex items-center gap-1">
                   {card.title}
                 </CardTitle>
-                <div className={`h-9 w-9 sm:h-11 sm:w-11 rounded-xl flex items-center justify-center shadow-md flex-shrink-0 ${
-                  isNegative ? 'bg-gradient-to-br from-destructive to-destructive/80' :
+                <div className={`h-9 w-9 sm:h-11 sm:w-11 rounded-xl flex items-center justify-center shadow-md flex-shrink-0 ${isNegative ? 'bg-gradient-to-br from-destructive to-destructive/80' :
                   isWarning ? 'bg-gradient-to-br from-warning to-warning/80' :
-                  'bg-gradient-to-br from-primary to-primary-light'
-                }`} aria-hidden="true">
+                    'bg-gradient-to-br from-primary to-primary-light'
+                  }`} aria-hidden="true">
                   <Icon className="h-4 w-4 sm:h-5 sm:w-5 text-primary-foreground" />
                 </div>
               </CardHeader>
-              
+
               <CardContent className="p-3 sm:p-4 pt-0">
                 <div className="space-y-1">
                   <div className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-foreground truncate tabular-nums">
                     {card.value}
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <Badge className={`text-[10px] sm:text-xs font-semibold border px-1.5 ${
-                      isNegative ? 'bg-destructive/15 text-destructive border-destructive/30' :
+                    <Badge className={`text-[10px] sm:text-xs font-semibold border px-1.5 ${isNegative ? 'bg-destructive/15 text-destructive border-destructive/30' :
                       isWarning ? 'bg-warning/15 text-warning border-warning/30' :
-                      'bg-success/15 text-success border-success/30'
-                    }`}>
+                        'bg-success/15 text-success border-success/30'
+                      }`}>
                       {isNegative ? <TrendingDown className="h-2.5 w-2.5 mr-0.5" aria-hidden="true" /> : <TrendingUp className="h-2.5 w-2.5 mr-0.5" aria-hidden="true" />}
                       {card.change}
                     </Badge>
@@ -257,32 +255,30 @@ export const DashboardOverview = ({
 
       {/* Cylinder Balance Card */}
       {isOwnerOrManager && (
-        <Card className={`border shadow-md overflow-hidden ${
-          analytics.cylinderStockHealth === 'critical' ? 'border-destructive/50 bg-destructive/5' :
+        <Card className={`border shadow-md overflow-hidden ${analytics.cylinderStockHealth === 'critical' ? 'border-destructive/50 bg-destructive/5' :
           analytics.cylinderStockHealth === 'warning' ? 'border-warning/50 bg-warning/5' :
-          'border-border/40 bg-card'
-        }`}>
+            'border-border/40 bg-card'
+          }`}>
           <CardHeader className="p-3 sm:p-4 pb-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 sm:gap-3">
-                <div className={`h-10 w-10 sm:h-12 sm:w-12 rounded-xl flex items-center justify-center shadow-md ${
-                  analytics.cylinderStockHealth === 'critical' ? 'bg-gradient-to-br from-destructive to-destructive/80' :
+                <div className={`h-10 w-10 sm:h-12 sm:w-12 rounded-xl flex items-center justify-center shadow-md ${analytics.cylinderStockHealth === 'critical' ? 'bg-gradient-to-br from-destructive to-destructive/80' :
                   analytics.cylinderStockHealth === 'warning' ? 'bg-gradient-to-br from-warning to-warning/80' :
-                  'bg-gradient-to-br from-success to-success/80'
-                }`}>
+                    'bg-gradient-to-br from-success to-success/80'
+                  }`}>
                   <Cylinder className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
                 </div>
                 <div>
                   <CardTitle className="text-base sm:text-lg font-bold">Cylinder Balance</CardTitle>
                   <CardDescription className="text-xs sm:text-sm">
                     {analytics.cylinderStockHealth === 'critical' ? 'Urgent: Refill needed!' :
-                     analytics.cylinderStockHealth === 'warning' ? 'Stock running low' :
-                     'Stock levels healthy'}
+                      analytics.cylinderStockHealth === 'warning' ? 'Stock running low' :
+                        'Stock levels healthy'}
                   </CardDescription>
                 </div>
               </div>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 size="sm"
                 onClick={() => setActiveModule?.('lpg-stock')}
               >
@@ -290,7 +286,7 @@ export const DashboardOverview = ({
               </Button>
             </div>
           </CardHeader>
-          
+
           <CardContent className="p-3 sm:p-4 pt-0">
             <div className="space-y-4">
               <div className="space-y-2">
@@ -298,8 +294,8 @@ export const DashboardOverview = ({
                   <span className="text-success font-semibold">Full: {analytics.totalFullCylinders}</span>
                   <span className="text-destructive font-semibold">Empty: {analytics.totalEmptyCylinders}</span>
                 </div>
-                <Progress 
-                  value={fullPercentage} 
+                <Progress
+                  value={fullPercentage}
                   className="h-3 sm:h-4"
                 />
                 <p className="text-xs text-muted-foreground text-center">
@@ -311,8 +307,8 @@ export const DashboardOverview = ({
                 <div className="overflow-x-auto -mx-3 sm:mx-0 px-3 sm:px-0 pb-2">
                   <div className="flex sm:grid sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 min-w-max sm:min-w-0">
                     {cylinderStock.slice(0, 4).map((stock) => (
-                      <div 
-                        key={stock.id} 
+                      <div
+                        key={stock.id}
                         className="p-2 sm:p-3 bg-muted/30 rounded-lg border border-border/40 min-w-[120px] sm:min-w-0"
                       >
                         <p className="font-semibold text-xs sm:text-sm truncate">{stock.brand}</p>
@@ -345,7 +341,7 @@ export const DashboardOverview = ({
             </div>
           </div>
         </CardHeader>
-        
+
         <CardContent className="p-3 sm:p-4 space-y-4 sm:space-y-5">
           {/* Sales Group */}
           <div>
@@ -357,7 +353,7 @@ export const DashboardOverview = ({
               {salesActions.map((action) => {
                 const Icon = action.icon;
                 return (
-                  <button 
+                  <button
                     key={action.module}
                     onClick={() => handleQuickAction(action.module)}
                     className="group/action relative flex flex-col items-center justify-center p-3 sm:p-4 rounded-xl border border-border/40 bg-card hover:bg-primary/5 hover:border-primary/30 transition-all duration-200 hover:shadow-md focus-visible:ring-2 focus-visible:ring-primary touch-target"
@@ -388,7 +384,7 @@ export const DashboardOverview = ({
               {marketplaceActions.map((action) => {
                 const Icon = action.icon;
                 return (
-                  <button 
+                  <button
                     key={action.module}
                     onClick={() => handleQuickAction(action.module)}
                     className="group/action flex flex-col items-center justify-center p-3 sm:p-4 rounded-xl border border-border/40 bg-card hover:bg-primary/5 hover:border-primary/30 transition-all duration-200 hover:shadow-md focus-visible:ring-2 focus-visible:ring-primary touch-target"
@@ -413,7 +409,7 @@ export const DashboardOverview = ({
               {inventoryActions.map((action) => {
                 const Icon = action.icon;
                 return (
-                  <button 
+                  <button
                     key={action.module}
                     onClick={() => handleQuickAction(action.module)}
                     className="group/action relative flex flex-col items-center justify-center p-3 sm:p-4 rounded-xl border border-border/40 bg-card hover:bg-primary/5 hover:border-primary/30 transition-all duration-200 hover:shadow-md focus-visible:ring-2 focus-visible:ring-primary touch-target"
@@ -446,7 +442,7 @@ export const DashboardOverview = ({
                   .map((action) => {
                     const Icon = action.icon;
                     return (
-                      <button 
+                      <button
                         key={action.module}
                         onClick={() => handleQuickAction(action.module)}
                         className="group/action flex flex-col items-center justify-center p-3 sm:p-4 rounded-xl border border-border/40 bg-card hover:bg-primary/5 hover:border-primary/30 transition-all duration-200 hover:shadow-md focus-visible:ring-2 focus-visible:ring-primary touch-target"

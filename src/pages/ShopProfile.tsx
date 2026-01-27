@@ -4,11 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  ArrowLeft, 
-  Star, 
-  MapPin, 
-  Phone, 
+import {
+  ArrowLeft,
+  Star,
+  MapPin,
+  Phone,
   Clock,
   Shield,
   MessageCircle,
@@ -60,13 +60,13 @@ const ShopProfile = () => {
   useEffect(() => {
     const loadData = async () => {
       if (!shopId) return;
-      
+
       setLoading(true);
       const [shopData, productsData] = await Promise.all([
         fetchShopById(shopId),
         fetchShopProducts(shopId)
       ]);
-      
+
       setShop(shopData);
       setProducts(productsData);
       setLoading(false);
@@ -78,20 +78,20 @@ const ShopProfile = () => {
   // Handle checkout from POS-style selector
   const handleCheckout = (items: CartItem[]) => {
     if (!shop) return;
-    
+
     // Add shop info and shop_id to all items - CRITICAL for checkout
-    const itemsWithShop = items.map(item => ({ 
-      ...item, 
+    const itemsWithShop = items.map(item => ({
+      ...item,
       shop,
       shop_id: shop.id // Ensure shop_id is always set for checkout
     }));
     setCart(itemsWithShop);
-    
+
     toast({
       title: "Cart Updated",
       description: `${items.length} item(s) ready for checkout`,
     });
-    
+
     navigate('/community/cart');
   };
 
@@ -162,18 +162,18 @@ const ShopProfile = () => {
 
   return (
     <div className="min-h-screen bg-background pb-20 sm:pb-0">
-      <CommunityHeader 
-        cartItemCount={cart.length} 
+      <CommunityHeader
+        cartItemCount={cart.length}
         userRole={userRole}
         userName={currentUser?.email}
-        onCartClick={handleCartClick} 
+        onCartClick={handleCartClick}
       />
 
       {/* Back Button */}
       <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-        <Button 
-          variant="ghost" 
-          size="sm" 
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={() => navigate('/community')}
           className="h-10 touch-target"
           aria-label="Go back to marketplace"
@@ -181,7 +181,7 @@ const ShopProfile = () => {
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Shops
         </Button>
-        
+
         {/* Owner badges and actions */}
         <div className="flex items-center gap-2">
           {isOwnShop && (
@@ -190,8 +190,8 @@ const ShopProfile = () => {
                 <Sparkles className="h-3 w-3 mr-1" />
                 Your Shop
               </Badge>
-              <Button 
-                size="sm" 
+              <Button
+                size="sm"
                 variant="outline"
                 onClick={() => navigate('/dashboard?module=my-shop')}
               >
@@ -211,8 +211,8 @@ const ShopProfile = () => {
       {/* Hero Section - Enhanced */}
       <div className="relative h-52 sm:h-72 bg-gradient-to-br from-primary/30 via-primary/20 to-accent/10 overflow-hidden">
         {shop.cover_image_url ? (
-          <img 
-            src={shop.cover_image_url} 
+          <img
+            src={shop.cover_image_url}
             alt=""
             className="w-full h-full object-cover"
             loading="eager"
@@ -229,17 +229,17 @@ const ShopProfile = () => {
           </div>
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
-        
+
         {/* Floating Quick Actions - Mobile */}
         <div className="absolute bottom-4 right-4 flex gap-2 sm:hidden">
           <a href={`tel:${shop.phone}`}>
-            <Button size="icon" className="h-11 w-11 rounded-full shadow-lg bg-primary hover:bg-primary/90">
+            <Button size="icon" className="h-11 w-11 rounded-full shadow-lg bg-primary hover:bg-primary/90" aria-label="Call Shop">
               <Phone className="h-5 w-5" />
             </Button>
           </a>
           {shop.whatsapp && (
             <a href={`https://wa.me/${shop.whatsapp.replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener noreferrer">
-              <Button size="icon" variant="secondary" className="h-11 w-11 rounded-full shadow-lg">
+              <Button size="icon" variant="secondary" className="h-11 w-11 rounded-full shadow-lg" aria-label="Chat on WhatsApp">
                 <MessageCircle className="h-5 w-5" />
               </Button>
             </a>
@@ -254,10 +254,12 @@ const ShopProfile = () => {
             <div className="flex flex-col sm:flex-row gap-4 items-start">
               {/* Logo */}
               {shop.logo_url ? (
-                <img 
-                  src={shop.logo_url} 
-                  alt={shop.shop_name}
+                <img
+                  src={shop.logo_url}
+                  alt={`${shop.shop_name} Logo`}
                   className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl object-cover border-4 border-background shadow-lg"
+                  loading="lazy"
+                  decoding="async"
                 />
               ) : (
                 <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center border-4 border-background shadow-lg">
@@ -362,7 +364,7 @@ const ShopProfile = () => {
                   <h3 className="font-semibold">No products listed yet</h3>
                   <p className="text-muted-foreground">This shop hasn't added any products</p>
                   {isOwnShop && (
-                    <Button 
+                    <Button
                       className="mt-4"
                       onClick={() => navigate('/dashboard?module=my-shop')}
                     >
@@ -405,7 +407,7 @@ const ShopProfile = () => {
                 {shop.description && (
                   <p className="text-muted-foreground">{shop.description}</p>
                 )}
-                
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="p-4 rounded-lg bg-muted/50">
                     <p className="text-sm text-muted-foreground">Total Orders</p>

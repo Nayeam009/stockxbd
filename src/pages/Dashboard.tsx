@@ -35,21 +35,21 @@ const AdminPanelModule = lazy(() => import("@/components/dashboard/modules/Admin
 const Dashboard = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  
+
   // Get module from URL or default to overview
   const params = new URLSearchParams(location.search);
   const moduleFromUrl = params.get('module') || 'overview';
-  
+
   const [activeModule, setActiveModule] = useState(moduleFromUrl);
   const [searchQuery, setSearchQuery] = useState("");
-  
+
   // Performance: React 18 transitions for non-blocking module switches
   const [isPending, startTransition] = useTransition();
-  
+
   // Track loaded modules for instant revisit rendering
   const [loadedModules, setLoadedModules] = useState<Set<string>>(new Set(['overview']));
   const [hasInitiallyLoaded, setHasInitiallyLoaded] = useState(false);
-  
+
   // Sync activeModule with URL changes
   useEffect(() => {
     const param = params.get('module');
@@ -58,10 +58,10 @@ const Dashboard = () => {
       setLoadedModules(prev => new Set([...prev, param]));
     }
   }, [location.search]);
-  
+
   // Safety timeout to prevent infinite loading
   const [safetyTimeoutReached, setSafetyTimeoutReached] = useState(false);
-  
+
   // Smooth module switching with transitions
   const handleModuleChange = useCallback((module: string) => {
     startTransition(() => {
@@ -71,57 +71,64 @@ const Dashboard = () => {
       navigate(`/dashboard?module=${module}`, { replace: true });
     });
   }, [navigate]);
-  
+
   // Use real authentication - fetch user role from database
   const { userRole, userName, userId, loading: authLoading, error: authError } = useUserRole();
-  
- // Check if user is super admin with timeout protection
+
+  // Check if user is super admin with timeout protection
   const [isAdmin, setIsAdmin] = useState(false);
- const [adminCheckComplete, setAdminCheckComplete] = useState(false);
-  
+  const [adminCheckComplete, setAdminCheckComplete] = useState(false);
+
   useEffect(() => {
     const checkAdminStatus = async () => {
       if (!userId) {
-       setIsAdmin(false);
-       setAdminCheckComplete(true);
+        setIsAdmin(false);
+        setAdminCheckComplete(true);
         return;
       }
-      
-     try {
-       // Add timeout protection to prevent dashboard freeze
-       const timeoutPromise = new Promise<null>((resolve) => 
-         setTimeout(() => resolve(null), 3000) // 3 second timeout
-       );
-       
-       const queryPromise = supabase
-         .from('admin_users')
-         .select('id')
-         .eq('user_id', userId)
-         .maybeSingle();
-       
-       const result = await Promise.race([queryPromise, timeoutPromise]);
-      
-       if (result && 'data' in result) {
-         const isAdminUser = !!result.data;
-         setIsAdmin(isAdminUser);
-       } else {
-         // Timeout or error - default to false
-         console.warn('[Dashboard] Admin check timed out, defaulting to false');
-         setIsAdmin(false);
-       }
-     } catch (error) {
-       console.error('[Dashboard] Admin check error:', error);
-       setIsAdmin(false);
-     } finally {
-       setAdminCheckComplete(true);
-     }
+
+      // If role is super_admin, they are admin by definition
+      if (userRole === 'super_admin') {
+        setIsAdmin(true);
+        setAdminCheckComplete(true);
+        return;
+      }
+
+      try {
+        // Add timeout protection to prevent dashboard freeze
+        const timeoutPromise = new Promise<null>((resolve) =>
+          setTimeout(() => resolve(null), 3000) // 3 second timeout
+        );
+
+        const queryPromise = supabase
+          .from('admin_users')
+          .select('id')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+        const result = await Promise.race([queryPromise, timeoutPromise]);
+
+        if (result && 'data' in result) {
+          const isAdminUser = !!result.data;
+          setIsAdmin(isAdminUser);
+        } else {
+          // Timeout or error - default to false
+          console.warn('[Dashboard] Admin check timed out, defaulting to false');
+          setIsAdmin(false);
+        }
+      } catch (error) {
+        console.error('[Dashboard] Admin check error:', error);
+        setIsAdmin(false);
+      } finally {
+        setAdminCheckComplete(true);
+      }
     };
-    
+
     checkAdminStatus();
   }, [userId]);
   // Get network status for offline handling
   const { isOnline } = useNetwork();
-  
+
   const isMobile = useIsMobile();
 
   // Mark initial load complete for animation control
@@ -146,7 +153,7 @@ const Dashboard = () => {
 
   const onTouchEnd = useCallback(() => {
     if (!touchStart || !touchEnd) return;
-    
+
     const distance = touchStart - touchEnd;
     const isLeftSwipe = distance > minSwipeDistance;
     const isRightSwipe = distance < -minSwipeDistance;
@@ -203,7 +210,7 @@ const Dashboard = () => {
 
   // REMOVED: Safety timeout - we now always render with cached data
   // The dashboard should NEVER show a timeout screen after first visit
-  
+
   // Simplified loading - only block if auth is loading AND we have no user ID yet
   if (authLoading && !userId) {
     return (
@@ -232,8 +239,8 @@ const Dashboard = () => {
           </div>
           <h2 className="text-lg font-semibold text-foreground">Failed to Load</h2>
           <p className="text-muted-foreground">{authError}</p>
-          <button 
-            onClick={() => window.location.reload()} 
+          <button
+            onClick={() => window.location.reload()}
             className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
           >
             Try Again
@@ -245,13 +252,13 @@ const Dashboard = () => {
 
   // Get sanitized role for components - customers should not reach here (redirected by ProtectedRoute)
   // Managers and owners are the only valid dashboard roles
-  const dashboardRole: 'owner' | 'manager' = userRole === 'owner' ? 'owner' : 'manager';
-  const navRole = dashboardRole;
+  const dashboardRole: 'owner' | 'manager' | 'super_admin' = (userRole === 'owner' || userRole === 'super_admin') ? userRole : 'manager';
+  const navRole = dashboardRole === 'super_admin' ? 'owner' : dashboardRole;
 
   const renderActiveModule = () => {
     // Check if this module was previously loaded for faster revisit
     const isFirstLoad = !loadedModules.has(activeModule);
-    
+
     const moduleContent = (() => {
       switch (activeModule) {
         case "overview":
@@ -293,7 +300,6 @@ const Dashboard = () => {
         case "admin-panel":
           return isAdmin ? <AdminPanelModule /> : null;
         case "utility-expense":
-        case "staff-salary":
         case "vehicle-cost":
           return <UtilityExpenseModule />;
         case "search":
@@ -340,14 +346,14 @@ const Dashboard = () => {
           <div className="h-full bg-primary animate-[loading_1s_ease-in-out_infinite] w-1/3" />
         </div>
       )}
-      
+
       {/* Transition pending indicator - shows during module switch */}
       {isPending && !softLoading && (
         <div className="fixed top-0 left-0 right-0 h-1 bg-primary/20 z-[100]">
           <div className="h-full w-1/3 bg-primary rounded-r-full animate-pulse transition-loading" />
         </div>
       )}
-      
+
       <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-background to-muted/30">
         <AppSidebar
           activeModule={activeModule}
@@ -370,7 +376,7 @@ const Dashboard = () => {
           />
 
           {/* Main Content with Swipe Support */}
-          <main 
+          <main
             className="flex-1 overflow-auto pb-mobile-nav"
             onTouchStart={isMobile ? onTouchStart : undefined}
             onTouchMove={isMobile ? onTouchMove : undefined}
@@ -390,13 +396,13 @@ const Dashboard = () => {
             setActiveModule={handleModuleChange}
             userRole={navRole}
           />
-          
+
           {/* Offline Status Indicator */}
           <OfflineIndicator />
         </div>
-        
+
         {/* Global Command Palette */}
-        <GlobalCommandPalette 
+        <GlobalCommandPalette
           userRole={dashboardRole}
           setActiveModule={handleModuleChange}
         />

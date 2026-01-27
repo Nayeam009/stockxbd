@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
-export type UserRole = 'owner' | 'manager' | 'customer';
+export type UserRole = 'owner' | 'manager' | 'customer' | 'super_admin';
 
 interface UserRoleData {
   userRole: UserRole;
@@ -21,22 +21,22 @@ const getStoredSession = (): { userId: string; email: string; role?: string } | 
     const storageKey = `sb-xupvteigmqcrfluuadte-auth-token`;
     const stored = localStorage.getItem(storageKey);
     if (!stored) return null;
-    
+
     const parsed = JSON.parse(stored);
     const expiresAt = parsed?.expires_at;
     const userId = parsed?.user?.id;
     const email = parsed?.user?.email;
-    
+
     // If no expiry or expired, return null
     if (!expiresAt || !userId) return null;
-    
+
     // Check if token is expired (with 60 second buffer)
     const now = Math.floor(Date.now() / 1000);
     if (expiresAt <= now - 60) return null;
-    
+
     // Check for cached role
     const cachedRole = sessionStorage.getItem(`user-role-${userId}`);
-    
+
     return { userId, email: email || '', role: cachedRole || undefined };
   } catch {
     return null;
@@ -44,16 +44,16 @@ const getStoredSession = (): { userId: string; email: string; role?: string } | 
 };
 
 export const useUserRole = (): UserRoleData => {
-  // Check localStorage for instant initial state
-  const storedSession = getStoredSession();
-  
+  // Get initial stored session once using useMemo to prevent recalculation
+  const initialStoredSession = useMemo(() => getStoredSession(), []);
+
   // Use cached role if available for instant UI
   const [userRole, setUserRole] = useState<UserRole>(
-    (storedSession?.role as UserRole) || 'customer'
+    (initialStoredSession?.role as UserRole) || 'customer'
   );
-  const [userName, setUserName] = useState<string>(storedSession?.email?.split('@')[0] || 'User');
-  const [userId, setUserId] = useState<string | null>(storedSession?.userId || null);
-  const [loading, setLoading] = useState(!storedSession);
+  const [userName, setUserName] = useState<string>(initialStoredSession?.email?.split('@')[0] || 'User');
+  const [userId, setUserId] = useState<string | null>(initialStoredSession?.userId || null);
+  const [loading, setLoading] = useState(!initialStoredSession);
   const [error, setError] = useState<string | null>(null);
 
   const mountedRef = useRef(true);
@@ -69,7 +69,7 @@ export const useUserRole = (): UserRoleData => {
 
     try {
       setError(null);
-      
+
       // Fetch role and profile in parallel
       const [roleResult, profileResult] = await Promise.all([
         supabase
@@ -88,11 +88,11 @@ export const useUserRole = (): UserRoleData => {
 
       const role = roleResult.data?.role as UserRole || 'customer';
       const displayName = profileResult.data?.full_name || userName;
-      
+
       setUserRole(role);
       setUserName(displayName);
       roleLoadedRef.current = true;
-      
+
       // Cache role in sessionStorage for fast access on next page load
       if (targetUserId) {
         sessionStorage.setItem(`user-role-${targetUserId}`, role);
@@ -107,14 +107,14 @@ export const useUserRole = (): UserRoleData => {
 
   useEffect(() => {
     mountedRef.current = true;
-    
-    // Only run once
+
+    // Only run once per component mount
     if (initRef.current) return;
     initRef.current = true;
-    
+
     // If we have a stored session, fetch role data immediately
-    if (storedSession && !roleLoadedRef.current) {
-      fetchUserData(storedSession.userId);
+    if (initialStoredSession && !roleLoadedRef.current) {
+      fetchUserData(initialStoredSession.userId);
     }
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -149,7 +149,7 @@ export const useUserRole = (): UserRoleData => {
       mountedRef.current = false;
       subscription.unsubscribe();
     };
-  }, [fetchUserData, storedSession]);
+  }, [fetchUserData, initialStoredSession]); // initialStoredSession is stable (useMemo)
 
   return { userRole, userName, userId, loading, error, refetch: fetchUserData };
 };

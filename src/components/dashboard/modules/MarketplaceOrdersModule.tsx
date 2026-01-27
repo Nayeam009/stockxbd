@@ -12,8 +12,8 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
 import { logger } from "@/lib/logger";
 import { InvoiceDialog } from "@/components/invoice/InvoiceDialog";
-import { 
-  ShoppingBag, Package, Clock, CheckCircle, Truck, XCircle, 
+import {
+  ShoppingBag, Package, Clock, CheckCircle, Truck, XCircle,
   Search, RefreshCw, Phone, MapPin, Calendar, ExternalLink,
   Store, TrendingUp, AlertCircle, Printer, RotateCcw, ImageIcon,
   ZoomIn, ShieldCheck, Cylinder
@@ -103,10 +103,13 @@ export const MarketplaceOrdersModule = () => {
         return;
       }
 
+      // Get shop owner ID (handles both Owner and Manager)
+      const { data: ownerId } = await supabase.rpc("get_owner_id");
+
       const { data: shopData, error: shopError } = await supabase
         .from('shop_profiles')
         .select('id, shop_name, phone, address')
-        .eq('owner_id', user.id)
+        .eq('owner_id', ownerId || user.id)
         .maybeSingle();
 
       if (shopError || !shopData) {
@@ -139,7 +142,7 @@ export const MarketplaceOrdersModule = () => {
             .from('community_order_items')
             .select('*')
             .eq('order_id', order.id);
-          
+
           // Fetch customer cylinder photo
           const { data: cylinderProfile } = await supabase
             .from('customer_cylinder_profiles')
@@ -147,8 +150,8 @@ export const MarketplaceOrdersModule = () => {
             .eq('user_id', order.customer_id)
             .maybeSingle();
 
-          return { 
-            ...order, 
+          return {
+            ...order,
             items: items || [],
             customer_cylinder_photo: cylinderProfile?.cylinder_photo_url || null
           } as CommunityOrder;
@@ -187,7 +190,7 @@ export const MarketplaceOrdersModule = () => {
           (payload) => {
             logger.info('Order change detected:', payload);
             fetchData();
-            
+
             if (payload.eventType === 'INSERT') {
               toast({
                 title: "🛒 New Order!",
@@ -260,10 +263,10 @@ export const MarketplaceOrdersModule = () => {
     // 4. Create transaction items from order items
     for (const item of order.items || []) {
       const productName = `${item.brand_name || item.product_name} ${item.weight || ''} (${item.product_type === 'lpg_refill' ? 'Refill' : item.product_type === 'lpg_package' ? 'Package' : item.product_type})`;
-      
+
       // Generate a placeholder product_id (use the item id or create a unique one)
       const productId = crypto.randomUUID();
-      
+
       await supabase.from('pos_transaction_items').insert({
         transaction_id: transaction.id,
         product_id: productId,
@@ -316,14 +319,14 @@ export const MarketplaceOrdersModule = () => {
       const order = orders.find(o => o.id === orderId);
       if (!order) return;
 
-      const updateData: Record<string, any> = { 
+      const updateData: Record<string, any> = {
         status: newStatus,
         updated_at: new Date().toISOString()
       };
 
       if (newStatus === 'confirmed') updateData.confirmed_at = new Date().toISOString();
       if (newStatus === 'dispatched') updateData.dispatched_at = new Date().toISOString();
-      
+
       if (newStatus === 'delivered') {
         updateData.delivered_at = new Date().toISOString();
         updateData.payment_status = 'paid';
@@ -346,7 +349,7 @@ export const MarketplaceOrdersModule = () => {
               -item.quantity,
               item.product_type as 'lpg_refill' | 'lpg_package'
             );
-            
+
             // Increase empty/problem cylinder if returned
             if (item.return_cylinder_qty > 0 && item.return_cylinder_type) {
               await updateEmptyCylinderStock(
@@ -359,7 +362,7 @@ export const MarketplaceOrdersModule = () => {
           }
         }
       }
-      
+
       if (newStatus === 'rejected' && reason) updateData.rejection_reason = reason;
 
       const { error } = await supabase
@@ -371,7 +374,7 @@ export const MarketplaceOrdersModule = () => {
 
       toast({
         title: newStatus === 'delivered' ? "✅ Order Delivered!" : "Status Updated",
-        description: newStatus === 'delivered' 
+        description: newStatus === 'delivered'
           ? "Inventory updated. Payment marked as complete."
           : `Order status: ${newStatus}`
       });
@@ -394,14 +397,14 @@ export const MarketplaceOrdersModule = () => {
       // Create POS transaction
       const txnNumber = await convertOnlineOrderToPOS(order);
       setPosTransactionNumber(txnNumber);
-      
+
       // Update order status
       await updateOrderStatus(order.id, 'confirmed');
-      
+
       // Show invoice dialog
       setSelectedOrderForInvoice(order);
       setInvoiceDialogOpen(true);
-      
+
       toast({
         title: "✅ Order Confirmed",
         description: `POS Transaction: ${txnNumber}. Print memo for driver.`
@@ -430,7 +433,7 @@ export const MarketplaceOrdersModule = () => {
   // Handle verify return - updates return type and marks as delivered
   const handleVerifyReturn = async () => {
     if (!selectedOrderForVerify) return;
-    
+
     // Update return cylinder type in order items if needed
     for (const item of selectedOrderForVerify.items || []) {
       if (item.return_cylinder_qty > 0) {
@@ -440,10 +443,10 @@ export const MarketplaceOrdersModule = () => {
           .eq('id', item.id);
       }
     }
-    
+
     // Mark as delivered (this triggers inventory update)
     await updateOrderStatus(selectedOrderForVerify.id, 'delivered');
-    
+
     setVerifyDialogOpen(false);
     setSelectedOrderForVerify(null);
     setVerifyReturnType('empty');
@@ -453,7 +456,7 @@ export const MarketplaceOrdersModule = () => {
   const filteredOrders = useMemo(() => {
     return orders.filter(order => {
       const matchesTab = activeTab === 'all' || order.status === activeTab;
-      const matchesSearch = searchQuery === '' || 
+      const matchesSearch = searchQuery === '' ||
         order.order_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
         order.customer_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         order.customer_phone.includes(searchQuery);
@@ -658,7 +661,7 @@ export const MarketplaceOrdersModule = () => {
                 <Package className="h-12 w-12 text-muted-foreground/40 mb-4" />
                 <h3 className="text-lg font-semibold mb-2">No Orders Found</h3>
                 <p className="text-muted-foreground text-center">
-                  {activeTab === 'all' 
+                  {activeTab === 'all'
                     ? "You haven't received any orders yet. Share your shop with customers!"
                     : `No ${activeTab} orders at the moment.`
                   }
@@ -736,7 +739,7 @@ export const MarketplaceOrdersModule = () => {
                             <div className="pt-2 mt-2 border-t border-border/50">
                               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                 <RotateCcw className="h-3 w-3" />
-                                Customer returning: {order.items.filter(i => i.return_cylinder_qty > 0).map(i => 
+                                Customer returning: {order.items.filter(i => i.return_cylinder_qty > 0).map(i =>
                                   `${i.return_cylinder_qty} ${i.return_cylinder_type} cylinder(s)`
                                 ).join(', ')}
                               </div>
@@ -760,9 +763,9 @@ export const MarketplaceOrdersModule = () => {
                           <ZoomDialog>
                             <ZoomDialogTrigger asChild>
                               <div className="relative w-16 h-16 rounded-lg overflow-hidden cursor-pointer hover:opacity-80 transition-opacity border">
-                                <img 
-                                  src={order.customer_cylinder_photo} 
-                                  alt="Customer cylinder" 
+                                <img
+                                  src={order.customer_cylinder_photo}
+                                  alt="Customer cylinder"
                                   className="w-full h-full object-cover"
                                 />
                                 <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
@@ -774,9 +777,9 @@ export const MarketplaceOrdersModule = () => {
                               <ZoomDialogHeader className="sr-only">
                                 <ZoomDialogTitle>Customer Cylinder Photo</ZoomDialogTitle>
                               </ZoomDialogHeader>
-                              <img 
-                                src={order.customer_cylinder_photo} 
-                                alt="Customer cylinder full view" 
+                              <img
+                                src={order.customer_cylinder_photo}
+                                alt="Customer cylinder full view"
                                 className="w-full h-auto rounded-lg"
                               />
                             </ZoomDialogContent>
@@ -805,8 +808,8 @@ export const MarketplaceOrdersModule = () => {
                     <div className="flex flex-wrap gap-2 pt-2">
                       {order.status === 'pending' && (
                         <>
-                          <Button 
-                            size="sm" 
+                          <Button
+                            size="sm"
                             onClick={() => handleAcceptAndPrint(order)}
                             disabled={processingOrderId === order.id}
                             className="gap-1 h-10 px-4"
@@ -818,8 +821,8 @@ export const MarketplaceOrdersModule = () => {
                             )}
                             Accept & Print Memo
                           </Button>
-                          <Button 
-                            size="sm" 
+                          <Button
+                            size="sm"
                             variant="destructive"
                             onClick={() => {
                               setSelectedOrderId(order.id);
@@ -833,8 +836,8 @@ export const MarketplaceOrdersModule = () => {
                         </>
                       )}
                       {order.status === 'confirmed' && (
-                        <Button 
-                          size="sm" 
+                        <Button
+                          size="sm"
                           onClick={() => updateOrderStatus(order.id, 'dispatched')}
                           className="gap-1 h-10"
                         >
@@ -843,8 +846,8 @@ export const MarketplaceOrdersModule = () => {
                         </Button>
                       )}
                       {order.status === 'dispatched' && (
-                        <Button 
-                          size="sm" 
+                        <Button
+                          size="sm"
                           onClick={() => {
                             setSelectedOrderForVerify(order);
                             setVerifyDialogOpen(true);
@@ -888,8 +891,8 @@ export const MarketplaceOrdersModule = () => {
             <Button variant="outline" onClick={() => setRejectDialogOpen(false)}>
               Cancel
             </Button>
-            <Button 
-              variant="destructive" 
+            <Button
+              variant="destructive"
               onClick={handleReject}
               disabled={!rejectionReason.trim()}
             >
@@ -923,7 +926,7 @@ export const MarketplaceOrdersModule = () => {
               Confirm the driver has returned with the empty cylinder from the customer.
             </DialogDescription>
           </DialogHeader>
-          
+
           {selectedOrderForVerify && (
             <div className="space-y-4 py-2">
               {/* Order summary */}
@@ -971,7 +974,7 @@ export const MarketplaceOrdersModule = () => {
 
               <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
                 <p className="text-xs text-amber-700 dark:text-amber-300">
-                  <strong>⚠️ Important:</strong> Inventory will be updated only after you confirm. 
+                  <strong>⚠️ Important:</strong> Inventory will be updated only after you confirm.
                   This ensures accurate stock tracking.
                 </p>
               </div>
@@ -982,7 +985,7 @@ export const MarketplaceOrdersModule = () => {
             <Button variant="outline" onClick={() => setVerifyDialogOpen(false)}>
               Cancel
             </Button>
-            <Button 
+            <Button
               onClick={handleVerifyReturn}
               className="bg-success hover:bg-success/90"
             >

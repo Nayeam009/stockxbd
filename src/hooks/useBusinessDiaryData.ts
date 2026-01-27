@@ -17,6 +17,8 @@ export interface SaleEntry {
   quantity: number;
   unitPrice: number;
   totalAmount: number;
+  amountPaid: number; // Actual amount received (for partial = paid portion, for due = 0, for paid = totalAmount)
+  remainingDue: number; // Amount still owed (for partial = remaining, for due = totalAmount, for paid = 0)
   paymentMethod: string;
   paymentStatus: 'paid' | 'due' | 'partial';
   customerName: string;
@@ -115,7 +117,7 @@ export const useBusinessDiaryData = (): UseBusinessDiaryDataReturn => {
       const { data: userRoles } = await supabase
         .from('user_roles')
         .select('user_id, role');
-      
+
       const roleMap = new Map<string, string>(userRoles?.map(r => [r.user_id, r.role]) || []);
 
       // Fetch POS transactions with items and created_by
@@ -145,7 +147,7 @@ export const useBusinessDiaryData = (): UseBusinessDiaryDataReturn => {
         .eq('is_voided', false)
         .order('created_at', { ascending: false })
         .limit(500);
-      
+
       // Separately fetch online order info to avoid type issues with new columns
       const { data: onlineOrderInfo } = await supabase
         .from('pos_transactions')
@@ -212,11 +214,39 @@ export const useBusinessDiaryData = (): UseBusinessDiaryDataReturn => {
 
       // Build a map of online order transactions
       const onlineOrderMap = new Map<string, { isOnline: boolean; communityOrderId: string | null }>(
-        (onlineOrderInfo || []).map((info: any) => [info.id, { 
-          isOnline: info.is_online_order || false, 
-          communityOrderId: info.community_order_id 
+        (onlineOrderInfo || []).map((info: any) => [info.id, {
+          isOnline: info.is_online_order || false,
+          communityOrderId: info.community_order_id
         }])
       );
+
+      // Helper to parse partial payment amounts from notes
+      // Notes format: "Paid: ৳X, Remaining: ৳Y"
+      const parsePartialPaymentFromNotes = (notes: string | null, total: number): { amountPaid: number; remainingDue: number } => {
+        if (!notes) return { amountPaid: 0, remainingDue: total };
+
+        // Try to parse "Paid: ৳X" from notes
+        const paidMatch = notes.match(/Paid:\s*৳?(\d+(?:,\d+)*(?:\.\d+)?)/i);
+        if (paidMatch) {
+          const amountPaid = parseFloat(paidMatch[1].replace(/,/g, '')) || 0;
+          const remainingDue = Math.max(0, total - amountPaid);
+          return { amountPaid, remainingDue };
+        }
+
+        return { amountPaid: 0, remainingDue: total };
+      };
+
+      // Calculate payment amounts based on status and notes
+      const getPaymentAmounts = (paymentStatus: string, total: number, notes: string | null): { amountPaid: number; remainingDue: number } => {
+        if (paymentStatus === 'paid' || paymentStatus === 'completed') {
+          return { amountPaid: total, remainingDue: 0 };
+        }
+        if (paymentStatus === 'partial') {
+          return parsePartialPaymentFromNotes(notes, total);
+        }
+        // Due
+        return { amountPaid: 0, remainingDue: total };
+      };
 
       // Process POS transactions - handle both items and itemless transactions
       const posEntries: SaleEntry[] = (posTransactions || []).flatMap(txn => {
@@ -227,9 +257,10 @@ export const useBusinessDiaryData = (): UseBusinessDiaryDataReturn => {
         const onlineInfo = onlineOrderMap.get(txn.id);
         const isOnlineOrder = onlineInfo?.isOnline || false;
         const communityOrderId = onlineInfo?.communityOrderId || null;
-        
+
         // If no items but transaction has value, create single summary entry
         if (items.length === 0 && Number(txn.total) > 0) {
+          const txnPaymentAmounts = getPaymentAmounts(txn.payment_status, Number(txn.total), txn.notes);
           return [{
             id: txn.id,
             type: 'pos' as const,
@@ -244,6 +275,8 @@ export const useBusinessDiaryData = (): UseBusinessDiaryDataReturn => {
             quantity: 1,
             unitPrice: Number(txn.total),
             totalAmount: Number(txn.total),
+            amountPaid: txnPaymentAmounts.amountPaid,
+            remainingDue: txnPaymentAmounts.remainingDue,
             paymentMethod: txn.payment_method,
             paymentStatus: (txn.payment_status === 'completed' || txn.payment_status === 'paid' ? 'paid' : txn.payment_status === 'partial' ? 'partial' : 'due') as 'paid' | 'due' | 'partial',
             customerName: customer?.name || 'Walk-in Customer',
@@ -257,38 +290,54 @@ export const useBusinessDiaryData = (): UseBusinessDiaryDataReturn => {
             communityOrderId
           }];
         }
-        
-        return items.map((item: any) => ({
-          id: item.id,
-          type: 'pos' as const,
-          date: format(new Date(txn.created_at), 'yyyy-MM-dd'),
-          timestamp: txn.created_at,
-          staffName: getStaffName(staffRole),
-          staffRole,
-          staffId: txn.created_by,
-          productName: item.product_name || 'Unknown Product',
-          productDetails: `${item.quantity} x ৳${item.unit_price}`,
-          returnCylinders: parseReturnCylinders(item.product_name || ''),
-          quantity: item.quantity,
-          unitPrice: Number(item.unit_price),
-          totalAmount: Number(item.total_price),
-          paymentMethod: txn.payment_method,
-          paymentStatus: (txn.payment_status === 'completed' || txn.payment_status === 'paid' ? 'paid' : txn.payment_status === 'partial' ? 'partial' : 'due') as 'paid' | 'due' | 'partial',
-          customerName: customer?.name || 'Walk-in Customer',
-          customerPhone: customer?.phone || null,
-          customerId: txn.customer_id,
-          transactionType: isWholesale ? 'wholesale' : 'retail' as 'retail' | 'wholesale',
-          transactionNumber: txn.transaction_number,
-          source: isOnlineOrder ? 'Online Order' : 'POS',
-          sourceId: txn.id,
-          isOnlineOrder,
-          communityOrderId
-        }));
+
+        // For multi-item transactions: distribute payment proportionally
+        const txnTotal = Number(txn.total);
+        const txnPaymentAmounts = getPaymentAmounts(txn.payment_status, txnTotal, txn.notes);
+        const itemsTotal = items.reduce((sum: number, item: any) => sum + Number(item.total_price), 0);
+
+        return items.map((item: any) => {
+          const itemTotal = Number(item.total_price);
+          // Distribute paid amount proportionally to each item
+          const itemProportion = itemsTotal > 0 ? itemTotal / itemsTotal : 0;
+          const itemAmountPaid = txnPaymentAmounts.amountPaid * itemProportion;
+          const itemRemainingDue = txnPaymentAmounts.remainingDue * itemProportion;
+
+          return {
+            id: item.id,
+            type: 'pos' as const,
+            date: format(new Date(txn.created_at), 'yyyy-MM-dd'),
+            timestamp: txn.created_at,
+            staffName: getStaffName(staffRole),
+            staffRole,
+            staffId: txn.created_by,
+            productName: item.product_name || 'Unknown Product',
+            productDetails: `${item.quantity} x ৳${item.unit_price}`,
+            returnCylinders: parseReturnCylinders(item.product_name || ''),
+            quantity: item.quantity,
+            unitPrice: Number(item.unit_price),
+            totalAmount: itemTotal,
+            amountPaid: itemAmountPaid,
+            remainingDue: itemRemainingDue,
+            paymentMethod: txn.payment_method,
+            paymentStatus: (txn.payment_status === 'completed' || txn.payment_status === 'paid' ? 'paid' : txn.payment_status === 'partial' ? 'partial' : 'due') as 'paid' | 'due' | 'partial',
+            customerName: customer?.name || 'Walk-in Customer',
+            customerPhone: customer?.phone || null,
+            customerId: txn.customer_id,
+            transactionType: isWholesale ? 'wholesale' : 'retail' as 'retail' | 'wholesale',
+            transactionNumber: txn.transaction_number,
+            source: isOnlineOrder ? 'Online Order' : 'POS',
+            sourceId: txn.id,
+            isOnlineOrder,
+            communityOrderId
+          };
+        });
       });
 
       // Process customer payments (due collections)
       const paymentEntries: SaleEntry[] = (customerPayments || []).map(payment => {
         const staffRole = getStaffRole(payment.created_by);
+        const paymentAmount = Number(payment.amount);
         return {
           id: payment.id,
           type: 'payment' as const,
@@ -301,8 +350,10 @@ export const useBusinessDiaryData = (): UseBusinessDiaryDataReturn => {
           productDetails: payment.cylinders_collected ? `+ ${payment.cylinders_collected} cylinders returned` : '',
           returnCylinders: [],
           quantity: 1,
-          unitPrice: Number(payment.amount),
-          totalAmount: Number(payment.amount),
+          unitPrice: paymentAmount,
+          totalAmount: paymentAmount,
+          amountPaid: paymentAmount, // Due collections are always fully paid
+          remainingDue: 0, // No remaining due for collected payments
           paymentMethod: 'cash',
           paymentStatus: 'paid' as const,
           customerName: (payment.customers as any)?.name || 'Unknown Customer',
@@ -315,7 +366,7 @@ export const useBusinessDiaryData = (): UseBusinessDiaryDataReturn => {
         };
       });
 
-      setSales([...posEntries, ...paymentEntries].sort((a, b) => 
+      setSales([...posEntries, ...paymentEntries].sort((a, b) =>
         new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
       ));
     } catch (error) {
@@ -329,7 +380,7 @@ export const useBusinessDiaryData = (): UseBusinessDiaryDataReturn => {
       const { data: userRoles } = await supabase
         .from('user_roles')
         .select('user_id, role');
-      
+
       const roleMap = new Map<string, string>(userRoles?.map(r => [r.user_id, r.role]) || []);
 
       // Helper to get staff role label
@@ -432,12 +483,12 @@ export const useBusinessDiaryData = (): UseBusinessDiaryDataReturn => {
         const items = txn.pob_transaction_items || [];
         const mainItem = items[0];
         const productType = mainItem?.product_type || 'Other';
-        const categoryName = productType === 'lpg_cylinder' ? 'LPG Purchase' : 
-                            productType === 'stove' ? 'Gas Stove Purchase' : 
-                            productType === 'regulator' ? 'Regulator Purchase' : 'Other';
+        const categoryName = productType === 'lpg_cylinder' ? 'LPG Purchase' :
+          productType === 'stove' ? 'Gas Stove Purchase' :
+            productType === 'regulator' ? 'Regulator Purchase' : 'Other';
         const catInfo = getCategoryInfo(categoryName);
         const staffRole = getStaffRole(txn.created_by);
-        
+
         return {
           id: txn.id,
           type: 'pob' as const,
@@ -523,18 +574,18 @@ export const useBusinessDiaryData = (): UseBusinessDiaryDataReturn => {
           categoryIcon: catInfo.icon,
           categoryColor: catInfo.color,
           description: expense.description || expense.category,
-          whySpent: expense.category === 'Utilities' ? 'Utility bill payment' : 
-                    expense.category === 'Rent' ? 'Shop rent payment' :
-                    expense.category === 'Loading' ? 'Loading/labor cost' :
-                    expense.category === 'Entertainment' ? 'Business entertainment' :
-                    'General expense',
+          whySpent: expense.category === 'Utilities' ? 'Utility bill payment' :
+            expense.category === 'Rent' ? 'Shop rent payment' :
+              expense.category === 'Loading' ? 'Loading/labor cost' :
+                expense.category === 'Entertainment' ? 'Business entertainment' :
+                  'General expense',
           amount: Number(expense.amount),
           source: 'Manual Entry',
           sourceId: expense.id
         };
       });
 
-      setExpenses([...pobEntries, ...salaryEntries, ...vehicleEntries, ...manualEntries].sort((a, b) => 
+      setExpenses([...pobEntries, ...salaryEntries, ...vehicleEntries, ...manualEntries].sort((a, b) =>
         new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
       ));
     } catch (error) {
@@ -555,7 +606,7 @@ export const useBusinessDiaryData = (): UseBusinessDiaryDataReturn => {
   useEffect(() => {
     if (hasFetchedRef.current) return;
     hasFetchedRef.current = true;
-    
+
     refetch(false);
 
     // Set up real-time subscriptions with debouncing
@@ -563,12 +614,12 @@ export const useBusinessDiaryData = (): UseBusinessDiaryDataReturn => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => fetchSalesData(), 1000);
     };
-    
+
     const debouncedExpensesFetch = () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => fetchExpensesData(), 1000);
     };
-    
+
     const salesChannel = supabase
       .channel('diary-sales-realtime-v2')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pos_transactions' }, debouncedSalesFetch)
@@ -624,12 +675,13 @@ export const useBusinessDiaryData = (): UseBusinessDiaryDataReturn => {
       return d >= lastMonthStart && d <= lastMonthEnd;
     };
 
-    // Income calculations
-    const todayIncome = sales.filter(s => isToday(s.date)).reduce((sum, s) => sum + s.totalAmount, 0);
-    const weeklyIncome = sales.filter(s => isThisWeek(s.date)).reduce((sum, s) => sum + s.totalAmount, 0);
-    const monthlyIncome = sales.filter(s => isThisMonth(s.date)).reduce((sum, s) => sum + s.totalAmount, 0);
-    const yearlyIncome = sales.filter(s => isThisYear(s.date)).reduce((sum, s) => sum + s.totalAmount, 0);
-    const lastMonthIncome = sales.filter(s => isLastMonth(s.date)).reduce((sum, s) => sum + s.totalAmount, 0);
+    // Income calculations - use amountPaid (actual money received) not totalAmount (full bill)
+    // This ensures partial payments only count the received portion as income
+    const todayIncome = sales.filter(s => isToday(s.date)).reduce((sum, s) => sum + s.amountPaid, 0);
+    const weeklyIncome = sales.filter(s => isThisWeek(s.date)).reduce((sum, s) => sum + s.amountPaid, 0);
+    const monthlyIncome = sales.filter(s => isThisMonth(s.date)).reduce((sum, s) => sum + s.amountPaid, 0);
+    const yearlyIncome = sales.filter(s => isThisYear(s.date)).reduce((sum, s) => sum + s.amountPaid, 0);
+    const lastMonthIncome = sales.filter(s => isLastMonth(s.date)).reduce((sum, s) => sum + s.amountPaid, 0);
 
     // Expense calculations
     const todayExpenses = expenses.filter(e => isToday(e.date)).reduce((sum, e) => sum + e.amount, 0);
@@ -649,13 +701,13 @@ export const useBusinessDiaryData = (): UseBusinessDiaryDataReturn => {
     const expenseGrowth = lastMonthExpenses > 0 ? ((monthlyExpenses - lastMonthExpenses) / lastMonthExpenses) * 100 : 0;
     const profitMargin = monthlyIncome > 0 ? (monthlyProfit / monthlyIncome) * 100 : 0;
 
-    // Top products
+    // Top products - use amountPaid for accurate revenue
     const productMap = new Map<string, { amount: number; count: number }>();
     sales.filter(s => isThisMonth(s.date)).forEach(s => {
       const existing = productMap.get(s.productName) || { amount: 0, count: 0 };
-      productMap.set(s.productName, { 
-        amount: existing.amount + s.totalAmount, 
-        count: existing.count + s.quantity 
+      productMap.set(s.productName, {
+        amount: existing.amount + s.amountPaid,
+        count: existing.count + s.quantity
       });
     });
     const topProducts = Array.from(productMap.entries())
@@ -667,10 +719,10 @@ export const useBusinessDiaryData = (): UseBusinessDiaryDataReturn => {
     const categoryMap = new Map<string, { amount: number; icon: string; color: string }>();
     expenses.filter(e => isThisMonth(e.date)).forEach(e => {
       const existing = categoryMap.get(e.category) || { amount: 0, icon: e.categoryIcon, color: e.categoryColor };
-      categoryMap.set(e.category, { 
-        amount: existing.amount + e.amount, 
-        icon: e.categoryIcon, 
-        color: e.categoryColor 
+      categoryMap.set(e.category, {
+        amount: existing.amount + e.amount,
+        icon: e.categoryIcon,
+        color: e.categoryColor
       });
     });
     const topExpenseCategories = Array.from(categoryMap.entries())

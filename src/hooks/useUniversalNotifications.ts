@@ -2,13 +2,13 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { logger } from "@/lib/logger";
 
-export type NotificationType = 
-  | "low_stock" 
+export type NotificationType =
+  | "low_stock"
   | "out_of_stock"
-  | "new_order" 
+  | "new_order"
   | "order_completed"
   | "order_cancelled"
-  | "payment_received" 
+  | "payment_received"
   | "payment_overdue"
   | "expense_added"
   | "staff_payment"
@@ -21,6 +21,8 @@ export type NotificationType =
   | "info";
 
 export type NotificationPriority = "low" | "medium" | "high" | "critical";
+
+export type UserRole = 'owner' | 'manager' | 'super_admin';
 
 export interface UniversalNotification {
   id: string;
@@ -36,17 +38,17 @@ export interface UniversalNotification {
     moduleId: string;
   };
   data?: Record<string, any>;
-  roles: ('owner' | 'manager' | 'driver' | 'staff')[];
+  roles: UserRole[];
 }
 
 // Helper to send browser push notification
 const sendBrowserNotification = (title: string, body: string, tag: string) => {
   const isEnabled = localStorage.getItem("push-notifications-enabled") === "true";
-  
+
   if (!isEnabled || !("Notification" in window) || Notification.permission !== "granted") {
     return;
   }
-  
+
   try {
     new Notification(title, {
       body,
@@ -59,14 +61,14 @@ const sendBrowserNotification = (title: string, body: string, tag: string) => {
   }
 };
 
-export const useUniversalNotifications = (userRole: 'owner' | 'manager' | 'driver' | 'staff' = 'driver') => {
+export const useUniversalNotifications = (userRole: UserRole = 'manager') => {
   const [notifications, setNotifications] = useState<UniversalNotification[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Check low stock for LPG, Stoves, Regulators
   const checkInventoryAlerts = useCallback(async (): Promise<UniversalNotification[]> => {
     const alerts: UniversalNotification[] = [];
-    
+
     const [lpgResult, stoveResult, regulatorResult] = await Promise.all([
       supabase.from("lpg_brands").select("*").eq("is_active", true),
       supabase.from("stoves").select("*").eq("is_active", true),
@@ -77,7 +79,7 @@ export const useUniversalNotifications = (userRole: 'owner' | 'manager' | 'drive
     lpgResult.data?.forEach((brand) => {
       const totalStock = brand.package_cylinder + brand.refill_cylinder;
       const brandInfo = `${brand.name} (${brand.size})`;
-      
+
       if (totalStock === 0) {
         alerts.push({
           id: `out_of_stock_lpg_${brand.id}`,
@@ -90,7 +92,7 @@ export const useUniversalNotifications = (userRole: 'owner' | 'manager' | 'drive
           module: "lpg-stock",
           action: { label: "View Stock", moduleId: "lpg-stock" },
           data: { brandId: brand.id, brandName: brand.name, stock: totalStock, category: "lpg" },
-          roles: ['owner', 'manager'],
+          roles: ['owner', 'manager', 'super_admin'],
         });
       } else if (totalStock < 10) {
         alerts.push({
@@ -104,7 +106,7 @@ export const useUniversalNotifications = (userRole: 'owner' | 'manager' | 'drive
           module: "lpg-stock",
           action: { label: "View Stock", moduleId: "lpg-stock" },
           data: { brandId: brand.id, brandName: brand.name, stock: totalStock, category: "lpg" },
-          roles: ['owner', 'manager'],
+          roles: ['owner', 'manager', 'super_admin'],
         });
       } else if (totalStock < 30) {
         alerts.push({
@@ -118,7 +120,7 @@ export const useUniversalNotifications = (userRole: 'owner' | 'manager' | 'drive
           module: "lpg-stock",
           action: { label: "View Stock", moduleId: "lpg-stock" },
           data: { brandId: brand.id, brandName: brand.name, stock: totalStock, category: "lpg" },
-          roles: ['owner', 'manager'],
+          roles: ['owner', 'manager', 'super_admin'],
         });
       }
 
@@ -135,7 +137,7 @@ export const useUniversalNotifications = (userRole: 'owner' | 'manager' | 'drive
           module: "lpg-stock",
           action: { label: "View Stock", moduleId: "lpg-stock" },
           data: { brandId: brand.id, empty: brand.empty_cylinder, full: brand.package_cylinder + brand.refill_cylinder },
-          roles: ['owner', 'manager'],
+          roles: ['owner', 'manager', 'super_admin'],
         });
       }
     });
@@ -143,7 +145,7 @@ export const useUniversalNotifications = (userRole: 'owner' | 'manager' | 'drive
     // Stoves
     stoveResult.data?.forEach((stove) => {
       const stoveInfo = `${stove.brand} (${stove.burners === 1 ? 'Single' : 'Double'} Burner)`;
-      
+
       if (stove.quantity === 0) {
         alerts.push({
           id: `out_of_stock_stove_${stove.id}`,
@@ -156,7 +158,7 @@ export const useUniversalNotifications = (userRole: 'owner' | 'manager' | 'drive
           module: "stove-stock",
           action: { label: "View Stoves", moduleId: "stove-stock" },
           data: { stoveId: stove.id, stock: 0, category: "stove" },
-          roles: ['owner', 'manager'],
+          roles: ['owner', 'manager', 'super_admin'],
         });
       } else if (stove.quantity < 5) {
         alerts.push({
@@ -170,7 +172,7 @@ export const useUniversalNotifications = (userRole: 'owner' | 'manager' | 'drive
           module: "stove-stock",
           action: { label: "View Stoves", moduleId: "stove-stock" },
           data: { stoveId: stove.id, stock: stove.quantity, category: "stove" },
-          roles: ['owner', 'manager'],
+          roles: ['owner', 'manager', 'super_admin'],
         });
       }
     });
@@ -178,7 +180,7 @@ export const useUniversalNotifications = (userRole: 'owner' | 'manager' | 'drive
     // Regulators
     regulatorResult.data?.forEach((regulator) => {
       const regInfo = `${regulator.brand} (${regulator.type})`;
-      
+
       if (regulator.quantity === 0) {
         alerts.push({
           id: `out_of_stock_reg_${regulator.id}`,
@@ -191,7 +193,7 @@ export const useUniversalNotifications = (userRole: 'owner' | 'manager' | 'drive
           module: "regulators",
           action: { label: "View Regulators", moduleId: "regulators" },
           data: { regulatorId: regulator.id, stock: 0, category: "regulator" },
-          roles: ['owner', 'manager'],
+          roles: ['owner', 'manager', 'super_admin'],
         });
       } else if (regulator.quantity < 5) {
         alerts.push({
@@ -205,7 +207,7 @@ export const useUniversalNotifications = (userRole: 'owner' | 'manager' | 'drive
           module: "regulators",
           action: { label: "View Regulators", moduleId: "regulators" },
           data: { regulatorId: regulator.id, stock: regulator.quantity, category: "regulator" },
-          roles: ['owner', 'manager'],
+          roles: ['owner', 'manager', 'super_admin'],
         });
       }
     });
@@ -242,7 +244,7 @@ export const useUniversalNotifications = (userRole: 'owner' | 'manager' | 'drive
           module: "orders",
           action: { label: "View Orders", moduleId: "orders" },
           data: { orderId: order.id, orderNumber: order.order_number },
-          roles: ['owner', 'manager', 'driver'],
+          roles: ['owner', 'manager', 'super_admin'],
         });
       } else if (order.status === "pending") {
         alerts.push({
@@ -256,7 +258,7 @@ export const useUniversalNotifications = (userRole: 'owner' | 'manager' | 'drive
           module: "orders",
           action: { label: "View Orders", moduleId: "orders" },
           data: { orderId: order.id, orderNumber: order.order_number },
-          roles: ['owner', 'manager', 'driver'],
+          roles: ['owner', 'manager', 'super_admin'],
         });
       }
     });
@@ -295,7 +297,7 @@ export const useUniversalNotifications = (userRole: 'owner' | 'manager' | 'drive
           module: "customers",
           action: { label: "Collect Due", moduleId: "customers" },
           data: { customerId: customer.id, due: customer.total_due },
-          roles: ['owner', 'manager'],
+          roles: ['owner', 'manager', 'super_admin'],
         });
       }
 
@@ -312,7 +314,7 @@ export const useUniversalNotifications = (userRole: 'owner' | 'manager' | 'drive
           module: "customers",
           action: { label: "View Customer", moduleId: "customers" },
           data: { customerId: customer.id, cylindersDue: customer.cylinders_due },
-          roles: ['owner', 'manager'],
+          roles: ['owner', 'manager', 'super_admin'],
         });
       }
 
@@ -329,7 +331,7 @@ export const useUniversalNotifications = (userRole: 'owner' | 'manager' | 'drive
           module: "customers",
           action: { label: "View Customer", moduleId: "customers" },
           data: { customerId: customer.id, due: customer.total_due, limit: customer.credit_limit },
-          roles: ['owner', 'manager'],
+          roles: ['owner', 'manager', 'super_admin'],
         });
       }
     });
@@ -377,7 +379,7 @@ export const useUniversalNotifications = (userRole: 'owner' | 'manager' | 'drive
         module: "exchange",
         action: { label: "View Exchanges", moduleId: "exchange" },
         data: { exchangeId: exchange.id },
-        roles: ['owner', 'manager', 'driver'],
+        roles: ['owner', 'manager', 'super_admin'],
       });
     });
 
@@ -414,7 +416,7 @@ export const useUniversalNotifications = (userRole: 'owner' | 'manager' | 'drive
           module: "daily-sales",
           action: { label: "View Sales", moduleId: "daily-sales" },
           data: { totalSales, transactionCount: transactions.length },
-          roles: ['owner', 'manager'],
+          roles: ['owner', 'manager', 'super_admin'],
         });
       }
     }
@@ -539,10 +541,10 @@ export const useUniversalNotifications = (userRole: 'owner' | 'manager' | 'drive
             module: "orders",
             action: { label: "View Order", moduleId: "orders" },
             data: { orderId: order.id, orderNumber: order.order_number },
-            roles: ['owner', 'manager', 'driver'],
+            roles: ['owner', 'manager', 'super_admin'],
           };
           setNotifications((prev) => [newNotification, ...prev]);
-          
+
           const notifSettings = JSON.parse(localStorage.getItem("notification-settings") || "{}");
           if (notifSettings.newOrders !== false) {
             sendBrowserNotification(
@@ -563,15 +565,15 @@ export const useUniversalNotifications = (userRole: 'owner' | 'manager' | 'drive
         { event: "INSERT", schema: "public", table: "customer_payments" },
         async (payload) => {
           const payment = payload.new as any;
-          
+
           const { data: customer } = await supabase
             .from("customers")
             .select("name")
             .eq("id", payment.customer_id)
             .single();
-          
+
           const customerName = customer?.name || "Customer";
-          
+
           const newNotification: UniversalNotification = {
             id: `payment_${payment.id}`,
             type: "payment_received",
@@ -583,10 +585,10 @@ export const useUniversalNotifications = (userRole: 'owner' | 'manager' | 'drive
             module: "customers",
             action: { label: "View Payments", moduleId: "customers" },
             data: { paymentId: payment.id, amount: payment.amount },
-            roles: ['owner', 'manager'],
+            roles: ['owner', 'manager', 'super_admin'],
           };
           setNotifications((prev) => [newNotification, ...prev]);
-          
+
           const notifSettings = JSON.parse(localStorage.getItem("notification-settings") || "{}");
           if (notifSettings.payments !== false) {
             sendBrowserNotification(
@@ -607,7 +609,7 @@ export const useUniversalNotifications = (userRole: 'owner' | 'manager' | 'drive
         { event: "INSERT", schema: "public", table: "pos_transactions" },
         (payload) => {
           const transaction = payload.new as any;
-          
+
           const newNotification: UniversalNotification = {
             id: `pos_${transaction.id}`,
             type: "info",
@@ -636,7 +638,7 @@ export const useUniversalNotifications = (userRole: 'owner' | 'manager' | 'drive
           // Refresh inventory alerts when stock changes
           const alerts = await checkInventoryAlerts();
           const criticalAlerts = alerts.filter(a => a.priority === 'critical');
-          
+
           if (criticalAlerts.length > 0) {
             setNotifications(prev => {
               const existingIds = prev.map(n => n.id);

@@ -18,13 +18,13 @@ const hasLocalSession = (): boolean => {
     const storageKey = `sb-xupvteigmqcrfluuadte-auth-token`;
     const stored = localStorage.getItem(storageKey);
     if (!stored) return false;
-    
+
     const parsed = JSON.parse(stored);
     const expiresAt = parsed?.expires_at;
-    
+
     // If no expiry or expired, return false
     if (!expiresAt) return false;
-    
+
     // Check if token is expired (with 60 second buffer)
     const now = Math.floor(Date.now() / 1000);
     return expiresAt > now - 60;
@@ -36,12 +36,12 @@ const hasLocalSession = (): boolean => {
 export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   // Start with optimistic state if localStorage has a session
   const hasStoredSession = hasLocalSession();
-  
+
   const [loading, setLoading] = useState(!hasStoredSession);
   const [authenticated, setAuthenticated] = useState(hasStoredSession);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [authError, setAuthError] = useState<'error' | 'offline' | null>(null);
-  
+
   const location = useLocation();
   const navigate = useNavigate();
   const mountedRef = useRef(true);
@@ -50,17 +50,20 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
 
   useEffect(() => {
     mountedRef.current = true;
-    
-    // Only run once
+
+    // Only run once per component mount
     if (initRef.current) return;
     initRef.current = true;
+
+    // Capture the initial session state for safety timeout logic
+    const hadStoredSession = hasStoredSession;
 
     // Safety timeout - if we have a local session but auth doesn't respond in 8s,
     // still allow access (the session was validated on localStorage check)
     let safetyTimeout: ReturnType<typeof setTimeout> | null = null;
-    if (hasStoredSession && loading) {
+    if (hadStoredSession) {
       safetyTimeout = setTimeout(() => {
-        if (mountedRef.current && loading) {
+        if (mountedRef.current) {
           console.log('[ProtectedRoute] Safety timeout - allowing access with cached session');
           setLoading(false);
           setAuthenticated(true);
@@ -71,15 +74,15 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     // Listen to auth state changes - this is the PRIMARY source of truth
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mountedRef.current) return;
-      
+
       // Clear safety timeout since auth responded
       if (safetyTimeout) {
         clearTimeout(safetyTimeout);
         safetyTimeout = null;
       }
-      
+
       console.log('[ProtectedRoute] Auth event:', event, !!session);
-      
+
       // Clear any previous errors on new auth events
       setAuthError(null);
 
@@ -105,7 +108,7 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
       // Only fetch once per session to avoid repeated timeouts
       if (!roleLoadedRef.current) {
         roleLoadedRef.current = true;
-        
+
         try {
           const { data: roleData } = await supabase
             .from('user_roles')
@@ -128,25 +131,26 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
       if (safetyTimeout) clearTimeout(safetyTimeout);
       subscription.unsubscribe();
     };
-  }, [hasStoredSession, loading]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty deps - run only once on mount
 
   // Retry handler
   const handleRetry = useCallback(() => {
     setLoading(true);
     setAuthError(null);
     roleLoadedRef.current = false;
-    
+
     // Force a session refresh
     supabase.auth.getSession().then(({ data: { session }, error }) => {
       if (!mountedRef.current) return;
-      
+
       if (error || !session) {
         setAuthError(navigator.onLine ? 'error' : 'offline');
         setAuthenticated(false);
       } else {
         setAuthenticated(true);
         setAuthError(null);
-        
+
         // Fetch role
         supabase
           .from('user_roles')
@@ -186,23 +190,23 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
               {authError === 'offline' ? "You're Offline" : 'Authentication Error'}
             </CardTitle>
             <CardDescription>
-              {authError === 'offline' 
+              {authError === 'offline'
                 ? 'No internet connection detected. Please check your network.'
                 : 'Unable to verify your session. Please try again.'}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Button 
-              onClick={handleRetry} 
+            <Button
+              onClick={handleRetry}
               variant="outline"
               className="w-full h-12 touch-target"
             >
               <RefreshCw className="h-4 w-4 mr-2" />
               Try Again
             </Button>
-            
-            <Button 
-              onClick={() => navigate('/auth')} 
+
+            <Button
+              onClick={() => navigate('/auth')}
               className="w-full h-12 touch-target"
             >
               <LogIn className="h-4 w-4 mr-2" />

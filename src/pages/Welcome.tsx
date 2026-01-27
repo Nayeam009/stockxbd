@@ -1,13 +1,13 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { 
-  ArrowRight, 
-  Truck, 
-  BarChart3, 
-  Users, 
-  Flame, 
-  Shield, 
+import {
+  ArrowRight,
+  Truck,
+  BarChart3,
+  Users,
+  Flame,
+  Shield,
   Clock,
   Package,
   FileText,
@@ -37,6 +37,8 @@ import stockXLogoWebP from "@/assets/stock-x-logo.webp";
 import stockXLogoPng from "@/assets/stock-x-logo.png";
 import heroLpgImageWebP from "@/assets/hero-lpg-cylinders.webp";
 import heroLpgImagePng from "@/assets/hero-lpg-cylinders.png";
+
+import { Helmet } from "react-helmet-async";
 
 const Welcome = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -93,11 +95,7 @@ const Welcome = () => {
       title: "Analytics & Reports",
       description: "Comprehensive profit/loss reports with actionable business insights.",
     },
-    {
-      icon: DollarSign,
-      title: "Staff & Salary",
-      description: "Manage staff payments, commissions, and monthly salary tracking.",
-    },
+
     {
       icon: Search,
       title: "Smart Search",
@@ -113,7 +111,17 @@ const Welcome = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-background overflow-hidden">
+    <main className="min-h-screen bg-background overflow-hidden">
+      <Helmet>
+        <title>Stock X - #1 LPG Inventory & Delivery Management Software</title>
+        <meta name="description" content="Complete business management solution for LPG distributors in Bangladesh. Track inventory, manage customers, process sales, and deliver online with Stock X." />
+        <meta name="keywords" content="LPG management software, gas cylinder inventory, LPG delivery app, authorized distributor software Bangladesh, Stock X" />
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content="Stock X - Smart LPG Business Management" />
+        <meta property="og:description" content="Streamline your LPG distribution business with real-time inventory tracking and online delivery tools." />
+        <meta property="og:image" content="/og-image.png" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
+      </Helmet>
       {/* Header */}
       <header className="sticky top-0 z-50 bg-card/95 backdrop-blur-xl border-b border-border/50 shadow-sm">
         <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-3 sm:py-4">
@@ -123,9 +131,9 @@ const Welcome = () => {
               <div className="relative flex-shrink-0">
                 <picture>
                   <source srcSet={stockXLogoWebP} type="image/webp" />
-                  <img 
-                    src={stockXLogoPng} 
-                    alt="Stock-X Logo" 
+                  <img
+                    src={stockXLogoPng}
+                    alt="Stock-X Logo"
                     className="h-9 w-9 sm:h-11 sm:w-11 lg:h-12 lg:w-12 rounded-xl shadow-lg transition-transform duration-300 group-hover:scale-105"
                     width="48"
                     height="48"
@@ -158,7 +166,7 @@ const Welcome = () => {
             </div>
 
             {/* Mobile Menu Button */}
-            <button 
+            <button
               className="md:hidden p-2 -mr-1 rounded-lg hover:bg-muted transition-colors touch-target min-h-[44px] min-w-[44px] flex items-center justify-center"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
@@ -170,7 +178,7 @@ const Welcome = () => {
 
           {/* Mobile Menu */}
           {mobileMenuOpen && (
-            <nav 
+            <nav
               className="md:hidden absolute top-full left-0 right-0 bg-card border-b border-border shadow-xl py-4 px-4 space-y-2 animate-fade-in z-50"
               aria-label="Mobile navigation"
             >
@@ -199,7 +207,7 @@ const Welcome = () => {
             backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.4'%3E%3Cpath d='M36 34c0-2.21-1.79-4-4-4s-4 1.79-4 4 1.79 4 4 4 4-1.79 4-4z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
           }} />
         </div>
-        
+
         <div className="container mx-auto px-4 sm:px-6 relative">
           <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center py-10 sm:py-14 lg:py-20">
             {/* Left: Text Content */}
@@ -208,7 +216,7 @@ const Welcome = () => {
                 <Flame className="h-3 w-3 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
                 #1 LPG Business Platform in Bangladesh
               </Badge>
-              
+
               <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-extrabold leading-tight">
                 <span className="text-white">STOCK X</span>
                 <br />
@@ -216,7 +224,7 @@ const Welcome = () => {
                 <br />
                 <span className="text-secondary">Online Delivery Platform</span>
               </h1>
-              
+
               <p className="text-sm sm:text-base lg:text-lg text-white/80 max-w-xl mx-auto lg:mx-0 leading-relaxed">
                 Complete business management solution for LPG distributors. Track inventory, manage customers, process sales, and deliver online — all in one platform.
               </p>
@@ -237,18 +245,18 @@ const Welcome = () => {
               </div>
 
               {/* Quick Stats in Hero */}
-              <div className="grid grid-cols-3 gap-4 pt-4 lg:pt-6 max-w-md mx-auto lg:mx-0">
+              <div className="grid grid-cols-2 xs:grid-cols-3 gap-3 pt-4 lg:pt-6 max-w-md mx-auto lg:mx-0 border-t border-white/10 mt-4">
                 <div className="text-center lg:text-left">
                   <div className="text-xl sm:text-2xl font-bold text-white">500+</div>
                   <div className="text-[10px] sm:text-xs text-white/60">Businesses</div>
                 </div>
                 <div className="text-center lg:text-left">
                   <div className="text-xl sm:text-2xl font-bold text-white">50K+</div>
-                  <div className="text-[10px] sm:text-xs text-white/60">Deliveries/Day</div>
+                  <div className="text-[10px] sm:text-xs text-white/60">Daily Deliveries</div>
                 </div>
-                <div className="text-center lg:text-left">
+                <div className="text-center lg:text-left col-span-2 xs:col-span-1">
                   <div className="text-xl sm:text-2xl font-bold text-white">99.9%</div>
-                  <div className="text-[10px] sm:text-xs text-white/60">Uptime</div>
+                  <div className="text-[10px] sm:text-xs text-white/60">System Uptime</div>
                 </div>
               </div>
             </div>
@@ -258,12 +266,12 @@ const Welcome = () => {
               <div className="relative mx-auto max-w-md lg:max-w-none">
                 {/* Glow Effect */}
                 <div className="absolute -inset-4 bg-secondary/20 rounded-3xl blur-2xl" aria-hidden="true" />
-                
+
                 <picture>
                   <source srcSet={heroLpgImageWebP} type="image/webp" />
-                  <img 
-                    src={heroLpgImagePng} 
-                    alt="LPG Cylinders - Stock X Inventory Management" 
+                  <img
+                    src={heroLpgImagePng}
+                    alt="LPG Cylinders - Stock X Inventory Management"
                     className="relative w-full h-auto rounded-2xl sm:rounded-3xl shadow-2xl border-4 border-white/10"
                     loading="eager"
                     decoding="async"
@@ -301,7 +309,7 @@ const Welcome = () => {
         {/* Wave Bottom */}
         <div className="absolute bottom-0 left-0 right-0">
           <svg viewBox="0 0 1440 120" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full">
-            <path d="M0 120L60 110C120 100 240 80 360 70C480 60 600 60 720 65C840 70 960 80 1080 85C1200 90 1320 90 1380 90L1440 90V120H1380C1320 120 1200 120 1080 120C960 120 840 120 720 120C600 120 480 120 360 120C240 120 120 120 60 120H0Z" fill="hsl(var(--background))"/>
+            <path d="M0 120L60 110C120 100 240 80 360 70C480 60 600 60 720 65C840 70 960 80 1080 85C1200 90 1320 90 1380 90L1440 90V120H1380C1320 120 1200 120 1080 120C960 120 840 120 720 120C600 120 480 120 360 120C240 120 120 120 60 120H0Z" fill="hsl(var(--background))" />
           </svg>
         </div>
       </section>
@@ -324,7 +332,7 @@ const Welcome = () => {
               <Card key={index} className="relative overflow-hidden border-2 border-border hover:border-primary/50 transition-all duration-300 hover:shadow-2xl group">
                 {/* Gradient Top Bar */}
                 <div className={`h-2 bg-gradient-to-r ${feature.gradient}`} />
-                
+
                 <CardContent className="p-5 sm:p-6 lg:p-8 space-y-4 sm:space-y-5">
                   <div className="flex items-start gap-4">
                     <div className={`h-14 w-14 sm:h-16 sm:w-16 rounded-2xl bg-gradient-to-br ${feature.gradient} flex items-center justify-center flex-shrink-0 shadow-lg group-hover:scale-110 transition-transform duration-300`}>
@@ -335,7 +343,7 @@ const Welcome = () => {
                       <p className="text-sm sm:text-base text-muted-foreground mt-1">{feature.description}</p>
                     </div>
                   </div>
-                  
+
                   <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                     {feature.features.map((item, idx) => (
                       <li key={idx} className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -424,7 +432,7 @@ const Welcome = () => {
               <p className="text-sm sm:text-base lg:text-lg text-muted-foreground">
                 Join hundreds of distributors who have transformed their operations with Stock-X.
               </p>
-              
+
               <div className="grid grid-cols-2 gap-4 sm:gap-6 pt-2 sm:pt-4">
                 <div className="space-y-0.5 sm:space-y-1">
                   <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-secondary">+45%</div>
@@ -493,7 +501,7 @@ const Welcome = () => {
                 <h3 className="text-xl sm:text-2xl font-bold text-foreground">Pro</h3>
                 <p className="text-sm text-muted-foreground">Perfect for small businesses</p>
               </div>
-              
+
               <div className="flex items-baseline gap-1">
                 <span className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-primary">৳500</span>
                 <span className="text-muted-foreground">/month</span>
@@ -541,7 +549,7 @@ const Welcome = () => {
                 <h3 className="text-xl sm:text-2xl font-bold text-foreground">Premium</h3>
                 <p className="text-sm text-muted-foreground">For growing businesses</p>
               </div>
-              
+
               <div className="flex items-baseline gap-1">
                 <span className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-primary">৳1000</span>
                 <span className="text-muted-foreground">/month</span>
@@ -591,7 +599,7 @@ const Welcome = () => {
           <div className="absolute inset-0 opacity-10" style={{
             backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.4'%3E%3Cpath d='M36 34c0-2.21-1.79-4-4-4s-4 1.79-4 4 1.79 4 4 4 4-1.79 4-4z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
           }} />
-          
+
           <div className="relative space-y-4 sm:space-y-6 max-w-2xl mx-auto">
             <h2 className="text-xl sm:text-2xl lg:text-3xl xl:text-4xl font-bold text-white px-4">
               Ready to Transform Your LPG Business?
@@ -685,7 +693,7 @@ const Welcome = () => {
           </div>
         </div>
       </footer>
-    </div>
+    </main>
   );
 };
 

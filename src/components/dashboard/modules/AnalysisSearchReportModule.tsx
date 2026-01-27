@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { 
+import {
   Table,
   TableBody,
   TableCell,
@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { 
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
+import {
   Command,
   CommandEmpty,
   CommandGroup,
@@ -38,9 +38,9 @@ import {
   CommandList,
   CommandSeparator,
 } from "@/components/ui/command";
-import { 
-  Search, 
-  Download, 
+import {
+  Search,
+  Download,
   FileText,
   Users,
   Package,
@@ -83,16 +83,16 @@ import { toast } from "sonner";
 import { format, startOfMonth, endOfMonth, subDays } from "date-fns";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer, 
-  PieChart, 
-  Pie, 
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
   Cell,
   AreaChart,
   Area,
@@ -143,14 +143,14 @@ const CHART_COLORS = ['#22c55e', '#3b82f6', '#f97316', '#8b5cf6', '#ec4899', '#0
 export const AnalysisSearchReportModule = ({ salesData, customers, stockData, drivers, userRole }: AnalysisSearchReportModuleProps) => {
   const { t } = useLanguage();
   const isMobile = useIsMobile();
-  
+
   // View mode toggle
   const [viewMode, setViewMode] = useState<ViewMode>('analysis');
-  
+
   // Analysis state
   const [timeRange, setTimeRange] = useState<TimeRange>('daily');
   const { sales, expenses, analytics, loading: diaryLoading } = useBusinessDiaryData();
-  
+
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
   const [searchCategory, setSearchCategory] = useState("all");
@@ -199,15 +199,15 @@ export const AnalysisSearchReportModule = ({ salesData, customers, stockData, dr
     const last7Days = Array.from({ length: 7 }, (_, i) => {
       const date = subDays(new Date(), 6 - i);
       const dateStr = format(date, 'yyyy-MM-dd');
-      
+
       const dayIncome = sales
         .filter(s => s.date === dateStr)
-        .reduce((sum, s) => sum + s.totalAmount, 0);
-      
+        .reduce((sum, s) => sum + (s.amountPaid ?? s.totalAmount), 0);
+
       const dayExpenses = expenses
         .filter(e => e.date === dateStr)
         .reduce((sum, e) => sum + e.amount, 0);
-      
+
       return {
         name: format(date, 'EEE'),
         fullDate: format(date, 'MMM d'),
@@ -216,7 +216,7 @@ export const AnalysisSearchReportModule = ({ salesData, customers, stockData, dr
         profit: dayIncome - dayExpenses
       };
     });
-    
+
     return last7Days;
   }, [sales, expenses]);
 
@@ -320,7 +320,7 @@ export const AnalysisSearchReportModule = ({ salesData, customers, stockData, dr
     setCommandOpen(false);
     try {
       let report: ReportData;
-      
+
       switch (type) {
         case 'daily-sales':
           report = await generateDailySalesReport();
@@ -355,7 +355,7 @@ export const AnalysisSearchReportModule = ({ salesData, customers, stockData, dr
   // Handle action execution
   const handleAction = useCallback((actionId: string) => {
     setCommandOpen(false);
-    
+
     switch (actionId) {
       case 'action-new-sale':
         navigateToModule('pos');
@@ -413,7 +413,7 @@ export const AnalysisSearchReportModule = ({ salesData, customers, stockData, dr
         const matchesTitle = item.title.toLowerCase().includes(query);
         const matchesDesc = item.description.toLowerCase().includes(query);
         const matchesKeywords = item.keywords.some(k => k.includes(query));
-        
+
         if (matchesTitle || matchesDesc || matchesKeywords) {
           results.push({
             type: 'navigation',
@@ -565,7 +565,7 @@ export const AnalysisSearchReportModule = ({ salesData, customers, stockData, dr
   // Report generation functions
   const generateDailySalesReport = async (): Promise<ReportData> => {
     const today = format(new Date(), 'yyyy-MM-dd');
-    
+
     const { data: transactions, error } = await supabase
       .from("pos_transactions")
       .select(`*, pos_transaction_items (*)`)
@@ -802,11 +802,10 @@ export const AnalysisSearchReportModule = ({ salesData, customers, stockData, dr
               variant="ghost"
               size="sm"
               onClick={() => setTimeRange(range)}
-              className={`h-10 px-4 sm:px-6 text-xs sm:text-sm capitalize rounded-lg transition-all duration-200 touch-manipulation ${
-                timeRange === range 
-                  ? "bg-primary text-primary-foreground shadow-md hover:bg-primary/90" 
+              className={`h-10 px-4 sm:px-6 text-xs sm:text-sm capitalize rounded-lg transition-all duration-200 touch-manipulation ${timeRange === range
+                  ? "bg-primary text-primary-foreground shadow-md hover:bg-primary/90"
                   : "hover:bg-background/80"
-              }`}
+                }`}
             >
               {range}
             </Button>
@@ -941,53 +940,53 @@ export const AnalysisSearchReportModule = ({ salesData, customers, stockData, dr
                   <AreaChart data={trendChartData}>
                     <defs>
                       <linearGradient id="incomeGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="#22c55e" stopOpacity={0}/>
+                        <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
                       </linearGradient>
                       <linearGradient id="expenseGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+                        <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis 
-                      dataKey="name" 
-                      stroke="hsl(var(--muted-foreground))" 
-                      fontSize={10} 
+                    <XAxis
+                      dataKey="name"
+                      stroke="hsl(var(--muted-foreground))"
+                      fontSize={10}
                       tickLine={false}
                     />
-                    <YAxis 
-                      stroke="hsl(var(--muted-foreground))" 
+                    <YAxis
+                      stroke="hsl(var(--muted-foreground))"
                       fontSize={10}
                       tickLine={false}
                       tickFormatter={(value) => `${value / 1000}k`}
                     />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: 'hsl(var(--card))', 
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'hsl(var(--card))',
                         border: '1px solid hsl(var(--border))',
                         borderRadius: '8px',
                         fontSize: '12px'
                       }}
                       formatter={(value: number, name: string) => [
-                        `${BANGLADESHI_CURRENCY_SYMBOL}${value.toLocaleString()}`, 
+                        `${BANGLADESHI_CURRENCY_SYMBOL}${value.toLocaleString()}`,
                         name.charAt(0).toUpperCase() + name.slice(1)
                       ]}
                     />
                     <Legend />
-                    <Area 
-                      type="monotone" 
-                      dataKey="income" 
-                      stroke="#22c55e" 
+                    <Area
+                      type="monotone"
+                      dataKey="income"
+                      stroke="#22c55e"
                       strokeWidth={2}
-                      fill="url(#incomeGradient)" 
+                      fill="url(#incomeGradient)"
                     />
-                    <Area 
-                      type="monotone" 
-                      dataKey="expenses" 
-                      stroke="#ef4444" 
+                    <Area
+                      type="monotone"
+                      dataKey="expenses"
+                      stroke="#ef4444"
                       strokeWidth={2}
-                      fill="url(#expenseGradient)" 
+                      fill="url(#expenseGradient)"
                     />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -1020,10 +1019,10 @@ export const AnalysisSearchReportModule = ({ salesData, customers, stockData, dr
                           <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}
                       </Pie>
-                      <Tooltip 
+                      <Tooltip
                         formatter={(value: number) => [`${BANGLADESHI_CURRENCY_SYMBOL}${value.toLocaleString()}`, '']}
-                        contentStyle={{ 
-                          backgroundColor: 'hsl(var(--card))', 
+                        contentStyle={{
+                          backgroundColor: 'hsl(var(--card))',
                           border: '1px solid hsl(var(--border))',
                           borderRadius: '8px',
                           fontSize: '12px'
@@ -1066,10 +1065,10 @@ export const AnalysisSearchReportModule = ({ salesData, customers, stockData, dr
                           <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}
                       </Pie>
-                      <Tooltip 
+                      <Tooltip
                         formatter={(value: number) => [`${BANGLADESHI_CURRENCY_SYMBOL}${value.toLocaleString()}`, '']}
-                        contentStyle={{ 
-                          backgroundColor: 'hsl(var(--card))', 
+                        contentStyle={{
+                          backgroundColor: 'hsl(var(--card))',
                           border: '1px solid hsl(var(--border))',
                           borderRadius: '8px',
                           fontSize: '12px'
@@ -1154,8 +1153,8 @@ export const AnalysisSearchReportModule = ({ salesData, customers, stockData, dr
   const renderSearchView = () => (
     <div className="space-y-4">
       {/* Quick Search Button */}
-      <Button 
-        variant="outline" 
+      <Button
+        variant="outline"
         onClick={() => setCommandOpen(true)}
         className="w-full gap-2 h-12 justify-start"
       >
@@ -1201,7 +1200,7 @@ export const AnalysisSearchReportModule = ({ salesData, customers, stockData, dr
               </SelectContent>
             </Select>
           </div>
-          
+
           {/* Search Results */}
           {searchQuery && searchResults.length > 0 && (
             <ScrollArea className="h-[200px] sm:h-[250px]">
@@ -1227,7 +1226,7 @@ export const AnalysisSearchReportModule = ({ salesData, customers, stockData, dr
               </div>
             </ScrollArea>
           )}
-          
+
           {searchQuery && searchResults.length === 0 && (
             <div className="text-center py-6 text-muted-foreground">
               <Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
@@ -1248,8 +1247,8 @@ export const AnalysisSearchReportModule = ({ salesData, customers, stockData, dr
         </CardHeader>
         <CardContent className="px-3 pb-3">
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="h-auto py-3 px-3 flex flex-col items-center gap-2 text-xs"
               onClick={() => generateReport('daily-sales')}
               disabled={isGeneratingReport}
@@ -1257,8 +1256,8 @@ export const AnalysisSearchReportModule = ({ salesData, customers, stockData, dr
               <Receipt className="h-5 w-5 text-green-600" />
               <span>Daily Sales</span>
             </Button>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="h-auto py-3 px-3 flex flex-col items-center gap-2 text-xs"
               onClick={() => generateReport('stock-status')}
               disabled={isGeneratingReport}
@@ -1266,8 +1265,8 @@ export const AnalysisSearchReportModule = ({ salesData, customers, stockData, dr
               <Package className="h-5 w-5 text-blue-600" />
               <span>Stock Status</span>
             </Button>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="h-auto py-3 px-3 flex flex-col items-center gap-2 text-xs"
               onClick={() => generateReport('customer-analysis')}
               disabled={isGeneratingReport}
@@ -1276,8 +1275,8 @@ export const AnalysisSearchReportModule = ({ salesData, customers, stockData, dr
               <span>Customer Dues</span>
             </Button>
             {userRole === 'owner' && (
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="h-auto py-3 px-3 flex flex-col items-center gap-2 text-xs"
                 onClick={() => generateReport('financial-summary')}
                 disabled={isGeneratingReport}
@@ -1286,8 +1285,8 @@ export const AnalysisSearchReportModule = ({ salesData, customers, stockData, dr
                 <span>Financial</span>
               </Button>
             )}
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="h-auto py-3 px-3 flex flex-col items-center gap-2 text-xs"
               onClick={() => generateReport('monthly-report')}
               disabled={isGeneratingReport}
@@ -1308,9 +1307,9 @@ export const AnalysisSearchReportModule = ({ salesData, customers, stockData, dr
                 <Clock className="h-4 w-4 text-muted-foreground" />
                 Recent Searches
               </CardTitle>
-              <Button 
-                variant="ghost" 
-                size="sm" 
+              <Button
+                variant="ghost"
+                size="sm"
                 className="h-7 text-xs"
                 onClick={() => {
                   setRecentSearches([]);
@@ -1369,11 +1368,10 @@ export const AnalysisSearchReportModule = ({ salesData, customers, stockData, dr
               <Button
                 variant="ghost"
                 size="sm"
-                className={`h-12 rounded-lg transition-all duration-200 touch-manipulation ${
-                  viewMode === 'analysis' 
-                    ? 'bg-primary text-primary-foreground shadow-lg hover:bg-primary/90' 
+                className={`h-12 rounded-lg transition-all duration-200 touch-manipulation ${viewMode === 'analysis'
+                    ? 'bg-primary text-primary-foreground shadow-lg hover:bg-primary/90'
                     : 'hover:bg-background/80'
-                }`}
+                  }`}
                 onClick={() => setViewMode('analysis')}
               >
                 <div className="flex items-center gap-2">
@@ -1384,11 +1382,10 @@ export const AnalysisSearchReportModule = ({ salesData, customers, stockData, dr
               <Button
                 variant="ghost"
                 size="sm"
-                className={`h-12 rounded-lg transition-all duration-200 touch-manipulation ${
-                  viewMode === 'search' 
-                    ? 'bg-accent text-accent-foreground shadow-lg hover:bg-accent/90' 
+                className={`h-12 rounded-lg transition-all duration-200 touch-manipulation ${viewMode === 'search'
+                    ? 'bg-accent text-accent-foreground shadow-lg hover:bg-accent/90'
                     : 'hover:bg-background/80'
-                }`}
+                  }`}
                 onClick={() => setViewMode('search')}
               >
                 <div className="flex items-center gap-2">
@@ -1409,8 +1406,8 @@ export const AnalysisSearchReportModule = ({ salesData, customers, stockData, dr
         <DialogContent className="p-0 gap-0 max-w-[95vw] md:max-w-2xl overflow-hidden" aria-describedby={undefined}>
           <DialogTitle className="sr-only">Quick Command Palette</DialogTitle>
           <Command className="rounded-lg border-0" shouldFilter={true}>
-            <CommandInput 
-              placeholder="Search pages, actions, customers, sales, stock..." 
+            <CommandInput
+              placeholder="Search pages, actions, customers, sales, stock..."
               className="h-12 md:h-14 text-base border-0"
             />
             <CommandList className="max-h-[60vh] md:max-h-[400px]">
@@ -1421,11 +1418,11 @@ export const AnalysisSearchReportModule = ({ salesData, customers, stockData, dr
                   <p className="text-xs text-muted-foreground mt-1">Try different keywords</p>
                 </div>
               </CommandEmpty>
-              
+
               {/* Pages */}
               <CommandGroup heading="Pages">
                 {categoryGroups.pages.map(item => (
-                  <CommandItem 
+                  <CommandItem
                     key={item.id}
                     value={`${item.title} ${item.description} ${item.keywords.join(' ')}`}
                     onSelect={() => handleAction(item.id)}
@@ -1440,13 +1437,13 @@ export const AnalysisSearchReportModule = ({ salesData, customers, stockData, dr
                   </CommandItem>
                 ))}
               </CommandGroup>
-              
+
               <CommandSeparator />
-              
+
               {/* Quick Actions */}
               <CommandGroup heading="Quick Actions">
                 {categoryGroups.actions.map(item => (
-                  <CommandItem 
+                  <CommandItem
                     key={item.id}
                     value={`${item.title} ${item.description} ${item.keywords.join(' ')}`}
                     onSelect={() => handleAction(item.id)}
@@ -1465,13 +1462,13 @@ export const AnalysisSearchReportModule = ({ salesData, customers, stockData, dr
                   </CommandItem>
                 ))}
               </CommandGroup>
-              
+
               <CommandSeparator />
-              
+
               {/* Reports */}
               <CommandGroup heading="Reports">
                 {categoryGroups.reports.map(item => (
-                  <CommandItem 
+                  <CommandItem
                     key={item.id}
                     value={`${item.title} ${item.description} ${item.keywords.join(' ')}`}
                     onSelect={() => handleAction(item.id)}
@@ -1504,13 +1501,13 @@ export const AnalysisSearchReportModule = ({ salesData, customers, stockData, dr
               Generated on {format(new Date(), 'dd MMM yyyy, hh:mm a')}
             </DialogDescription>
           </DialogHeader>
-          
+
           <Tabs value={activeReportTab} onValueChange={setActiveReportTab} className="flex-1 flex flex-col overflow-hidden">
             <TabsList className="grid w-full grid-cols-2 h-10">
               <TabsTrigger value="preview" className="text-xs sm:text-sm">Preview</TabsTrigger>
               <TabsTrigger value="summary" className="text-xs sm:text-sm">Summary</TabsTrigger>
             </TabsList>
-            
+
             <TabsContent value="preview" className="flex-1 overflow-hidden mt-3">
               <ScrollArea className="h-[50vh] sm:h-[55vh]">
                 <Table>
@@ -1533,7 +1530,7 @@ export const AnalysisSearchReportModule = ({ salesData, customers, stockData, dr
                 </Table>
               </ScrollArea>
             </TabsContent>
-            
+
             <TabsContent value="summary" className="mt-3">
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {currentReport?.summary?.map((item, i) => (
@@ -1547,7 +1544,7 @@ export const AnalysisSearchReportModule = ({ salesData, customers, stockData, dr
               </div>
             </TabsContent>
           </Tabs>
-          
+
           <div className="flex justify-end gap-2 pt-3 border-t">
             <Button variant="outline" onClick={() => setReportDialogOpen(false)} className="h-10">
               Close

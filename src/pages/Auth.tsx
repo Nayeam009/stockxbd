@@ -13,7 +13,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { validateBDPhone, getPhoneValidationError, formatBDPhone } from "@/lib/phoneValidation";
 
 type AuthMode = 'signin' | 'signup' | 'manager-invite';
-type UserRole = 'owner' | 'manager' | 'customer';
+type UserRole = 'owner' | 'manager' | 'customer' | 'super_admin';
 type SignupCategory = 'customer' | 'owner';
 
 interface SignupCategoryOption {
@@ -50,10 +50,12 @@ const signupCategories: SignupCategoryOption[] = [
 const Auth = () => {
   const [searchParams] = useSearchParams();
   const inviteCode = searchParams.get('invite');
-  
+
   const [authMode, setAuthMode] = useState<AuthMode>('signin');
   const [signupCategory, setSignupCategory] = useState<SignupCategory>('customer');
   const [email, setEmail] = useState("");
+  const [loginId, setLoginId] = useState(""); // Replaces email for login
+  const [username, setUsername] = useState(""); // For manager signup
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [fullName, setFullName] = useState("");
@@ -64,14 +66,14 @@ const Auth = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  
+
   // Manager invite specific state
   const [inviteValid, setInviteValid] = useState<boolean | null>(null);
   const [inviteData, setInviteData] = useState<{ role: string; created_by: string } | null>(null);
   const [ownerShopName, setOwnerShopName] = useState("");
-  
+
   const navigate = useNavigate();
-  
+
   // Retry handler for loading failures
   const handleRetry = useCallback(() => {
     setLoadError(null);
@@ -86,14 +88,14 @@ const Auth = () => {
 
     const checkSystemState = async () => {
       if (!mounted) return;
-      
+
       // Set a timeout to show error if loading takes too long
       timeoutId = setTimeout(() => {
         if (mounted) {
           setLoadError('Connection is slow. Please check your internet and try again.');
         }
       }, 15000);
-      
+
       try {
         // Check if user is already logged in
         const { data: { session } } = await supabase.auth.getSession();
@@ -104,7 +106,7 @@ const Auth = () => {
             .select('role')
             .eq('user_id', session.user.id)
             .maybeSingle();
-          
+
           if (roleData?.role === 'customer') {
             navigate('/community');
           } else {
@@ -116,7 +118,7 @@ const Auth = () => {
         // If invite code is present, validate it for manager signup
         if (inviteCode) {
           const { data: inviteResult, error } = await supabase.rpc('validate_invite', { _code: inviteCode });
-          
+
           if (error || !inviteResult || inviteResult.length === 0) {
             if (mounted) {
               setInviteValid(false);
@@ -131,14 +133,14 @@ const Auth = () => {
             setInviteValid(true);
             setInviteData({ role: inviteResult[0].role, created_by: inviteResult[0].created_by });
             setAuthMode('manager-invite');
-            
+
             // Get shop name for display
             const { data: shopData } = await supabase
               .from('shop_profiles')
               .select('shop_name')
               .eq('owner_id', inviteResult[0].created_by)
               .maybeSingle();
-            
+
             if (shopData) {
               setOwnerShopName(shopData.shop_name);
             }
@@ -146,7 +148,7 @@ const Auth = () => {
         } else {
           // Check if any owners exist
           const { data: hasOwners, error } = await supabase.rpc('owners_exist');
-          
+
           if (error) {
             console.error('Error checking owners:', error);
             if (mounted) setOwnersExist(true);
@@ -170,16 +172,16 @@ const Auth = () => {
     };
 
     checkSystemState();
-    
+
     return () => {
       mounted = false;
       clearTimeout(timeoutId);
     };
   }, [inviteCode, navigate]);
 
-  // Handle manager registration with invite
   const handleManagerSignUp = async () => {
-    if (!email || !password || !fullName || !phoneNumber) {
+    // Only require username, name, password for manager
+    if (!username || !password || !fullName) {
       toast({ title: "Please fill in all fields", variant: "destructive" });
       return;
     }
@@ -191,11 +193,6 @@ const Auth = () => {
 
     if (password.length < 6) {
       toast({ title: "Password must be at least 6 characters", variant: "destructive" });
-      return;
-    }
-
-    if (!validateBDPhone(phoneNumber)) {
-      toast({ title: getPhoneValidationError(phoneNumber), variant: "destructive" });
       return;
     }
 
@@ -207,15 +204,17 @@ const Auth = () => {
     setLoading(true);
 
     try {
+      // Generate synthetic email for username login
+      const syntheticEmail = `${username.toLowerCase().replace(/\s+/g, '')}@manager.stockx`;
+
       // Create the manager account
       const { data, error } = await supabase.auth.signUp({
-        email,
+        email: syntheticEmail,
         password,
         options: {
-          emailRedirectTo: window.location.origin,
           data: {
             full_name: fullName,
-            phone: formatBDPhone(phoneNumber),
+            username: username,
             requested_role: 'manager'
           }
         }
@@ -224,32 +223,32 @@ const Auth = () => {
       if (error) throw error;
 
       if (data.user) {
-        // Mark invite as used and add to team
+        // Mark invite as used
         await supabase.rpc('mark_invite_used', {
           _code: inviteCode,
           _user_id: data.user.id,
-          _email: email
+          _email: syntheticEmail
         });
-        
-        // Update profile with phone
+
+        // Update profile
         await supabase.from('profiles').upsert({
           user_id: data.user.id,
           full_name: fullName,
-          phone: formatBDPhone(phoneNumber)
+          username: username
         });
-        
-        toast({ 
-          title: "Welcome to the Team!", 
-          description: `You've successfully joined ${ownerShopName || 'the shop'} as Manager` 
+
+        toast({
+          title: "Welcome to the Team!",
+          description: `You've successfully joined ${ownerShopName || 'the shop'} as Manager`
         });
-        
+
         navigate('/dashboard');
       }
     } catch (error: any) {
-      toast({ 
-        title: "Registration Failed", 
-        description: error.message, 
-        variant: "destructive" 
+      toast({
+        title: "Registration Failed",
+        description: error.message,
+        variant: "destructive"
       });
     } finally {
       setLoading(false);
@@ -257,8 +256,12 @@ const Auth = () => {
   };
 
   const handleSignUp = async () => {
-    if (!email || !password) {
-      toast({ title: "Please fill in all fields", variant: "destructive" });
+    const isOwner = signupCategory === 'owner';
+    const isCustomer = signupCategory === 'customer';
+
+    // Validation
+    if (!password || (isOwner && !email) || (isCustomer && !phoneNumber)) {
+      toast({ title: "Please fill in all required fields", variant: "destructive" });
       return;
     }
 
@@ -267,24 +270,30 @@ const Auth = () => {
       return;
     }
 
-    if (password.length < 6) {
-      toast({ title: "Password must be at least 6 characters", variant: "destructive" });
+    if (isCustomer && !validateBDPhone(phoneNumber)) {
+      toast({ title: getPhoneValidationError(phoneNumber), variant: "destructive" });
       return;
     }
 
     setLoading(true);
 
     try {
-      const actualRole = signupCategory === 'customer' ? 'customer' : 'owner';
+      let signupEmail = email;
+
+      // For customers, generate synthetic email from phone
+      if (isCustomer) {
+        const formattedPhone = formatBDPhone(phoneNumber).replace('+', '');
+        signupEmail = `${formattedPhone}@customer.stockx`;
+      }
 
       const { data, error } = await supabase.auth.signUp({
-        email,
+        email: signupEmail,
         password,
         options: {
-          emailRedirectTo: window.location.origin,
           data: {
             full_name: fullName || undefined,
-            requested_role: actualRole
+            phone: isCustomer ? formatBDPhone(phoneNumber) : (phoneNumber ? formatBDPhone(phoneNumber) : undefined),
+            requested_role: isCustomer ? 'customer' : 'owner'
           }
         }
       });
@@ -292,23 +301,32 @@ const Auth = () => {
       if (error) throw error;
 
       if (data.user) {
-        toast({ 
-          title: "Account Created Successfully!", 
-          description: `Welcome! You've signed up as ${actualRole === 'customer' ? 'Customer' : 'Shop Owner'}` 
+        /* If owner provided phone, update profile */
+        if (isOwner && phoneNumber) {
+          await supabase.from('profiles').upsert({
+            user_id: data.user.id,
+            phone: formatBDPhone(phoneNumber),
+            full_name: fullName
+          });
+        }
+
+        toast({
+          title: "Account Created Successfully!",
+          description: `Welcome! You've signed up as ${isCustomer ? 'Customer' : 'Shop Owner'}`
         });
-        
+
         // Redirect based on role
-        if (actualRole === 'customer') {
+        if (isCustomer) {
           navigate('/community');
         } else {
           navigate('/dashboard');
         }
       }
     } catch (error: any) {
-      toast({ 
-        title: "Registration Failed", 
-        description: error.message, 
-        variant: "destructive" 
+      toast({
+        title: "Registration Failed",
+        description: error.message,
+        variant: "destructive"
       });
     } finally {
       setLoading(false);
@@ -316,31 +334,80 @@ const Auth = () => {
   };
 
   const handleSignIn = async () => {
-    if (!email || !password) {
-      toast({ title: "Please fill in all fields", variant: "destructive" });
+    if (!loginId || !password) {
+      toast({ title: "Please ensure ID and Password are filled", variant: "destructive" });
       return;
     }
 
     setLoading(true);
 
     try {
+      let signInEmail = loginId;
+
+      // Smart ID resolution
+      if (loginId.includes('@')) {
+        // Assume it's an email (Standard Owner/Admin login)
+        signInEmail = loginId;
+      } else if (/^(01\d{9}|\+8801\d{9})$/.test(loginId)) {
+        // Look like a phone number? -> Customer Login
+        const formattedPhone = formatBDPhone(loginId).replace('+', '');
+        signInEmail = `${formattedPhone}@customer.stockx`;
+      } else {
+        // Assume it's a username -> Manager Login
+        signInEmail = `${loginId.toLowerCase().replace(/\s+/g, '')}@manager.stockx`;
+      }
+
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
+        email: signInEmail,
         password,
       });
 
-      if (error) throw error;
+      if (error) {
+        // If first attempt fails, and likely username/phone, maybe try fallback? 
+        // For now, strict mapping is safer.
+        throw error;
+      };
 
       if (data.user) {
         toast({ title: "Welcome back!", description: "Successfully signed in" });
-        
+
         // Check user role and redirect accordingly
         const { data: roleData } = await supabase
           .from('user_roles')
           .select('role')
           .eq('user_id', data.user.id)
           .maybeSingle();
-        
+
+        // STRICT CHECK: For Managers, ensure Parent Shop is active
+        if (roleData?.role === 'manager') {
+          // 1. Get the owner this manager belongs to
+          const { data: teamMember } = await supabase
+            .from('team_members')
+            .select('owner_id')
+            .eq('member_id', data.user.id)
+            .maybeSingle();
+
+          if (teamMember) {
+            // 2. Check if that owner's shop exists and is verified (proxy for active)
+            const { data: shop } = await supabase
+              .from('shop_profiles')
+              .select('id, is_verified')
+              .eq('owner_id', teamMember.owner_id)
+              .maybeSingle();
+
+            if (!shop) {
+              await supabase.auth.signOut();
+              throw new Error("Shop not found. Please contact the owner.");
+            }
+
+            // Optional: Enforce verification. If the requirements strongly imply "Active" = Verified
+            // if (shop.is_verified === false) {
+            //    await supabase.auth.signOut();
+            //    throw new Error("Shop is not verified yet. Please contact support.");
+            // }
+          }
+        }
+
         if (roleData?.role === 'customer') {
           navigate('/community');
         } else {
@@ -348,10 +415,15 @@ const Auth = () => {
         }
       }
     } catch (error: any) {
-      toast({ 
-        title: "Sign In Failed", 
-        description: error.message, 
-        variant: "destructive" 
+      // Special handling for auth errors to give hint
+      let msg = error.message;
+      if (msg === "Invalid login credentials") {
+        msg = "Invalid ID or Password. Check if you used the correct Phone or Username.";
+      }
+      toast({
+        title: "Sign In Failed",
+        description: msg,
+        variant: "destructive"
       });
     } finally {
       setLoading(false);
@@ -370,10 +442,10 @@ const Auth = () => {
 
       if (error) throw error;
     } catch (error: any) {
-      toast({ 
-        title: "Google authentication failed", 
-        description: error.message, 
-        variant: "destructive" 
+      toast({
+        title: "Google authentication failed",
+        description: error.message,
+        variant: "destructive"
       });
       setLoading(false);
     }
@@ -381,7 +453,7 @@ const Auth = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (authMode === 'signin') {
       await handleSignIn();
     } else if (authMode === 'manager-invite') {
@@ -399,9 +471,9 @@ const Auth = () => {
         <div className="text-center space-y-4">
           <div className="relative">
             <div className="absolute inset-0 bg-white/20 rounded-full blur-xl animate-pulse" />
-            <img 
-              src={stockXLogo} 
-              alt="Stock-X" 
+            <img
+              src={stockXLogo}
+              alt="Stock-X"
               className="relative h-16 w-16 mx-auto rounded-xl shadow-lg"
             />
           </div>
@@ -413,9 +485,9 @@ const Auth = () => {
           {loadError && (
             <div className="mt-6 p-4 bg-white/10 rounded-xl border border-white/20">
               <p className="text-white/90 text-sm mb-3">{loadError}</p>
-              <Button 
-                variant="secondary" 
-                size="sm" 
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={handleRetry}
                 className="h-10 px-6"
               >
@@ -439,23 +511,23 @@ const Auth = () => {
           <div className="absolute bottom-40 right-20 w-48 h-48 border-2 border-white rounded-full" />
           <div className="absolute top-1/2 left-1/3 w-24 h-24 border-2 border-white rounded-full" />
         </div>
-        
+
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-8">
             <img src={stockXLogo} alt="Stock-X" className="h-14 w-14" />
             <span className="text-3xl font-bold text-white">Stock-X</span>
           </div>
-          
+
           <h1 className="text-4xl xl:text-5xl font-bold text-white mb-4 leading-tight">
             L.P.G Inventory &
             <br />
             <span className="text-secondary">Online Delivery Platform</span>
           </h1>
-          
+
           <p className="text-white/80 text-lg mb-10 max-w-md">
             Complete business management for LPG distributors with real-time tracking and analytics.
           </p>
-          
+
           {/* Feature Highlights */}
           <div className="space-y-4 mb-10">
             <div className="flex items-center gap-3 text-white/90">
@@ -477,7 +549,7 @@ const Auth = () => {
               <span>Secure Role-Based Access</span>
             </div>
           </div>
-          
+
           {/* Trust Indicators */}
           <div className="flex gap-8 text-white/90">
             <div>
@@ -573,7 +645,7 @@ const Auth = () => {
                 </>
               )}
             </CardHeader>
-            
+
             <CardContent>
               {/* Invalid Invite Alert */}
               {inviteCode && inviteValid === false && (
@@ -620,11 +692,10 @@ const Auth = () => {
                           type="button"
                           onClick={() => setSignupCategory(category.id)}
                           disabled={loading}
-                          className={`p-4 rounded-xl border-2 transition-all text-center ${
-                            isSelected 
-                              ? `${category.borderColor} ${category.bgColor}` 
-                              : 'border-border hover:border-muted-foreground/50'
-                          }`}
+                          className={`p-4 rounded-xl border-2 transition-all text-center ${isSelected
+                            ? `${category.borderColor} ${category.bgColor}`
+                            : 'border-border hover:border-muted-foreground/50'
+                            }`}
                         >
                           <Icon className={`h-8 w-8 mx-auto mb-2 ${category.color}`} />
                           <span className="font-semibold text-sm block">{category.label}</span>
@@ -660,51 +731,54 @@ const Auth = () => {
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="fullName">Full Name *</Label>
-                    <Input 
-                      id="fullName" 
-                      type="text" 
+                    <Input
+                      id="fullName"
+                      type="text"
                       placeholder="Enter your full name"
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
                       disabled={loading}
                       className="h-12"
                       required
+                      autoComplete="name"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="email">Email Address *</Label>
-                    <Input 
-                      id="email" 
-                      type="email" 
-                      placeholder="your@email.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                    <Label htmlFor="username">Username *</Label>
+                    <Input
+                      id="username"
+                      type="text"
+                      placeholder="Choose a unique username"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value.replace(/\s/g, ''))}
                       required
                       disabled={loading}
                       className="h-12"
+                      autoComplete="username"
                     />
                   </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="phone">Phone Number *</Label>
-                    <Input 
-                      id="phone" 
-                      type="tel" 
+                    <Input
+                      id="phone"
+                      type="tel"
                       placeholder="01XXXXXXXXX"
                       value={phoneNumber}
                       onChange={(e) => setPhoneNumber(e.target.value)}
                       required
                       disabled={loading}
                       className="h-12"
+                      autoComplete="tel"
                     />
                   </div>
-                  
+
                   <div className="space-y-2">
                     <Label htmlFor="password">Password *</Label>
                     <div className="relative">
-                      <Input 
-                        id="password" 
+                      <Input
+                        id="password"
                         type={showPassword ? "text" : "password"}
                         placeholder="Create a password (min 6 characters)"
                         value={password}
@@ -712,15 +786,16 @@ const Auth = () => {
                         required
                         disabled={loading}
                         className="h-12 pr-10"
+                        autoComplete="new-password"
                       />
                       <Button
                         type="button"
                         variant="ghost"
                         size="icon"
-                        className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
+                        className="absolute right-1 top-1/2 -translate-y-1/2 h-10 w-10 text-muted-foreground hover:text-foreground"
                         onClick={() => setShowPassword(!showPassword)}
                       >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                       </Button>
                     </div>
                   </div>
@@ -728,8 +803,8 @@ const Auth = () => {
                   <div className="space-y-2">
                     <Label htmlFor="confirmPassword">Confirm Password *</Label>
                     <div className="relative">
-                      <Input 
-                        id="confirmPassword" 
+                      <Input
+                        id="confirmPassword"
                         type={showConfirmPassword ? "text" : "password"}
                         placeholder="Re-enter your password"
                         value={confirmPassword}
@@ -750,8 +825,8 @@ const Auth = () => {
                     </div>
                   </div>
 
-                  <Button 
-                    type="submit" 
+                  <Button
+                    type="submit"
                     className="w-full h-12 bg-gradient-primary hover:opacity-90 transition-opacity text-base"
                     disabled={loading}
                   >
@@ -772,8 +847,8 @@ const Auth = () => {
                     <p className="text-sm text-muted-foreground mb-2">
                       Already have an account?
                     </p>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       className="w-full h-11"
                       onClick={() => setAuthMode('signin')}
                       type="button"
@@ -793,37 +868,81 @@ const Auth = () => {
                   {isSignUpMode && (
                     <div className="space-y-2">
                       <Label htmlFor="fullName">Full Name</Label>
-                      <Input 
-                        id="fullName" 
-                        type="text" 
+                      <Input
+                        id="fullName"
+                        type="text"
                         placeholder="Enter your full name"
                         value={fullName}
                         onChange={(e) => setFullName(e.target.value)}
                         disabled={loading}
                         className="h-12"
+                        autoComplete="name"
                       />
                     </div>
                   )}
 
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email Address</Label>
-                    <Input 
-                      id="email" 
-                      type="email" 
-                      placeholder="your@email.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                      disabled={loading}
-                      className="h-12"
-                    />
-                  </div>
-                  
+                  {/* Sign In Only: Login ID */}
+                  {!isSignUpMode && (
+                    <div className="space-y-2">
+                      <Label htmlFor="loginId">Email, Phone, or Username</Label>
+                      <Input
+                        id="loginId"
+                        type="text"
+                        placeholder="Enter email, phone, or username"
+                        value={loginId}
+                        onChange={(e) => setLoginId(e.target.value)}
+                        required
+                        disabled={loading}
+                        className="h-12"
+                        autoComplete="username"
+                      />
+                    </div>
+                  )}
+
+                  {/* Sign Up Only: Role Specific Inputs */}
+                  {isSignUpMode && (
+                    <>
+                      {/* Email - Only for Shop Owner Sign Up */}
+                      {signupCategory === 'owner' && (
+                        <div className="space-y-2">
+                          <Label htmlFor="email">Email Address</Label>
+                          <Input
+                            id="email"
+                            type="email"
+                            placeholder="your@email.com"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            disabled={loading}
+                            className="h-12"
+                            required
+                            autoComplete="email"
+                          />
+                        </div>
+                      )}
+
+                      {/* Phone - For Customer (Req) and Owner (Opt) */}
+                      <div className="space-y-2">
+                        <Label htmlFor="phone">Phone Number {signupCategory === 'customer' && '*'}</Label>
+                        <Input
+                          id="phone"
+                          type="tel"
+                          placeholder="01XXXXXXXXX"
+                          value={phoneNumber}
+                          onChange={(e) => setPhoneNumber(e.target.value)}
+                          disabled={loading}
+                          className="h-12"
+                          required={signupCategory === 'customer'}
+                          autoComplete="tel"
+                        />
+                      </div>
+                    </>
+                  )}
+
                   <div className="space-y-2">
                     <Label htmlFor="password">Password</Label>
                     <div className="relative">
-                      <Input 
-                        id="password" 
+                      <Input
+                        id="password"
                         type={showPassword ? "text" : "password"}
                         placeholder={isSignUpMode ? "Create a password (min 6 characters)" : "Enter your password"}
                         value={password}
@@ -831,15 +950,16 @@ const Auth = () => {
                         required
                         disabled={loading}
                         className="h-12 pr-10"
+                        autoComplete={isSignUpMode ? "new-password" : "current-password"}
                       />
                       <Button
                         type="button"
                         variant="ghost"
                         size="icon"
-                        className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
+                        className="absolute right-1 top-1/2 -translate-y-1/2 h-10 w-10 text-muted-foreground hover:text-foreground"
                         onClick={() => setShowPassword(!showPassword)}
                       >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                       </Button>
                     </div>
                   </div>
@@ -849,8 +969,8 @@ const Auth = () => {
                     <div className="space-y-2">
                       <Label htmlFor="confirmPassword">Confirm Password</Label>
                       <div className="relative">
-                        <Input 
-                          id="confirmPassword" 
+                        <Input
+                          id="confirmPassword"
                           type={showConfirmPassword ? "text" : "password"}
                           placeholder="Re-enter your password"
                           value={confirmPassword}
@@ -858,22 +978,23 @@ const Auth = () => {
                           required
                           disabled={loading}
                           className="h-12 pr-10"
+                          autoComplete="new-password"
                         />
                         <Button
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
+                          className="absolute right-1 top-1/2 -translate-y-1/2 h-10 w-10 text-muted-foreground hover:text-foreground"
                           onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                         >
-                          {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                         </Button>
                       </div>
                     </div>
                   )}
 
-                  <Button 
-                    type="submit" 
+                  <Button
+                    type="submit"
                     className="w-full h-12 bg-gradient-primary hover:opacity-90 transition-opacity text-base"
                     disabled={loading}
                   >
@@ -910,7 +1031,7 @@ const Auth = () => {
                   </div>
 
                   {/* Google OAuth */}
-                  <Button 
+                  <Button
                     type="button"
                     variant="outline"
                     className="w-full h-12"
@@ -945,8 +1066,8 @@ const Auth = () => {
                         <p className="text-sm text-muted-foreground">
                           Don't have an account yet?
                         </p>
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           className="w-full h-11"
                           onClick={() => setAuthMode('signup')}
                           type="button"
@@ -965,8 +1086,8 @@ const Auth = () => {
                         <p className="text-sm text-muted-foreground">
                           Already have an account?
                         </p>
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           className="w-full h-11"
                           onClick={() => setAuthMode('signin')}
                           type="button"

@@ -9,18 +9,18 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { Separator } from "@/components/ui/separator";
-import { 
+import {
   Drawer,
   DrawerContent,
   DrawerHeader,
   DrawerTitle,
   DrawerFooter,
 } from "@/components/ui/drawer";
-import { 
-  Plus, 
-  Minus, 
-  Trash2, 
-  ShoppingCart, 
+import {
+  Plus,
+  Minus,
+  Trash2,
+  ShoppingCart,
   Loader2,
   X,
   User,
@@ -150,7 +150,7 @@ const DEFAULT_CREDIT_LIMIT = 10000;
 
 // ============= POS MODULE PROPS =============
 interface POSModuleProps {
-  userRole?: 'owner' | 'manager' | 'driver' | 'staff';
+  userRole?: 'owner' | 'manager' | 'super_admin';
   userName?: string;
 }
 
@@ -158,8 +158,7 @@ interface POSModuleProps {
 const ROLE_CONFIG: Record<string, { label: string; color: string; bgColor: string }> = {
   owner: { label: 'Owner', color: 'text-emerald-700', bgColor: 'bg-emerald-100 border-emerald-300' },
   manager: { label: 'Manager', color: 'text-blue-700', bgColor: 'bg-blue-100 border-blue-300' },
-  driver: { label: 'Driver', color: 'text-amber-700', bgColor: 'bg-amber-100 border-amber-300' },
-  staff: { label: 'Staff', color: 'text-purple-700', bgColor: 'bg-purple-100 border-purple-300' },
+  super_admin: { label: 'Super Admin', color: 'text-emerald-700', bgColor: 'bg-emerald-100 border-emerald-300' },
 };
 
 // ============= MAIN POS MODULE =============
@@ -167,7 +166,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
   const { t, language } = useLanguage();
   const isMobile = useIsMobile();
   const { isOnline } = useNetwork();
-  
+
   // ===== DATA STATE =====
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
@@ -176,10 +175,10 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
   const [regulators, setRegulators] = useState<Regulator[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [productPrices, setProductPrices] = useState<ProductPrice[]>([]);
-  
+
   // ===== ACTIVE TABLE STATE (Sale or Return) =====
   const [activeTable, setActiveTable] = useState<'sale' | 'return'>('sale');
-  
+
   // ===== PRODUCT SELECTION STATE =====
   const [activeTab, setActiveTab] = useState("lpg");
   const [cylinderType, setCylinderType] = useState<"refill" | "package">("refill");
@@ -187,37 +186,37 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
   const [mouthSize, setMouthSize] = useState("22mm");
   const [weight, setWeight] = useState("12kg");
   const [productSearch, setProductSearch] = useState("");
-  
+
   // ===== CART STATE (Selling Items) =====
   const [saleItems, setSaleItems] = useState<SaleItem[]>([]);
-  
+
   // ===== RETURN CYLINDER STATE =====
   const [returnItems, setReturnItems] = useState<ReturnItem[]>([]);
   const [customReturnBrand, setCustomReturnBrand] = useState("");
   const [showCustomBrandInput, setShowCustomBrandInput] = useState(false);
-  
+
   // ===== CUSTOM SELLING BRAND STATE =====
   const [showCustomSellingBrandInput, setShowCustomSellingBrandInput] = useState(false);
   const [customSellingBrand, setCustomSellingBrand] = useState("");
   const [customSellingPrice, setCustomSellingPrice] = useState("");
-  
+
   // ===== CUSTOM STOVE/REGULATOR STATE =====
   const [showCustomStoveInput, setShowCustomStoveInput] = useState(false);
   const [customStove, setCustomStove] = useState({ brand: "", burners: 1, price: "" });
   const [showCustomRegulatorInput, setShowCustomRegulatorInput] = useState(false);
   const [customRegulator, setCustomRegulator] = useState({ brand: "", type: "22mm", price: "" });
-  
+
   // ===== CUSTOM WEIGHT STATE =====
   const [showCustomWeightInput, setShowCustomWeightInput] = useState(false);
   const [customWeight, setCustomWeight] = useState("");
-  
+
   // ===== PHONE-FIRST CUSTOMER STATE =====
   const [phoneQuery, setPhoneQuery] = useState("");
   const [customerStatus, setCustomerStatus] = useState<'idle' | 'searching' | 'found' | 'new'>('idle');
   const [foundCustomer, setFoundCustomer] = useState<Customer | null>(null);
   const [newCustomerName, setNewCustomerName] = useState("");
   const [newCustomerAddress, setNewCustomerAddress] = useState("");
-  
+
   // ===== LEGACY CUSTOMER STATE (kept for compatibility) =====
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
@@ -228,11 +227,11 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
   const [showAddCustomerDialog, setShowAddCustomerDialog] = useState(false);
   const [customerSearch, setCustomerSearch] = useState("");
   const [showCustomerListDialog, setShowCustomerListDialog] = useState(false);
-  
+
   // ===== PAYMENT MODAL STATE =====
   const [showPaymentDrawer, setShowPaymentDrawer] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState("");
-  
+
   // ===== UI STATE =====
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
   const [showInvoiceDialog, setShowInvoiceDialog] = useState(false);
@@ -245,7 +244,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
   const normalizePhoneForLookup = useCallback((phone: string): string[] => {
     const cleaned = phone.replace(/[\s\-().]/g, '');
     const normalized = formatBDPhone(cleaned);
-    
+
     // Return multiple formats to search for (handles both old and new data)
     const formats: string[] = [];
     if (normalized.startsWith('01') && normalized.length === 11) {
@@ -264,7 +263,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
         try {
           // Get all possible phone formats to search
           const phoneFormats = normalizePhoneForLookup(phoneQuery);
-          
+
           // Search for customer with any of the phone formats
           // Use 'or' filter to match any format, get most recent if duplicates exist
           const { data, error } = await supabase
@@ -273,15 +272,15 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
             .or(phoneFormats.map(p => `phone.eq.${p}`).join(','))
             .order('created_at', { ascending: false })
             .limit(1);
-          
+
           if (error) {
             console.error('Customer lookup error:', error);
             setCustomerStatus('new');
             return;
           }
-          
+
           const customer = data && data.length > 0 ? data[0] : null;
-          
+
           if (customer) {
             // Old customer found - auto-fill all fields
             setCustomerStatus('found');
@@ -294,12 +293,12 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
             // Auto-fill editable fields too
             setNewCustomerName(customer.name);
             setNewCustomerAddress(customer.address || "");
-            
-            logger.info('Old customer found', { 
-              component: 'POS', 
+
+            logger.info('Old customer found', {
+              component: 'POS',
               customerId: customer.id,
               customerName: customer.name,
-              phone: customer.phone 
+              phone: customer.phone
             });
           } else {
             // New customer - phone not in system
@@ -341,7 +340,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
 
   // ============= DATA FETCHING =============
   const hasFetchedRef = useRef(false);
-  
+
   const fetchData = useCallback(async () => {
     try {
       const [brandsRes, stovesRes, regulatorsRes, customersRes, pricesRes] = await Promise.all([
@@ -366,7 +365,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
   useEffect(() => {
     if (hasFetchedRef.current) return;
     hasFetchedRef.current = true;
-    
+
     const initData = async () => {
       setLoading(true);
       await fetchData();
@@ -377,16 +376,16 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
 
   // Real-time subscriptions - debounced to prevent excessive refetches
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
-  
+
   useEffect(() => {
     // Skip subscriptions when offline to prevent connection errors
     if (!isOnline) return;
-    
+
     const debouncedFetch = () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => fetchData(), 1000);
     };
-    
+
     const channels = [
       supabase.channel('pos-lpg-v2').on('postgres_changes', { event: '*', schema: 'public', table: 'lpg_brands' }, debouncedFetch).subscribe(),
       supabase.channel('pos-stoves-v2').on('postgres_changes', { event: '*', schema: 'public', table: 'stoves' }, debouncedFetch).subscribe(),
@@ -406,23 +405,23 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
   const getLPGPrice = useCallback((brandId: string, weightVal: string, cylType: 'refill' | 'package', saleTp: 'retail' | 'wholesale') => {
     // Find pricing entry matching brand + variant (Refill or Package)
     const variant = cylType === 'refill' ? 'Refill' : 'Package';
-    
+
     // First try to find exact match with brand_id and variant
     let priceEntry = productPrices.find(
-      p => p.product_type === 'lpg' && 
-           p.brand_id === brandId && 
-           p.variant === variant
+      p => p.product_type === 'lpg' &&
+        p.brand_id === brandId &&
+        p.variant === variant
     );
-    
+
     // Fallback: find by brand_id only (legacy records)
     if (!priceEntry) {
       priceEntry = productPrices.find(
         p => p.product_type === 'lpg' && p.brand_id === brandId && p.size?.includes(weightVal)
       );
     }
-    
+
     if (!priceEntry) return 0;
-    
+
     // For Package cylinder: use retail_price or distributor_price based on sale type
     // For Refill cylinder: use retail_price or distributor_price based on sale type
     if (saleTp === 'wholesale') {
@@ -433,18 +432,18 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
 
   const getStovePrice = useCallback((brand: string, model: string) => {
     const priceEntry = productPrices.find(
-      p => p.product_type === 'stove' && 
-           p.product_name.toLowerCase().includes(brand.toLowerCase()) &&
-           p.product_name.toLowerCase().includes(model.toLowerCase())
+      p => p.product_type === 'stove' &&
+        p.product_name.toLowerCase().includes(brand.toLowerCase()) &&
+        p.product_name.toLowerCase().includes(model.toLowerCase())
     );
     return priceEntry?.retail_price || 0;
   }, [productPrices]);
 
   const getRegulatorPrice = useCallback((brand: string, type: string) => {
     const priceEntry = productPrices.find(
-      p => p.product_type === 'regulator' && 
-           p.product_name.toLowerCase().includes(brand.toLowerCase()) &&
-           p.product_name.toLowerCase().includes(type.toLowerCase())
+      p => p.product_type === 'regulator' &&
+        p.product_name.toLowerCase().includes(brand.toLowerCase()) &&
+        p.product_name.toLowerCase().includes(type.toLowerCase())
     );
     return priceEntry?.retail_price || 0;
   }, [productPrices]);
@@ -466,7 +465,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
 
   const filteredStoves = useMemo(() => {
     if (!productSearch) return stoves;
-    return stoves.filter(s => 
+    return stoves.filter(s =>
       s.brand.toLowerCase().includes(productSearch.toLowerCase()) ||
       s.model.toLowerCase().includes(productSearch.toLowerCase())
     );
@@ -474,7 +473,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
 
   const filteredRegulators = useMemo(() => {
     if (!productSearch) return regulators;
-    return regulators.filter(r => 
+    return regulators.filter(r =>
       r.brand.toLowerCase().includes(productSearch.toLowerCase()) ||
       r.type.toLowerCase().includes(productSearch.toLowerCase())
     );
@@ -557,7 +556,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
     }
 
     const price = getLPGPrice(brand.id, weight, cylinderType, saleType);
-    
+
     const existingItem = saleItems.find(
       i => i.type === 'lpg' && i.brandId === brand.id && i.cylinderType === cylinderType && i.weight === weight
     );
@@ -567,7 +566,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
         toast({ title: `Only ${stock} in stock`, variant: "destructive" });
         return;
       }
-      setSaleItems(saleItems.map(i => 
+      setSaleItems(saleItems.map(i =>
         i.id === existingItem.id ? { ...i, quantity: i.quantity + 1 } : i
       ));
     } else {
@@ -603,7 +602,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
         toast({ title: `Only ${stove.quantity} in stock`, variant: "destructive" });
         return;
       }
-      setSaleItems(saleItems.map(i => 
+      setSaleItems(saleItems.map(i =>
         i.id === existingItem.id ? { ...i, quantity: i.quantity + 1 } : i
       ));
     } else {
@@ -635,7 +634,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
         toast({ title: `Only ${regulator.quantity} in stock`, variant: "destructive" });
         return;
       }
-      setSaleItems(saleItems.map(i => 
+      setSaleItems(saleItems.map(i =>
         i.id === existingItem.id ? { ...i, quantity: i.quantity + 1 } : i
       ));
     } else {
@@ -671,9 +670,9 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
   // ============= RETURN CYLINDER ACTIONS =============
   const addReturnCylinder = (brand: LPGBrand) => {
     const existingReturn = returnItems.find(r => r.brandId === brand.id && !r.isLeaked);
-    
+
     if (existingReturn) {
-      setReturnItems(prev => prev.map(r => 
+      setReturnItems(prev => prev.map(r =>
         r.id === existingReturn.id ? { ...r, quantity: r.quantity + 1 } : r
       ));
     } else {
@@ -706,7 +705,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
   };
 
   const toggleReturnLeaked = (id: string) => {
-    setReturnItems(prev => prev.map(item => 
+    setReturnItems(prev => prev.map(item =>
       item.id === id ? { ...item, isLeaked: !item.isLeaked } : item
     ));
   };
@@ -1048,10 +1047,10 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
 
     const { data: { user } } = await supabase.auth.getUser();
     const { data: ownerId } = await supabase.rpc("get_owner_id");
-    
+
     // Normalize phone before saving
     const normalizedPhone = customerPhone ? formatBDPhone(customerPhone) : null;
-    
+
     const { data, error } = await supabase
       .from('customers')
       .insert({
@@ -1071,7 +1070,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
 
     toast({ title: "Customer added" });
     setShowAddCustomerDialog(false);
-    
+
     if (data) {
       setSelectedCustomerId(data.id);
       setSelectedCustomer(data);
@@ -1080,7 +1079,10 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
   };
 
   // ============= COMPLETE SALE =============
-  const handleCompleteSale = async (paymentStat: 'paid' | 'due') => {
+  const handleCompleteSale = async () => {
+    // Use calculated payment status based on amount paid vs total
+    const finalPaymentStatus = paymentStatus; // 'paid' | 'partial' | 'due'
+    const actualAmountPaid = paidAmount;
     if (saleItems.length === 0) {
       toast({ title: "Cart is empty", variant: "destructive" });
       return;
@@ -1088,35 +1090,37 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
 
     // Check return count for refill sales
     if (hasRefillInCart && !isReturnCountMatched) {
-      toast({ 
-        title: "Return count mismatch", 
+      toast({
+        title: "Return count mismatch",
         description: `Selling ${refillCylindersCount} cylinders, but returning ${returnCylindersCount}`,
-        variant: "destructive" 
+        variant: "destructive"
       });
       return;
     }
 
-    // Due requires a registered customer (phone number entered)
+    // Partial or Due requires a registered customer (phone number entered)
     const hasCustomer = phoneQuery.length >= 11 || selectedCustomerId;
 
-    if (paymentStat === 'due' && !hasCustomer) {
-      toast({ 
-        title: "Cannot save as due", 
-        description: "Credit requires a registered customer with phone number",
-        variant: "destructive" 
+    if ((finalPaymentStatus === 'due' || finalPaymentStatus === 'partial') && !hasCustomer) {
+      toast({
+        title: "Cannot save with outstanding balance",
+        description: "Credit/partial payment requires a registered customer with phone number",
+        variant: "destructive"
       });
       return;
     }
 
-    // Credit limit check
-    if (paymentStat === 'due' && selectedCustomer) {
+    // Credit limit check for partial/due payments
+    const remainingDue = finalPaymentStatus === 'paid' ? 0 : (total - actualAmountPaid);
+
+    if ((finalPaymentStatus === 'due' || finalPaymentStatus === 'partial') && selectedCustomer) {
       const currentDue = selectedCustomer.total_due || 0;
       const limit = selectedCustomer.credit_limit || DEFAULT_CREDIT_LIMIT;
-      if (currentDue + total > limit) {
-        toast({ 
-          title: "Credit limit exceeded", 
-          description: `Limit: ${BANGLADESHI_CURRENCY_SYMBOL}${limit}`,
-          variant: "destructive" 
+      if (currentDue + remainingDue > limit) {
+        toast({
+          title: "Credit limit exceeded",
+          description: `Limit: ${BANGLADESHI_CURRENCY_SYMBOL}${limit}. This sale would add ${BANGLADESHI_CURRENCY_SYMBOL}${remainingDue} to dues.`,
+          variant: "destructive"
         });
         return;
       }
@@ -1137,11 +1141,11 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
       // Create customer if new (from phone-first flow)
       // Always normalize phone to 01XXXXXXXXX format before saving
       const normalizedPhone = phoneQuery ? formatBDPhone(phoneQuery) : null;
-      
+
       if (!customerId && customerStatus === 'new' && newCustomerName) {
         const { data: newCust } = await supabase
           .from('customers')
-          .insert({ 
+          .insert({
             name: sanitizeString(newCustomerName),
             phone: normalizedPhone,
             address: newCustomerAddress || null,
@@ -1163,7 +1167,8 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
           discount: discountAmount,
           total,
           payment_method: 'cash' as const,
-          payment_status: paymentStat,
+          payment_status: finalPaymentStatus,
+          notes: finalPaymentStatus === 'partial' ? `Paid: ৳${actualAmountPaid}, Remaining: ৳${remainingDue}` : null,
           driver_id: null,
           created_by: user.id,
           owner_id: ownerId || user.id
@@ -1184,7 +1189,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
           total_price: item.price * item.quantity,
           created_by: user.id
         }));
-        
+
         const { error: itemsError } = await supabase.from('pos_transaction_items').insert(items);
         if (itemsError) {
           logger.error('Failed to insert transaction items', itemsError, { component: 'POS' });
@@ -1239,32 +1244,34 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
       }
 
       // Update customer dues (track both money AND cylinders including refill debt)
-      if (paymentStat === 'due' && customerId) {
+      // For partial payments, only add the REMAINING amount to dues, not the full total
+      if ((finalPaymentStatus === 'due' || finalPaymentStatus === 'partial') && customerId) {
         const customer = customers.find(c => c.id === customerId);
         if (customer) {
           // Package cylinders = always owed (customer gets new cylinder)
           const packageCylindersSold = saleItems
             .filter(i => i.type === 'lpg' && i.cylinderType === 'package')
             .reduce((sum, i) => sum + i.quantity, 0);
-          
+
           // Refill cylinders = owed ONLY if empty not returned (refill needs exchange)
           const refillCylindersSold = saleItems
             .filter(i => i.type === 'lpg' && i.cylinderType === 'refill')
             .reduce((sum, i) => sum + i.quantity, 0);
-          
+
           const emptyReturned = returnItems.reduce((sum, r) => sum + r.quantity, 0);
-          
+
           // Missing refill returns = cylinders the customer owes
           const missingRefillReturns = Math.max(0, refillCylindersSold - emptyReturned);
-          
+
           // Total cylinder debt = packages (always) + missing refill returns
           const totalCylinderDebt = packageCylindersSold + missingRefillReturns;
-          
+
+          // Add only the REMAINING due amount (not full total for partial payments)
           await supabase.from('customers')
-            .update({ 
-              total_due: (customer.total_due || 0) + total,
+            .update({
+              total_due: (customer.total_due || 0) + remainingDue,
               cylinders_due: (customer.cylinders_due || 0) + totalCylinderDebt,
-              billing_status: 'pending',
+              billing_status: remainingDue > 0 ? 'pending' : 'clear',
               last_order_date: new Date().toISOString()
             })
             .eq('id', customerId);
@@ -1295,7 +1302,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
         subtotal,
         discount: discountAmount,
         total,
-        paymentStatus: paymentStat,
+        paymentStatus: finalPaymentStatus,
         paymentMethod: 'cash'
       });
       setShowPaymentDrawer(false);
@@ -1317,8 +1324,9 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
       setCustomerStatus('idle');
       setFoundCustomer(null);
 
-      toast({ 
-        title: paymentStat === 'paid' ? "Sale completed!" : "Saved as due",
+      toast({
+        title: finalPaymentStatus === 'paid' ? "Sale completed!" :
+          finalPaymentStatus === 'partial' ? "Partial payment saved!" : "Saved as due",
         description: transactionNumber
       });
 
@@ -1410,8 +1418,8 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           {/* SALE TABLE */}
           <Card className={`border-2 border-emerald-200 dark:border-emerald-900 ${activeTable !== 'sale' ? 'hidden lg:block' : ''}`}>
-            <CardHeader 
-              className="py-2 px-3 bg-emerald-50 dark:bg-emerald-950/30 cursor-pointer" 
+            <CardHeader
+              className="py-2 px-3 bg-emerald-50 dark:bg-emerald-950/30 cursor-pointer"
               onClick={() => setActiveTable('sale')}
             >
               <CardTitle className="flex items-center justify-between text-sm">
@@ -1433,7 +1441,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                   <div className="space-y-1.5">
                     {saleItems.map(item => (
                       <div key={item.id} className="flex items-center gap-2 p-2 rounded-lg bg-card border">
-                        <div 
+                        <div
                           className="w-7 h-7 rounded flex items-center justify-center flex-shrink-0"
                           style={{ backgroundColor: item.brandColor || (item.type === 'stove' ? '#f97316' : item.type === 'regulator' ? '#8b5cf6' : '#10b981') }}
                         >
@@ -1455,10 +1463,10 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                           </Button>
                         </div>
                         <p className="font-bold text-xs text-emerald-600 w-14 sm:w-16 text-right flex-shrink-0">{BANGLADESHI_CURRENCY_SYMBOL}{(item.price * item.quantity).toLocaleString()}</p>
-                        <Button 
-                          size="icon" 
-                          variant="ghost" 
-                          className="h-7 w-7 min-w-[28px] text-destructive hover:bg-destructive/10 flex-shrink-0" 
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 min-w-[28px] text-destructive hover:bg-destructive/10 flex-shrink-0"
                           onClick={() => removeItem(item.id)}
                         >
                           <X className="h-4 w-4" />
@@ -1479,7 +1487,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
 
           {/* RETURN TABLE */}
           <Card className={`border-2 ${hasRefillInCart ? 'border-amber-200 dark:border-amber-900' : 'border-muted'} ${activeTable !== 'return' ? 'hidden lg:block' : ''}`}>
-            <CardHeader 
+            <CardHeader
               className={`py-2 px-3 cursor-pointer ${hasRefillInCart ? 'bg-amber-50 dark:bg-amber-950/30' : 'bg-muted/30'}`}
               onClick={() => setActiveTable('return')}
             >
@@ -1507,7 +1515,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                   <div className="space-y-1.5">
                     {returnItems.map(item => (
                       <div key={item.id} className="flex items-center gap-2 p-2 rounded-lg bg-card border">
-                        <div 
+                        <div
                           className="w-7 h-7 rounded flex items-center justify-center flex-shrink-0"
                           style={{ backgroundColor: item.brandColor }}
                         >
@@ -1516,7 +1524,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-xs truncate">{item.brandName}</p>
                           <div className="flex items-center gap-1">
-                            <Checkbox 
+                            <Checkbox
                               checked={item.isLeaked}
                               onCheckedChange={() => toggleReturnLeaked(item.id)}
                               className="h-3 w-3"
@@ -1533,10 +1541,10 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                             <Plus className="h-3 w-3" />
                           </Button>
                         </div>
-                        <Button 
-                          size="icon" 
-                          variant="ghost" 
-                          className="h-7 w-7 min-w-[28px] text-destructive hover:bg-destructive/10 flex-shrink-0" 
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 min-w-[28px] text-destructive hover:bg-destructive/10 flex-shrink-0"
                           onClick={() => removeReturnItem(item.id)}
                         >
                           <X className="h-4 w-4" />
@@ -1576,7 +1584,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                   </Button>
                 </div>
               </div>
-              
+
               {/* Weight Dropdown */}
               <Select value={weight} onValueChange={setWeight}>
                 <SelectTrigger className="w-24 sm:w-28 h-10 font-semibold bg-primary text-primary-foreground border-primary">
@@ -1595,7 +1603,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                   </SelectItem>
                 </SelectContent>
               </Select>
-              
+
               {/* Search on Desktop */}
               <div className="hidden sm:flex relative w-40">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -1614,46 +1622,42 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                 {/* Cylinder Type Buttons */}
                 <button
                   onClick={() => setCylinderType('refill')}
-                  className={`flex-1 h-9 px-2 sm:px-4 rounded-full font-semibold text-xs sm:text-sm transition-all min-w-0 ${
-                    cylinderType === 'refill' 
-                      ? 'bg-primary text-primary-foreground shadow-md' 
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
+                  className={`flex-1 h-9 px-2 sm:px-4 rounded-full font-semibold text-xs sm:text-sm transition-all min-w-0 ${cylinderType === 'refill'
+                    ? 'bg-primary text-primary-foreground shadow-md'
+                    : 'text-muted-foreground hover:text-foreground'
+                    }`}
                 >
                   Refill
                 </button>
                 <button
                   onClick={() => setCylinderType('package')}
-                  className={`flex-1 h-9 px-2 sm:px-4 rounded-full font-semibold text-xs sm:text-sm transition-all min-w-0 ${
-                    cylinderType === 'package' 
-                      ? 'bg-primary text-primary-foreground shadow-md' 
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
+                  className={`flex-1 h-9 px-2 sm:px-4 rounded-full font-semibold text-xs sm:text-sm transition-all min-w-0 ${cylinderType === 'package'
+                    ? 'bg-primary text-primary-foreground shadow-md'
+                    : 'text-muted-foreground hover:text-foreground'
+                    }`}
                 >
                   Package
                 </button>
-                
+
                 {/* Visual Separator */}
                 <div className="w-px h-6 bg-border/70 self-center mx-1 sm:mx-2 flex-shrink-0" />
-                
+
                 {/* Valve Size Buttons */}
                 <button
                   onClick={() => setMouthSize('22mm')}
-                  className={`flex-1 h-9 px-2 sm:px-4 rounded-full font-semibold text-xs sm:text-sm transition-all min-w-0 ${
-                    mouthSize === '22mm' 
-                      ? 'bg-primary text-primary-foreground shadow-md' 
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
+                  className={`flex-1 h-9 px-2 sm:px-4 rounded-full font-semibold text-xs sm:text-sm transition-all min-w-0 ${mouthSize === '22mm'
+                    ? 'bg-primary text-primary-foreground shadow-md'
+                    : 'text-muted-foreground hover:text-foreground'
+                    }`}
                 >
                   22mm
                 </button>
                 <button
                   onClick={() => setMouthSize('20mm')}
-                  className={`flex-1 h-9 px-2 sm:px-4 rounded-full font-semibold text-xs sm:text-sm transition-all min-w-0 ${
-                    mouthSize === '20mm' 
-                      ? 'bg-primary text-primary-foreground shadow-md' 
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
+                  className={`flex-1 h-9 px-2 sm:px-4 rounded-full font-semibold text-xs sm:text-sm transition-all min-w-0 ${mouthSize === '20mm'
+                    ? 'bg-primary text-primary-foreground shadow-md'
+                    : 'text-muted-foreground hover:text-foreground'
+                    }`}
                 >
                   20mm
                 </button>
@@ -1666,11 +1670,10 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
               <div className="hidden lg:flex items-center bg-muted/60 rounded-full p-1 border border-border/50">
                 <button
                   onClick={() => setActiveTable('sale')}
-                  className={`flex items-center gap-2 h-9 px-4 rounded-full font-semibold text-sm transition-all ${
-                    isSaleMode 
-                      ? 'bg-emerald-600 text-white shadow-md' 
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
+                  className={`flex items-center gap-2 h-9 px-4 rounded-full font-semibold text-sm transition-all ${isSaleMode
+                    ? 'bg-emerald-600 text-white shadow-md'
+                    : 'text-muted-foreground hover:text-foreground'
+                    }`}
                 >
                   <ShoppingCart className="h-4 w-4" />
                   Selling
@@ -1682,11 +1685,10 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                 </button>
                 <button
                   onClick={() => setActiveTable('return')}
-                  className={`flex items-center gap-2 h-9 px-4 rounded-full font-semibold text-sm transition-all ${
-                    !isSaleMode 
-                      ? 'bg-amber-500 text-white shadow-md' 
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
+                  className={`flex items-center gap-2 h-9 px-4 rounded-full font-semibold text-sm transition-all ${!isSaleMode
+                    ? 'bg-amber-500 text-white shadow-md'
+                    : 'text-muted-foreground hover:text-foreground'
+                    }`}
                 >
                   <ArrowLeftRight className="h-4 w-4" />
                   Return
@@ -1709,11 +1711,10 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                     <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
-                      className={`flex-1 flex items-center justify-center gap-2 h-10 px-4 rounded-lg text-sm font-medium transition-all border ${
-                        activeTab === tab.id 
-                          ? 'bg-muted border-border text-foreground shadow-sm' 
-                          : 'bg-transparent border-transparent text-muted-foreground hover:bg-muted/50'
-                      }`}
+                      className={`flex-1 flex items-center justify-center gap-2 h-10 px-4 rounded-lg text-sm font-medium transition-all border ${activeTab === tab.id
+                        ? 'bg-muted border-border text-foreground shadow-sm'
+                        : 'bg-transparent border-transparent text-muted-foreground hover:bg-muted/50'
+                        }`}
                     >
                       <tab.icon className="h-4 w-4" />
                       {tab.label}
@@ -1759,41 +1760,40 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                       const pendingQty = getPendingStock(brand.id, cylinderType);
                       const displayStock = baseStock - pendingQty;
                       const price = getLPGPrice(brand.id, weight, cylinderType, saleType);
-                      
+
                       // Return mode: show empty cylinder preview
                       const pendingReturns = getPendingReturns(brand.id);
                       const pendingProblem = getPendingProblem(brand.id);
                       const previewEmpty = brand.empty_cylinder + pendingReturns;
-                      
+
                       return (
                         <button
                           key={brand.id}
                           onClick={() => isSaleMode ? addLPGToCart(brand) : addReturnCylinder(brand)}
                           disabled={isSaleMode && displayStock <= 0}
-                          className={`p-2.5 rounded-lg text-left transition-all hover:shadow-md relative overflow-hidden ${
-                            isSaleMode && displayStock <= 0 
-                              ? 'opacity-50 cursor-not-allowed border border-muted' 
-                              : isSaleMode 
-                                ? 'border border-transparent hover:border-emerald-500/50 bg-card' 
-                                : 'border border-transparent hover:border-amber-500/50 bg-card'
-                          }`}
+                          className={`p-2.5 rounded-lg text-left transition-all hover:shadow-md relative overflow-hidden ${isSaleMode && displayStock <= 0
+                            ? 'opacity-50 cursor-not-allowed border border-muted'
+                            : isSaleMode
+                              ? 'border border-transparent hover:border-emerald-500/50 bg-card'
+                              : 'border border-transparent hover:border-amber-500/50 bg-card'
+                            }`}
                         >
                           {/* Left Border Color Strip */}
-                          <div 
+                          <div
                             className="absolute top-0 left-0 bottom-0 w-1.5 rounded-l-lg"
                             style={{ backgroundColor: brand.color }}
                           />
                           <div className="pl-2">
                             <div className="flex items-start justify-between gap-1">
-                              <div 
+                              <div
                                 className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
                                 style={{ backgroundColor: brand.color }}
                               >
                                 <Cylinder className="h-4 w-4 text-white" />
                               </div>
                               {isSaleMode ? (
-                                <Badge 
-                                  variant={displayStock > 5 ? "secondary" : displayStock > 0 ? "outline" : "destructive"} 
+                                <Badge
+                                  variant={displayStock > 5 ? "secondary" : displayStock > 0 ? "outline" : "destructive"}
                                   className="text-[9px] px-1.5 h-5"
                                 >
                                   {displayStock > 0 ? (
@@ -1806,7 +1806,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                                   ) : 'Out'}
                                 </Badge>
                               ) : (
-                                <Badge 
+                                <Badge
                                   variant="secondary"
                                   className="text-[9px] px-1.5 h-5 bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
                                 >
@@ -1877,9 +1877,8 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                           key={stove.id}
                           onClick={() => addStoveToCart(stove)}
                           disabled={stove.quantity === 0}
-                          className={`p-2.5 rounded-lg text-left transition-all hover:shadow-md relative overflow-hidden ${
-                            stove.quantity === 0 ? 'opacity-50 cursor-not-allowed border border-muted' : 'border border-transparent hover:border-orange-500/50 bg-card'
-                          }`}
+                          className={`p-2.5 rounded-lg text-left transition-all hover:shadow-md relative overflow-hidden ${stove.quantity === 0 ? 'opacity-50 cursor-not-allowed border border-muted' : 'border border-transparent hover:border-orange-500/50 bg-card'
+                            }`}
                         >
                           <div className="absolute top-0 left-0 bottom-0 w-1.5 rounded-l-lg bg-orange-500" />
                           <div className="pl-2">
@@ -1924,9 +1923,8 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                           key={reg.id}
                           onClick={() => addRegulatorToCart(reg)}
                           disabled={reg.quantity === 0}
-                          className={`p-2.5 rounded-lg text-left transition-all hover:shadow-md relative overflow-hidden ${
-                            reg.quantity === 0 ? 'opacity-50 cursor-not-allowed border border-muted' : 'border border-transparent hover:border-violet-500/50 bg-card'
-                          }`}
+                          className={`p-2.5 rounded-lg text-left transition-all hover:shadow-md relative overflow-hidden ${reg.quantity === 0 ? 'opacity-50 cursor-not-allowed border border-muted' : 'border border-transparent hover:border-violet-500/50 bg-card'
+                            }`}
                         >
                           <div className="absolute top-0 left-0 bottom-0 w-1.5 rounded-l-lg bg-violet-500" />
                           <div className="pl-2">
@@ -2139,7 +2137,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                 <p className="text-2xl font-bold text-foreground tabular-nums">{BANGLADESHI_CURRENCY_SYMBOL}{total.toLocaleString()}</p>
                 <p className="text-xs text-muted-foreground">{saleItemsCount} item{saleItemsCount > 1 ? 's' : ''}</p>
               </div>
-              <Button 
+              <Button
                 size="lg"
                 onClick={() => {
                   setPaymentAmount(total.toString());
@@ -2187,13 +2185,12 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                   { id: 'partial', label: 'PARTIAL', color: 'bg-amber-500' },
                   { id: 'due', label: 'DUE', color: 'bg-rose-500' },
                 ].map((status) => (
-                  <div 
+                  <div
                     key={status.id}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-full ${
-                      paymentStatus === status.id 
-                        ? `${status.color} text-white` 
-                        : 'bg-muted text-muted-foreground'
-                    }`}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-full ${paymentStatus === status.id
+                      ? `${status.color} text-white`
+                      : 'bg-muted text-muted-foreground'
+                      }`}
                   >
                     <div className={`w-2 h-2 rounded-full ${paymentStatus === status.id ? 'bg-white' : 'bg-muted-foreground/50'}`} />
                     <span className="text-sm font-medium">{status.label}</span>
@@ -2209,26 +2206,34 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
               )}
             </div>
             <DrawerFooter className="flex-row gap-3">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="flex-1 h-12"
                 onClick={() => setShowPaymentDrawer(false)}
               >
                 Cancel
               </Button>
               {paymentStatus === 'paid' ? (
-                <Button 
+                <Button
                   className="flex-1 h-12 bg-emerald-600 hover:bg-emerald-700"
-                  onClick={() => handleCompleteSale('paid')}
+                  onClick={() => handleCompleteSale()}
                   disabled={processing}
                 >
                   {processing ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Confirm & Print'}
                 </Button>
+              ) : paymentStatus === 'partial' ? (
+                <Button
+                  className="flex-1 h-12 bg-amber-500 hover:bg-amber-600 text-white"
+                  onClick={() => handleCompleteSale()}
+                  disabled={processing || (phoneQuery.length < 11 && !selectedCustomerId)}
+                >
+                  {processing ? <Loader2 className="h-5 w-5 animate-spin" /> : `Save Partial (৳${paidAmount} paid)`}
+                </Button>
               ) : (
-                <Button 
+                <Button
                   className="flex-1 h-12"
                   variant="outline"
-                  onClick={() => handleCompleteSale('due')}
+                  onClick={() => handleCompleteSale()}
                   disabled={processing || (phoneQuery.length < 11 && !selectedCustomerId)}
                 >
                   {processing ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Save as Due'}
@@ -2306,7 +2311,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                   className="h-11 pl-9"
                 />
               </div>
-              
+
               {/* Customer List */}
               <ScrollArea className="flex-1 h-[300px] pr-2">
                 <div className="space-y-2">
@@ -2360,8 +2365,8 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
               </ScrollArea>
             </div>
             <DialogFooter className="border-t pt-3">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="w-full"
                 onClick={() => {
                   setShowCustomerListDialog(false);

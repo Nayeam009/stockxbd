@@ -97,12 +97,12 @@ export interface Vehicle {
 export interface Staff {
   id: string;
   name: string;
-  role: 'driver' | 'manager' | 'staff';
-  basicSalary: number;
-  bonus: number;
-  deductions: number;
-  netSalary: number;
-  lastPayment: string;
+  role: 'manager';
+  phone?: string;
+  salary?: number;
+  joined_date?: string;
+  active: boolean;
+  avatar_url?: string;
 }
 
 export interface DashboardAnalytics {
@@ -136,7 +136,7 @@ export const useDashboardData = () => {
   const [staff, setStaff] = useState<Staff[]>([]);
   const [loading, setLoading] = useState(true);
   const [softLoading, setSoftLoading] = useState(false);
-  
+
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   const fetchData = useCallback(async (isSoftRefresh = false) => {
@@ -144,7 +144,7 @@ export const useDashboardData = () => {
       if (isSoftRefresh) {
         setSoftLoading(true);
       }
-      
+
       const today = new Date().toISOString().split('T')[0];
       const now = new Date();
       const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
@@ -216,21 +216,21 @@ export const useDashboardData = () => {
 
       const formattedSales: SalesData[] = transactions
         ? transactions.flatMap(txn =>
-            (txn.pos_transaction_items || []).map((item: any) => ({
-              id: `${txn.id}-${item.product_name}`,
-              date: new Date(txn.created_at).toISOString().split('T')[0],
-              productType: item.product_name?.toLowerCase().includes('stove') ? 'stove' as const :
-                          item.product_name?.toLowerCase().includes('regulator') ? 'accessory' as const : 'cylinder' as const,
-              productName: item.product_name || 'Unknown',
-              quantity: item.quantity,
-              unitPrice: Number(item.unit_price),
-              totalAmount: Number(item.total_price),
-              paymentMethod: txn.payment_method as any,
-              staffId: txn.created_by || '',
-              staffName: 'Staff',
-              paymentStatus: txn.payment_status || 'paid'
-            }))
-          )
+          (txn.pos_transaction_items || []).map((item: any) => ({
+            id: `${txn.id}-${item.product_name}`,
+            date: new Date(txn.created_at).toISOString().split('T')[0],
+            productType: item.product_name?.toLowerCase().includes('stove') ? 'stove' as const :
+              item.product_name?.toLowerCase().includes('regulator') ? 'accessory' as const : 'cylinder' as const,
+            productName: item.product_name || 'Unknown',
+            quantity: item.quantity,
+            unitPrice: Number(item.unit_price),
+            totalAmount: Number(item.total_price),
+            paymentMethod: txn.payment_method as any,
+            staffId: txn.created_by || '',
+            staffName: 'Staff',
+            paymentStatus: txn.payment_status || 'paid'
+          }))
+        )
         : [];
       setSalesData(formattedSales);
 
@@ -288,7 +288,7 @@ export const useDashboardData = () => {
       // Process stock
       const stockItems: StockItem[] = [];
       const cylinderItems: CylinderStock[] = [];
-      
+
       if (lpgBrands) {
         lpgBrands.forEach(brand => {
           stockItems.push({
@@ -301,7 +301,7 @@ export const useDashboardData = () => {
             lastUpdated: brand.updated_at,
             price: 1200
           });
-          
+
           cylinderItems.push({
             id: brand.id,
             brand: brand.name,
@@ -348,13 +348,13 @@ export const useDashboardData = () => {
           };
         });
 
-        const driverStats: Record<string, { 
-          sales: number; 
-          deliveries: number; 
+        const driverStats: Record<string, {
+          sales: number;
+          deliveries: number;
           stockOut: number;
           cashCollected: number;
         }> = {};
-        
+
         const todaysOrders = (ordersData || []).filter(o => {
           const d = new Date(o.order_date).toISOString().split('T')[0];
           return d === today;
@@ -402,20 +402,24 @@ export const useDashboardData = () => {
 
   // Debounce ref for real-time updates - reduced to 1s for faster sync
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
-  
+
+  // Store fetchData in a ref to use in subscription callbacks
+  const fetchDataRef = useRef(fetchData);
+  fetchDataRef.current = fetchData;
+
   const debouncedRefetch = useCallback(() => {
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
     }
     debounceRef.current = setTimeout(() => {
-      fetchData(true);
+      fetchDataRef.current(true);
     }, 1000); // Reduced from 2s to 1s for faster updates
-  }, [fetchData]);
+  }, []); // Empty deps - uses ref internally
 
-  // Setup real-time subscriptions
+  // Setup real-time subscriptions - runs only once
   useEffect(() => {
-    fetchData();
-    
+    fetchDataRef.current();
+
     const channel = supabase
       .channel('dashboard-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, debouncedRefetch)
@@ -423,7 +427,7 @@ export const useDashboardData = () => {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'lpg_brands' }, debouncedRefetch)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'customers' }, debouncedRefetch)
       .subscribe();
-    
+
     channelRef.current = channel;
 
     return () => {
@@ -432,13 +436,13 @@ export const useDashboardData = () => {
       }
       supabase.removeChannel(channel);
     };
-  }, [fetchData, debouncedRefetch]);
+  }, [debouncedRefetch]); // debouncedRefetch is stable now
 
   // Analytics calculations
   const analytics = useMemo((): DashboardAnalytics => {
     const today = new Date().toISOString().split('T')[0];
     const now = new Date();
-    
+
     const todaysSales = salesData.filter(sale => sale.date === today);
     const todayCashRevenue = todaysSales
       .filter(sale => sale.paymentStatus === 'paid' || sale.paymentStatus === 'completed')
@@ -462,15 +466,15 @@ export const useDashboardData = () => {
       })
       .reduce((sum, sale) => sum + sale.totalAmount, 0);
 
-    const monthlyGrowthPercent = lastMonthRevenue > 0 
+    const monthlyGrowthPercent = lastMonthRevenue > 0
       ? Math.round(((monthlyRevenue - lastMonthRevenue) / lastMonthRevenue) * 100)
       : 0;
 
     const totalFullCylinders = cylinderStock.reduce((sum, c) => sum + (c.fullCylinders || 0), 0);
     const totalEmptyCylinders = cylinderStock.reduce((sum, c) => sum + (c.emptyCylinders || 0), 0);
-    const cylinderStockHealth: 'critical' | 'warning' | 'good' = 
+    const cylinderStockHealth: 'critical' | 'warning' | 'good' =
       totalEmptyCylinders > totalFullCylinders ? 'critical' :
-      totalFullCylinders < 20 ? 'warning' : 'good';
+        totalFullCylinders < 20 ? 'warning' : 'good';
 
     const activeCustomers = customers.filter(c => c.isActive).length;
     const lostCustomers = customers.filter(c => !c.isActive && c.totalOrders > 0).length;

@@ -7,14 +7,14 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  Plus, 
-  Save, 
-  Trash2, 
-  Search, 
-  Package, 
-  ChefHat, 
-  Wrench, 
+import {
+  Plus,
+  Save,
+  Trash2,
+  Search,
+  Package,
+  ChefHat,
+  Wrench,
   Loader2,
   DollarSign,
   Building,
@@ -78,9 +78,9 @@ export const ProductPricingModule = () => {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editedPrices, setEditedPrices] = useState<Record<string, Partial<ProductPrice>>>({});
-  const [editingCell, setEditingCell] = useState<{id: string, field: string} | null>(null);
+  const [editingCell, setEditingCell] = useState<{ id: string, field: string } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  
+
   const [newProduct, setNewProduct] = useState({
     product_type: "lpg",
     brand_id: "",
@@ -92,7 +92,7 @@ export const ProductPricingModule = () => {
     retail_price: 0,
     package_price: 0,
   });
-  
+
   // Custom product name for LPG when not linked to existing brand
   const [useCustomLpgName, setUseCustomLpgName] = useState(false);
   const [customLpgName, setCustomLpgName] = useState("");
@@ -123,16 +123,16 @@ export const ProductPricingModule = () => {
   // Real-time pricing sync
   useEffect(() => {
     const channels = [
-      supabase.channel('pricing-prices-realtime').on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'product_prices' }, 
+      supabase.channel('pricing-prices-realtime').on('postgres_changes',
+        { event: '*', schema: 'public', table: 'product_prices' },
         () => fetchData()
       ).subscribe(),
-      supabase.channel('pricing-brands-realtime').on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'lpg_brands' }, 
+      supabase.channel('pricing-brands-realtime').on('postgres_changes',
+        { event: '*', schema: 'public', table: 'lpg_brands' },
         () => fetchData()
       ).subscribe(),
     ];
-    
+
     return () => channels.forEach(ch => supabase.removeChannel(ch));
   }, [fetchData]);
 
@@ -157,17 +157,17 @@ export const ProductPricingModule = () => {
 
   // Filter and group brands by size and weight for LPG with useMemo
   const getFilteredBrands = useMemo(() => {
-    const filtered = lpgBrands.filter(brand => 
-      brand.size === sizeTab && 
+    const filtered = lpgBrands.filter(brand =>
+      brand.size === sizeTab &&
       brand.weight === selectedWeight
     );
-    
+
     // Group by normalized name
     const groupMap = new Map<string, GroupedBrand>();
-    
+
     filtered.forEach(brand => {
       const normalizedName = normalizeBrandName(brand.name);
-      
+
       if (groupMap.has(normalizedName)) {
         // Add this brand ID to existing group
         groupMap.get(normalizedName)!.brandIds.push(brand.id);
@@ -181,14 +181,14 @@ export const ProductPricingModule = () => {
         });
       }
     });
-    
+
     return Array.from(groupMap.values());
   }, [lpgBrands, sizeTab, selectedWeight, normalizeBrandName]);
 
   // Get products for a group of brands (merged by normalized name)
   const getProductsForBrandGroup = useCallback((brandIds: string[]) => {
-    return products.filter(p => 
-      p.product_type === "lpg" && 
+    return products.filter(p =>
+      p.product_type === "lpg" &&
       brandIds.includes(p.brand_id || '') &&
       p.product_name.toLowerCase().includes(searchQuery.toLowerCase())
     );
@@ -196,20 +196,20 @@ export const ProductPricingModule = () => {
 
   // Legacy function for single brand lookup (kept for compatibility)
   const getProductsForBrand = useCallback((brandId: string) => {
-    return products.filter(p => 
-      p.product_type === "lpg" && 
+    return products.filter(p =>
+      p.product_type === "lpg" &&
       p.brand_id === brandId &&
       p.product_name.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [products, searchQuery]);
 
   // Get non-LPG products with useMemo
-  const filteredStoveProducts = useMemo(() => 
+  const filteredStoveProducts = useMemo(() =>
     products.filter(p => p.product_type === "stove" && p.product_name.toLowerCase().includes(searchQuery.toLowerCase())),
     [products, searchQuery]
   );
 
-  const filteredRegulatorProducts = useMemo(() => 
+  const filteredRegulatorProducts = useMemo(() =>
     products.filter(p => p.product_type === "regulator" && p.product_name.toLowerCase().includes(searchQuery.toLowerCase())),
     [products, searchQuery]
   );
@@ -255,10 +255,14 @@ export const ProductPricingModule = () => {
     }
 
     try {
+      // Get shop owner ID (handles both Owner and Manager)
+      const { data: ownerId } = await supabase.rpc("get_owner_id");
+
       const { error } = await supabase.from("product_prices").insert({
         ...newProduct,
         brand_id: newProduct.brand_id || null,
         created_by: user.user.id,
+        owner_id: ownerId || user.user.id, // Ensure owner_id is set
       });
 
       if (error) throw error;
@@ -296,14 +300,14 @@ export const ProductPricingModule = () => {
   const hasChanges = Object.keys(editedPrices).length > 0;
 
   // Editable Price Cell Component
-  const EditablePriceCell = ({ 
-    product, 
-    field, 
+  const EditablePriceCell = ({
+    product,
+    field,
     icon: Icon,
     label,
     bgColor = "bg-muted"
-  }: { 
-    product: ProductPrice; 
+  }: {
+    product: ProductPrice;
     field: keyof ProductPrice;
     icon: React.ElementType;
     label: string;
@@ -382,8 +386,8 @@ export const ProductPricingModule = () => {
         <Card className="border-dashed border-2 opacity-60">
           <CardHeader className="pb-2 sm:pb-3">
             <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
-              <span 
-                className="h-3 w-3 sm:h-4 sm:w-4 rounded-full flex-shrink-0" 
+              <span
+                className="h-3 w-3 sm:h-4 sm:w-4 rounded-full flex-shrink-0"
                 style={{ backgroundColor: brand.color }}
               />
               {brand.name}
@@ -401,15 +405,15 @@ export const ProductPricingModule = () => {
 
     // Use valve-size-specific color for the brand
     const brandColor = getLpgColorByValveSize(brand.name, sizeTab);
-    
+
     return (
       <Card className="border-border hover:shadow-lg transition-all duration-200">
         {/* Card Header - Brand Name + Weight Badge */}
         <CardHeader className="pb-3 px-4 sm:px-5 pt-4">
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2.5 text-base sm:text-lg font-semibold">
-              <span 
-                className="h-4 w-4 sm:h-5 sm:w-5 rounded-full flex-shrink-0 ring-2 ring-offset-2 ring-offset-background shadow-sm" 
+              <span
+                className="h-4 w-4 sm:h-5 sm:w-5 rounded-full flex-shrink-0 ring-2 ring-offset-2 ring-offset-background shadow-sm"
                 style={{ backgroundColor: brandColor, boxShadow: `0 0 10px ${brandColor}50` }}
                 title={`${brand.name} (${sizeTab})`}
               />
@@ -724,23 +728,23 @@ export const ProductPricingModule = () => {
         </CardHeader>
         <CardContent className="px-3 sm:px-6 pb-3 sm:pb-4">
           <div className="grid grid-cols-3 gap-2">
-            <EditablePriceCell 
-              product={product} 
-              field="company_price" 
+            <EditablePriceCell
+              product={product}
+              field="company_price"
               icon={Building}
               label="Company"
               bgColor="bg-orange-100 dark:bg-orange-900/30"
             />
-            <EditablePriceCell 
-              product={product} 
-              field="distributor_price" 
+            <EditablePriceCell
+              product={product}
+              field="distributor_price"
               icon={Truck}
               label="Wholesale"
               bgColor="bg-purple-100 dark:bg-purple-900/30"
             />
-            <EditablePriceCell 
-              product={product} 
-              field="retail_price" 
+            <EditablePriceCell
+              product={product}
+              field="retail_price"
               icon={Store}
               label="Retail"
               bgColor="bg-green-100 dark:bg-green-900/30"
@@ -798,9 +802,9 @@ export const ProductPricingModule = () => {
                 <div className="space-y-3 sm:space-y-4 py-3 sm:py-4">
                   <div className="space-y-2">
                     <Label className="text-sm">Product Type</Label>
-                    <Select 
-                      value={newProduct.product_type} 
-                      onValueChange={v => setNewProduct({...newProduct, product_type: v, product_name: ""})}
+                    <Select
+                      value={newProduct.product_type}
+                      onValueChange={v => setNewProduct({ ...newProduct, product_type: v, product_name: "" })}
                     >
                       <SelectTrigger className="h-10">
                         <SelectValue />
@@ -812,7 +816,7 @@ export const ProductPricingModule = () => {
                       </SelectContent>
                     </Select>
                   </div>
-                  
+
                   {/* LPG Brand Selection */}
                   {newProduct.product_type === "lpg" && (
                     <div className="space-y-2">
@@ -836,12 +840,12 @@ export const ProductPricingModule = () => {
                         </Button>
                       </div>
                       {!useCustomLpgName ? (
-                        <Select 
-                          value={newProduct.brand_id} 
+                        <Select
+                          value={newProduct.brand_id}
                           onValueChange={v => {
                             const brand = lpgBrands.find(b => b.id === v);
                             setNewProduct({
-                              ...newProduct, 
+                              ...newProduct,
                               brand_id: v,
                               product_name: brand ? `${brand.name} LP Gas ${brand.weight || '12kg'}` : ""
                             });
@@ -854,8 +858,8 @@ export const ProductPricingModule = () => {
                             {lpgBrands.map(brand => (
                               <SelectItem key={brand.id} value={brand.id}>
                                 <div className="flex items-center gap-2">
-                                  <span 
-                                    className="h-3 w-3 rounded-full flex-shrink-0" 
+                                  <span
+                                    className="h-3 w-3 rounded-full flex-shrink-0"
                                     style={{ backgroundColor: brand.color }}
                                   />
                                   {brand.name} ({brand.weight})
@@ -886,7 +890,7 @@ export const ProductPricingModule = () => {
                       )}
                     </div>
                   )}
-                  
+
                   {/* Stove Brand Selection */}
                   {newProduct.product_type === "stove" && (
                     <div className="space-y-2">
@@ -894,12 +898,12 @@ export const ProductPricingModule = () => {
                       <BrandSelect
                         type="stove"
                         value={newProduct.product_name}
-                        onChange={(value) => setNewProduct({...newProduct, product_name: value})}
+                        onChange={(value) => setNewProduct({ ...newProduct, product_name: value })}
                         placeholder="Select or type stove brand..."
                       />
                     </div>
                   )}
-                  
+
                   {/* Regulator Brand Selection */}
                   {newProduct.product_type === "regulator" && (
                     <div className="space-y-2">
@@ -907,28 +911,28 @@ export const ProductPricingModule = () => {
                       <BrandSelect
                         type="regulator"
                         value={newProduct.product_name}
-                        onChange={(value) => setNewProduct({...newProduct, product_name: value})}
+                        onChange={(value) => setNewProduct({ ...newProduct, product_name: value })}
                         placeholder="Select or type regulator brand..."
                       />
                     </div>
                   )}
-                  
+
                   {newProduct.product_type === "lpg" && (
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-2">
                         <Label className="text-sm">Size</Label>
-                        <Input 
+                        <Input
                           value={newProduct.size || ""}
-                          onChange={e => setNewProduct({...newProduct, size: e.target.value})}
+                          onChange={e => setNewProduct({ ...newProduct, size: e.target.value })}
                           placeholder="12kg"
                           className="h-10"
                         />
                       </div>
                       <div className="space-y-2">
                         <Label className="text-sm">Variant</Label>
-                        <Select 
-                          value={newProduct.variant || "Refill"} 
-                          onValueChange={v => setNewProduct({...newProduct, variant: v})}
+                        <Select
+                          value={newProduct.variant || "Refill"}
+                          onValueChange={v => setNewProduct({ ...newProduct, variant: v })}
                         >
                           <SelectTrigger className="h-10">
                             <SelectValue />
@@ -941,57 +945,57 @@ export const ProductPricingModule = () => {
                       </div>
                     </div>
                   )}
-                  
+
                   {(newProduct.product_type === "stove" || newProduct.product_type === "regulator") && (
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-2">
                         <Label className="text-sm">Size/Type</Label>
-                        <Input 
+                        <Input
                           value={newProduct.size || ""}
-                          onChange={e => setNewProduct({...newProduct, size: e.target.value})}
+                          onChange={e => setNewProduct({ ...newProduct, size: e.target.value })}
                           placeholder={newProduct.product_type === "stove" ? "Single/Double" : "22mm/20mm"}
                           className="h-10"
                         />
                       </div>
                       <div className="space-y-2">
                         <Label className="text-sm">Model/Variant</Label>
-                        <Input 
+                        <Input
                           value={newProduct.variant || ""}
-                          onChange={e => setNewProduct({...newProduct, variant: e.target.value})}
+                          onChange={e => setNewProduct({ ...newProduct, variant: e.target.value })}
                           placeholder="e.g., GS-102"
                           className="h-10"
                         />
                       </div>
                     </div>
                   )}
-                  
+
                   <div className="grid grid-cols-3 gap-3">
                     <div className="space-y-2">
                       <Label className="text-sm">Company</Label>
-                      <Input 
+                      <Input
                         type="number"
                         value={newProduct.company_price}
-                        onChange={e => setNewProduct({...newProduct, company_price: Number(e.target.value)})}
+                        onChange={e => setNewProduct({ ...newProduct, company_price: Number(e.target.value) })}
                         className="h-10"
                         min={0}
                       />
                     </div>
                     <div className="space-y-2">
                       <Label className="text-sm">Distributor</Label>
-                      <Input 
+                      <Input
                         type="number"
                         value={newProduct.distributor_price}
-                        onChange={e => setNewProduct({...newProduct, distributor_price: Number(e.target.value)})}
+                        onChange={e => setNewProduct({ ...newProduct, distributor_price: Number(e.target.value) })}
                         className="h-10"
                         min={0}
                       />
                     </div>
                     <div className="space-y-2">
                       <Label className="text-sm">Retail</Label>
-                      <Input 
+                      <Input
                         type="number"
                         value={newProduct.retail_price}
-                        onChange={e => setNewProduct({...newProduct, retail_price: Number(e.target.value)})}
+                        onChange={e => setNewProduct({ ...newProduct, retail_price: Number(e.target.value) })}
                         className="h-10"
                         min={0}
                       />
@@ -1008,8 +1012,8 @@ export const ProductPricingModule = () => {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
-            <Button 
-              onClick={saveChanges} 
+            <Button
+              onClick={saveChanges}
               disabled={!hasChanges || isSaving}
               size="sm"
               className="h-8 sm:h-9 text-xs sm:text-sm gap-1 bg-primary hover:bg-primary/90"
@@ -1115,26 +1119,24 @@ export const ProductPricingModule = () => {
             <div className="flex bg-muted/60 rounded-full p-1 border border-border/50 flex-shrink-0">
               <button
                 onClick={() => setSizeTab("22mm")}
-                className={`h-9 px-3 sm:px-4 rounded-full font-semibold text-xs sm:text-sm transition-all ${
-                  sizeTab === '22mm' 
-                    ? 'bg-primary text-primary-foreground shadow-md' 
+                className={`h-9 px-3 sm:px-4 rounded-full font-semibold text-xs sm:text-sm transition-all ${sizeTab === '22mm'
+                    ? 'bg-primary text-primary-foreground shadow-md'
                     : 'text-muted-foreground hover:text-foreground'
-                }`}
+                  }`}
               >
                 22mm
               </button>
               <button
                 onClick={() => setSizeTab("20mm")}
-                className={`h-9 px-3 sm:px-4 rounded-full font-semibold text-xs sm:text-sm transition-all ${
-                  sizeTab === '20mm' 
-                    ? 'bg-cyan-500 text-white shadow-md' 
+                className={`h-9 px-3 sm:px-4 rounded-full font-semibold text-xs sm:text-sm transition-all ${sizeTab === '20mm'
+                    ? 'bg-cyan-500 text-white shadow-md'
                     : 'text-muted-foreground hover:text-foreground'
-                }`}
+                  }`}
               >
                 20mm
               </button>
             </div>
-            
+
             {/* Weight Dropdown (Compact) */}
             <Select value={selectedWeight} onValueChange={setSelectedWeight}>
               <SelectTrigger className="h-9 w-24 sm:w-28 text-xs sm:text-sm">
@@ -1147,11 +1149,11 @@ export const ProductPricingModule = () => {
               </SelectContent>
             </Select>
           </div>
-          
+
           {/* Row 2: Search Bar (Full Width - Below for easy mobile access) */}
           <div className="relative w-full">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input 
+            <Input
               placeholder="Search brands..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
@@ -1185,7 +1187,7 @@ export const ProductPricingModule = () => {
         <TabsContent value="stove" className="space-y-4 mt-4">
           <div className="relative w-full sm:w-80">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input 
+            <Input
               placeholder="Search stoves..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
@@ -1216,7 +1218,7 @@ export const ProductPricingModule = () => {
         <TabsContent value="regulator" className="space-y-4 mt-4">
           <div className="relative w-full sm:w-80">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input 
+            <Input
               placeholder="Search regulators..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
