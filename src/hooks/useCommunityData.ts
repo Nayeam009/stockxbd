@@ -91,6 +91,7 @@ export interface CartItem extends ShopProduct {
   return_cylinder_qty: number;
   return_cylinder_type: 'empty' | 'leaked' | null;
   shop?: Shop;
+  shop_id: string; // Make shop_id required in CartItem for reliability
 }
 
 export const useCommunityData = () => {

@@ -79,8 +79,12 @@ const ShopProfile = () => {
   const handleCheckout = (items: CartItem[]) => {
     if (!shop) return;
     
-    // Add shop info to all items
-    const itemsWithShop = items.map(item => ({ ...item, shop }));
+    // Add shop info and shop_id to all items - CRITICAL for checkout
+    const itemsWithShop = items.map(item => ({ 
+      ...item, 
+      shop,
+      shop_id: shop.id // Ensure shop_id is always set for checkout
+    }));
     setCart(itemsWithShop);
     
     toast({
@@ -102,8 +106,8 @@ const ShopProfile = () => {
       return;
     }
 
-    // Add shop info to item
-    const itemWithShop = { ...item, shop };
+    // Add shop info AND shop_id to item - CRITICAL for checkout
+    const itemWithShop = { ...item, shop, shop_id: shop?.id || item.shop_id };
 
     // Check if item already in cart
     const existingIndex = cart.findIndex(c => c.id === item.id);
@@ -373,6 +377,7 @@ const ShopProfile = () => {
                 products={products}
                 onCheckout={handleCheckout}
                 isWholesale={isWholesaleCustomer}
+                shopId={shop.id}
               />
             )}
           </TabsContent>

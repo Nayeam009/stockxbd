@@ -55,9 +55,28 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     if (initRef.current) return;
     initRef.current = true;
 
+    // Safety timeout - if we have a local session but auth doesn't respond in 8s,
+    // still allow access (the session was validated on localStorage check)
+    let safetyTimeout: ReturnType<typeof setTimeout> | null = null;
+    if (hasStoredSession && loading) {
+      safetyTimeout = setTimeout(() => {
+        if (mountedRef.current && loading) {
+          console.log('[ProtectedRoute] Safety timeout - allowing access with cached session');
+          setLoading(false);
+          setAuthenticated(true);
+        }
+      }, 8000);
+    }
+
     // Listen to auth state changes - this is the PRIMARY source of truth
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mountedRef.current) return;
+      
+      // Clear safety timeout since auth responded
+      if (safetyTimeout) {
+        clearTimeout(safetyTimeout);
+        safetyTimeout = null;
+      }
       
       console.log('[ProtectedRoute] Auth event:', event, !!session);
       
@@ -106,9 +125,10 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
 
     return () => {
       mountedRef.current = false;
+      if (safetyTimeout) clearTimeout(safetyTimeout);
       subscription.unsubscribe();
     };
-  }, []);
+  }, [hasStoredSession, loading]);
 
   // Retry handler
   const handleRetry = useCallback(() => {

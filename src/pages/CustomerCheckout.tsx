@@ -181,7 +181,8 @@ const CustomerCheckout = () => {
   const deliveryFee = 50;
   const total = subtotal + deliveryFee;
 
-  const shopId = cart.length > 0 ? cart[0].shop_id : null;
+  // CRITICAL: Get shop_id from cart - check multiple possible locations
+  const shopId = cart.length > 0 ? (cart[0].shop_id || cart[0].shop?.id) : null;
 
   const handleClearAutoFill = () => {
     setUseSavedAddress(false);
