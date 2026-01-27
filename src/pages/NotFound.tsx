@@ -1,4 +1,4 @@
-import { useLocation, Link } from "react-router-dom";
+import { useLocation, Link, useNavigate } from "react-router-dom";
 import { useEffect } from "react";
 import { Home, ArrowLeft, Search, Store } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -6,6 +6,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 
 const NotFound = () => {
   const location = useLocation();
+  const navigate = useNavigate();
+
+  // Fix common broken/encoded dashboard module URLs (e.g. "/dashboard%3Fmodule=settings")
+  useEffect(() => {
+    const path = location.pathname;
+    const lower = path.toLowerCase();
+    const prefix = "/dashboard%3fmodule=";
+
+    if (lower.startsWith(prefix)) {
+      const module = decodeURIComponent(path.slice(prefix.length));
+      // Preserve expected dashboard routing format
+      navigate(`/dashboard?module=${encodeURIComponent(module)}`, { replace: true });
+    }
+  }, [location.pathname, navigate]);
 
   useEffect(() => {
     console.error(
