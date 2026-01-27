@@ -40,19 +40,20 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   }, []);
 
   const checkAuthAndRole = useCallback(async () => {
+    // Always enter a known loading state (prevents stale UI on refresh)
+    setAuthError(null);
+    setLoading(true);
+
+    // Check if offline
+    if (!navigator.onLine) {
+      setAuthError('offline');
+      setAuthenticated(false);
+      setUserRole(null);
+      setLoading(false);
+      return;
+    }
+
     try {
-      setAuthError(null);
-
-      // Always enter a known loading state (prevents stale UI on refresh)
-      setLoading(true);
-
-      // Check if offline
-      if (!navigator.onLine) {
-        setAuthError('offline');
-        setLoading(false);
-        return;
-      }
-
       // Get session with hard timeout protection
       const { data: { session }, error: sessionError } = await withTimeout(
         supabase.auth.getSession(),
@@ -62,36 +63,43 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
       
       if (sessionError || !session) {
         setAuthenticated(false);
+        setUserRole(null);
         setLoading(false);
         return;
       }
 
-      // Fetch user role
-      const { data: roleData } = await withTimeout(
-        supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', session.user.id)
-          .maybeSingle(),
-        8000,
-        'Role fetch'
-      );
+      // Session OK → authenticate immediately.
+      // Role fetch is best-effort; it must NEVER block the dashboard.
+      setAuthenticated(true);
 
-      if (mountedRef.current) {
-        setAuthenticated(true);
-        setUserRole(roleData?.role || null);
-        setLoading(false);
+      try {
+        const { data: roleData } = await withTimeout(
+          supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', session.user.id)
+            .maybeSingle(),
+          8000,
+          'Role fetch'
+        );
+
+        if (mountedRef.current) {
+          setUserRole(roleData?.role || null);
+        }
+      } catch (roleError) {
+        // IMPORTANT: Do not show auth error UI for role fetch timeouts.
+        // We keep the user authenticated and let the app retry later.
+        console.warn('[ProtectedRoute] Role fetch failed (initial), continuing:', roleError);
+      } finally {
+        if (mountedRef.current) setLoading(false);
       }
     } catch (error) {
       console.error('Auth check error:', error);
-      
-      if (!navigator.onLine) {
-        setAuthError('offline');
-      } else {
-        setAuthError('error');
-      }
-      
+      if (!mountedRef.current) return;
+
+      setAuthError(navigator.onLine ? 'error' : 'offline');
       setAuthenticated(false);
+      setUserRole(null);
       setLoading(false);
     }
   }, [withTimeout]);
@@ -118,20 +126,32 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
       }
     }, 10000); // 10 second max wait
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mountedRef.current) return;
 
-      try {
+      // TOKEN_REFRESHED happens frequently and should never block UI.
+      // Role doesn't change on token refresh → skip role fetch to avoid timeouts on refresh.
+      if (event === 'TOKEN_REFRESHED') {
         setAuthError(null);
-        setLoading(true);
+        setAuthenticated(!!session);
+        setLoading(false);
+        return;
+      }
 
-        if (!session) {
-          setAuthenticated(false);
-          setUserRole(null);
-          setLoading(false);
-          return;
-        }
+      setAuthError(null);
+      setLoading(true);
 
+      if (!session) {
+        setAuthenticated(false);
+        setUserRole(null);
+        setLoading(false);
+        return;
+      }
+
+      // Session OK
+      setAuthenticated(true);
+
+      try {
         const { data: roleData } = await withTimeout(
           supabase
             .from('user_roles')
@@ -143,17 +163,13 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
         );
 
         if (mountedRef.current) {
-          setAuthenticated(true);
           setUserRole(roleData?.role || null);
-          setLoading(false);
         }
       } catch (e) {
-        console.error('[ProtectedRoute] Auth state change error:', e);
-        if (!mountedRef.current) return;
-        setAuthError(navigator.onLine ? 'error' : 'offline');
-        setAuthenticated(false);
-        setUserRole(null);
-        setLoading(false);
+        // Same principle: role fetch failures must NOT break auth.
+        console.warn('[ProtectedRoute] Role fetch failed (auth change), continuing:', e);
+      } finally {
+        if (mountedRef.current) setLoading(false);
       }
     });
 
