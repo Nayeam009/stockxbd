@@ -37,7 +37,7 @@ export const DashboardHeader = ({
 }: DashboardHeaderProps) => {
   const { t, language } = useLanguage();
   const { theme, toggleTheme } = useTheme();
-  const { isOnline, pendingSyncCount } = useNetwork();
+  const { isOnline } = useNetwork();
   const navigate = useNavigate();
   const [shopId, setShopId] = useState<string | null>(null);
 

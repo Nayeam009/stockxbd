@@ -1,38 +1,26 @@
 /**
  * Network Context Provider
- * Provides network status information to the app
+ * Simple online/offline detection
  */
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 
 interface NetworkContextValue {
   isOnline: boolean;
-  syncStatus: 'idle' | 'syncing' | 'error' | 'offline';
-  pendingSyncCount: number;
-  lastSyncedAt: Date | null;
-  isSyncing: boolean;
-  syncNow: () => Promise<void>;
-  retryFailed: () => Promise<void>;
 }
 
 const NetworkContext = createContext<NetworkContextValue | undefined>(undefined);
 
 export const NetworkProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
-  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'error' | 'offline'>('idle');
-  
-  // Refs to track toast state
   const wasOffline = useRef(false);
   const hasShownOnlineToast = useRef(false);
 
-  // Handle online status change
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
-      setSyncStatus('idle');
       
-      // Show toast only when coming back online
       if (wasOffline.current && !hasShownOnlineToast.current) {
         hasShownOnlineToast.current = true;
         toast.success('Back online!', {
@@ -50,7 +38,6 @@ export const NetworkProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     const handleOffline = () => {
       setIsOnline(false);
-      setSyncStatus('offline');
       wasOffline.current = true;
       hasShownOnlineToast.current = false;
       
@@ -73,32 +60,8 @@ export const NetworkProvider: React.FC<{ children: React.ReactNode }> = ({ child
     };
   }, []);
 
-  const syncNow = useCallback(async (): Promise<void> => {
-    if (!isOnline) {
-      toast.error('Cannot sync while offline');
-      return;
-    }
-  }, [isOnline]);
-
-  const retryFailed = useCallback(async (): Promise<void> => {
-    if (!isOnline) {
-      toast.error('Cannot retry while offline');
-      return;
-    }
-  }, [isOnline]);
-
-  const value: NetworkContextValue = {
-    isOnline,
-    syncStatus,
-    pendingSyncCount: 0,
-    lastSyncedAt: null,
-    isSyncing: false,
-    syncNow,
-    retryFailed,
-  };
-
   return (
-    <NetworkContext.Provider value={value}>
+    <NetworkContext.Provider value={{ isOnline }}>
       {children}
     </NetworkContext.Provider>
   );

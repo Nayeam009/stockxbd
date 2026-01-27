@@ -27,8 +27,6 @@ export interface CustomerData {
   };
 }
 
-const STORAGE_KEY = 'lpg-customer-data';
-
 const defaultCustomerData: CustomerData = {
   profile: { name: '', phone: '', email: '' },
   defaultAddress: { division: '', district: '', thana: '', streetAddress: '' },
@@ -41,20 +39,14 @@ export const useCustomerData = () => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [isSynced, setIsSynced] = useState(false);
 
-  // Load data from localStorage first, then sync with Supabase
+  // Load data directly from Supabase
   const loadCustomerData = useCallback(async () => {
     try {
-      // 1. Load from localStorage (instant)
-      const savedData = localStorage.getItem(STORAGE_KEY);
-      if (savedData) {
-        const parsed = JSON.parse(savedData) as CustomerData;
-        setCustomerData(parsed);
-      }
-      setIsLoaded(true);
-
-      // 2. Sync with Supabase profile (background)
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        setIsLoaded(true);
+        return;
+      }
 
       const { data: profile } = await supabase
         .from('profiles')
@@ -63,19 +55,14 @@ export const useCustomerData = () => {
         .single();
 
       if (profile) {
-        setCustomerData(prev => {
-          const updated = {
-            ...prev,
-            profile: {
-              name: profile.full_name || prev.profile.name,
-              phone: profile.phone || prev.profile.phone,
-              email: user.email || prev.profile.email
-            }
-          };
-          // Persist the synced data
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-          return updated;
-        });
+        setCustomerData(prev => ({
+          ...prev,
+          profile: {
+            name: profile.full_name || prev.profile.name,
+            phone: profile.phone || prev.profile.phone,
+            email: user.email || prev.profile.email
+          }
+        }));
       } else if (user.email) {
         setCustomerData(prev => ({
           ...prev,
@@ -83,6 +70,7 @@ export const useCustomerData = () => {
         }));
       }
 
+      setIsLoaded(true);
       setIsSynced(true);
     } catch (error) {
       console.error('Error loading customer data:', error);
@@ -90,17 +78,12 @@ export const useCustomerData = () => {
     }
   }, []);
 
-  // Save customer data to localStorage and optionally to Supabase
-  const saveCustomerData = useCallback(async (data: Partial<CustomerData>, syncToServer = false) => {
+  // Save customer data to Supabase
+  const saveCustomerData = useCallback(async (data: Partial<CustomerData>, syncToServer = true) => {
     const updated = { ...customerData, ...data };
-    
-    // Update state
     setCustomerData(updated);
-    
-    // Persist to localStorage
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
 
-    // Optionally sync profile to Supabase
+    // Sync profile to Supabase
     if (syncToServer && (data.profile?.name || data.profile?.phone)) {
       try {
         const { data: { user } } = await supabase.auth.getUser();
@@ -120,15 +103,13 @@ export const useCustomerData = () => {
     }
   }, [customerData]);
 
-  // Save address only
+  // Save address
   const saveAddress = useCallback((address: Omit<SavedAddress, 'id' | 'label' | 'isDefault'>) => {
-    const updated = {
-      ...customerData,
+    setCustomerData(prev => ({
+      ...prev,
       defaultAddress: address
-    };
-    setCustomerData(updated);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-  }, [customerData]);
+    }));
+  }, []);
 
   // Add a new saved address
   const addSavedAddress = useCallback((address: Omit<SavedAddress, 'id'>) => {
@@ -139,80 +120,67 @@ export const useCustomerData = () => {
     
     const updatedAddresses = [...customerData.savedAddresses];
     
-    // If this is set as default, update other addresses
     if (address.isDefault) {
       updatedAddresses.forEach(addr => addr.isDefault = false);
     }
     
     updatedAddresses.push(newAddress);
     
-    const updated = {
-      ...customerData,
+    setCustomerData(prev => ({
+      ...prev,
       savedAddresses: updatedAddresses,
-      // Also update default address if this is the default
-      ...(address.isDefault && { defaultAddress: { 
-        division: address.division,
-        district: address.district,
-        thana: address.thana,
-        streetAddress: address.streetAddress
-      }})
-    };
-    
-    setCustomerData(updated);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      ...(address.isDefault && { 
+        defaultAddress: { 
+          division: address.division,
+          district: address.district,
+          thana: address.thana,
+          streetAddress: address.streetAddress
+        }
+      })
+    }));
     
     return newAddress.id;
-  }, [customerData]);
+  }, [customerData.savedAddresses]);
 
   // Remove a saved address
   const removeSavedAddress = useCallback((addressId: string) => {
-    const updated = {
-      ...customerData,
-      savedAddresses: customerData.savedAddresses.filter(a => a.id !== addressId)
-    };
-    setCustomerData(updated);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-  }, [customerData]);
+    setCustomerData(prev => ({
+      ...prev,
+      savedAddresses: prev.savedAddresses.filter(a => a.id !== addressId)
+    }));
+  }, []);
 
   // Set default address from saved addresses
   const setDefaultAddress = useCallback((addressId: string) => {
     const address = customerData.savedAddresses.find(a => a.id === addressId);
     if (!address) return;
     
-    const updatedAddresses = customerData.savedAddresses.map(a => ({
-      ...a,
-      isDefault: a.id === addressId
-    }));
-    
-    const updated = {
-      ...customerData,
-      savedAddresses: updatedAddresses,
+    setCustomerData(prev => ({
+      ...prev,
+      savedAddresses: prev.savedAddresses.map(a => ({
+        ...a,
+        isDefault: a.id === addressId
+      })),
       defaultAddress: {
         division: address.division,
         district: address.district,
         thana: address.thana,
         streetAddress: address.streetAddress
       }
-    };
-    
-    setCustomerData(updated);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-  }, [customerData]);
+    }));
+  }, [customerData.savedAddresses]);
 
-  // Save order preferences (like return cylinder type)
+  // Save order preferences
   const saveOrderPreferences = useCallback((prefs: CustomerData['lastOrderPreferences']) => {
-    const updated = {
-      ...customerData,
-      lastOrderPreferences: { ...customerData.lastOrderPreferences, ...prefs }
-    };
-    setCustomerData(updated);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-  }, [customerData]);
+    setCustomerData(prev => ({
+      ...prev,
+      lastOrderPreferences: { ...prev.lastOrderPreferences, ...prefs }
+    }));
+  }, []);
 
   // Clear all saved data
   const clearSavedData = useCallback(() => {
     setCustomerData(defaultCustomerData);
-    localStorage.removeItem(STORAGE_KEY);
   }, []);
 
   // Check if customer has saved data
