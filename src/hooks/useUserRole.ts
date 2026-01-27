@@ -12,104 +12,128 @@ interface UserRoleData {
   refetch: () => Promise<void>;
 }
 
+/**
+ * Check if there's a potentially valid session in localStorage.
+ * This is a fast, synchronous check to avoid blocking the UI.
+ */
+const getStoredSession = (): { userId: string; email: string } | null => {
+  try {
+    const storageKey = `sb-xupvteigmqcrfluuadte-auth-token`;
+    const stored = localStorage.getItem(storageKey);
+    if (!stored) return null;
+    
+    const parsed = JSON.parse(stored);
+    const expiresAt = parsed?.expires_at;
+    const userId = parsed?.user?.id;
+    const email = parsed?.user?.email;
+    
+    // If no expiry or expired, return null
+    if (!expiresAt || !userId) return null;
+    
+    // Check if token is expired (with 60 second buffer)
+    const now = Math.floor(Date.now() / 1000);
+    if (expiresAt <= now - 60) return null;
+    
+    return { userId, email: email || '' };
+  } catch {
+    return null;
+  }
+};
+
 export const useUserRole = (): UserRoleData => {
+  // Check localStorage for instant initial state
+  const storedSession = getStoredSession();
+  
   const [userRole, setUserRole] = useState<UserRole>('customer');
-  const [userName, setUserName] = useState<string>('User');
-  const [userId, setUserId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [userName, setUserName] = useState<string>(storedSession?.email?.split('@')[0] || 'User');
+  const [userId, setUserId] = useState<string | null>(storedSession?.userId || null);
+  const [loading, setLoading] = useState(!storedSession);
   const [error, setError] = useState<string | null>(null);
 
   const mountedRef = useRef(true);
-  const requestIdRef = useRef(0);
+  const roleLoadedRef = useRef(false);
 
-  const withTimeout = useCallback(async <T,>(promiseLike: PromiseLike<T>, ms: number, label: string): Promise<T> => {
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      timeoutId = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
-    });
-
-    try {
-      return await Promise.race([Promise.resolve(promiseLike), timeoutPromise]);
-    } finally {
-      if (timeoutId) clearTimeout(timeoutId);
+  const fetchUserData = useCallback(async (uid?: string) => {
+    const targetUserId = uid || userId;
+    if (!targetUserId) {
+      setLoading(false);
+      return;
     }
-  }, []);
 
-  const fetchUserData = useCallback(async () => {
-    const requestId = ++requestIdRef.current;
     try {
-      setLoading(true);
       setError(null);
       
-      const { data: { session } } = await withTimeout(
-        supabase.auth.getSession(),
-        8000,
-        'Auth session check'
-      );
-
-      if (!mountedRef.current || requestId !== requestIdRef.current) return;
-      
-      if (!session?.user) {
-        setUserRole('customer');
-        setUserName('Guest');
-        setUserId(null);
-        return;
-      }
-
-      setUserId(session.user.id);
-
       // Fetch role and profile in parallel
-      const [roleResult, profileResult] = await withTimeout(
-        Promise.all([
-          Promise.resolve(
-            supabase
-              .from('user_roles')
-              .select('role')
-              .eq('user_id', session.user.id)
-              .maybeSingle()
-          ),
-          Promise.resolve(
-            supabase
-              .from('profiles')
-              .select('full_name')
-              .eq('user_id', session.user.id)
-              .maybeSingle()
-          ),
-        ]),
-        8000,
-        'Role/profile fetch'
-      );
+      const [roleResult, profileResult] = await Promise.all([
+        supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', targetUserId)
+          .maybeSingle(),
+        supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('user_id', targetUserId)
+          .maybeSingle()
+      ]);
 
-      if (!mountedRef.current || requestId !== requestIdRef.current) return;
+      if (!mountedRef.current) return;
 
       const role = roleResult.data?.role as UserRole || 'customer';
-      const displayName = profileResult.data?.full_name || 
-                         session.user.email?.split('@')[0] || 'User';
+      const displayName = profileResult.data?.full_name || userName;
       
       setUserRole(role);
       setUserName(displayName);
+      roleLoadedRef.current = true;
     } catch (err) {
-      console.error('Error in useUserRole:', err);
+      console.warn('[useUserRole] Error fetching user data:', err);
       if (mountedRef.current) setError('Failed to load user data');
     } finally {
-      if (mountedRef.current && requestId === requestIdRef.current) setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
-  }, [withTimeout]);
+  }, [userId, userName]);
 
   useEffect(() => {
     mountedRef.current = true;
-    fetchUserData();
     
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
-      fetchUserData();
+    // If we have a stored session, fetch role data immediately
+    if (storedSession && !roleLoadedRef.current) {
+      fetchUserData(storedSession.userId);
+    }
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!mountedRef.current) return;
+
+      if (!session) {
+        setUserRole('customer');
+        setUserName('Guest');
+        setUserId(null);
+        setLoading(false);
+        roleLoadedRef.current = false;
+        return;
+      }
+
+      // Update user ID immediately
+      setUserId(session.user.id);
+      setUserName(session.user.email?.split('@')[0] || 'User');
+      setLoading(false);
+
+      // Skip role refresh for token refresh events
+      if (event === 'TOKEN_REFRESHED') {
+        return;
+      }
+
+      // Fetch role data for new sessions
+      if (!roleLoadedRef.current) {
+        fetchUserData(session.user.id);
+      }
     });
 
     return () => {
       mountedRef.current = false;
-      requestIdRef.current += 1; // invalidate in-flight requests
       subscription.unsubscribe();
     };
-  }, [fetchUserData]);
+  }, [fetchUserData, storedSession]);
 
   return { userRole, userName, userId, loading, error, refetch: fetchUserData };
 };
