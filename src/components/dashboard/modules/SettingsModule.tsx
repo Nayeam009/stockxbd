@@ -50,6 +50,7 @@ import {
 import { BackupRestoreCard } from "@/components/settings/BackupRestoreCard";
 import { PushNotificationCard } from "@/components/settings/PushNotificationCard";
 import { AccountSettingsSection } from "@/components/settings/AccountSettingsSection";
+import { TeamSettingsSection } from "@/components/settings/TeamSettingsSection";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -318,32 +319,49 @@ export const SettingsModule = () => {
       id: 'account', 
       icon: <UserCircle className="h-5 w-5" />, 
       title: language === 'bn' ? 'অ্যাকাউন্ট' : 'Account', 
-      description: language === 'bn' ? 'প্রোফাইল, থিম ও টিম' : 'Profile, theme & team' 
+      description: language === 'bn' ? 'প্রোফাইল ও থিম' : 'Profile & theme',
+      ownerOnly: false
+    },
+    { 
+      id: 'team', 
+      icon: <Settings className="h-5 w-5" />, 
+      title: language === 'bn' ? 'টিম ও ব্যবসা' : 'Team & Business', 
+      description: language === 'bn' ? 'ম্যানেজার ও ব্যবসা' : 'Managers & business',
+      ownerOnly: true
     },
     { 
       id: 'notifications', 
       icon: <Bell className="h-5 w-5" />, 
       title: language === 'bn' ? 'বিজ্ঞপ্তি' : 'Notifications', 
-      description: language === 'bn' ? 'অ্যালার্ট সেটিংস' : 'Alert preferences' 
+      description: language === 'bn' ? 'অ্যালার্ট সেটিংস' : 'Alert preferences',
+      ownerOnly: false
     },
     { 
       id: 'security', 
       icon: <Shield className="h-5 w-5" />, 
       title: language === 'bn' ? 'নিরাপত্তা' : 'Security', 
-      description: language === 'bn' ? 'পাসওয়ার্ড ও অ্যাকাউন্ট' : 'Password & account' 
+      description: language === 'bn' ? 'পাসওয়ার্ড ও অ্যাকাউন্ট' : 'Password & account',
+      ownerOnly: false
     },
     { 
       id: 'advanced', 
       icon: <Zap className="h-5 w-5" />, 
       title: language === 'bn' ? 'উন্নত' : 'Advanced', 
-      description: language === 'bn' ? 'ব্যাকআপ ও ডেটা' : 'Backup & data' 
+      description: language === 'bn' ? 'ব্যাকআপ ও ডেটা' : 'Backup & data',
+      ownerOnly: false
     },
   ];
+
+  // Filter sections based on role
+  const visibleSections = sections.filter(s => !s.ownerOnly || userRole === 'owner');
 
   const renderSectionContent = () => {
     switch (activeSection) {
       case 'account':
         return <AccountSettingsSection />;
+
+      case 'team':
+        return <TeamSettingsSection />;
 
       case 'notifications':
         return (
@@ -570,7 +588,7 @@ export const SettingsModule = () => {
             {/* Settings Navigation */}
             <Card className="border-border/50 shadow-sm bg-card">
               <CardContent className="p-3 space-y-1">
-                {sections.map(section => (
+                {visibleSections.map(section => (
                   <SettingsSection
                     key={section.id}
                     icon={section.icon}
@@ -597,7 +615,7 @@ export const SettingsModule = () => {
             </Button>
 
             {/* Section Header */}
-            <SectionHeader section={sections.find(s => s.id === activeSection)!} />
+            <SectionHeader section={visibleSections.find(s => s.id === activeSection)!} />
 
             {/* Content */}
             {renderSectionContent()}
@@ -615,7 +633,7 @@ export const SettingsModule = () => {
             {/* Navigation */}
             <Card className="sticky top-6 border-border/50 shadow-sm bg-card">
               <CardContent className="p-3 space-y-1">
-                {sections.map(section => (
+                {visibleSections.map(section => (
                   <SettingsSection
                     key={section.id}
                     icon={section.icon}
@@ -631,7 +649,7 @@ export const SettingsModule = () => {
 
           {/* Content */}
           <div className="min-w-0">
-            <SectionHeader section={sections.find(s => s.id === activeSection)!} />
+            <SectionHeader section={visibleSections.find(s => s.id === activeSection)!} />
             {renderSectionContent()}
           </div>
         </div>
