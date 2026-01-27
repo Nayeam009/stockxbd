@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,7 +12,8 @@ import {
   Loader2,
   Shield,
   Trash2,
-  RefreshCw
+  RefreshCw,
+  Link2
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -28,13 +28,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 interface TeamMember {
   id: string;
@@ -49,7 +42,7 @@ export const ProfileSharingCard = () => {
   const [loading, setLoading] = useState(false);
   const [showQRDialog, setShowQRDialog] = useState(false);
   const [inviteCode, setInviteCode] = useState("");
-  const [inviteRole] = useState<'manager'>('manager'); // Only manager role available
+  const [inviteLink, setInviteLink] = useState("");
   const [copied, setCopied] = useState(false);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [userRole, setUserRole] = useState<string>('');
@@ -62,6 +55,7 @@ export const ProfileSharingCard = () => {
       .from('team_members')
       .select('id, member_user_id, member_email, role, created_at')
       .eq('owner_id', currentUserId)
+      .eq('role', 'manager')
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -92,7 +86,7 @@ export const ProfileSharingCard = () => {
         .from('user_roles')
         .select('role')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
       
       if (roleData) {
         setUserRole(roleData.role);
@@ -112,7 +106,7 @@ export const ProfileSharingCard = () => {
         .from('team_invites')
         .insert({
           code,
-          role: inviteRole,
+          role: 'manager',
           created_by: currentUserId,
           expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 hours
         });
@@ -127,8 +121,15 @@ export const ProfileSharingCard = () => {
         return;
       }
 
+      const link = `${window.location.origin}/auth?invite=${code}&role=manager`;
       setInviteCode(code);
+      setInviteLink(link);
       setShowQRDialog(true);
+      
+      toast({
+        title: language === 'bn' ? 'আমন্ত্রণ তৈরি হয়েছে!' : 'Invite created!',
+        description: language === 'bn' ? 'QR কোড বা লিঙ্ক শেয়ার করুন' : 'Share the QR code or link'
+      });
     } catch (err) {
       logger.error('Error generating invite', err, { component: 'ProfileSharingCard' });
       toast({ 
@@ -141,8 +142,8 @@ export const ProfileSharingCard = () => {
   };
 
   const copyInviteLink = async () => {
-    const inviteUrl = `${window.location.origin}/auth?invite=${inviteCode}&role=${inviteRole}`;
-    await navigator.clipboard.writeText(inviteUrl);
+    const link = inviteLink || `${window.location.origin}/auth?invite=${inviteCode}&role=manager`;
+    await navigator.clipboard.writeText(link);
     setCopied(true);
     toast({ title: language === 'bn' ? 'লিঙ্ক কপি হয়েছে!' : 'Invite link copied!' });
     setTimeout(() => setCopied(false), 2000);
@@ -167,20 +168,6 @@ export const ProfileSharingCard = () => {
     toast({ title: language === 'bn' ? 'সদস্য সরানো হয়েছে' : 'Team member removed' });
   };
 
-  const getRoleBadgeColor = (role: string) => {
-    switch (role) {
-      case 'manager': return 'bg-blue-500/10 text-blue-500 border-blue-500/20';
-      default: return 'bg-muted text-muted-foreground';
-    }
-  };
-
-  const getRoleLabel = (role: string) => {
-    if (language === 'bn') {
-      return 'ম্যানেজার';
-    }
-    return 'Manager';
-  };
-
   // Only owners can share profiles
   if (userRole !== 'owner') {
     return null;
@@ -188,127 +175,129 @@ export const ProfileSharingCard = () => {
 
   return (
     <>
-      <Card className="bg-card border-border">
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <QrCode className="h-5 w-5 text-primary" />
-            <CardTitle className="text-foreground">
-              {language === 'bn' ? 'প্রোফাইল শেয়ারিং' : 'Profile Sharing'}
-            </CardTitle>
-          </div>
-          <CardDescription>
-            {language === 'bn' 
-              ? 'QR কোড স্ক্যান করে ম্যানেজার ও ড্রাইভারদের অ্যাক্সেস দিন' 
-              : 'Share access with managers and drivers via QR code'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Invite Section */}
-          <div className="space-y-3">
-            <Label>{language === 'bn' ? 'নতুন ম্যানেজার আমন্ত্রণ' : 'Invite Manager'}</Label>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="flex-1 flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-lg border">
-                <Badge className={`${getRoleBadgeColor('manager')} text-xs`}>
-                  {language === 'bn' ? 'ম্যানেজার' : 'Manager'}
-                </Badge>
-                <span className="text-sm text-muted-foreground">
-                  {language === 'bn' ? 'পূর্ণ অ্যাক্সেস' : 'Full access'}
-                </span>
-              </div>
-              <Button 
-                onClick={generateInviteCode} 
-                disabled={loading}
-                className="w-full sm:w-auto"
-              >
-                {loading ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : (
-                  <QrCode className="h-4 w-4 mr-2" />
-                )}
-                {language === 'bn' ? 'QR কোড তৈরি করুন' : 'Generate QR Code'}
-              </Button>
-            </div>
-          </div>
-
-          <Separator className="bg-border" />
-
-          {/* Team Members */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <Label>{language === 'bn' ? 'টিম সদস্য' : 'Team Members'}</Label>
-              <Badge variant="outline" className="text-xs">
-                {teamMembers.length} {language === 'bn' ? 'সদস্য' : 'members'}
-              </Badge>
-            </div>
-            
-            {teamMembers.length === 0 ? (
-              <div className="text-center py-6 text-muted-foreground">
-                <Users className="h-10 w-10 mx-auto mb-2 opacity-50" />
-                <p className="text-sm">
-                  {language === 'bn' 
-                    ? 'কোনো টিম সদস্য নেই' 
-                    : 'No team members yet'}
-                </p>
-                <p className="text-xs mt-1">
-                  {language === 'bn' 
-                    ? 'QR কোড দিয়ে সদস্য যোগ করুন' 
-                    : 'Generate a QR code to invite members'}
-                </p>
-              </div>
+      <div className="p-4 space-y-4">
+        {/* Quick Actions */}
+        <div className="grid grid-cols-2 gap-3">
+          <Button 
+            onClick={generateInviteCode} 
+            disabled={loading}
+            className="h-14 flex flex-col items-center justify-center gap-1"
+          >
+            {loading ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
             ) : (
-              <div className="space-y-2">
-                {teamMembers.map((member) => (
-                  <div 
-                    key={member.id} 
-                    className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-border/50"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="h-9 w-9 bg-primary/10 rounded-full flex items-center justify-center">
-                        <Shield className="h-4 w-4 text-primary" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-foreground">{member.member_email}</p>
-                        <Badge className={`text-xs mt-1 ${getRoleBadgeColor(member.role)}`}>
-                          {getRoleLabel(member.role)}
-                        </Badge>
-                      </div>
-                    </div>
-                    <Button 
-                      variant="ghost" 
-                      size="icon"
-                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                      onClick={() => removeTeamMember(member.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
+              <QrCode className="h-5 w-5" />
             )}
+            <span className="text-xs">
+              {language === 'bn' ? 'QR কোড' : 'QR Code'}
+            </span>
+          </Button>
+          
+          <Button 
+            variant="outline"
+            onClick={generateInviteCode} 
+            disabled={loading}
+            className="h-14 flex flex-col items-center justify-center gap-1"
+          >
+            {loading ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <Link2 className="h-5 w-5" />
+            )}
+            <span className="text-xs">
+              {language === 'bn' ? 'লিঙ্ক তৈরি' : 'Create Link'}
+            </span>
+          </Button>
+        </div>
+
+        <Separator />
+
+        {/* Team Members Preview */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <Label className="text-sm font-medium">
+              {language === 'bn' ? 'টিম সদস্য' : 'Team Members'}
+            </Label>
+            <Badge variant="secondary" className="text-xs">
+              {teamMembers.length} {language === 'bn' ? 'সদস্য' : 'members'}
+            </Badge>
           </div>
-        </CardContent>
-      </Card>
+          
+          {teamMembers.length === 0 ? (
+            <div className="text-center py-6 bg-muted/30 rounded-lg">
+              <Users className="h-10 w-10 mx-auto mb-2 text-muted-foreground opacity-50" />
+              <p className="text-sm text-muted-foreground">
+                {language === 'bn' 
+                  ? 'কোনো ম্যানেজার নেই' 
+                  : 'No managers yet'}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {language === 'bn' 
+                  ? 'উপরের বোতাম দিয়ে আমন্ত্রণ পাঠান' 
+                  : 'Use the buttons above to invite'}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2 max-h-[200px] overflow-y-auto">
+              {teamMembers.slice(0, 3).map((member) => (
+                <div 
+                  key={member.id} 
+                  className="flex items-center justify-between p-3 bg-muted/30 rounded-lg"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="h-9 w-9 bg-blue-500/10 rounded-full flex items-center justify-center">
+                      <Shield className="h-4 w-4 text-blue-500" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium truncate max-w-[150px]">
+                        {member.member_email}
+                      </p>
+                      <Badge className="text-[10px] bg-blue-500/10 text-blue-600 border-blue-500/20">
+                        {language === 'bn' ? 'ম্যানেজার' : 'Manager'}
+                      </Badge>
+                    </div>
+                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                    onClick={() => removeTeamMember(member.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+              {teamMembers.length > 3 && (
+                <p className="text-xs text-center text-muted-foreground py-2">
+                  +{teamMembers.length - 3} {language === 'bn' ? 'আরও সদস্য' : 'more members'}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* QR Code Dialog */}
       <Dialog open={showQRDialog} onOpenChange={setShowQRDialog}>
         <DialogContent className="max-w-sm mx-4 sm:mx-auto">
           <DialogHeader>
-            <DialogTitle className="text-center">
-              {language === 'bn' ? 'টিম সদস্য আমন্ত্রণ' : 'Invite Team Member'}
+            <DialogTitle className="text-center flex items-center justify-center gap-2">
+              <QrCode className="h-5 w-5 text-primary" />
+              {language === 'bn' ? 'ম্যানেজার আমন্ত্রণ' : 'Manager Invitation'}
             </DialogTitle>
             <DialogDescription className="text-center">
               {language === 'bn' 
-                ? `এই QR কোড স্ক্যান করে ${getRoleLabel(inviteRole)} যোগ করুন` 
-                : `Scan this QR code to join as ${getRoleLabel(inviteRole)}`}
+                ? 'এই QR কোড স্ক্যান করে বা লিঙ্ক ব্যবহার করে ম্যানেজার যোগ করুন' 
+                : 'Scan this QR code or use the link to join as Manager'}
             </DialogDescription>
           </DialogHeader>
           
           <div className="flex flex-col items-center space-y-4 py-4">
             {/* QR Code */}
-            <div className="p-4 bg-white rounded-xl shadow-lg">
+            <div className="p-4 bg-white rounded-xl shadow-lg border">
               <QRCodeSVG 
-                value={`${window.location.origin}/auth?invite=${inviteCode}&role=${inviteRole}`}
-                size={200}
+                value={inviteLink || `${window.location.origin}/auth?invite=${inviteCode}&role=manager`}
+                size={180}
                 level="H"
                 includeMargin
                 imageSettings={{
@@ -329,17 +318,17 @@ export const ProfileSharingCard = () => {
                 <Input 
                   value={inviteCode} 
                   readOnly 
-                  className="font-mono text-center bg-muted/50"
+                  className="font-mono text-center bg-muted/50 h-11 text-base"
                 />
-                <Button variant="outline" size="icon" onClick={copyInviteLink}>
+                <Button variant="outline" size="icon" onClick={copyInviteLink} className="h-11 w-11">
                   {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
                 </Button>
               </div>
             </div>
 
             {/* Role Badge */}
-            <Badge className={`${getRoleBadgeColor(inviteRole)} text-sm px-4 py-1`}>
-              {getRoleLabel(inviteRole)}
+            <Badge className="bg-blue-500/10 text-blue-600 border-blue-500/20 text-sm px-4 py-1.5">
+              {language === 'bn' ? 'ম্যানেজার' : 'Manager'}
             </Badge>
 
             {/* Expiry Notice */}
@@ -353,9 +342,10 @@ export const ProfileSharingCard = () => {
             <div className="flex gap-2 w-full">
               <Button 
                 variant="outline" 
-                className="flex-1"
+                className="flex-1 h-11"
                 onClick={() => {
                   setInviteCode('');
+                  setInviteLink('');
                   generateInviteCode();
                 }}
               >
@@ -363,7 +353,7 @@ export const ProfileSharingCard = () => {
                 {language === 'bn' ? 'নতুন কোড' : 'New Code'}
               </Button>
               <Button 
-                className="flex-1"
+                className="flex-1 h-11"
                 onClick={copyInviteLink}
               >
                 <Copy className="h-4 w-4 mr-2" />
