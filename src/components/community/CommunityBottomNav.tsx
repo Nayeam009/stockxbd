@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Home, ShoppingCart, User, Package, LayoutDashboard } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -8,14 +9,55 @@ interface CommunityBottomNavProps {
   userRole?: string | null;
 }
 
+/**
+ * Fast check for owner/manager role from sessionStorage cache
+ */
+const getStoredRole = (): string | null => {
+  try {
+    const storageKey = `sb-xupvteigmqcrfluuadte-auth-token`;
+    const stored = localStorage.getItem(storageKey);
+    if (!stored) return null;
+    
+    const parsed = JSON.parse(stored);
+    const userId = parsed?.user?.id;
+    
+    // Check cached role
+    const roleCache = sessionStorage.getItem(`user-role-${userId}`);
+    return roleCache || null;
+  } catch {
+    return null;
+  }
+};
+
 export const CommunityBottomNav = ({ 
   cartItemCount = 0,
-  userRole 
+  userRole: propUserRole 
 }: CommunityBottomNavProps) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [localRole, setLocalRole] = useState<string | null>(getStoredRole());
   
+  // Use prop role if available, otherwise fall back to local check
+  const userRole = propUserRole || localRole;
   const isOwnerOrManager = userRole === 'owner' || userRole === 'manager';
+
+  // Cache role when it changes
+  useEffect(() => {
+    if (propUserRole) {
+      try {
+        const storageKey = `sb-xupvteigmqcrfluuadte-auth-token`;
+        const stored = localStorage.getItem(storageKey);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          const userId = parsed?.user?.id;
+          if (userId) {
+            sessionStorage.setItem(`user-role-${userId}`, propUserRole);
+            setLocalRole(propUserRole);
+          }
+        }
+      } catch {}
+    }
+  }, [propUserRole]);
 
   // Different nav items for owners/managers vs regular customers
   const navItems = isOwnerOrManager ? [

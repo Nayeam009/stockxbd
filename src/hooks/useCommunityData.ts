@@ -377,39 +377,98 @@ export const useCommunityData = () => {
     }
   }, []);
 
-  // Fetch current user info
+  // Fetch current user info - optimistic with localStorage check
   useEffect(() => {
+    let mounted = true;
+    
     const fetchUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setCurrentUser({ id: user.id, email: user.email || '' });
-
-        // Get user role
-        const { data: roleData } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', user.id)
-          .single();
-
-        if (roleData) {
-          setUserRole(roleData.role);
+      try {
+        // Quick localStorage check first
+        const storageKey = `sb-xupvteigmqcrfluuadte-auth-token`;
+        const stored = localStorage.getItem(storageKey);
+        let userId: string | null = null;
+        let userEmail: string = '';
+        
+        if (stored) {
+          try {
+            const parsed = JSON.parse(stored);
+            userId = parsed?.user?.id;
+            userEmail = parsed?.user?.email || '';
+          } catch {}
         }
+        
+        // If we have stored data, use it immediately
+        if (userId) {
+          setCurrentUser({ id: userId, email: userEmail });
+          
+          // Fetch role and shop in parallel (non-blocking)
+          const [roleResult, shopResult] = await Promise.all([
+            supabase
+              .from('user_roles')
+              .select('role')
+              .eq('user_id', userId)
+              .maybeSingle(),
+            supabase
+              .from('shop_profiles')
+              .select('*')
+              .eq('owner_id', userId)
+              .maybeSingle()
+          ]);
+          
+          if (!mounted) return;
+          
+          if (roleResult.data) {
+            setUserRole(roleResult.data.role);
+            // Cache role in sessionStorage for fast access
+            sessionStorage.setItem(`user-role-${userId}`, roleResult.data.role);
+          }
+          
+          if (shopResult.data) {
+            setUserShop(shopResult.data as Shop);
+          }
+        } else {
+          // Fallback to getUser if no localStorage data
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!mounted) return;
+          
+          if (user) {
+            setCurrentUser({ id: user.id, email: user.email || '' });
 
-        // Get user's shop if they're an owner
-        const { data: shopData } = await supabase
-          .from('shop_profiles')
-          .select('*')
-          .eq('owner_id', user.id)
-          .single();
-
-        if (shopData) {
-          setUserShop(shopData as Shop);
+            const [roleResult, shopResult] = await Promise.all([
+              supabase
+                .from('user_roles')
+                .select('role')
+                .eq('user_id', user.id)
+                .maybeSingle(),
+              supabase
+                .from('shop_profiles')
+                .select('*')
+                .eq('owner_id', user.id)
+                .maybeSingle()
+            ]);
+            
+            if (!mounted) return;
+            
+            if (roleResult.data) {
+              setUserRole(roleResult.data.role);
+              // Cache role in sessionStorage for fast access
+              sessionStorage.setItem(`user-role-${user.id}`, roleResult.data.role);
+            }
+            
+            if (shopResult.data) {
+              setUserShop(shopResult.data as Shop);
+            }
+          }
         }
+      } catch (error) {
+        console.warn('[useCommunityData] Error fetching user:', error);
       }
     };
 
     fetchUser();
     fetchShops();
+    
+    return () => { mounted = false; };
   }, [fetchShops]);
 
   return {

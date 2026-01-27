@@ -16,7 +16,7 @@ interface UserRoleData {
  * Check if there's a potentially valid session in localStorage.
  * This is a fast, synchronous check to avoid blocking the UI.
  */
-const getStoredSession = (): { userId: string; email: string } | null => {
+const getStoredSession = (): { userId: string; email: string; role?: string } | null => {
   try {
     const storageKey = `sb-xupvteigmqcrfluuadte-auth-token`;
     const stored = localStorage.getItem(storageKey);
@@ -34,7 +34,10 @@ const getStoredSession = (): { userId: string; email: string } | null => {
     const now = Math.floor(Date.now() / 1000);
     if (expiresAt <= now - 60) return null;
     
-    return { userId, email: email || '' };
+    // Check for cached role
+    const cachedRole = sessionStorage.getItem(`user-role-${userId}`);
+    
+    return { userId, email: email || '', role: cachedRole || undefined };
   } catch {
     return null;
   }
@@ -44,7 +47,10 @@ export const useUserRole = (): UserRoleData => {
   // Check localStorage for instant initial state
   const storedSession = getStoredSession();
   
-  const [userRole, setUserRole] = useState<UserRole>('customer');
+  // Use cached role if available for instant UI
+  const [userRole, setUserRole] = useState<UserRole>(
+    (storedSession?.role as UserRole) || 'customer'
+  );
   const [userName, setUserName] = useState<string>(storedSession?.email?.split('@')[0] || 'User');
   const [userId, setUserId] = useState<string | null>(storedSession?.userId || null);
   const [loading, setLoading] = useState(!storedSession);
@@ -52,6 +58,7 @@ export const useUserRole = (): UserRoleData => {
 
   const mountedRef = useRef(true);
   const roleLoadedRef = useRef(false);
+  const initRef = useRef(false);
 
   const fetchUserData = useCallback(async (uid?: string) => {
     const targetUserId = uid || userId;
@@ -85,6 +92,11 @@ export const useUserRole = (): UserRoleData => {
       setUserRole(role);
       setUserName(displayName);
       roleLoadedRef.current = true;
+      
+      // Cache role in sessionStorage for fast access on next page load
+      if (targetUserId) {
+        sessionStorage.setItem(`user-role-${targetUserId}`, role);
+      }
     } catch (err) {
       console.warn('[useUserRole] Error fetching user data:', err);
       if (mountedRef.current) setError('Failed to load user data');
@@ -95,6 +107,10 @@ export const useUserRole = (): UserRoleData => {
 
   useEffect(() => {
     mountedRef.current = true;
+    
+    // Only run once
+    if (initRef.current) return;
+    initRef.current = true;
     
     // If we have a stored session, fetch role data immediately
     if (storedSession && !roleLoadedRef.current) {
