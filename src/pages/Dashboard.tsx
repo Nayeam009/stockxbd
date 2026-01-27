@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, TouchEvent, Suspense, lazy, useTransition } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, Navigate } from "react-router-dom";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/dashboard/AppSidebar";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
@@ -214,6 +214,12 @@ const Dashboard = () => {
         </div>
       </div>
     );
+  }
+
+  // Safety RBAC: if a customer ever reaches /dashboard (e.g. role gate failed upstream), redirect.
+  // Wait until authLoading is false so we don't mis-route owners during initial role fetch.
+  if (!authLoading && userRole === 'customer') {
+    return <Navigate to="/community" replace />;
   }
 
   // Show error state if auth failed
