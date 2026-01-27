@@ -59,10 +59,6 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { logger } from "@/lib/logger";
 import { useNetwork } from "@/contexts/NetworkContext";
-import { getCombinedCache, setCombinedCache } from "@/hooks/useModuleCache";
-
-// Cache key for POS module
-const POS_CACHE_KEY = 'pos_module_data';
 
 // ============= INTERFACES =============
 interface LPGBrand {
@@ -343,10 +339,10 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
     }
   }, [weight, mouthSize]);
 
-  // ============= DATA FETCHING WITH CACHE =============
+  // ============= DATA FETCHING =============
   const hasFetchedRef = useRef(false);
   
-  const fetchData = useCallback(async (isBackgroundRefresh = false) => {
+  const fetchData = useCallback(async () => {
     try {
       const [brandsRes, stovesRes, regulatorsRes, customersRes, pricesRes] = await Promise.all([
         supabase.from('lpg_brands').select('*').eq('is_active', true),
@@ -361,57 +357,23 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
       if (regulatorsRes.data) setRegulators(regulatorsRes.data);
       if (customersRes.data) setCustomers(customersRes.data);
       if (pricesRes.data) setProductPrices(pricesRes.data);
-      
-      // Save to cache for instant future loads
-      setCombinedCache(POS_CACHE_KEY, {
-        lpgBrands: brandsRes.data || [],
-        stoves: stovesRes.data || [],
-        regulators: regulatorsRes.data || [],
-        customers: customersRes.data || [],
-        productPrices: pricesRes.data || []
-      });
     } catch (error) {
       logger.error('Error fetching POS data', error, { component: 'POS' });
     }
   }, []);
 
-  // Initial load with cache-first strategy
+  // Initial load
   useEffect(() => {
     if (hasFetchedRef.current) return;
     hasFetchedRef.current = true;
     
     const initData = async () => {
-      // Try cache first for instant rendering
-      const cached = getCombinedCache<{
-        lpgBrands: any[];
-        stoves: any[];
-        regulators: any[];
-        customers: any[];
-        productPrices: any[];
-      }>(POS_CACHE_KEY);
-      
-      if (cached) {
-        // Instant restore from cache
-        setLpgBrands(cached.lpgBrands || []);
-        setStoves(cached.stoves || []);
-        setRegulators(cached.regulators || []);
-        setCustomers(cached.customers || []);
-        setProductPrices(cached.productPrices || []);
-        setLoading(false);
-        
-        // Background refresh if online
-        if (isOnline) {
-          fetchData(true);
-        }
-      } else {
-        // No cache - fetch and show loading
-        setLoading(true);
-        await fetchData();
-        setLoading(false);
-      }
+      setLoading(true);
+      await fetchData();
+      setLoading(false);
     };
     initData();
-  }, [fetchData, isOnline]);
+  }, [fetchData]);
 
   // Real-time subscriptions - debounced to prevent excessive refetches
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
@@ -422,7 +384,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
     
     const debouncedFetch = () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => fetchData(true), 1000);
+      debounceRef.current = setTimeout(() => fetchData(), 1000);
     };
     
     const channels = [
