@@ -1,31 +1,51 @@
-# Dashboard Connection Optimization - COMPLETED ✅
+# Dashboard Connection Optimization - FINAL FIX ✅
 
-## Changes Made
+## Problem
+Dashboard was freezing on refresh showing "Loading your dashboard..." or "Authentication Error" due to:
+1. `supabase.auth.getSession()` timing out after 8 seconds
+2. Role fetch timing out during `TOKEN_REFRESHED` events
+3. Service Worker (Airlift optimization) caching stale API responses
 
-### 1. Authentication Flow (Simplified)
-- **`useUserRole.ts`** - Direct Supabase queries, no caching/localStorage
-- **`ProtectedRoute.tsx`** - 10-second safety timeout prevents infinite loading
-- **`Dashboard.tsx`** - Faster loading condition (`authLoading && !userId`)
+## Root Cause
+The Supabase SDK's session restoration can take >8 seconds on slow networks, causing our timeout-based approach to show error screens even when the user has a valid session.
 
-### 2. QueryClient Optimized (`App.tsx`)
-- Retry: 2 attempts with exponential backoff (1s, 2s, 4s max 5s)
-- staleTime: 30 seconds (data stays fresh)
-- gcTime: 5 minutes (garbage collection)
-- refetchOnReconnect: true (auto-refresh on network restore)
+## Solution Applied
 
-### 3. Real-time Sync Improved
-- **Dashboard**: 1s debounce (reduced from 2s)
-- **Business Diary**: 1s debounce (reduced from 2s)
-- **POS/Inventory**: 1s debounce already in place
-- All modules use network-aware subscriptions (skip when offline)
+### 1. Optimistic Authentication (localStorage Check)
+- **`ProtectedRoute.tsx`** and **`useUserRole.ts`** now check `localStorage` for a valid session token SYNCHRONOUSLY on mount
+- If a non-expired token exists, we start in authenticated state immediately
+- No waiting for `getSession()` - we trust `onAuthStateChange` to confirm/deny
 
-### 4. Data Fetching Patterns
-- All modules use parallel Promise.all() for batch queries
-- .maybeSingle() used instead of .single() to prevent errors
-- Proper error handling with graceful fallbacks
+### 2. Event-Driven Architecture
+- Removed all manual `getSession()` calls on mount
+- Rely entirely on `onAuthStateChange` events:
+  - `INITIAL_SESSION` - confirms auth state
+  - `SIGNED_IN` / `SIGNED_OUT` - updates state
+  - `TOKEN_REFRESHED` - **skipped for role fetch** (role never changes on token refresh)
+
+### 3. Non-Blocking Role Fetch
+- Role fetch happens in background AFTER auth is confirmed
+- Failures don't block dashboard access
+- Role is fetched only once per session (using `roleLoadedRef`)
+
+### 4. Service Worker Disabled
+- **`src/main.tsx`** now disables/unregisters the Service Worker on app init
+- Clears all `stock-x-*` caches
+- Prevents stale API responses causing auth issues
+
+### 5. Safety Timeout Increased
+- Changed from 10s to 12s to give more time before showing error
+- Only triggers if no localStorage session exists
+
+## Files Changed
+- `src/components/auth/ProtectedRoute.tsx` - Complete rewrite for optimistic auth
+- `src/hooks/useUserRole.ts` - localStorage-first, event-driven
+- `src/main.tsx` - Service Worker disable/cleanup
+- `src/pages/Dashboard.tsx` - Customer redirect safety
 
 ## Result
-- Fast, reliable connections
-- No loading/reloading loops
-- Real-time updates within 1 second
-- Network-resilient with automatic reconnection
+- **Instant dashboard load** for returning users (localStorage session)
+- **No more "Authentication Error" on refresh**
+- **No more frozen loading screens**
+- Token refresh events no longer cause timeouts
+- Network-resilient with graceful degradation
