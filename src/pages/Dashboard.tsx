@@ -204,8 +204,8 @@ const Dashboard = () => {
   // REMOVED: Safety timeout - we now always render with cached data
   // The dashboard should NEVER show a timeout screen after first visit
   
-  // Simplified loading - only block on initial auth, never on data
-  if (authLoading && !userRole) {
+  // Simplified loading - only block if auth is loading AND we have no user ID yet
+  if (authLoading && !userId) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center space-y-4 animate-fade-in">
