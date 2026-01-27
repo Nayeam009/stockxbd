@@ -40,12 +40,14 @@ interface OnlineProductSelectorProps {
   products: ShopProduct[];
   onCheckout: (items: CartItem[]) => void;
   isWholesale?: boolean;
+  shopId?: string;
 }
 
 export const OnlineProductSelector = ({ 
   products, 
   onCheckout,
-  isWholesale = false 
+  isWholesale = false,
+  shopId
 }: OnlineProductSelectorProps) => {
   const [saleItems, setSaleItems] = useState<SaleItem[]>([]);
   const [returnItems, setReturnItems] = useState<ReturnItem[]>([]);
@@ -259,7 +261,7 @@ export const OnlineProductSelector = ({
       return;
     }
 
-    // Convert to cart items
+    // Convert to cart items - ensure shop_id is set
     const cartItems: CartItem[] = saleItems.map(item => {
       const linkedReturn = returnItems.find(r => 
         r.brandName === item.product.brand_name && r.weight === item.product.weight
@@ -267,6 +269,7 @@ export const OnlineProductSelector = ({
 
       return {
         ...item.product,
+        shop_id: shopId || item.product.shop_id, // Ensure shop_id is always set
         quantity: item.quantity,
         return_cylinder_qty: linkedReturn?.quantity || 0,
         return_cylinder_type: linkedReturn?.type || null

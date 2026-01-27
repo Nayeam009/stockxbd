@@ -77,7 +77,9 @@ const CustomerCart = () => {
   const deliveryFee = cart.length > 0 ? 50 : 0;
   const total = subtotal + deliveryFee;
 
+  // Get shop info - check both shop object and shop_id
   const shopInfo = cart.length > 0 && cart[0].shop ? cart[0].shop : null;
+  const shopId = cart.length > 0 ? (cart[0].shop_id || cart[0].shop?.id) : null;
 
   const handleCheckout = () => {
     if (cart.length === 0) {

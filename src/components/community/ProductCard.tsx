@@ -65,6 +65,7 @@ export const ProductCard = ({ product, onAddToCart, cartItem }: ProductCardProps
 
     const item: CartItem = {
       ...product,
+      shop_id: product.shop_id, // Ensure shop_id is explicitly set
       quantity,
       return_cylinder_qty: isRefill ? quantity : returnQty,
       return_cylinder_type: returnType
