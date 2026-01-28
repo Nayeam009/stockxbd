@@ -16,7 +16,7 @@ interface DashboardOverviewProps {
   analytics: DashboardAnalytics;
   drivers: Driver[];
   cylinderStock?: CylinderStock[];
-  userRole: 'owner' | 'manager' | 'super_admin'; // Keep as string to accept flexible roles, or update to specific union
+  userRole: 'owner' | 'manager';
   setActiveModule?: (module: string) => void;
   onRefresh?: () => void;
 }
@@ -41,8 +41,8 @@ export const DashboardOverview = ({
     dispatched_count: analytics.dispatchedOrders || 0,
   };
 
-  const isOwnerOrManager = userRole === 'owner' || userRole === 'manager' || userRole === 'super_admin';
-  const isOwner = userRole === 'owner' || userRole === 'super_admin';
+  const isOwnerOrManager = userRole === 'owner' || userRole === 'manager';
+  const isOwner = userRole === 'owner';
 
   const profitMargin = useMemo(() => {
     return todaySales > 0 ? Math.round((todayProfit / todaySales) * 100) : 0;
