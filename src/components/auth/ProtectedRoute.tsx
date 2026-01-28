@@ -4,170 +4,178 @@ import { supabase } from "@/integrations/supabase/client";
 import { Loader2, RefreshCw, LogIn, WifiOff, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { clearStoredAuthSession, hasValidStoredSession } from "@/lib/authUtils";
+import { 
+  clearStoredAuthSession, 
+  hasValidStoredSession, 
+  getSessionWithTimeout,
+  isRefreshTokenError 
+} from "@/lib/authUtils";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
 }
 
-const withTimeout = async <T,>(promise: Promise<T>, ms: number): Promise<T> => {
-  return await Promise.race([
-    promise,
-    new Promise<T>((_, reject) => setTimeout(() => reject(new Error('timeout')), ms)),
-  ]);
-};
-
+/**
+ * ProtectedRoute - Handles auth gating with resilient session detection
+ * 
+ * Key features:
+ * 1. Optimistic rendering if localStorage has valid session
+ * 2. Hard timeout (8s) prevents infinite loading
+ * 3. Stale refresh tokens are detected and cleared
+ * 4. Works across preview/published domains
+ */
 export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
-  // Start with optimistic state if localStorage has a session
+  // Optimistic: if localStorage has session, render immediately
   const hasStoredSession = hasValidStoredSession();
-
+  
   const [loading, setLoading] = useState(!hasStoredSession);
   const [authenticated, setAuthenticated] = useState(hasStoredSession);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [authError, setAuthError] = useState<'error' | 'offline' | null>(null);
-
+  
   const location = useLocation();
   const navigate = useNavigate();
   const mountedRef = useRef(true);
-  const roleLoadedRef = useRef(false);
-  const initRef = useRef(false);
+  const initCompleteRef = useRef(false);
 
   useEffect(() => {
     mountedRef.current = true;
-
-    // Only run once per component mount
-    if (initRef.current) return;
-    initRef.current = true;
-
-    // Capture the initial session state for safety timeout logic
-    const hadStoredSession = hasStoredSession;
-
-    // Safety timeout - if we have a local session but auth doesn't respond in 8s,
-    // still allow access (the session was validated on localStorage check)
+    
+    // Prevent double initialization
+    if (initCompleteRef.current) return;
+    initCompleteRef.current = true;
+    
     let safetyTimeout: ReturnType<typeof setTimeout> | null = null;
-    if (hadStoredSession) {
+    
+    // CRITICAL: Safety net - never stay loading forever
+    // If we have a stored session, allow access after 5s regardless
+    if (hasStoredSession) {
       safetyTimeout = setTimeout(() => {
-        if (mountedRef.current) {
-          console.log('[ProtectedRoute] Safety timeout - allowing access with cached session');
+        if (mountedRef.current && loading) {
+          console.log('[ProtectedRoute] Safety timeout - allowing cached session');
           setLoading(false);
           setAuthenticated(true);
         }
-      }, 8000);
+      }, 5000);
+    } else {
+      // No stored session - still don't hang forever
+      safetyTimeout = setTimeout(() => {
+        if (mountedRef.current && loading) {
+          console.log('[ProtectedRoute] No session timeout - redirecting to auth');
+          setLoading(false);
+          setAuthenticated(false);
+        }
+      }, 10000);
     }
-
-    // Listen to auth state changes - this is the PRIMARY source of truth
+    
+    // Listen to auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mountedRef.current) return;
-
-      // Clear safety timeout since auth responded
+      
+      console.log('[ProtectedRoute] Auth event:', event, !!session);
+      
+      // Clear any errors on new auth events
+      setAuthError(null);
+      
+      if (!session) {
+        // No session - user is signed out
+        if (event === 'SIGNED_OUT') {
+          clearStoredAuthSession();
+        }
+        setAuthenticated(false);
+        setUserRole(null);
+        setLoading(false);
+        return;
+      }
+      
+      // Session exists - mark authenticated immediately
+      setAuthenticated(true);
+      setLoading(false);
+      
+      // Clear safety timeout since we got auth response
       if (safetyTimeout) {
         clearTimeout(safetyTimeout);
         safetyTimeout = null;
       }
-
-      console.log('[ProtectedRoute] Auth event:', event, !!session);
-
-      // Clear any previous errors on new auth events
-      setAuthError(null);
-
-      // Handle sign out
-      if (!session) {
-        setAuthenticated(false);
-        setUserRole(null);
-        setLoading(false);
-        roleLoadedRef.current = false;
-        return;
-      }
-
-      // Session exists - mark as authenticated immediately
-      setAuthenticated(true);
-      setLoading(false);
-
-      // Skip role fetch for token refresh events (role doesn't change)
+      
+      // Skip role fetch for token refresh (role doesn't change)
       if (event === 'TOKEN_REFRESHED') {
         return;
       }
-
+      
       // Fetch role in background (non-blocking)
-      // Only fetch once per session to avoid repeated timeouts
-      if (!roleLoadedRef.current) {
-        roleLoadedRef.current = true;
-
-        try {
-          const { data: roleData } = await supabase
-            .from('user_roles')
-            .select('role')
-            .eq('user_id', session.user.id)
-            .maybeSingle();
-
-          if (mountedRef.current) {
-            setUserRole(roleData?.role || null);
-          }
-        } catch (err) {
-          // Role fetch failed - continue without it, user can still access dashboard
-          console.warn('[ProtectedRoute] Role fetch failed, continuing:', err);
+      try {
+        const { data: roleData } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', session.user.id)
+          .maybeSingle();
+        
+        if (mountedRef.current) {
+          setUserRole(roleData?.role || null);
         }
+      } catch (err) {
+        console.warn('[ProtectedRoute] Role fetch failed:', err);
       }
     });
-
-    // HARDENING: If no cached session exists, bootstrap with getSession() so we never
-    // stay stuck on the loading screen waiting for an auth event.
-    if (!hadStoredSession) {
+    
+    // Bootstrap: If no stored session, verify with server
+    if (!hasStoredSession) {
       (async () => {
         try {
-          const { data, error } = await withTimeout(supabase.auth.getSession(), 10000);
+          const { session, error } = await getSessionWithTimeout(8000);
+          
           if (!mountedRef.current) return;
-
+          
           if (error) {
-            // Common root cause: stale/invalid refresh token -> clear local auth cache
-            const msg = String((error as any)?.message || '').toLowerCase();
-            const code = (error as any)?.code;
-            if (msg.includes('refresh token') || code === 'refresh_token_not_found') {
+            console.warn('[ProtectedRoute] Session check error:', error);
+            
+            // Clear stale tokens
+            if (isRefreshTokenError(error)) {
               clearStoredAuthSession();
             }
+            
+            setAuthError(navigator.onLine ? 'error' : 'offline');
             setAuthenticated(false);
             setLoading(false);
             return;
           }
-
-          if (data?.session) {
+          
+          if (session) {
             setAuthenticated(true);
           } else {
             setAuthenticated(false);
           }
           setLoading(false);
+          
         } catch (err) {
-          if (!mountedRef.current) return;
-          // Timeout or network failure
-          setAuthError(navigator.onLine ? 'error' : 'offline');
-          setAuthenticated(false);
-          setLoading(false);
+          console.warn('[ProtectedRoute] Bootstrap error:', err);
+          if (mountedRef.current) {
+            setAuthError(navigator.onLine ? 'error' : 'offline');
+            setAuthenticated(false);
+            setLoading(false);
+          }
         }
       })();
     }
-
+    
     return () => {
       mountedRef.current = false;
       if (safetyTimeout) clearTimeout(safetyTimeout);
       subscription.unsubscribe();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Empty deps - run only once on mount
+  }, []); // Empty deps - run only once
 
   // Retry handler
   const handleRetry = useCallback(() => {
     setLoading(true);
     setAuthError(null);
-    roleLoadedRef.current = false;
-
-    // Force a session refresh
+    
     supabase.auth.getSession().then(({ data: { session }, error }) => {
       if (!mountedRef.current) return;
-
+      
       if (error || !session) {
-        const msg = String((error as any)?.message || '').toLowerCase();
-        const code = (error as any)?.code;
-        if (msg.includes('refresh token') || code === 'refresh_token_not_found') {
+        if (error && isRefreshTokenError(error)) {
           clearStoredAuthSession();
         }
         setAuthError(navigator.onLine ? 'error' : 'offline');
@@ -175,7 +183,7 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
       } else {
         setAuthenticated(true);
         setAuthError(null);
-
+        
         // Fetch role
         supabase
           .from('user_roles')
@@ -212,12 +220,12 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
               )}
             </div>
             <CardTitle className="text-xl">
-              {authError === 'offline' ? "You're Offline" : 'Authentication Error'}
+              {authError === 'offline' ? "You're Offline" : 'Session Expired'}
             </CardTitle>
             <CardDescription>
               {authError === 'offline'
                 ? 'No internet connection detected. Please check your network.'
-                : 'Unable to verify your session. Please try again.'}
+                : 'Your session has expired. Please sign in again.'}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -229,9 +237,12 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
               <RefreshCw className="h-4 w-4 mr-2" />
               Try Again
             </Button>
-
+            
             <Button
-              onClick={() => navigate('/auth')}
+              onClick={() => {
+                clearStoredAuthSession();
+                navigate('/auth');
+              }}
               className="w-full h-12 touch-target"
             >
               <LogIn className="h-4 w-4 mr-2" />
@@ -247,8 +258,8 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center space-y-4 animate-fade-in">
-          <Loader2 className="h-10 w-10 animate-spin text-primary mx-auto" aria-label="Loading" />
-          <p className="text-muted-foreground">Loading your dashboard...</p>
+          <Loader2 className="h-10 w-10 animate-spin text-primary mx-auto" aria-label="Verifying session" />
+          <p className="text-muted-foreground">Verifying session...</p>
         </div>
       </div>
     );

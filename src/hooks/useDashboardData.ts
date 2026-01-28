@@ -140,6 +140,16 @@ export const useDashboardData = () => {
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   const fetchData = useCallback(async (isSoftRefresh = false) => {
+    // Safety timeout - never hang indefinitely
+    const timeoutId = setTimeout(() => {
+      if (isSoftRefresh) {
+        setSoftLoading(false);
+      } else {
+        setLoading(false);
+      }
+      console.warn('[useDashboardData] Fetch timeout - continuing with available data');
+    }, 15000);
+    
     try {
       if (isSoftRefresh) {
         setSoftLoading(true);
@@ -395,6 +405,7 @@ export const useDashboardData = () => {
     } catch (error) {
       logger.error('Error fetching dashboard data', error, { component: 'Dashboard' });
     } finally {
+      clearTimeout(timeoutId);
       setLoading(false);
       setSoftLoading(false);
     }

@@ -75,29 +75,26 @@ const Dashboard = () => {
   // Use real authentication - fetch user role from database
   const { userRole, userName, userId, loading: authLoading, error: authError } = useUserRole();
 
-  // Check if user is super admin with timeout protection
+  // Check if user is super admin - with timeout protection
   const [isAdmin, setIsAdmin] = useState(false);
-  const [adminCheckComplete, setAdminCheckComplete] = useState(false);
 
   useEffect(() => {
-    const checkAdminStatus = async () => {
-      if (!userId) {
-        setIsAdmin(false);
-        setAdminCheckComplete(true);
-        return;
-      }
+    if (!userId) {
+      setIsAdmin(false);
+      return;
+    }
 
-      // If role is super_admin, they are admin by definition
-      if (userRole === 'super_admin') {
-        setIsAdmin(true);
-        setAdminCheckComplete(true);
-        return;
-      }
+    // If role is super_admin, they are admin by definition
+    if (userRole === 'super_admin') {
+      setIsAdmin(true);
+      return;
+    }
 
+    // Check admin_users table with timeout
+    const checkAdmin = async () => {
       try {
-        // Add timeout protection to prevent dashboard freeze
         const timeoutPromise = new Promise<null>((resolve) =>
-          setTimeout(() => resolve(null), 3000) // 3 second timeout
+          setTimeout(() => resolve(null), 3000)
         );
 
         const queryPromise = supabase
@@ -109,23 +106,16 @@ const Dashboard = () => {
         const result = await Promise.race([queryPromise, timeoutPromise]);
 
         if (result && 'data' in result) {
-          const isAdminUser = !!result.data;
-          setIsAdmin(isAdminUser);
-        } else {
-          // Timeout or error - default to false
-          console.warn('[Dashboard] Admin check timed out, defaulting to false');
-          setIsAdmin(false);
+          setIsAdmin(!!result.data);
         }
       } catch (error) {
-        console.error('[Dashboard] Admin check error:', error);
+        console.warn('[Dashboard] Admin check failed:', error);
         setIsAdmin(false);
-      } finally {
-        setAdminCheckComplete(true);
       }
     };
 
-    checkAdminStatus();
-  }, [userId]);
+    checkAdmin();
+  }, [userId, userRole]);
   // Get network status for offline handling
   const { isOnline } = useNetwork();
 
@@ -205,19 +195,17 @@ const Dashboard = () => {
     setOrders,
   } = useDashboardData();
 
-  // Combined loading state - but allow rendering with cached data
-  const loading = (authLoading || dataLoading) && !isOnline;
-
-  // REMOVED: Safety timeout - we now always render with cached data
-  // The dashboard should NEVER show a timeout screen after first visit
-
-  // Simplified loading - only block if auth is loading AND we have no user ID yet
+  // Never block on loading - always show dashboard with skeleton states
+  // Auth is already verified by ProtectedRoute
+  
+  // Brief loading state only if auth is still initializing AND no userId yet
+  // This should be very rare since ProtectedRoute already verified auth
   if (authLoading && !userId) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center space-y-4 animate-fade-in">
-          <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" />
-          <p className="text-lg font-medium text-foreground">Verifying Access</p>
+          <Loader2 className="h-10 w-10 animate-spin text-primary mx-auto" />
+          <p className="text-sm text-muted-foreground">Loading dashboard...</p>
         </div>
       </div>
     );

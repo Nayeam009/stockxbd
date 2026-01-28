@@ -1,91 +1,152 @@
 /**
- * Auth Utilities - Simple helpers
+ * Auth Utilities - Robust session helpers with dynamic key detection
+ * 
+ * CRITICAL: This module handles session detection for Supabase auth.
+ * The storage key changes based on environment (preview vs published).
  */
 
 import { supabase } from "@/integrations/supabase/client";
 
+// Cache the detected key for performance
+let cachedStorageKey: string | null = null;
+
 /**
- * Supabase stores the auth session in localStorage under a key like:
- *   sb-<project-ref>-auth-token
- *
- * In some environments (preview/published/custom domain), hardcoding the key can
- * lead to "no session" detection and infinite loading. These helpers find the
- * correct key dynamically.
+ * Dynamically find the Supabase auth token storage key.
+ * Supabase uses: sb-<project-ref>-auth-token
  */
 export const getAuthTokenStorageKey = (): string | null => {
+  // Return cached key if available
+  if (cachedStorageKey) return cachedStorageKey;
+  
   try {
     if (typeof window === 'undefined') return null;
+    
     const keys = Object.keys(window.localStorage);
     const key = keys.find((k) => k.startsWith('sb-') && k.endsWith('-auth-token'));
-    return key || null;
+    
+    if (key) {
+      cachedStorageKey = key;
+      return key;
+    }
+    
+    return null;
   } catch {
     return null;
   }
 };
 
+/**
+ * Read the raw auth token from localStorage
+ */
 export const readAuthTokenFromStorage = (): any | null => {
   try {
     if (typeof window === 'undefined') return null;
+    
     const key = getAuthTokenStorageKey();
     if (!key) return null;
+    
     const stored = window.localStorage.getItem(key);
     if (!stored) return null;
+    
     return JSON.parse(stored);
   } catch {
     return null;
   }
 };
 
+/**
+ * Extract session snapshot from stored token
+ */
 export const getStoredSessionSnapshot = (): { userId: string; email: string; expiresAt: number } | null => {
-  const parsed = readAuthTokenFromStorage();
-  const expiresAt = parsed?.expires_at;
-  const userId = parsed?.user?.id;
-  const email = parsed?.user?.email;
-  if (!expiresAt || !userId) return null;
-  return { userId, email: email || '', expiresAt };
-};
-
-export const hasValidStoredSession = (): boolean => {
-  const snapshot = getStoredSessionSnapshot();
-  if (!snapshot) return false;
-  // 60s buffer
-  const now = Math.floor(Date.now() / 1000);
-  return snapshot.expiresAt > now - 60;
-};
-
-export const clearStoredAuthSession = (): void => {
   try {
-    if (typeof window === 'undefined') return;
-
-    const snapshot = getStoredSessionSnapshot();
-    const key = getAuthTokenStorageKey();
-    if (key) window.localStorage.removeItem(key);
-
-    // Clear cached role for this user (used only for fast UI routing)
-    if (snapshot?.userId) {
-      window.sessionStorage.removeItem(`user-role-${snapshot.userId}`);
-    }
+    const parsed = readAuthTokenFromStorage();
+    if (!parsed) return null;
+    
+    const expiresAt = parsed?.expires_at;
+    const userId = parsed?.user?.id;
+    const email = parsed?.user?.email;
+    
+    if (!expiresAt || !userId) return null;
+    
+    return { userId, email: email || '', expiresAt };
   } catch {
-    // no-op
+    return null;
   }
 };
 
 /**
- * Get current session - simple wrapper
+ * Check if there's a potentially valid session in localStorage
+ * Uses 60-second buffer for token expiry
  */
-export const getSessionWithRetry = async () => {
-  return supabase.auth.getSession();
+export const hasValidStoredSession = (): boolean => {
+  try {
+    const snapshot = getStoredSessionSnapshot();
+    if (!snapshot) return false;
+    
+    const now = Math.floor(Date.now() / 1000);
+    // Allow 60 second buffer before expiry
+    return snapshot.expiresAt > now - 60;
+  } catch {
+    return false;
+  }
 };
 
 /**
- * Get current user - simple wrapper
+ * Clear the stored auth session from localStorage
+ * Also clears cached role data
  */
-export const getUserWithRetry = async () => {
-  return supabase.auth.getUser();
+export const clearStoredAuthSession = (): void => {
+  try {
+    if (typeof window === 'undefined') return;
+    
+    // Get snapshot before clearing to get userId for role cache
+    const snapshot = getStoredSessionSnapshot();
+    
+    // Clear the auth token
+    const key = getAuthTokenStorageKey();
+    if (key) {
+      window.localStorage.removeItem(key);
+      cachedStorageKey = null; // Clear cache
+    }
+    
+    // Clear cached role for this user
+    if (snapshot?.userId) {
+      window.sessionStorage.removeItem(`user-role-${snapshot.userId}`);
+    }
+    
+    // Clear any other auth-related items
+    const keysToRemove = Object.keys(window.localStorage).filter(k => 
+      k.startsWith('sb-') || k.includes('supabase')
+    );
+    keysToRemove.forEach(k => window.localStorage.removeItem(k));
+    
+  } catch (e) {
+    console.warn('[AuthUtils] Error clearing session:', e);
+  }
 };
 
 /**
- * Safe session check that doesn't throw - returns null on any failure
+ * Get current session with timeout protection
+ */
+export const getSessionWithTimeout = async (timeoutMs = 8000): Promise<{ session: any; error: any }> => {
+  try {
+    const timeoutPromise = new Promise<{ session: null; error: Error }>((resolve) => {
+      setTimeout(() => resolve({ session: null, error: new Error('Session check timeout') }), timeoutMs);
+    });
+    
+    const sessionPromise = supabase.auth.getSession().then(({ data, error }) => ({
+      session: data?.session || null,
+      error
+    }));
+    
+    return await Promise.race([sessionPromise, timeoutPromise]);
+  } catch (error) {
+    return { session: null, error };
+  }
+};
+
+/**
+ * Simple session check - doesn't throw
  */
 export const safeGetSession = async () => {
   try {
@@ -98,7 +159,7 @@ export const safeGetSession = async () => {
 };
 
 /**
- * Safe user check that doesn't throw - returns null on any failure
+ * Simple user check - doesn't throw
  */
 export const safeGetUser = async () => {
   try {
@@ -111,17 +172,20 @@ export const safeGetUser = async () => {
 };
 
 /**
- * Clear auth cache (stub for compatibility)
+ * Check if error indicates invalid/stale refresh token
  */
-export const clearAuthCache = (): void => {
-  // No-op
-};
-
-/**
- * Get cached user ID (stub for compatibility)
- */
-export const getCachedUserId = (): string | null => {
-  return null;
+export const isRefreshTokenError = (error: any): boolean => {
+  if (!error) return false;
+  
+  const message = String(error?.message || '').toLowerCase();
+  const code = error?.code;
+  
+  return (
+    message.includes('refresh_token_not_found') ||
+    message.includes('refresh token') ||
+    message.includes('invalid refresh token') ||
+    code === 'refresh_token_not_found'
+  );
 };
 
 /**
@@ -131,7 +195,12 @@ export const isOnline = (): boolean => {
   return typeof navigator !== 'undefined' ? navigator.onLine : true;
 };
 
-// For backward compatibility
+// Legacy exports for compatibility
+export const getSessionWithRetry = async () => supabase.auth.getSession();
+export const getUserWithRetry = async () => supabase.auth.getUser();
+export const clearAuthCache = (): void => { cachedStorageKey = null; };
+export const getCachedUserId = (): string | null => getStoredSessionSnapshot()?.userId || null;
+
 export class AuthTimeoutError extends Error {
   constructor() {
     super('Authentication timed out');
