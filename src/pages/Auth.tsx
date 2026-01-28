@@ -384,7 +384,7 @@ const Auth = () => {
           const { data: teamMember } = await supabase
             .from('team_members')
             .select('owner_id')
-            .eq('member_id', data.user.id)
+            .eq('member_user_id', data.user.id)
             .maybeSingle();
 
           if (teamMember) {
