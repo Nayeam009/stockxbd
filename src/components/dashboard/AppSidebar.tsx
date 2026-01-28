@@ -13,7 +13,7 @@ import { useNavigate } from "react-router-dom";
 interface AppSidebarProps {
   activeModule: string;
   setActiveModule: (module: string) => void;
-  userRole: 'owner' | 'manager' | 'super_admin';
+  userRole: 'owner' | 'manager';
   userName: string;
   analytics: {
     lowStockItems: any[];
@@ -39,17 +39,17 @@ export const AppSidebar = ({
 
   // All navigation items - only owner and manager access dashboard
   const allNavItems = [
-    { id: 'overview', titleKey: 'overview', icon: Home, roles: ['owner', 'manager', 'super_admin'] },
-    ...(isAdmin ? [{ id: 'admin-panel', titleKey: 'admin_panel', icon: Shield, roles: ['owner', 'manager', 'super_admin'], isAdmin: true }] : []),
-    { id: 'business-diary', titleKey: 'business_diary', icon: BarChart3, roles: ['owner', 'manager', 'super_admin'] },
-    { id: 'pos', titleKey: 'pos', icon: Receipt, roles: ['owner', 'manager', 'super_admin'] },
-    { id: 'my-shop', titleKey: 'my_shop', icon: Store, roles: ['owner', 'super_admin'], badge: analytics.activeOrders > 0 ? analytics.activeOrders : null },
-    { id: 'inventory', titleKey: 'inventory', icon: Package, roles: ['owner', 'manager', 'super_admin'], badge: analytics.lowStockItems.length > 0 ? analytics.lowStockItems.length : null },
-    { id: 'product-pricing', titleKey: 'product_pricing', icon: Tag, roles: ['owner', 'manager', 'super_admin'] },
-    { id: 'customers', titleKey: 'customers', icon: Users, roles: ['owner', 'manager', 'super_admin'] },
-    { id: 'utility-expense', titleKey: 'utility_expense', icon: Wallet, roles: ['owner', 'manager', 'super_admin'] },
-    { id: 'analysis-search', titleKey: 'analysis_search', icon: Search, roles: ['owner', 'manager', 'super_admin'] },
-    { id: 'settings', titleKey: 'settings', icon: Settings, roles: ['owner', 'manager', 'super_admin'] },
+    { id: 'overview', titleKey: 'overview', icon: Home, roles: ['owner', 'manager'] },
+    ...(isAdmin ? [{ id: 'admin-panel', titleKey: 'admin_panel', icon: Shield, roles: ['owner', 'manager'], isAdmin: true }] : []),
+    { id: 'business-diary', titleKey: 'business_diary', icon: BarChart3, roles: ['owner', 'manager'] },
+    { id: 'pos', titleKey: 'pos', icon: Receipt, roles: ['owner', 'manager'] },
+    { id: 'my-shop', titleKey: 'my_shop', icon: Store, roles: ['owner'], badge: analytics.activeOrders > 0 ? analytics.activeOrders : null },
+    { id: 'inventory', titleKey: 'inventory', icon: Package, roles: ['owner', 'manager'], badge: analytics.lowStockItems.length > 0 ? analytics.lowStockItems.length : null },
+    { id: 'product-pricing', titleKey: 'product_pricing', icon: Tag, roles: ['owner', 'manager'] },
+    { id: 'customers', titleKey: 'customers', icon: Users, roles: ['owner', 'manager'] },
+    { id: 'utility-expense', titleKey: 'utility_expense', icon: Wallet, roles: ['owner', 'manager'] },
+    { id: 'analysis-search', titleKey: 'analysis_search', icon: Search, roles: ['owner', 'manager'] },
+    { id: 'settings', titleKey: 'settings', icon: Settings, roles: ['owner', 'manager'] },
   ];
 
   const handleModuleChange = (moduleId: string) => {

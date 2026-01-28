@@ -84,11 +84,7 @@ const Dashboard = () => {
       return;
     }
 
-    // If role is super_admin, they are admin by definition
-    if (userRole === 'super_admin') {
-      setIsAdmin(true);
-      return;
-    }
+    // Owner can also be admin - check admin_users table
 
     // Check admin_users table with timeout
     const checkAdmin = async () => {
@@ -240,8 +236,8 @@ const Dashboard = () => {
 
   // Get sanitized role for components - customers should not reach here (redirected by ProtectedRoute)
   // Managers and owners are the only valid dashboard roles
-  const dashboardRole: 'owner' | 'manager' | 'super_admin' = (userRole === 'owner' || userRole === 'super_admin') ? userRole : 'manager';
-  const navRole = dashboardRole === 'super_admin' ? 'owner' : dashboardRole;
+  const dashboardRole: 'owner' | 'manager' = userRole === 'owner' ? 'owner' : 'manager';
+  const navRole = dashboardRole;
 
   const renderActiveModule = () => {
     // Check if this module was previously loaded for faster revisit

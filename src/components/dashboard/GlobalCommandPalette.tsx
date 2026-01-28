@@ -51,7 +51,7 @@ interface NavigationItem {
 }
 
 interface GlobalCommandPaletteProps {
-  userRole: 'owner' | 'manager' | 'super_admin';
+  userRole: 'owner' | 'manager';
   setActiveModule: (module: string) => void;
 }
 
@@ -59,26 +59,26 @@ export const GlobalCommandPalette = ({ userRole, setActiveModule }: GlobalComman
   const [open, setOpen] = useState(false);
   const isMobile = useIsMobile();
 
-  // Navigation items based on role (staff has limited access: overview, pos, settings)
+  // Navigation items based on role
   const navigationItems: NavigationItem[] = useMemo((): NavigationItem[] => [
-    { id: 'overview', title: 'Dashboard Overview', description: 'Main dashboard with KPIs and quick actions', icon: Home, category: 'page' as const, roles: ['owner', 'manager', 'super_admin'], keywords: ['home', 'dashboard', 'overview', 'main', 'kpi', 'summary'] },
-    { id: 'pos', title: 'Point of Sale (POS)', description: 'Create new sales transactions', icon: Receipt, category: 'page' as const, roles: ['owner', 'manager', 'super_admin'], keywords: ['pos', 'sale', 'sell', 'transaction', 'billing', 'invoice', 'cash'] },
-    { id: 'orders', title: 'Online Delivery Orders', description: 'Manage delivery orders and tracking', icon: Truck, category: 'page' as const, roles: ['owner', 'manager', 'super_admin'], keywords: ['order', 'delivery', 'online', 'tracking', 'dispatch'] },
-    { id: 'exchange', title: 'Cylinder Exchange', description: 'Dealer-to-dealer cylinder exchange', icon: RefreshCw, category: 'page' as const, roles: ['owner', 'manager', 'super_admin'], keywords: ['exchange', 'swap', 'dealer', 'cylinder', 'transfer'] },
-    { id: 'community', title: 'Community Forum', description: 'Connect with other LPG dealers', icon: Users, category: 'page' as const, roles: ['owner', 'manager', 'super_admin'], keywords: ['community', 'forum', 'discussion', 'post', 'share'] },
-    { id: 'settings', title: 'Settings', description: 'System settings and configuration', icon: Settings, category: 'page' as const, roles: ['owner', 'manager', 'super_admin'], keywords: ['settings', 'config', 'preference', 'system', 'backup', 'team'] },
-    { id: 'profile', title: 'My Profile', description: 'View and edit your profile', icon: Users, category: 'page' as const, roles: ['owner', 'manager', 'super_admin'], keywords: ['profile', 'account', 'user', 'me', 'my'] },
-    { id: 'action-new-sale', title: 'Create New Sale', description: 'Start a new POS transaction', icon: Plus, category: 'action' as const, roles: ['owner', 'manager', 'super_admin'], keywords: ['new', 'sale', 'create', 'add', 'transaction'] },
-    { id: 'action-add-customer', title: 'Add New Customer', description: 'Register a new customer', icon: UserPlus, category: 'action' as const, roles: ['owner', 'manager', 'super_admin'], keywords: ['add', 'new', 'customer', 'register', 'create'] },
-    { id: 'action-add-expense', title: 'Add Expense', description: 'Record a new expense', icon: Wallet, category: 'action' as const, roles: ['owner', 'manager', 'super_admin'], keywords: ['add', 'expense', 'cost', 'spending', 'record'] },
-    { id: 'action-add-stock', title: 'Add New Stock', description: 'Add new LPG brand/stock', icon: PackagePlus, category: 'action' as const, roles: ['owner', 'manager', 'super_admin'], keywords: ['add', 'stock', 'inventory', 'brand', 'new'] },
-    { id: 'action-pay-salary', title: 'Pay Staff Salary', description: 'Make salary payment to staff', icon: CreditCard, category: 'action' as const, roles: ['owner', 'manager', 'super_admin'], keywords: ['pay', 'salary', 'staff', 'payment', 'wage'] },
-    { id: 'action-collect-due', title: 'Collect Customer Due', description: 'Settle customer dues', icon: DollarSign, category: 'action' as const, roles: ['owner', 'manager', 'super_admin'], keywords: ['collect', 'due', 'payment', 'settle', 'customer', 'baki'] },
-    { id: 'report-daily-sales', title: 'Daily Sales Report', description: 'Generate today\'s sales report', icon: FileText, category: 'report' as const, roles: ['owner', 'manager', 'super_admin'], keywords: ['report', 'daily', 'sales', 'today'] },
-    { id: 'report-stock-status', title: 'Stock Status Report', description: 'Current inventory levels', icon: Package, category: 'report' as const, roles: ['owner', 'manager', 'super_admin'], keywords: ['report', 'stock', 'inventory', 'status', 'levels'] },
-    { id: 'report-customer-dues', title: 'Customer Dues Report', description: 'Outstanding customer payments', icon: Users, category: 'report' as const, roles: ['owner', 'manager', 'super_admin'], keywords: ['report', 'customer', 'due', 'outstanding', 'baki'] },
-    { id: 'report-financial', title: 'Financial Summary', description: 'Income vs expenses summary', icon: DollarSign, category: 'report' as const, roles: ['owner', 'super_admin'], keywords: ['report', 'financial', 'summary', 'profit', 'loss'] },
-    { id: 'report-monthly', title: 'Monthly Report', description: 'Monthly business breakdown', icon: Calendar, category: 'report' as const, roles: ['owner', 'manager', 'super_admin'], keywords: ['report', 'monthly', 'month', 'breakdown'] },
+    { id: 'overview', title: 'Dashboard Overview', description: 'Main dashboard with KPIs and quick actions', icon: Home, category: 'page' as const, roles: ['owner', 'manager'], keywords: ['home', 'dashboard', 'overview', 'main', 'kpi', 'summary'] },
+    { id: 'pos', title: 'Point of Sale (POS)', description: 'Create new sales transactions', icon: Receipt, category: 'page' as const, roles: ['owner', 'manager'], keywords: ['pos', 'sale', 'sell', 'transaction', 'billing', 'invoice', 'cash'] },
+    { id: 'orders', title: 'Online Delivery Orders', description: 'Manage delivery orders and tracking', icon: Truck, category: 'page' as const, roles: ['owner', 'manager'], keywords: ['order', 'delivery', 'online', 'tracking', 'dispatch'] },
+    { id: 'exchange', title: 'Cylinder Exchange', description: 'Dealer-to-dealer cylinder exchange', icon: RefreshCw, category: 'page' as const, roles: ['owner', 'manager'], keywords: ['exchange', 'swap', 'dealer', 'cylinder', 'transfer'] },
+    { id: 'community', title: 'Community Forum', description: 'Connect with other LPG dealers', icon: Users, category: 'page' as const, roles: ['owner', 'manager'], keywords: ['community', 'forum', 'discussion', 'post', 'share'] },
+    { id: 'settings', title: 'Settings', description: 'System settings and configuration', icon: Settings, category: 'page' as const, roles: ['owner', 'manager'], keywords: ['settings', 'config', 'preference', 'system', 'backup', 'team'] },
+    { id: 'profile', title: 'My Profile', description: 'View and edit your profile', icon: Users, category: 'page' as const, roles: ['owner', 'manager'], keywords: ['profile', 'account', 'user', 'me', 'my'] },
+    { id: 'action-new-sale', title: 'Create New Sale', description: 'Start a new POS transaction', icon: Plus, category: 'action' as const, roles: ['owner', 'manager'], keywords: ['new', 'sale', 'create', 'add', 'transaction'] },
+    { id: 'action-add-customer', title: 'Add New Customer', description: 'Register a new customer', icon: UserPlus, category: 'action' as const, roles: ['owner', 'manager'], keywords: ['add', 'new', 'customer', 'register', 'create'] },
+    { id: 'action-add-expense', title: 'Add Expense', description: 'Record a new expense', icon: Wallet, category: 'action' as const, roles: ['owner', 'manager'], keywords: ['add', 'expense', 'cost', 'spending', 'record'] },
+    { id: 'action-add-stock', title: 'Add New Stock', description: 'Add new LPG brand/stock', icon: PackagePlus, category: 'action' as const, roles: ['owner', 'manager'], keywords: ['add', 'stock', 'inventory', 'brand', 'new'] },
+    { id: 'action-pay-salary', title: 'Pay Staff Salary', description: 'Make salary payment to staff', icon: CreditCard, category: 'action' as const, roles: ['owner', 'manager'], keywords: ['pay', 'salary', 'staff', 'payment', 'wage'] },
+    { id: 'action-collect-due', title: 'Collect Customer Due', description: 'Settle customer dues', icon: DollarSign, category: 'action' as const, roles: ['owner', 'manager'], keywords: ['collect', 'due', 'payment', 'settle', 'customer', 'baki'] },
+    { id: 'report-daily-sales', title: 'Daily Sales Report', description: 'Generate today\'s sales report', icon: FileText, category: 'report' as const, roles: ['owner', 'manager'], keywords: ['report', 'daily', 'sales', 'today'] },
+    { id: 'report-stock-status', title: 'Stock Status Report', description: 'Current inventory levels', icon: Package, category: 'report' as const, roles: ['owner', 'manager'], keywords: ['report', 'stock', 'inventory', 'status', 'levels'] },
+    { id: 'report-customer-dues', title: 'Customer Dues Report', description: 'Outstanding customer payments', icon: Users, category: 'report' as const, roles: ['owner', 'manager'], keywords: ['report', 'customer', 'due', 'outstanding', 'baki'] },
+    { id: 'report-financial', title: 'Financial Summary', description: 'Income vs expenses summary', icon: DollarSign, category: 'report' as const, roles: ['owner'], keywords: ['report', 'financial', 'summary', 'profit', 'loss'] },
+    { id: 'report-monthly', title: 'Monthly Report', description: 'Monthly business breakdown', icon: Calendar, category: 'report' as const, roles: ['owner', 'manager'], keywords: ['report', 'monthly', 'month', 'breakdown'] },
   ].filter(item => item.roles.includes(userRole)), [userRole]);
 
   // Keyboard shortcut

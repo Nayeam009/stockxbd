@@ -2,7 +2,9 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { getStoredSessionSnapshot } from "@/lib/authUtils";
 
-export type UserRole = 'owner' | 'manager' | 'customer' | 'super_admin';
+// User roles: owner (shop owner), manager (team member), customer (marketplace user)
+// Note: super_admin is handled separately via admin_users table
+export type UserRole = 'owner' | 'manager' | 'customer';
 
 interface UserRoleData {
   userRole: UserRole;

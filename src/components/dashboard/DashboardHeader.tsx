@@ -19,7 +19,7 @@ import {
 interface DashboardHeaderProps {
   searchQuery: string;
   setSearchQuery: (query: string) => void;
-  userRole: 'owner' | 'manager' | 'super_admin';
+  userRole: 'owner' | 'manager';
   userName: string;
   isAdmin?: boolean;
   onSettingsClick?: () => void;
@@ -44,7 +44,7 @@ export const DashboardHeader = ({
   // Fetch shop ID for owner
   useEffect(() => {
     const fetchShopId = async () => {
-      if (userRole !== 'owner' && userRole !== 'super_admin') return;
+      if (userRole !== 'owner') return;
 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;

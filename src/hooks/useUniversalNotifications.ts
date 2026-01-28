@@ -22,7 +22,7 @@ export type NotificationType =
 
 export type NotificationPriority = "low" | "medium" | "high" | "critical";
 
-export type UserRole = 'owner' | 'manager' | 'super_admin';
+export type UserRole = 'owner' | 'manager';
 
 export interface UniversalNotification {
   id: string;
@@ -92,7 +92,7 @@ export const useUniversalNotifications = (userRole: UserRole = 'manager') => {
           module: "lpg-stock",
           action: { label: "View Stock", moduleId: "lpg-stock" },
           data: { brandId: brand.id, brandName: brand.name, stock: totalStock, category: "lpg" },
-          roles: ['owner', 'manager', 'super_admin'],
+          roles: ['owner', 'manager'],
         });
       } else if (totalStock < 10) {
         alerts.push({
@@ -106,7 +106,7 @@ export const useUniversalNotifications = (userRole: UserRole = 'manager') => {
           module: "lpg-stock",
           action: { label: "View Stock", moduleId: "lpg-stock" },
           data: { brandId: brand.id, brandName: brand.name, stock: totalStock, category: "lpg" },
-          roles: ['owner', 'manager', 'super_admin'],
+          roles: ['owner', 'manager'],
         });
       } else if (totalStock < 30) {
         alerts.push({
@@ -120,7 +120,7 @@ export const useUniversalNotifications = (userRole: UserRole = 'manager') => {
           module: "lpg-stock",
           action: { label: "View Stock", moduleId: "lpg-stock" },
           data: { brandId: brand.id, brandName: brand.name, stock: totalStock, category: "lpg" },
-          roles: ['owner', 'manager', 'super_admin'],
+          roles: ['owner', 'manager'],
         });
       }
 
@@ -137,7 +137,7 @@ export const useUniversalNotifications = (userRole: UserRole = 'manager') => {
           module: "lpg-stock",
           action: { label: "View Stock", moduleId: "lpg-stock" },
           data: { brandId: brand.id, empty: brand.empty_cylinder, full: brand.package_cylinder + brand.refill_cylinder },
-          roles: ['owner', 'manager', 'super_admin'],
+          roles: ['owner', 'manager'],
         });
       }
     });
@@ -158,7 +158,7 @@ export const useUniversalNotifications = (userRole: UserRole = 'manager') => {
           module: "stove-stock",
           action: { label: "View Stoves", moduleId: "stove-stock" },
           data: { stoveId: stove.id, stock: 0, category: "stove" },
-          roles: ['owner', 'manager', 'super_admin'],
+          roles: ['owner', 'manager'],
         });
       } else if (stove.quantity < 5) {
         alerts.push({
@@ -172,7 +172,7 @@ export const useUniversalNotifications = (userRole: UserRole = 'manager') => {
           module: "stove-stock",
           action: { label: "View Stoves", moduleId: "stove-stock" },
           data: { stoveId: stove.id, stock: stove.quantity, category: "stove" },
-          roles: ['owner', 'manager', 'super_admin'],
+          roles: ['owner', 'manager'],
         });
       }
     });
@@ -193,7 +193,7 @@ export const useUniversalNotifications = (userRole: UserRole = 'manager') => {
           module: "regulators",
           action: { label: "View Regulators", moduleId: "regulators" },
           data: { regulatorId: regulator.id, stock: 0, category: "regulator" },
-          roles: ['owner', 'manager', 'super_admin'],
+          roles: ['owner', 'manager'],
         });
       } else if (regulator.quantity < 5) {
         alerts.push({
@@ -207,7 +207,7 @@ export const useUniversalNotifications = (userRole: UserRole = 'manager') => {
           module: "regulators",
           action: { label: "View Regulators", moduleId: "regulators" },
           data: { regulatorId: regulator.id, stock: regulator.quantity, category: "regulator" },
-          roles: ['owner', 'manager', 'super_admin'],
+          roles: ['owner', 'manager'],
         });
       }
     });
@@ -244,7 +244,7 @@ export const useUniversalNotifications = (userRole: UserRole = 'manager') => {
           module: "orders",
           action: { label: "View Orders", moduleId: "orders" },
           data: { orderId: order.id, orderNumber: order.order_number },
-          roles: ['owner', 'manager', 'super_admin'],
+          roles: ['owner', 'manager'],
         });
       } else if (order.status === "pending") {
         alerts.push({
@@ -258,7 +258,7 @@ export const useUniversalNotifications = (userRole: UserRole = 'manager') => {
           module: "orders",
           action: { label: "View Orders", moduleId: "orders" },
           data: { orderId: order.id, orderNumber: order.order_number },
-          roles: ['owner', 'manager', 'super_admin'],
+          roles: ['owner', 'manager'],
         });
       }
     });
@@ -297,7 +297,7 @@ export const useUniversalNotifications = (userRole: UserRole = 'manager') => {
           module: "customers",
           action: { label: "Collect Due", moduleId: "customers" },
           data: { customerId: customer.id, due: customer.total_due },
-          roles: ['owner', 'manager', 'super_admin'],
+          roles: ['owner', 'manager'],
         });
       }
 
@@ -314,7 +314,7 @@ export const useUniversalNotifications = (userRole: UserRole = 'manager') => {
           module: "customers",
           action: { label: "View Customer", moduleId: "customers" },
           data: { customerId: customer.id, cylindersDue: customer.cylinders_due },
-          roles: ['owner', 'manager', 'super_admin'],
+          roles: ['owner', 'manager'],
         });
       }
 
@@ -331,7 +331,7 @@ export const useUniversalNotifications = (userRole: UserRole = 'manager') => {
           module: "customers",
           action: { label: "View Customer", moduleId: "customers" },
           data: { customerId: customer.id, due: customer.total_due, limit: customer.credit_limit },
-          roles: ['owner', 'manager', 'super_admin'],
+          roles: ['owner', 'manager'],
         });
       }
     });
@@ -379,7 +379,7 @@ export const useUniversalNotifications = (userRole: UserRole = 'manager') => {
         module: "exchange",
         action: { label: "View Exchanges", moduleId: "exchange" },
         data: { exchangeId: exchange.id },
-        roles: ['owner', 'manager', 'super_admin'],
+        roles: ['owner', 'manager'],
       });
     });
 
@@ -416,7 +416,7 @@ export const useUniversalNotifications = (userRole: UserRole = 'manager') => {
           module: "daily-sales",
           action: { label: "View Sales", moduleId: "daily-sales" },
           data: { totalSales, transactionCount: transactions.length },
-          roles: ['owner', 'manager', 'super_admin'],
+          roles: ['owner', 'manager'],
         });
       }
     }
@@ -541,7 +541,7 @@ export const useUniversalNotifications = (userRole: UserRole = 'manager') => {
             module: "orders",
             action: { label: "View Order", moduleId: "orders" },
             data: { orderId: order.id, orderNumber: order.order_number },
-            roles: ['owner', 'manager', 'super_admin'],
+            roles: ['owner', 'manager'],
           };
           setNotifications((prev) => [newNotification, ...prev]);
 
@@ -585,7 +585,7 @@ export const useUniversalNotifications = (userRole: UserRole = 'manager') => {
             module: "customers",
             action: { label: "View Payments", moduleId: "customers" },
             data: { paymentId: payment.id, amount: payment.amount },
-            roles: ['owner', 'manager', 'super_admin'],
+            roles: ['owner', 'manager'],
           };
           setNotifications((prev) => [newNotification, ...prev]);
 

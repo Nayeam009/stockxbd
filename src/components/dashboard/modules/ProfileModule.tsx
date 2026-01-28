@@ -278,7 +278,6 @@ export const ProfileModule = () => {
     switch (role) {
       case 'owner': return 'bg-gradient-to-r from-emerald-500 to-green-600 text-white';
       case 'manager': return 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white';
-      case 'driver': return 'bg-gradient-to-r from-purple-500 to-pink-500 text-white';
       case 'customer': return 'bg-gradient-to-r from-purple-500 to-pink-500 text-white';
       default: return 'bg-muted text-muted-foreground';
     }
