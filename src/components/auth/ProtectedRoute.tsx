@@ -4,38 +4,22 @@ import { supabase } from "@/integrations/supabase/client";
 import { Loader2, RefreshCw, LogIn, WifiOff, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { clearStoredAuthSession, hasValidStoredSession } from "@/lib/authUtils";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
 }
 
-/**
- * Check if there's a potentially valid session in localStorage.
- * This is a fast, synchronous check to avoid blocking the UI.
- */
-const hasLocalSession = (): boolean => {
-  try {
-    const storageKey = `sb-xupvteigmqcrfluuadte-auth-token`;
-    const stored = localStorage.getItem(storageKey);
-    if (!stored) return false;
-
-    const parsed = JSON.parse(stored);
-    const expiresAt = parsed?.expires_at;
-
-    // If no expiry or expired, return false
-    if (!expiresAt) return false;
-
-    // Check if token is expired (with 60 second buffer)
-    const now = Math.floor(Date.now() / 1000);
-    return expiresAt > now - 60;
-  } catch {
-    return false;
-  }
+const withTimeout = async <T,>(promise: Promise<T>, ms: number): Promise<T> => {
+  return await Promise.race([
+    promise,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error('timeout')), ms)),
+  ]);
 };
 
 export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   // Start with optimistic state if localStorage has a session
-  const hasStoredSession = hasLocalSession();
+  const hasStoredSession = hasValidStoredSession();
 
   const [loading, setLoading] = useState(!hasStoredSession);
   const [authenticated, setAuthenticated] = useState(hasStoredSession);
@@ -126,6 +110,42 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
       }
     });
 
+    // HARDENING: If no cached session exists, bootstrap with getSession() so we never
+    // stay stuck on the loading screen waiting for an auth event.
+    if (!hadStoredSession) {
+      (async () => {
+        try {
+          const { data, error } = await withTimeout(supabase.auth.getSession(), 10000);
+          if (!mountedRef.current) return;
+
+          if (error) {
+            // Common root cause: stale/invalid refresh token -> clear local auth cache
+            const msg = String((error as any)?.message || '').toLowerCase();
+            const code = (error as any)?.code;
+            if (msg.includes('refresh token') || code === 'refresh_token_not_found') {
+              clearStoredAuthSession();
+            }
+            setAuthenticated(false);
+            setLoading(false);
+            return;
+          }
+
+          if (data?.session) {
+            setAuthenticated(true);
+          } else {
+            setAuthenticated(false);
+          }
+          setLoading(false);
+        } catch (err) {
+          if (!mountedRef.current) return;
+          // Timeout or network failure
+          setAuthError(navigator.onLine ? 'error' : 'offline');
+          setAuthenticated(false);
+          setLoading(false);
+        }
+      })();
+    }
+
     return () => {
       mountedRef.current = false;
       if (safetyTimeout) clearTimeout(safetyTimeout);
@@ -145,6 +165,11 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
       if (!mountedRef.current) return;
 
       if (error || !session) {
+        const msg = String((error as any)?.message || '').toLowerCase();
+        const code = (error as any)?.code;
+        if (msg.includes('refresh token') || code === 'refresh_token_not_found') {
+          clearStoredAuthSession();
+        }
         setAuthError(navigator.onLine ? 'error' : 'offline');
         setAuthenticated(false);
       } else {

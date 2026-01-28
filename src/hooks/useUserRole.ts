@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getStoredSessionSnapshot } from "@/lib/authUtils";
 
 export type UserRole = 'owner' | 'manager' | 'customer' | 'super_admin';
 
@@ -17,30 +18,14 @@ interface UserRoleData {
  * This is a fast, synchronous check to avoid blocking the UI.
  */
 const getStoredSession = (): { userId: string; email: string; role?: string } | null => {
-  try {
-    const storageKey = `sb-xupvteigmqcrfluuadte-auth-token`;
-    const stored = localStorage.getItem(storageKey);
-    if (!stored) return null;
+  const snapshot = getStoredSessionSnapshot();
+  if (!snapshot) return null;
 
-    const parsed = JSON.parse(stored);
-    const expiresAt = parsed?.expires_at;
-    const userId = parsed?.user?.id;
-    const email = parsed?.user?.email;
+  const now = Math.floor(Date.now() / 1000);
+  if (snapshot.expiresAt <= now - 60) return null;
 
-    // If no expiry or expired, return null
-    if (!expiresAt || !userId) return null;
-
-    // Check if token is expired (with 60 second buffer)
-    const now = Math.floor(Date.now() / 1000);
-    if (expiresAt <= now - 60) return null;
-
-    // Check for cached role
-    const cachedRole = sessionStorage.getItem(`user-role-${userId}`);
-
-    return { userId, email: email || '', role: cachedRole || undefined };
-  } catch {
-    return null;
-  }
+  const cachedRole = sessionStorage.getItem(`user-role-${snapshot.userId}`);
+  return { userId: snapshot.userId, email: snapshot.email || '', role: cachedRole || undefined };
 };
 
 export const useUserRole = (): UserRoleData => {

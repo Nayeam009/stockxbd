@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { Home, ShoppingCart, User, Package, LayoutDashboard } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { getStoredSessionSnapshot } from "@/lib/authUtils";
 
 interface CommunityBottomNavProps {
   cartItemCount?: number;
@@ -14,15 +15,9 @@ interface CommunityBottomNavProps {
  */
 const getStoredRole = (): string | null => {
   try {
-    const storageKey = `sb-xupvteigmqcrfluuadte-auth-token`;
-    const stored = localStorage.getItem(storageKey);
-    if (!stored) return null;
-    
-    const parsed = JSON.parse(stored);
-    const userId = parsed?.user?.id;
-    
-    // Check cached role
-    const roleCache = sessionStorage.getItem(`user-role-${userId}`);
+    const snapshot = getStoredSessionSnapshot();
+    if (!snapshot?.userId) return null;
+    const roleCache = sessionStorage.getItem(`user-role-${snapshot.userId}`);
     return roleCache || null;
   } catch {
     return null;
@@ -45,15 +40,10 @@ export const CommunityBottomNav = ({
   useEffect(() => {
     if (propUserRole) {
       try {
-        const storageKey = `sb-xupvteigmqcrfluuadte-auth-token`;
-        const stored = localStorage.getItem(storageKey);
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          const userId = parsed?.user?.id;
-          if (userId) {
-            sessionStorage.setItem(`user-role-${userId}`, propUserRole);
-            setLocalRole(propUserRole);
-          }
+        const snapshot = getStoredSessionSnapshot();
+        if (snapshot?.userId) {
+          sessionStorage.setItem(`user-role-${snapshot.userId}`, propUserRole);
+          setLocalRole(propUserRole);
         }
       } catch {}
     }

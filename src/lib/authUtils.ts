@@ -5,6 +5,72 @@
 import { supabase } from "@/integrations/supabase/client";
 
 /**
+ * Supabase stores the auth session in localStorage under a key like:
+ *   sb-<project-ref>-auth-token
+ *
+ * In some environments (preview/published/custom domain), hardcoding the key can
+ * lead to "no session" detection and infinite loading. These helpers find the
+ * correct key dynamically.
+ */
+export const getAuthTokenStorageKey = (): string | null => {
+  try {
+    if (typeof window === 'undefined') return null;
+    const keys = Object.keys(window.localStorage);
+    const key = keys.find((k) => k.startsWith('sb-') && k.endsWith('-auth-token'));
+    return key || null;
+  } catch {
+    return null;
+  }
+};
+
+export const readAuthTokenFromStorage = (): any | null => {
+  try {
+    if (typeof window === 'undefined') return null;
+    const key = getAuthTokenStorageKey();
+    if (!key) return null;
+    const stored = window.localStorage.getItem(key);
+    if (!stored) return null;
+    return JSON.parse(stored);
+  } catch {
+    return null;
+  }
+};
+
+export const getStoredSessionSnapshot = (): { userId: string; email: string; expiresAt: number } | null => {
+  const parsed = readAuthTokenFromStorage();
+  const expiresAt = parsed?.expires_at;
+  const userId = parsed?.user?.id;
+  const email = parsed?.user?.email;
+  if (!expiresAt || !userId) return null;
+  return { userId, email: email || '', expiresAt };
+};
+
+export const hasValidStoredSession = (): boolean => {
+  const snapshot = getStoredSessionSnapshot();
+  if (!snapshot) return false;
+  // 60s buffer
+  const now = Math.floor(Date.now() / 1000);
+  return snapshot.expiresAt > now - 60;
+};
+
+export const clearStoredAuthSession = (): void => {
+  try {
+    if (typeof window === 'undefined') return;
+
+    const snapshot = getStoredSessionSnapshot();
+    const key = getAuthTokenStorageKey();
+    if (key) window.localStorage.removeItem(key);
+
+    // Clear cached role for this user (used only for fast UI routing)
+    if (snapshot?.userId) {
+      window.sessionStorage.removeItem(`user-role-${snapshot.userId}`);
+    }
+  } catch {
+    // no-op
+  }
+};
+
+/**
  * Get current session - simple wrapper
  */
 export const getSessionWithRetry = async () => {

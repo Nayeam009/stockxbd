@@ -15,6 +15,7 @@ import { Link, useNavigate } from "react-router-dom";
 import stockXLogo from "@/assets/stock-x-logo.png";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { getStoredSessionSnapshot } from "@/lib/authUtils";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -47,15 +48,9 @@ interface CommunityHeaderProps {
  */
 const getStoredRole = (): string | null => {
   try {
-    const storageKey = `sb-xupvteigmqcrfluuadte-auth-token`;
-    const stored = localStorage.getItem(storageKey);
-    if (!stored) return null;
-    
-    const parsed = JSON.parse(stored);
-    const userId = parsed?.user?.id;
-    
-    // Check cached role
-    const roleCache = sessionStorage.getItem(`user-role-${userId}`);
+    const snapshot = getStoredSessionSnapshot();
+    if (!snapshot?.userId) return null;
+    const roleCache = sessionStorage.getItem(`user-role-${snapshot.userId}`);
     return roleCache || null;
   } catch {
     return null;
@@ -79,15 +74,10 @@ export const CommunityHeader = ({
   useEffect(() => {
     if (propUserRole) {
       try {
-        const storageKey = `sb-xupvteigmqcrfluuadte-auth-token`;
-        const stored = localStorage.getItem(storageKey);
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          const userId = parsed?.user?.id;
-          if (userId) {
-            sessionStorage.setItem(`user-role-${userId}`, propUserRole);
-            setLocalRole(propUserRole);
-          }
+        const snapshot = getStoredSessionSnapshot();
+        if (snapshot?.userId) {
+          sessionStorage.setItem(`user-role-${snapshot.userId}`, propUserRole);
+          setLocalRole(propUserRole);
         }
       } catch {}
     }
