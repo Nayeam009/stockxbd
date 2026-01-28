@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { logger } from "@/lib/logger";
+import { getStoredSessionSnapshot } from "@/lib/authUtils";
 
 export interface Shop {
   id: string;
@@ -384,19 +385,10 @@ export const useCommunityData = () => {
     
     const fetchUser = async () => {
       try {
-        // Quick localStorage check first
-        const storageKey = `sb-xupvteigmqcrfluuadte-auth-token`;
-        const stored = localStorage.getItem(storageKey);
-        let userId: string | null = null;
-        let userEmail: string = '';
-        
-        if (stored) {
-          try {
-            const parsed = JSON.parse(stored);
-            userId = parsed?.user?.id;
-            userEmail = parsed?.user?.email || '';
-          } catch {}
-        }
+        // Quick localStorage check first (key detected dynamically)
+        const snapshot = getStoredSessionSnapshot();
+        let userId: string | null = snapshot?.userId || null;
+        let userEmail: string = snapshot?.email || '';
         
         // If we have stored data, use it immediately
         if (userId) {
