@@ -1,287 +1,417 @@
 
 
-# Admin Panel Rebuild Plan
+# Business Diary Module - Complete Rebuild Plan
 
 ## Current State Analysis
 
-After thoroughly examining the codebase, I've identified several issues that need to be fixed for a proper admin panel implementation:
+After thorough examination of the codebase, I've identified the current implementation and issues that need optimization:
+
+### Architecture Overview
+
+The Business Diary currently has **two parallel data hooks**:
+1. `useBusinessDiaryData.ts` (772 lines) - Full analytics hook with all data
+2. `useBusinessDiaryQueries.ts` (527 lines) - TanStack Query-based hook for date-specific fetching
+
+The module uses `useBusinessDiaryQueries.ts` in production but has code duplication.
 
 ### Issues Found
 
 | # | Issue | Location | Impact |
 |---|-------|----------|--------|
-| 1 | **RLS blocks profile access** | `profiles` table RLS policy | Admin can only see their own profile, not other users' names |
-| 2 | **No admin verification** | `AdminPanelModule.tsx` | Component doesn't verify admin status - relies only on parent |
-| 3 | **Missing phone numbers** | User data display | Phone numbers aren't shown for customer identification |
-| 4 | **Poor error handling** | `fetchUsers()` function | No retry logic or proper error states |
-| 5 | **No real-time updates** | User list | Changes don't sync in real-time |
-| 6 | **Missing email data** | UserData interface | Only shows name, not email for identification |
-| 7 | **No admin self-protection** | Block/Delete actions | Admin could accidentally block/delete themselves |
-| 8 | **Missing loading skeletons** | User list | Shows only spinner, no skeleton preview |
-| 9 | **No pagination** | User list with ScrollArea | Will be slow with many users |
-| 10 | **Legacy `super_admin` reference** | AppSidebar line 64 | Type reference still exists |
+| 1 | **Duplicate data hooks** | Two hooks with similar logic | Code bloat, maintenance burden |
+| 2 | **Missing Customer Debt Summary** | No visibility of Due/Partial customers | Business critical data hidden |
+| 3 | **No Payment Status Filters** | Cannot filter by Paid/Partial/Due | Hard to track outstanding payments |
+| 4 | **Staff/Vehicle Costs not synced** | `useBusinessDiaryQueries` missing staff_payments/vehicle_costs | Incomplete expense tracking |
+| 5 | **COGS not displayed** | Calculated but not shown to user | Profitability insight missing |
+| 6 | **No Date Range Selection** | Only single date picker | Cannot view weekly/monthly summaries |
+| 7 | **No Export Functionality** | Cannot export data | Business reporting limitation |
+| 8 | **Missing Quick Stats** | No visual KPI breakdown | Poor dashboard experience |
+| 9 | **Hardcoded category list** | `EXPENSE_CATEGORIES` missing POB categories | Categories mismatch with actual data |
+| 10 | **Mobile Tab Badge overlap** | Badge styling on mobile tabs | UI polish issue |
 
 ---
 
-## Architecture Overview
+## Rebuild Architecture
+
+### New Module Structure
 
 ```text
-┌─────────────────────────────────────────────────────────────────┐
-│                     Admin Panel Module                          │
-├─────────────────────────────────────────────────────────────────┤
-│  ┌────────────────────────────────────────────────────────────┐ │
-│  │  Admin Access Check (Server-side via admin_users table)    │ │
-│  │  - If not admin: Show "Access Denied" message              │ │
-│  │  - If admin: Show admin interface                          │ │
-│  └────────────────────────────────────────────────────────────┘ │
-├─────────────────────────────────────────────────────────────────┤
-│  ┌─────────────────────────────────────────────────────────────┐│
-│  │  Stats Grid (6 cards)                                       ││
-│  │  [Total Users] [Owners] [Managers] [Customers] [Shops]     ││
-│  │  [Blocked]                                                  ││
-│  └─────────────────────────────────────────────────────────────┘│
-├─────────────────────────────────────────────────────────────────┤
-│  ┌─────────────────────────────────────────────────────────────┐│
-│  │  User Management Card                                       ││
-│  │  ┌───────────────────────────────────────────────────────┐ ││
-│  │  │  Search Bar + Refresh Button                          │ ││
-│  │  └───────────────────────────────────────────────────────┘ ││
-│  │  ┌───────────────────────────────────────────────────────┐ ││
-│  │  │  Filter Tabs: [All] [Owners] [Managers] [Customers]   │ ││
-│  │  │               [Blocked]                                │ ││
-│  │  └───────────────────────────────────────────────────────┘ ││
-│  │  ┌───────────────────────────────────────────────────────┐ ││
-│  │  │  User List (Virtual Scroll for performance)           │ ││
-│  │  │  ┌─────────────────────────────────────────────────┐  │ ││
-│  │  │  │ Avatar | Name | Phone/Email | Role | Shop | Act │  │ ││
-│  │  │  └─────────────────────────────────────────────────┘  │ ││
-│  │  └───────────────────────────────────────────────────────┘ ││
-│  └─────────────────────────────────────────────────────────────┘│
-└─────────────────────────────────────────────────────────────────┘
+BusinessDiaryModule (Main Container)
+├── BusinessDiaryHeader
+│   ├── Title + Description
+│   ├── View Mode Toggle (Cash Flow / Profit)
+│   ├── Date Range Selector (Today / This Week / This Month / Custom)
+│   └── Action Buttons (Add Expense / Export / Refresh)
+│
+├── BusinessDiarySummaryGrid (6 Cards)
+│   ├── Total Sales (Cash Received)
+│   ├── Total Expenses (Money Out)
+│   ├── Net Profit/Loss
+│   ├── Paid Customers
+│   ├── Partial Paid Customers
+│   └── Due Customers
+│
+├── BusinessDiaryFilters
+│   ├── Search Bar (Product/Customer/Transaction)
+│   ├── Payment Status Filter (All / Paid / Partial / Due)
+│   └── Source Filter (POS / Online / Customer Payment / POB)
+│
+└── BusinessDiaryContent
+    ├── Mobile: Tab View (Sales | Expenses)
+    └── Desktop: Side-by-Side Panels
+        ├── Sales Panel (with status grouping)
+        │   ├── Paid Sales Section
+        │   ├── Partial Paid Section
+        │   └── Due Sales Section
+        └── Expenses Panel (with source grouping)
+            ├── POB Purchases
+            ├── Staff Payments
+            ├── Vehicle Costs
+            └── Manual Expenses
 ```
 
 ---
 
-## Part 1: Database Fix - Admin Profile Access
+## Part 1: Consolidate Data Hooks
 
-### Problem
-The `profiles` table has RLS that only allows users to view their own profile:
-```sql
--- Current policy
-Policy Name: Users can view their own profile
-Using Expression: (auth.uid() = user_id)
-```
+### Remove Duplicate Hook
+Delete or deprecate `useBusinessDiaryData.ts` and enhance `useBusinessDiaryQueries.ts` to include:
 
-### Solution
-Create a new policy that allows admins to view all profiles for management purposes.
+1. **Add Staff Payments & Vehicle Costs** to expense fetch
+2. **Add Customer Debt Summary** calculation
+3. **Add COGS integration** with product_prices lookup
 
-**Migration Required:**
-```sql
--- Allow admins to view all profiles
-CREATE POLICY "Admins can view all profiles"
-ON public.profiles
-FOR SELECT
-TO authenticated
-USING (
-  EXISTS (
-    SELECT 1 FROM public.admin_users
-    WHERE admin_users.user_id = auth.uid()
-  )
-);
-```
-
----
-
-## Part 2: Enhanced UserData Interface
-
-### Current Interface
+### Enhanced Expense Fetching
 ```typescript
-interface UserData {
-  id: string;
-  email: string;          // Actually stores name, confusing
-  created_at: string;
-  role: string;
-  is_blocked: boolean;
-  has_shop: boolean;
-  shop_name?: string;
+// Add to fetchExpensesData parallel queries
+const [userRolesResult, pobResult, manualExpensesResult, staffPaymentsResult, vehicleCostsResult] = await Promise.all([
+  supabase.from('user_roles').select('user_id, role'),
+  supabase.from('pob_transactions')...,
+  supabase.from('daily_expenses')...,
+  supabase.from('staff_payments')
+    .select('id, staff_id, amount, payment_date, notes, created_at, created_by, staff(name, role)')
+    .eq('payment_date', date),
+  supabase.from('vehicle_costs')
+    .select('id, vehicle_id, amount, cost_type, cost_date, description, liters_filled, created_at, created_by, vehicles(name)')
+    .eq('cost_date', date)
+]);
+```
+
+---
+
+## Part 2: Customer Debt Summary Integration
+
+### Add New Interface
+```typescript
+interface CustomerDebtSummary {
+  totalPaidCount: number;
+  totalPaidAmount: number;
+  partialPaidCount: number;
+  partialPaidAmount: number;
+  partialRemainingDue: number;
+  dueCount: number;
+  dueAmount: number;
 }
 ```
 
-### New Interface
+### Calculate from Sales Data
 ```typescript
-interface UserData {
-  id: string;
-  fullName: string;         // Renamed for clarity
-  phone: string | null;     // Added for customer identification
-  email: string | null;     // Actual email from auth (if available)
-  role: 'owner' | 'manager' | 'customer';
-  isBlocked: boolean;       // camelCase consistency
-  isAdmin: boolean;         // Flag if user is also admin
-  hasShop: boolean;         // camelCase
-  shopName: string | null;  // camelCase
-  createdAt: string;        // camelCase
-}
+const customerDebtSummary = useMemo(() => {
+  const paid = filteredSales.filter(s => s.paymentStatus === 'paid');
+  const partial = filteredSales.filter(s => s.paymentStatus === 'partial');
+  const due = filteredSales.filter(s => s.paymentStatus === 'due');
+  
+  return {
+    totalPaidCount: paid.length,
+    totalPaidAmount: paid.reduce((sum, s) => sum + s.totalAmount, 0),
+    partialPaidCount: partial.length,
+    partialPaidAmount: partial.reduce((sum, s) => sum + s.amountPaid, 0),
+    partialRemainingDue: partial.reduce((sum, s) => sum + s.remainingDue, 0),
+    dueCount: due.length,
+    dueAmount: due.reduce((sum, s) => sum + s.totalAmount, 0)
+  };
+}, [filteredSales]);
 ```
 
 ---
 
-## Part 3: Admin Access Verification
+## Part 3: Enhanced Summary Cards (6-Card Grid)
 
-### Add Server-Side Admin Check
+### New Grid Layout
 ```typescript
-// Add at start of AdminPanelModule
-const [isVerifiedAdmin, setIsVerifiedAdmin] = useState<boolean | null>(null);
+<div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
+  {/* 1. Total Sales */}
+  <SummaryCard 
+    title="Total Sales" 
+    value={dayTotals.cashIn} 
+    icon={ArrowUpRight}
+    color="emerald"
+    subtitle={`${filteredSales.length} transactions`}
+  />
+  
+  {/* 2. Total Expenses */}
+  <SummaryCard 
+    title="Total Expenses" 
+    value={dayTotals.cashOut} 
+    icon={ArrowDownRight}
+    color="rose"
+    subtitle={`${filteredExpenses.length} entries`}
+  />
+  
+  {/* 3. Net Profit/Loss */}
+  <SummaryCard 
+    title="Net Profit" 
+    value={dayTotals.netCashFlow} 
+    icon={dayTotals.netCashFlow >= 0 ? TrendingUp : TrendingDown}
+    color={dayTotals.netCashFlow >= 0 ? 'primary' : 'destructive'}
+  />
+  
+  {/* 4. Paid Customers */}
+  <SummaryCard 
+    title="Paid" 
+    value={customerDebtSummary.totalPaidAmount} 
+    icon={CheckCircle}
+    color="emerald"
+    subtitle={`${customerDebtSummary.totalPaidCount} customers`}
+    onClick={() => setPaymentFilter('paid')}
+  />
+  
+  {/* 5. Partial Paid */}
+  <SummaryCard 
+    title="Partial" 
+    value={customerDebtSummary.partialPaidAmount} 
+    icon={Clock}
+    color="amber"
+    subtitle={`Due: ৳${customerDebtSummary.partialRemainingDue.toLocaleString()}`}
+    onClick={() => setPaymentFilter('partial')}
+  />
+  
+  {/* 6. Due Customers */}
+  <SummaryCard 
+    title="Due" 
+    value={customerDebtSummary.dueAmount} 
+    icon={AlertCircle}
+    color="rose"
+    subtitle={`${customerDebtSummary.dueCount} unpaid`}
+    onClick={() => setPaymentFilter('due')}
+  />
+</div>
+```
 
-useEffect(() => {
-  const verifyAdmin = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      setIsVerifiedAdmin(false);
-      return;
+---
+
+## Part 4: Payment Status Filtering
+
+### Add Filter State
+```typescript
+const [paymentFilter, setPaymentFilter] = useState<'all' | 'paid' | 'partial' | 'due'>('all');
+```
+
+### Filter Sales by Payment Status
+```typescript
+const filteredSales = useMemo(() => {
+  return sales.filter(s => {
+    // Date filter
+    if (dateFilter && s.date !== dateFilter) return false;
+    
+    // Payment status filter
+    if (paymentFilter !== 'all' && s.paymentStatus !== paymentFilter) return false;
+    
+    // Search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      return s.productName.toLowerCase().includes(query) ||
+        s.customerName.toLowerCase().includes(query) ||
+        s.transactionNumber.toLowerCase().includes(query) ||
+        (s.customerPhone && s.customerPhone.includes(query));
     }
-    
-    const { data } = await supabase
-      .from('admin_users')
-      .select('id')
-      .eq('user_id', user.id)
-      .maybeSingle();
-    
-    setIsVerifiedAdmin(!!data);
-  };
-  
-  verifyAdmin();
-}, []);
-
-// Show access denied if not admin
-if (isVerifiedAdmin === false) {
-  return <AccessDeniedCard />;
-}
-```
-
----
-
-## Part 4: Enhanced Data Fetching
-
-### New Fetch Logic with Parallel Queries + Timeout
-```typescript
-const fetchUsers = async () => {
-  setLoading(true);
-  setError(null);
-  
-  try {
-    const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Request timeout')), 10000)
-    );
-    
-    const fetchPromise = Promise.all([
-      supabase.from('user_roles').select('user_id, role'),
-      supabase.from('profiles').select('user_id, full_name, phone'),
-      supabase.from('user_status').select('user_id, is_blocked'),
-      supabase.from('shop_profiles').select('owner_id, shop_name'),
-      supabase.from('admin_users').select('user_id'),
-    ]);
-    
-    const results = await Promise.race([fetchPromise, timeoutPromise]);
-    // Process and combine data...
-    
-  } catch (err) {
-    setError(err.message);
-  } finally {
-    setLoading(false);
-  }
-};
-```
-
----
-
-## Part 5: Self-Protection Logic
-
-### Prevent Admin Self-Actions
-```typescript
-const currentUserId = useRef<string | null>(null);
-
-// Get current user on mount
-useEffect(() => {
-  supabase.auth.getUser().then(({ data }) => {
-    currentUserId.current = data.user?.id || null;
+    return true;
   });
-}, []);
+}, [sales, dateFilter, searchQuery, paymentFilter]);
+```
 
-// In user row actions
-const isCurrentUser = user.id === currentUserId.current;
-
-<Button
-  disabled={isCurrentUser}
-  title={isCurrentUser ? "Cannot block yourself" : undefined}
->
-  {isCurrentUser ? "You" : "Block"}
-</Button>
+### Filter Tabs UI
+```typescript
+<Tabs value={paymentFilter} onValueChange={(v) => setPaymentFilter(v as any)}>
+  <TabsList className="grid grid-cols-4 h-10">
+    <TabsTrigger value="all" className="text-xs">
+      All <Badge className="ml-1">{sales.length}</Badge>
+    </TabsTrigger>
+    <TabsTrigger value="paid" className="text-xs text-emerald-600">
+      Paid <Badge className="ml-1 bg-emerald-100">{paidCount}</Badge>
+    </TabsTrigger>
+    <TabsTrigger value="partial" className="text-xs text-amber-600">
+      Partial <Badge className="ml-1 bg-amber-100">{partialCount}</Badge>
+    </TabsTrigger>
+    <TabsTrigger value="due" className="text-xs text-rose-600">
+      Due <Badge className="ml-1 bg-rose-100">{dueCount}</Badge>
+    </TabsTrigger>
+  </TabsList>
+</Tabs>
 ```
 
 ---
 
-## Part 6: Loading Skeleton Component
+## Part 5: Date Range Selector
 
-### Add UserCardSkeleton
+### Add Date Range Options
 ```typescript
-const UserCardSkeleton = () => (
-  <div className="flex items-center justify-between p-3 rounded-lg border bg-card animate-pulse">
-    <div className="flex items-center gap-3 flex-1">
-      <div className="h-10 w-10 rounded-full bg-muted" />
-      <div className="flex-1 space-y-2">
-        <div className="h-4 w-32 bg-muted rounded" />
-        <div className="h-3 w-20 bg-muted rounded" />
-      </div>
+type DateRangeOption = 'today' | 'yesterday' | 'week' | 'month' | 'custom';
+
+const [dateRangeOption, setDateRangeOption] = useState<DateRangeOption>('today');
+const [customDateRange, setCustomDateRange] = useState<{ start: string; end: string } | null>(null);
+
+const dateRange = useMemo(() => {
+  const today = new Date();
+  switch (dateRangeOption) {
+    case 'today':
+      return { start: format(today, 'yyyy-MM-dd'), end: format(today, 'yyyy-MM-dd') };
+    case 'yesterday':
+      return { start: format(subDays(today, 1), 'yyyy-MM-dd'), end: format(subDays(today, 1), 'yyyy-MM-dd') };
+    case 'week':
+      return { start: format(startOfWeek(today), 'yyyy-MM-dd'), end: format(endOfWeek(today), 'yyyy-MM-dd') };
+    case 'month':
+      return { start: format(startOfMonth(today), 'yyyy-MM-dd'), end: format(endOfMonth(today), 'yyyy-MM-dd') };
+    case 'custom':
+      return customDateRange || { start: format(today, 'yyyy-MM-dd'), end: format(today, 'yyyy-MM-dd') };
+  }
+}, [dateRangeOption, customDateRange]);
+```
+
+---
+
+## Part 6: Source Filtering for Expenses
+
+### Add Source Filter
+```typescript
+const [expenseSourceFilter, setExpenseSourceFilter] = useState<'all' | 'pob' | 'salary' | 'vehicle' | 'manual'>('all');
+
+const filteredExpenses = useMemo(() => {
+  return expenses.filter(e => {
+    if (dateFilter && e.date !== dateFilter) return false;
+    if (expenseSourceFilter !== 'all' && e.type !== expenseSourceFilter) return false;
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      return e.category.toLowerCase().includes(query) ||
+        e.description.toLowerCase().includes(query);
+    }
+    return true;
+  });
+}, [expenses, dateFilter, searchQuery, expenseSourceFilter]);
+```
+
+---
+
+## Part 7: Real-Time Sync Optimization
+
+### Consolidate Subscriptions
+The current implementation in `useBusinessDiaryQueries.ts` already has good real-time sync. Ensure these tables are covered:
+- `pos_transactions`
+- `pos_transaction_items`
+- `customer_payments`
+- `pob_transactions`
+- `pob_transaction_items`
+- `staff_payments` (Currently missing in queries hook)
+- `vehicle_costs` (Currently missing in queries hook)
+- `daily_expenses`
+
+### Fix Missing Subscriptions
+```typescript
+.on('postgres_changes', { event: '*', schema: 'public', table: 'staff_payments' }, debouncedInvalidate)
+.on('postgres_changes', { event: '*', schema: 'public', table: 'vehicle_costs' }, debouncedInvalidate)
+```
+
+---
+
+## Part 8: Update Expense Categories
+
+### Enhanced Category Map
+```typescript
+const EXPENSE_CATEGORIES = [
+  // Utility Expenses
+  { value: 'Utilities', label: 'Utilities', icon: '💡' },
+  { value: 'Rent', label: 'Rent', icon: '🏠' },
+  { value: 'Maintenance', label: 'Maintenance', icon: '🔧' },
+  // Labor/Service
+  { value: 'Loading', label: 'Loading/Labor', icon: '👷' },
+  { value: 'Entertainment', label: 'Entertainment', icon: '☕' },
+  // Business
+  { value: 'Marketing', label: 'Marketing', icon: '📢' },
+  { value: 'Bank', label: 'Bank Charges', icon: '🏦' },
+  // Other
+  { value: 'Other', label: 'Other', icon: '📦' }
+];
+```
+
+---
+
+## Part 9: Mobile UI Optimizations
+
+### Touch-Friendly Cards
+- Minimum height: 64px for all interactive cards
+- Touch targets: 48px minimum
+- Swipe gestures: Enable horizontal swipe for quick actions
+
+### Compact Mobile Summary
+```typescript
+{/* Mobile: Horizontal Scroll Summary */}
+{isMobile ? (
+  <ScrollArea orientation="horizontal" className="w-full">
+    <div className="flex gap-2 pb-2" style={{ minWidth: 'max-content' }}>
+      {summaryCards.map(card => <CompactSummaryCard key={card.id} {...card} />)}
     </div>
-    <div className="flex gap-2">
-      <div className="h-8 w-16 bg-muted rounded" />
-      <div className="h-8 w-8 bg-muted rounded" />
-    </div>
+  </ScrollArea>
+) : (
+  <div className="grid grid-cols-6 gap-3">
+    {summaryCards.map(card => <SummaryCard key={card.id} {...card} />)}
   </div>
-);
+)}
 ```
 
 ---
 
-## Part 7: Real-Time Updates
+## Part 10: View Details Dialog
 
-### Add Supabase Subscription
+### Sale Entry Details Dialog
 ```typescript
-useEffect(() => {
-  const channel = supabase
-    .channel('admin-users-changes')
-    .on('postgres_changes', 
-      { event: '*', schema: 'public', table: 'user_roles' }, 
-      () => fetchUsers()
-    )
-    .on('postgres_changes', 
-      { event: '*', schema: 'public', table: 'user_status' }, 
-      () => fetchUsers()
-    )
-    .subscribe();
-  
-  return () => {
-    supabase.removeChannel(channel);
-  };
-}, []);
+const [selectedSale, setSelectedSale] = useState<SaleEntry | null>(null);
+
+<Dialog open={!!selectedSale} onOpenChange={() => setSelectedSale(null)}>
+  <DialogContent>
+    <DialogHeader>
+      <DialogTitle>Transaction Details</DialogTitle>
+    </DialogHeader>
+    {selectedSale && (
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <InfoRow label="Transaction #" value={selectedSale.transactionNumber} />
+          <InfoRow label="Date" value={format(new Date(selectedSale.timestamp), 'PPpp')} />
+          <InfoRow label="Customer" value={selectedSale.customerName} />
+          <InfoRow label="Phone" value={selectedSale.customerPhone || 'N/A'} />
+          <InfoRow label="Product" value={selectedSale.productName} />
+          <InfoRow label="Quantity" value={selectedSale.quantity.toString()} />
+          <InfoRow label="Total Bill" value={`৳${selectedSale.totalAmount.toLocaleString()}`} />
+          <InfoRow label="Amount Paid" value={`৳${selectedSale.amountPaid.toLocaleString()}`} />
+          <InfoRow label="Remaining Due" value={`৳${selectedSale.remainingDue.toLocaleString()}`} />
+          <InfoRow label="Payment Method" value={selectedSale.paymentMethod} />
+          <InfoRow label="Status" value={selectedSale.paymentStatus} />
+          <InfoRow label="Sold By" value={selectedSale.staffName} />
+        </div>
+        {selectedSale.returnCylinders.length > 0 && (
+          <div>
+            <Label>Return Cylinders</Label>
+            <div className="flex gap-2 mt-1">
+              {selectedSale.returnCylinders.map((r, i) => (
+                <Badge key={i} variant="outline">{r.quantity}x {r.brand}</Badge>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    )}
+  </DialogContent>
+</Dialog>
 ```
-
----
-
-## Part 8: Clean Up Legacy References
-
-### Fix AppSidebar.tsx Line 64
-```typescript
-// Current (line 64)
-case 'super_admin':
-  return 'bg-primary/15 text-primary border-primary/30';
-
-// Fixed - Remove super_admin case entirely or rename
-// super_admin is no longer a user role, admin status is separate
-```
-
-### Fix DashboardHeader.tsx Lines 68-70, 83-84
-Remove `super_admin` references from role switch statements.
 
 ---
 
@@ -289,70 +419,43 @@ Remove `super_admin` references from role switch statements.
 
 | Step | File | Action | Priority |
 |------|------|--------|----------|
-| 1 | Database | Add RLS policy for admin profile access | Critical |
-| 2 | `AdminPanelModule.tsx` | Add server-side admin verification | Critical |
-| 3 | `AdminPanelModule.tsx` | Fix UserData interface with proper types | High |
-| 4 | `AdminPanelModule.tsx` | Add self-protection logic | High |
-| 5 | `AdminPanelModule.tsx` | Add loading skeletons | Medium |
-| 6 | `AdminPanelModule.tsx` | Add real-time subscriptions | Medium |
-| 7 | `AdminPanelModule.tsx` | Improve error handling with retry | Medium |
-| 8 | `AppSidebar.tsx` | Remove `super_admin` reference | Low |
-| 9 | `DashboardHeader.tsx` | Remove `super_admin` reference | Low |
-
----
-
-## New Features to Add
-
-1. **Search by phone number** - Customers often identified by phone
-2. **Admin badge indicator** - Show if a user is also an admin
-3. **Block reason input** - Allow admin to add reason when blocking
-4. **Confirmation with user details** - Show more info in dialogs
-5. **Empty state with illustration** - Better UX when no users match filter
-
----
-
-## UI/UX Improvements
-
-1. **Color-coded user cards**:
-   - Owner: Primary gradient border
-   - Manager: Secondary subtle background
-   - Customer: Accent subtle background
-   - Blocked: Red/destructive subtle background
-
-2. **Mobile optimizations**:
-   - Swipeable user cards for actions
-   - Bottom sheet for user details
-   - Compact view on small screens
-
-3. **Accessibility**:
-   - Proper ARIA labels on all buttons
-   - Keyboard navigation support
-   - Focus indicators
+| 1 | `useBusinessDiaryQueries.ts` | Add staff_payments & vehicle_costs to expense fetch | Critical |
+| 2 | `useBusinessDiaryQueries.ts` | Add staff_payments & vehicle_costs real-time subscriptions | Critical |
+| 3 | `BusinessDiaryModule.tsx` | Add customer debt summary calculation | High |
+| 4 | `BusinessDiaryModule.tsx` | Expand to 6-card summary grid | High |
+| 5 | `BusinessDiaryModule.tsx` | Add payment status filter tabs | High |
+| 6 | `BusinessDiaryModule.tsx` | Add date range selector | Medium |
+| 7 | `BusinessDiaryModule.tsx` | Add expense source filter | Medium |
+| 8 | `BusinessDiaryModule.tsx` | Add view details dialogs | Medium |
+| 9 | `SaleEntryCard.tsx` | Pass onViewDetails handler | Medium |
+| 10 | `ExpenseEntryCard.tsx` | Add onViewDetails handler | Medium |
+| 11 | Delete | `useBusinessDiaryData.ts` (keep as backup/analytics) | Low |
 
 ---
 
 ## Success Criteria
 
 After implementation:
-1. Admin panel only accessible to verified admins (server-side check)
-2. Admin can see all user names and phone numbers
-3. Admin cannot block/delete themselves
-4. User list updates in real-time when changes occur
-5. Loading states show skeletons, not just spinners
-6. No TypeScript errors or legacy role references
-7. All actions show proper confirmation dialogs
-8. Mobile-responsive with 44px+ touch targets
+1. **Complete Data Integration**: All sales (POS + Online + Customer Payments) and expenses (POB + Staff + Vehicle + Manual) display correctly
+2. **Customer Debt Visibility**: Summary cards show Paid/Partial/Due counts and amounts
+3. **Payment Filtering**: Can filter sales by payment status
+4. **Real-Time Sync**: Changes from POS, POB, Utility Expense modules appear instantly
+5. **Mobile Optimized**: 48px touch targets, horizontal scroll summaries, responsive layout
+6. **Date Flexibility**: Can view today, yesterday, this week, this month, or custom range
+7. **Source Tracking**: Each entry shows clear source (POS, Online Order, POB, Staff Salary, Vehicle Cost, Manual)
 
 ---
 
 ## Testing Scenarios
 
-1. Non-admin access: Navigate to `/dashboard?module=admin-panel` as non-admin user -> Should see "Access Denied"
-2. Admin access: Login as admin (khnayeam009@gmail.com) -> Should see full panel
-3. Block user: Click block on a user -> Confirm -> User should appear in Blocked tab
-4. Unblock user: Click unblock on blocked user -> Confirm -> User should return to normal
-5. Self-protection: Admin should see "You" badge on their own row, buttons disabled
-6. Search: Type phone number -> Should filter to matching users
-7. Tab filtering: Click each tab -> Should show only matching role users
-8. Real-time: In another tab, change a user role -> Admin panel should update
+1. **POS Sale Sync**: Complete a cash sale in POS -> Should appear in Business Diary within 2 seconds
+2. **Due Sale**: Create a Due sale in POS -> Should appear in Diary with red "Due" badge
+3. **Partial Payment**: Create partial payment -> Shows in Partial section with remaining due
+4. **POB Purchase**: Add POB transaction -> Shows in Expenses as "LPG Purchase"
+5. **Staff Salary**: Pay salary in Utility Expense -> Shows in Expenses as "Staff Salary"
+6. **Vehicle Cost**: Add fuel cost -> Shows in Expenses as "Vehicle Fuel"
+7. **Manual Expense**: Add utility bill -> Shows in Expenses as "Utilities"
+8. **Filter Test**: Click "Due" summary card -> Sales list filters to only Due transactions
+9. **Date Change**: Switch to yesterday -> Shows previous day's data
+10. **Real-Time**: In another tab, complete a sale -> Diary updates without refresh
 
