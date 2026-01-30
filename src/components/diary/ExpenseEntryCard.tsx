@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
 import { format } from "date-fns";
-import { ExpenseEntry } from "@/hooks/useBusinessDiaryData";
+import { ExpenseEntry } from "@/hooks/queries/useBusinessDiaryQueries";
 
 interface ExpenseEntryCardProps {
   entry: ExpenseEntry;
@@ -39,7 +39,19 @@ const sourceConfig: Record<string, { icon: React.ComponentType<any>; color: stri
     bgColor: 'bg-teal-100 dark:bg-teal-900/40 border-teal-200 dark:border-teal-800',
     hoverColor: 'hover:bg-teal-200 dark:hover:bg-teal-800/60'
   },
+  'Staff Salary Module': { 
+    icon: Users, 
+    color: 'text-teal-700 dark:text-teal-300',
+    bgColor: 'bg-teal-100 dark:bg-teal-900/40 border-teal-200 dark:border-teal-800',
+    hoverColor: 'hover:bg-teal-200 dark:hover:bg-teal-800/60'
+  },
   'Vehicle Cost': { 
+    icon: Truck, 
+    color: 'text-amber-700 dark:text-amber-300',
+    bgColor: 'bg-amber-100 dark:bg-amber-900/40 border-amber-200 dark:border-amber-800',
+    hoverColor: 'hover:bg-amber-200 dark:hover:bg-amber-800/60'
+  },
+  'Vehicle Module': { 
     icon: Truck, 
     color: 'text-amber-700 dark:text-amber-300',
     bgColor: 'bg-amber-100 dark:bg-amber-900/40 border-amber-200 dark:border-amber-800',
@@ -69,114 +81,86 @@ export const ExpenseEntryCard = ({ entry, onViewDetails, onNavigateToSource }: E
 
   return (
     <Card className="border overflow-hidden transition-all duration-300 hover:shadow-lg bg-card hover:bg-gradient-to-r hover:from-rose-50/30 dark:hover:from-rose-950/20 hover:to-card border-border/60 group">
-      {/* Top Color Bar */}
       <div className="h-1 bg-rose-400/80" />
-      
-      <CardContent className="p-3.5 sm:p-4">
-        <div className="flex items-start justify-between gap-3">
+      <CardContent className="p-3 sm:p-3.5">
+        <div className="flex items-start justify-between gap-2.5">
           {/* Left: Category & Description */}
-          <div className="flex-1 min-w-0 space-y-2.5">
-            {/* Header Row with Badges */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <Badge variant="outline" className="bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-300 dark:border-rose-700 text-xs font-medium">
-                <ArrowDownRight className="h-3 w-3 mr-1" />
-                Expense
+          <div className="flex-1 min-w-0 space-y-2">
+            {/* Header Badges */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <Badge variant="outline" className="bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-300 dark:border-rose-700 text-[10px] font-medium h-5">
+                <ArrowDownRight className="h-2.5 w-2.5 mr-0.5" />Expense
               </Badge>
-              <Badge 
-                variant="outline" 
-                className={`${sourceConf.bgColor} ${sourceConf.color} ${sourceConf.hoverColor} text-xs cursor-pointer transition-colors border font-medium`}
-                onClick={() => onNavigateToSource?.(entry.source)}
-              >
-                <SourceIcon className="h-3 w-3 mr-1" />
-                {entry.source}
-                <ExternalLink className="h-2.5 w-2.5 ml-1 opacity-60" />
+              <Badge variant="outline" 
+                className={`${sourceConf.bgColor} ${sourceConf.color} ${sourceConf.hoverColor} text-[10px] cursor-pointer transition-colors border font-medium h-5`}
+                onClick={() => onNavigateToSource?.(entry.source)}>
+                <SourceIcon className="h-2.5 w-2.5 mr-0.5" />
+                {entry.source.replace(' Module', '')}
+                <ExternalLink className="h-2 w-2 ml-0.5 opacity-60" />
               </Badge>
             </div>
 
             {/* Category with Icon */}
-            <div className="flex items-center gap-2.5">
-              <div className="h-9 w-9 rounded-lg bg-muted/80 flex items-center justify-center shrink-0">
-                <span className="text-xl" style={{ color: entry.categoryColor }}>
-                  {entry.categoryIcon}
-                </span>
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded-md bg-muted/80 flex items-center justify-center shrink-0">
+                <span className="text-lg" style={{ color: entry.categoryColor }}>{entry.categoryIcon}</span>
               </div>
               <div className="min-w-0">
-                <h4 className="font-semibold text-sm sm:text-base text-foreground leading-tight line-clamp-1 group-hover:text-rose-600 dark:group-hover:text-rose-400 transition-colors">
+                <h4 className="font-semibold text-sm text-foreground leading-tight line-clamp-1 group-hover:text-rose-600 dark:group-hover:text-rose-400 transition-colors">
                   {entry.category}
                 </h4>
                 {entry.description && (
-                  <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
-                    {entry.description}
-                  </p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-1">{entry.description}</p>
                 )}
               </div>
             </div>
 
-            {/* Why Spent Tag */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <Badge variant="secondary" className="text-xs bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 border-0 font-medium">
-                <HelpCircle className="h-3 w-3 mr-1" />
-                Why: {entry.whySpent}
-              </Badge>
-            </div>
+            {/* Why Spent */}
+            <Badge variant="secondary" className="text-[10px] bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 border-0 font-medium h-5">
+              <HelpCircle className="h-2.5 w-2.5 mr-0.5" />Why: {entry.whySpent}
+            </Badge>
 
-            {/* Metadata Tags */}
-            <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+            {/* Metadata */}
+            <div className="flex items-center gap-2 text-[10px] text-muted-foreground flex-wrap">
               {entry.supplierName && (
-                <span className="flex items-center gap-1.5 bg-muted/50 px-2 py-1 rounded-md">
-                  <Package className="h-3 w-3" />
-                  <span className="font-medium">{entry.supplierName}</span>
+                <span className="flex items-center gap-1 bg-muted/50 px-1.5 py-0.5 rounded">
+                  <Package className="h-2.5 w-2.5" />{entry.supplierName}
                 </span>
               )}
               {entry.vehicleName && (
-                <span className="flex items-center gap-1.5 bg-muted/50 px-2 py-1 rounded-md">
-                  <Truck className="h-3 w-3" />
-                  <span className="font-medium">{entry.vehicleName}</span>
+                <span className="flex items-center gap-1 bg-muted/50 px-1.5 py-0.5 rounded">
+                  <Truck className="h-2.5 w-2.5" />{entry.vehicleName}
                 </span>
               )}
               {entry.staffPayeeName && (
-                <span className="flex items-center gap-1.5 bg-muted/50 px-2 py-1 rounded-md">
-                  <Users className="h-3 w-3" />
-                  <span className="font-medium">{entry.staffPayeeName}</span>
+                <span className="flex items-center gap-1 bg-muted/50 px-1.5 py-0.5 rounded">
+                  <Users className="h-2.5 w-2.5" />{entry.staffPayeeName}
                 </span>
               )}
-              <span className="flex items-center gap-1.5">
-                <Calendar className="h-3 w-3" />
-                {format(new Date(entry.date), 'MMM dd, yyyy')}
+              <span className="flex items-center gap-1">
+                <Calendar className="h-2.5 w-2.5" />{format(new Date(entry.date), 'MMM dd')}
               </span>
-              <span className="flex items-center gap-1.5">
-                <Clock className="h-3 w-3" />
-                {format(new Date(entry.timestamp), 'hh:mm a')}
+              <span className="flex items-center gap-1">
+                <Clock className="h-2.5 w-2.5" />{format(new Date(entry.timestamp), 'hh:mm a')}
               </span>
             </div>
-
           </div>
 
           {/* Right: Amount & Staff */}
-          <div className="flex flex-col items-end gap-2 shrink-0">
-            {/* Staff Role Badge - Who Spent */}
-            <Badge variant="outline" className={`${roleConf.bgColor} ${roleConf.color} border-0 text-xs font-medium px-2 py-1`}>
-              <RoleIcon className="h-3 w-3 mr-1" />
-              {roleConf.label}
+          <div className="flex flex-col items-end gap-1.5 shrink-0">
+            <Badge variant="outline" className={`${roleConf.bgColor} ${roleConf.color} border-0 text-[10px] font-medium px-1.5 py-0.5 h-5`}>
+              <RoleIcon className="h-2.5 w-2.5 mr-0.5" />{roleConf.label}
             </Badge>
 
-            {/* Amount with Emphasis */}
-            <div className="text-right">
-              <p className="text-lg sm:text-xl lg:text-2xl font-bold text-rose-600 dark:text-rose-400 tabular-nums">
-                -{BANGLADESHI_CURRENCY_SYMBOL}{entry.amount.toLocaleString()}
-              </p>
-            </div>
+            <p className="text-base sm:text-lg font-bold text-rose-600 dark:text-rose-400 tabular-nums">
+              -{BANGLADESHI_CURRENCY_SYMBOL}{entry.amount.toLocaleString()}
+            </p>
 
-            {/* View Details Button */}
             {onViewDetails && (
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="h-8 px-3 text-xs hover:bg-rose-100 dark:hover:bg-rose-900/30 hover:text-rose-600 dark:hover:text-rose-400"
-                onClick={() => onViewDetails(entry)}
-              >
-                <Eye className="h-3.5 w-3.5 mr-1" />
-                View
+              <Button variant="ghost" size="sm" 
+                className="h-7 px-2 text-[10px] hover:bg-rose-100 dark:hover:bg-rose-900/30 hover:text-rose-600 dark:hover:text-rose-400"
+                onClick={() => onViewDetails(entry)}>
+                <Eye className="h-3 w-3 mr-0.5" />View
               </Button>
             )}
           </div>
