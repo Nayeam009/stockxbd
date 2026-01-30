@@ -1,416 +1,514 @@
 
-
-# Business Diary Module - Complete Rebuild Plan
+# POS Module - Complete Rebuild Plan
 
 ## Current State Analysis
 
-After thorough examination of the codebase, I've identified the current implementation and issues that need optimization:
+After thorough examination of the POS module (2,607 lines), I've identified both strengths and issues that need to be addressed for a proper rebuild.
 
-### Architecture Overview
-
-The Business Diary currently has **two parallel data hooks**:
-1. `useBusinessDiaryData.ts` (772 lines) - Full analytics hook with all data
-2. `useBusinessDiaryQueries.ts` (527 lines) - TanStack Query-based hook for date-specific fetching
-
-The module uses `useBusinessDiaryQueries.ts` in production but has code duplication.
+### Current Architecture
+The POS module is a single large component that handles:
+- Product selection (LPG, Stove, Regulator)
+- Cart management (Sale Items + Return Items)
+- Customer lookup (Phone-first flow)
+- Payment processing (Paid/Partial/Due)
+- Inventory updates
+- Invoice generation
 
 ### Issues Found
 
 | # | Issue | Location | Impact |
 |---|-------|----------|--------|
-| 1 | **Duplicate data hooks** | Two hooks with similar logic | Code bloat, maintenance burden |
-| 2 | **Missing Customer Debt Summary** | No visibility of Due/Partial customers | Business critical data hidden |
-| 3 | **No Payment Status Filters** | Cannot filter by Paid/Partial/Due | Hard to track outstanding payments |
-| 4 | **Staff/Vehicle Costs not synced** | `useBusinessDiaryQueries` missing staff_payments/vehicle_costs | Incomplete expense tracking |
-| 5 | **COGS not displayed** | Calculated but not shown to user | Profitability insight missing |
-| 6 | **No Date Range Selection** | Only single date picker | Cannot view weekly/monthly summaries |
-| 7 | **No Export Functionality** | Cannot export data | Business reporting limitation |
-| 8 | **Missing Quick Stats** | No visual KPI breakdown | Poor dashboard experience |
-| 9 | **Hardcoded category list** | `EXPENSE_CATEGORIES` missing POB categories | Categories mismatch with actual data |
-| 10 | **Mobile Tab Badge overlap** | Badge styling on mobile tabs | UI polish issue |
+| 1 | **Monolithic component** | Single 2,607 line file | Hard to maintain, slow initial render |
+| 2 | **No loading skeleton** | Loading state shows spinner only | Poor perceived performance |
+| 3 | **Inline price calculations** | Price lookups scattered throughout | Inconsistent pricing, hard to debug |
+| 4 | **Mobile footer overlap** | `bottom-16` fixed footer | Overlaps with bottom nav on some devices |
+| 5 | **No quick actions** | Must navigate through forms | Slow for repeat operations |
+| 6 | **Missing product images** | Only color badges | Less visual recognition |
+| 7 | **No offline queue** | Fails silently offline | Sales lost during network issues |
+| 8 | **Complex state management** | 40+ useState hooks | Hard to track, potential race conditions |
+| 9 | **No transaction summary** | Must check Business Diary | Can't see today's stats from POS |
+| 10 | **Slow product grid scroll** | All products rendered | Performance issue with large inventories |
 
 ---
 
 ## Rebuild Architecture
 
-### New Module Structure
+### New Component Structure
 
 ```text
-BusinessDiaryModule (Main Container)
-├── BusinessDiaryHeader
-│   ├── Title + Description
-│   ├── View Mode Toggle (Cash Flow / Profit)
-│   ├── Date Range Selector (Today / This Week / This Month / Custom)
-│   └── Action Buttons (Add Expense / Export / Refresh)
+POSModule (Main Container - Optimized)
+├── POSHeader
+│   ├── Title + Stats Mini-bar (Today's Sales, Items Sold)
+│   ├── Barcode Scanner Button
+│   └── Clear All Button
 │
-├── BusinessDiarySummaryGrid (6 Cards)
-│   ├── Total Sales (Cash Received)
-│   ├── Total Expenses (Money Out)
-│   ├── Net Profit/Loss
-│   ├── Paid Customers
-│   ├── Partial Paid Customers
-│   └── Due Customers
+├── POSSummaryBar (NEW - Quick Stats)
+│   ├── Today's Sales Count
+│   ├── Today's Revenue
+│   └── Pending Online Orders Badge
 │
-├── BusinessDiaryFilters
-│   ├── Search Bar (Product/Customer/Transaction)
-│   ├── Payment Status Filter (All / Paid / Partial / Due)
-│   └── Source Filter (POS / Online / Customer Payment / POB)
+├── POSTableTabs (Mobile: Toggle, Desktop: Side-by-side)
+│   ├── SaleTable (Products being sold)
+│   └── ReturnTable (Cylinders being returned)
 │
-└── BusinessDiaryContent
-    ├── Mobile: Tab View (Sales | Expenses)
-    └── Desktop: Side-by-Side Panels
-        ├── Sales Panel (with status grouping)
-        │   ├── Paid Sales Section
-        │   ├── Partial Paid Section
-        │   └── Due Sales Section
-        └── Expenses Panel (with source grouping)
-            ├── POB Purchases
-            ├── Staff Payments
-            ├── Vehicle Costs
-            └── Manual Expenses
+├── POSControlBar (Optimized Filters)
+│   ├── Row 1: Retail/Wholesale + Weight Select + Search
+│   ├── Row 2: Cylinder Type (Refill/Package) + Valve Size (22mm/20mm)
+│   └── Row 3: Desktop Selling/Return Toggle + Product Tabs (LPG/Stove/Regulator)
+│
+├── POSProductGrid (Virtualized for performance)
+│   ├── LPG Cards (Brand color strip, stock preview, price)
+│   ├── Stove Cards (Brand, model, burners, price)
+│   ├── Regulator Cards (Brand, type, price)
+│   └── Custom Product Buttons
+│
+├── POSCustomerSection (Phone-first flow)
+│   ├── Phone Input (Auto-lookup)
+│   ├── Customer Status Badge (Found/New/Due Warning)
+│   ├── Name + Location Fields
+│   └── Settlement + Seller Display
+│
+└── POSStickyFooter (Mobile-optimized)
+    ├── Total Amount
+    ├── Item Count
+    └── PROCEED TO PAY Button
 ```
 
 ---
 
-## Part 1: Consolidate Data Hooks
+## Part 1: Component Modularization
 
-### Remove Duplicate Hook
-Delete or deprecate `useBusinessDiaryData.ts` and enhance `useBusinessDiaryQueries.ts` to include:
+### Extract into Sub-Components
 
-1. **Add Staff Payments & Vehicle Costs** to expense fetch
-2. **Add Customer Debt Summary** calculation
-3. **Add COGS integration** with product_prices lookup
+| Component | Responsibility | Lines Saved |
+|-----------|---------------|-------------|
+| `POSProductCard.tsx` | Individual product display with stock preview | ~100 |
+| `POSSaleTable.tsx` | Sale items list with quantity controls | ~80 |
+| `POSReturnTable.tsx` | Return cylinders list with leaked toggle | ~70 |
+| `POSCustomerLookup.tsx` | Phone-first customer flow | ~150 |
+| `POSPaymentDrawer.tsx` | Payment modal with status selection | ~100 |
+| `POSQuickStats.tsx` | Today's sales summary | ~50 |
+| `usePOSData.ts` | Centralized data fetching hook | ~100 |
+| `usePOSCart.ts` | Cart state management hook | ~150 |
 
-### Enhanced Expense Fetching
+### New Hook: usePOSData
 ```typescript
-// Add to fetchExpensesData parallel queries
-const [userRolesResult, pobResult, manualExpensesResult, staffPaymentsResult, vehicleCostsResult] = await Promise.all([
-  supabase.from('user_roles').select('user_id, role'),
-  supabase.from('pob_transactions')...,
-  supabase.from('daily_expenses')...,
-  supabase.from('staff_payments')
-    .select('id, staff_id, amount, payment_date, notes, created_at, created_by, staff(name, role)')
-    .eq('payment_date', date),
-  supabase.from('vehicle_costs')
-    .select('id, vehicle_id, amount, cost_type, cost_date, description, liters_filled, created_at, created_by, vehicles(name)')
-    .eq('cost_date', date)
-]);
-```
-
----
-
-## Part 2: Customer Debt Summary Integration
-
-### Add New Interface
-```typescript
-interface CustomerDebtSummary {
-  totalPaidCount: number;
-  totalPaidAmount: number;
-  partialPaidCount: number;
-  partialPaidAmount: number;
-  partialRemainingDue: number;
-  dueCount: number;
-  dueAmount: number;
+// Centralize all POS data fetching
+export function usePOSData() {
+  const queryClient = useQueryClient();
+  
+  const { data: lpgBrands, isLoading: lpgLoading } = useQuery({
+    queryKey: ['pos-lpg-brands'],
+    queryFn: () => supabase.from('lpg_brands').select('*').eq('is_active', true),
+    staleTime: 30_000
+  });
+  
+  const { data: productPrices } = useQuery({
+    queryKey: ['pos-prices'],
+    queryFn: () => supabase.from('product_prices').select('*').eq('is_active', true),
+    staleTime: 30_000
+  });
+  
+  // Real-time subscriptions
+  useEffect(() => {
+    const channel = supabase
+      .channel('pos-realtime-v3')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'lpg_brands' }, 
+          () => queryClient.invalidateQueries({ queryKey: ['pos-lpg-brands'] }))
+      .subscribe();
+    return () => supabase.removeChannel(channel);
+  }, []);
+  
+  return { lpgBrands, productPrices, isLoading: lpgLoading };
 }
 ```
 
-### Calculate from Sales Data
+### New Hook: usePOSCart
 ```typescript
-const customerDebtSummary = useMemo(() => {
-  const paid = filteredSales.filter(s => s.paymentStatus === 'paid');
-  const partial = filteredSales.filter(s => s.paymentStatus === 'partial');
-  const due = filteredSales.filter(s => s.paymentStatus === 'due');
+// Centralize cart state management
+export function usePOSCart() {
+  const [saleItems, setSaleItems] = useState<SaleItem[]>([]);
+  const [returnItems, setReturnItems] = useState<ReturnItem[]>([]);
+  const [discount, setDiscount] = useState(0);
   
-  return {
-    totalPaidCount: paid.length,
-    totalPaidAmount: paid.reduce((sum, s) => sum + s.totalAmount, 0),
-    partialPaidCount: partial.length,
-    partialPaidAmount: partial.reduce((sum, s) => sum + s.amountPaid, 0),
-    partialRemainingDue: partial.reduce((sum, s) => sum + s.remainingDue, 0),
-    dueCount: due.length,
-    dueAmount: due.reduce((sum, s) => sum + s.totalAmount, 0)
-  };
-}, [filteredSales]);
-```
-
----
-
-## Part 3: Enhanced Summary Cards (6-Card Grid)
-
-### New Grid Layout
-```typescript
-<div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
-  {/* 1. Total Sales */}
-  <SummaryCard 
-    title="Total Sales" 
-    value={dayTotals.cashIn} 
-    icon={ArrowUpRight}
-    color="emerald"
-    subtitle={`${filteredSales.length} transactions`}
-  />
+  const addToCart = useCallback((item: SaleItem) => {
+    setSaleItems(prev => {
+      const existing = prev.find(i => i.id === item.id);
+      if (existing) {
+        return prev.map(i => i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i);
+      }
+      return [...prev, item];
+    });
+  }, []);
   
-  {/* 2. Total Expenses */}
-  <SummaryCard 
-    title="Total Expenses" 
-    value={dayTotals.cashOut} 
-    icon={ArrowDownRight}
-    color="rose"
-    subtitle={`${filteredExpenses.length} entries`}
-  />
+  const subtotal = useMemo(() => saleItems.reduce((sum, i) => sum + i.price * i.quantity, 0), [saleItems]);
+  const total = useMemo(() => Math.max(0, subtotal - discount), [subtotal, discount]);
   
-  {/* 3. Net Profit/Loss */}
-  <SummaryCard 
-    title="Net Profit" 
-    value={dayTotals.netCashFlow} 
-    icon={dayTotals.netCashFlow >= 0 ? TrendingUp : TrendingDown}
-    color={dayTotals.netCashFlow >= 0 ? 'primary' : 'destructive'}
-  />
+  const clearCart = useCallback(() => {
+    setSaleItems([]);
+    setReturnItems([]);
+    setDiscount(0);
+  }, []);
   
-  {/* 4. Paid Customers */}
-  <SummaryCard 
-    title="Paid" 
-    value={customerDebtSummary.totalPaidAmount} 
-    icon={CheckCircle}
-    color="emerald"
-    subtitle={`${customerDebtSummary.totalPaidCount} customers`}
-    onClick={() => setPaymentFilter('paid')}
-  />
-  
-  {/* 5. Partial Paid */}
-  <SummaryCard 
-    title="Partial" 
-    value={customerDebtSummary.partialPaidAmount} 
-    icon={Clock}
-    color="amber"
-    subtitle={`Due: ৳${customerDebtSummary.partialRemainingDue.toLocaleString()}`}
-    onClick={() => setPaymentFilter('partial')}
-  />
-  
-  {/* 6. Due Customers */}
-  <SummaryCard 
-    title="Due" 
-    value={customerDebtSummary.dueAmount} 
-    icon={AlertCircle}
-    color="rose"
-    subtitle={`${customerDebtSummary.dueCount} unpaid`}
-    onClick={() => setPaymentFilter('due')}
-  />
-</div>
+  return { saleItems, returnItems, subtotal, total, addToCart, clearCart };
+}
 ```
 
 ---
 
-## Part 4: Payment Status Filtering
+## Part 2: Loading & Skeleton States
 
-### Add Filter State
+### Add POSSkeleton Component
 ```typescript
-const [paymentFilter, setPaymentFilter] = useState<'all' | 'paid' | 'partial' | 'due'>('all');
-```
-
-### Filter Sales by Payment Status
-```typescript
-const filteredSales = useMemo(() => {
-  return sales.filter(s => {
-    // Date filter
-    if (dateFilter && s.date !== dateFilter) return false;
-    
-    // Payment status filter
-    if (paymentFilter !== 'all' && s.paymentStatus !== paymentFilter) return false;
-    
-    // Search filter
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      return s.productName.toLowerCase().includes(query) ||
-        s.customerName.toLowerCase().includes(query) ||
-        s.transactionNumber.toLowerCase().includes(query) ||
-        (s.customerPhone && s.customerPhone.includes(query));
-    }
-    return true;
-  });
-}, [sales, dateFilter, searchQuery, paymentFilter]);
-```
-
-### Filter Tabs UI
-```typescript
-<Tabs value={paymentFilter} onValueChange={(v) => setPaymentFilter(v as any)}>
-  <TabsList className="grid grid-cols-4 h-10">
-    <TabsTrigger value="all" className="text-xs">
-      All <Badge className="ml-1">{sales.length}</Badge>
-    </TabsTrigger>
-    <TabsTrigger value="paid" className="text-xs text-emerald-600">
-      Paid <Badge className="ml-1 bg-emerald-100">{paidCount}</Badge>
-    </TabsTrigger>
-    <TabsTrigger value="partial" className="text-xs text-amber-600">
-      Partial <Badge className="ml-1 bg-amber-100">{partialCount}</Badge>
-    </TabsTrigger>
-    <TabsTrigger value="due" className="text-xs text-rose-600">
-      Due <Badge className="ml-1 bg-rose-100">{dueCount}</Badge>
-    </TabsTrigger>
-  </TabsList>
-</Tabs>
-```
-
----
-
-## Part 5: Date Range Selector
-
-### Add Date Range Options
-```typescript
-type DateRangeOption = 'today' | 'yesterday' | 'week' | 'month' | 'custom';
-
-const [dateRangeOption, setDateRangeOption] = useState<DateRangeOption>('today');
-const [customDateRange, setCustomDateRange] = useState<{ start: string; end: string } | null>(null);
-
-const dateRange = useMemo(() => {
-  const today = new Date();
-  switch (dateRangeOption) {
-    case 'today':
-      return { start: format(today, 'yyyy-MM-dd'), end: format(today, 'yyyy-MM-dd') };
-    case 'yesterday':
-      return { start: format(subDays(today, 1), 'yyyy-MM-dd'), end: format(subDays(today, 1), 'yyyy-MM-dd') };
-    case 'week':
-      return { start: format(startOfWeek(today), 'yyyy-MM-dd'), end: format(endOfWeek(today), 'yyyy-MM-dd') };
-    case 'month':
-      return { start: format(startOfMonth(today), 'yyyy-MM-dd'), end: format(endOfMonth(today), 'yyyy-MM-dd') };
-    case 'custom':
-      return customDateRange || { start: format(today, 'yyyy-MM-dd'), end: format(today, 'yyyy-MM-dd') };
-  }
-}, [dateRangeOption, customDateRange]);
-```
-
----
-
-## Part 6: Source Filtering for Expenses
-
-### Add Source Filter
-```typescript
-const [expenseSourceFilter, setExpenseSourceFilter] = useState<'all' | 'pob' | 'salary' | 'vehicle' | 'manual'>('all');
-
-const filteredExpenses = useMemo(() => {
-  return expenses.filter(e => {
-    if (dateFilter && e.date !== dateFilter) return false;
-    if (expenseSourceFilter !== 'all' && e.type !== expenseSourceFilter) return false;
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      return e.category.toLowerCase().includes(query) ||
-        e.description.toLowerCase().includes(query);
-    }
-    return true;
-  });
-}, [expenses, dateFilter, searchQuery, expenseSourceFilter]);
-```
-
----
-
-## Part 7: Real-Time Sync Optimization
-
-### Consolidate Subscriptions
-The current implementation in `useBusinessDiaryQueries.ts` already has good real-time sync. Ensure these tables are covered:
-- `pos_transactions`
-- `pos_transaction_items`
-- `customer_payments`
-- `pob_transactions`
-- `pob_transaction_items`
-- `staff_payments` (Currently missing in queries hook)
-- `vehicle_costs` (Currently missing in queries hook)
-- `daily_expenses`
-
-### Fix Missing Subscriptions
-```typescript
-.on('postgres_changes', { event: '*', schema: 'public', table: 'staff_payments' }, debouncedInvalidate)
-.on('postgres_changes', { event: '*', schema: 'public', table: 'vehicle_costs' }, debouncedInvalidate)
-```
-
----
-
-## Part 8: Update Expense Categories
-
-### Enhanced Category Map
-```typescript
-const EXPENSE_CATEGORIES = [
-  // Utility Expenses
-  { value: 'Utilities', label: 'Utilities', icon: '💡' },
-  { value: 'Rent', label: 'Rent', icon: '🏠' },
-  { value: 'Maintenance', label: 'Maintenance', icon: '🔧' },
-  // Labor/Service
-  { value: 'Loading', label: 'Loading/Labor', icon: '👷' },
-  { value: 'Entertainment', label: 'Entertainment', icon: '☕' },
-  // Business
-  { value: 'Marketing', label: 'Marketing', icon: '📢' },
-  { value: 'Bank', label: 'Bank Charges', icon: '🏦' },
-  // Other
-  { value: 'Other', label: 'Other', icon: '📦' }
-];
-```
-
----
-
-## Part 9: Mobile UI Optimizations
-
-### Touch-Friendly Cards
-- Minimum height: 64px for all interactive cards
-- Touch targets: 48px minimum
-- Swipe gestures: Enable horizontal swipe for quick actions
-
-### Compact Mobile Summary
-```typescript
-{/* Mobile: Horizontal Scroll Summary */}
-{isMobile ? (
-  <ScrollArea orientation="horizontal" className="w-full">
-    <div className="flex gap-2 pb-2" style={{ minWidth: 'max-content' }}>
-      {summaryCards.map(card => <CompactSummaryCard key={card.id} {...card} />)}
+const POSSkeleton = () => (
+  <div className="space-y-3 animate-pulse">
+    {/* Header Skeleton */}
+    <div className="flex items-center justify-between">
+      <div className="flex items-center gap-2">
+        <div className="h-9 w-9 rounded-lg bg-muted" />
+        <div className="h-6 w-20 bg-muted rounded" />
+      </div>
+      <div className="flex gap-1.5">
+        <div className="h-8 w-8 bg-muted rounded" />
+        <div className="h-8 w-8 bg-muted rounded" />
+      </div>
     </div>
-  </ScrollArea>
-) : (
-  <div className="grid grid-cols-6 gap-3">
-    {summaryCards.map(card => <SummaryCard key={card.id} {...card} />)}
+    
+    {/* Stats Bar Skeleton */}
+    <div className="flex gap-2">
+      {[1, 2, 3].map(i => (
+        <div key={i} className="flex-1 h-16 bg-muted rounded-lg" />
+      ))}
+    </div>
+    
+    {/* Product Grid Skeleton */}
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+      {[...Array(8)].map((_, i) => (
+        <div key={i} className="h-24 bg-muted rounded-lg" />
+      ))}
+    </div>
   </div>
-)}
+);
 ```
 
 ---
 
-## Part 10: View Details Dialog
+## Part 3: Quick Stats Integration
 
-### Sale Entry Details Dialog
+### Add Today's Summary Bar
 ```typescript
-const [selectedSale, setSelectedSale] = useState<SaleEntry | null>(null);
-
-<Dialog open={!!selectedSale} onOpenChange={() => setSelectedSale(null)}>
-  <DialogContent>
-    <DialogHeader>
-      <DialogTitle>Transaction Details</DialogTitle>
-    </DialogHeader>
-    {selectedSale && (
-      <div className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <InfoRow label="Transaction #" value={selectedSale.transactionNumber} />
-          <InfoRow label="Date" value={format(new Date(selectedSale.timestamp), 'PPpp')} />
-          <InfoRow label="Customer" value={selectedSale.customerName} />
-          <InfoRow label="Phone" value={selectedSale.customerPhone || 'N/A'} />
-          <InfoRow label="Product" value={selectedSale.productName} />
-          <InfoRow label="Quantity" value={selectedSale.quantity.toString()} />
-          <InfoRow label="Total Bill" value={`৳${selectedSale.totalAmount.toLocaleString()}`} />
-          <InfoRow label="Amount Paid" value={`৳${selectedSale.amountPaid.toLocaleString()}`} />
-          <InfoRow label="Remaining Due" value={`৳${selectedSale.remainingDue.toLocaleString()}`} />
-          <InfoRow label="Payment Method" value={selectedSale.paymentMethod} />
-          <InfoRow label="Status" value={selectedSale.paymentStatus} />
-          <InfoRow label="Sold By" value={selectedSale.staffName} />
+const POSQuickStats = () => {
+  const { data: stats } = useQuery({
+    queryKey: ['pos-today-stats'],
+    queryFn: async () => {
+      const today = format(new Date(), 'yyyy-MM-dd');
+      const { data } = await supabase
+        .from('pos_transactions')
+        .select('total')
+        .gte('created_at', `${today}T00:00:00`)
+        .lte('created_at', `${today}T23:59:59`)
+        .eq('is_voided', false);
+      
+      const totalSales = data?.length || 0;
+      const totalRevenue = data?.reduce((sum, t) => sum + Number(t.total), 0) || 0;
+      
+      // Get pending online orders
+      const { count } = await supabase
+        .from('community_orders')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'pending');
+      
+      return { totalSales, totalRevenue, pendingOrders: count || 0 };
+    },
+    staleTime: 60_000,
+    refetchInterval: 30_000
+  });
+  
+  return (
+    <div className="grid grid-cols-3 gap-2">
+      <div className="bg-emerald-50 dark:bg-emerald-950/30 rounded-lg p-2.5 text-center">
+        <p className="text-lg font-bold text-emerald-600 tabular-nums">{stats?.totalSales || 0}</p>
+        <p className="text-[10px] text-muted-foreground">Sales Today</p>
+      </div>
+      <div className="bg-primary/10 rounded-lg p-2.5 text-center">
+        <p className="text-lg font-bold text-primary tabular-nums">৳{(stats?.totalRevenue || 0).toLocaleString()}</p>
+        <p className="text-[10px] text-muted-foreground">Revenue</p>
+      </div>
+      {stats?.pendingOrders > 0 && (
+        <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg p-2.5 text-center relative">
+          <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center bg-amber-500">
+            {stats.pendingOrders}
+          </Badge>
+          <p className="text-lg font-bold text-amber-600">Online</p>
+          <p className="text-[10px] text-muted-foreground">Pending</p>
         </div>
-        {selectedSale.returnCylinders.length > 0 && (
-          <div>
-            <Label>Return Cylinders</Label>
-            <div className="flex gap-2 mt-1">
-              {selectedSale.returnCylinders.map((r, i) => (
-                <Badge key={i} variant="outline">{r.quantity}x {r.brand}</Badge>
-              ))}
-            </div>
+      )}
+    </div>
+  );
+};
+```
+
+---
+
+## Part 4: Optimized Product Card
+
+### Enhanced Product Card with Stock Preview
+```typescript
+interface POSProductCardProps {
+  brand: LPGBrand;
+  cylinderType: 'refill' | 'package';
+  saleType: 'retail' | 'wholesale';
+  weight: string;
+  price: number;
+  pendingStock: number;
+  isSaleMode: boolean;
+  onAddToSale: () => void;
+  onAddToReturn: () => void;
+}
+
+const POSProductCard = ({ 
+  brand, cylinderType, saleType, weight, price, 
+  pendingStock, isSaleMode, onAddToSale, onAddToReturn 
+}: POSProductCardProps) => {
+  const baseStock = cylinderType === 'refill' ? brand.refill_cylinder : brand.package_cylinder;
+  const displayStock = Math.max(0, baseStock - pendingStock);
+  const isOutOfStock = displayStock <= 0;
+  
+  return (
+    <button
+      onClick={isSaleMode ? onAddToSale : onAddToReturn}
+      disabled={isSaleMode && isOutOfStock}
+      className={cn(
+        "relative p-3 rounded-xl text-left transition-all",
+        "hover:shadow-md active:scale-[0.98]",
+        "min-h-[88px]", // Touch-friendly minimum height
+        isSaleMode && isOutOfStock && "opacity-50 cursor-not-allowed",
+        isSaleMode ? "hover:border-emerald-500/50" : "hover:border-amber-500/50",
+        "border border-transparent bg-card"
+      )}
+    >
+      {/* Brand Color Strip */}
+      <div
+        className="absolute top-0 left-0 bottom-0 w-1.5 rounded-l-xl"
+        style={{ backgroundColor: brand.color }}
+      />
+      
+      <div className="pl-2.5 flex flex-col h-full justify-between">
+        {/* Header: Icon + Stock Badge */}
+        <div className="flex items-start justify-between gap-1">
+          <div
+            className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm"
+            style={{ backgroundColor: brand.color }}
+          >
+            <Cylinder className="h-4.5 w-4.5 text-white" />
           </div>
+          
+          {isSaleMode ? (
+            <Badge
+              variant={displayStock > 5 ? "secondary" : displayStock > 0 ? "outline" : "destructive"}
+              className="text-[10px] px-1.5 h-5 font-semibold"
+            >
+              {displayStock > 0 ? (
+                <span className="flex items-center gap-0.5">
+                  {displayStock}
+                  {pendingStock > 0 && (
+                    <span className="text-amber-600 dark:text-amber-400 text-[8px]">(-{pendingStock})</span>
+                  )}
+                </span>
+              ) : 'Out'}
+            </Badge>
+          ) : (
+            <Badge className="text-[10px] px-1.5 h-5 bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+              Empty: {brand.empty_cylinder}
+            </Badge>
+          )}
+        </div>
+        
+        {/* Body: Name + Weight */}
+        <div className="mt-1.5">
+          <p className="font-semibold text-sm truncate">{brand.name}</p>
+          <p className="text-[10px] text-muted-foreground">{weight} • {cylinderType}</p>
+        </div>
+        
+        {/* Footer: Price */}
+        {isSaleMode ? (
+          <p className="font-bold text-base text-emerald-600 mt-1.5 tabular-nums">
+            ৳{price.toLocaleString()}
+          </p>
+        ) : (
+          <p className="text-[10px] text-amber-600 font-medium mt-1.5">
+            Tap to add return
+          </p>
         )}
       </div>
-    )}
-  </DialogContent>
-</Dialog>
+    </button>
+  );
+};
+```
+
+---
+
+## Part 5: Mobile-Optimized Sticky Footer
+
+### Fix Bottom Navigation Overlap
+```typescript
+const POSStickyFooter = ({ 
+  total, 
+  itemCount, 
+  onProceed, 
+  disabled 
+}: { 
+  total: number; 
+  itemCount: number; 
+  onProceed: () => void; 
+  disabled: boolean;
+}) => (
+  <div className={cn(
+    "fixed left-0 right-0 z-40",
+    "bg-card/95 backdrop-blur-sm border-t border-border shadow-lg",
+    // Mobile: above bottom nav (h-16 = 64px + safe area)
+    "bottom-[calc(64px+env(safe-area-inset-bottom))] md:bottom-0",
+    "safe-area-pb"
+  )}>
+    <div className="flex items-center justify-between p-3 max-w-7xl mx-auto gap-4">
+      <div className="min-w-0">
+        <p className="text-2xl font-bold text-foreground tabular-nums truncate">
+          ৳{total.toLocaleString()}
+        </p>
+        <p className="text-xs text-muted-foreground">
+          {itemCount} item{itemCount !== 1 ? 's' : ''}
+        </p>
+      </div>
+      
+      <Button
+        size="lg"
+        onClick={onProceed}
+        disabled={disabled}
+        className={cn(
+          "h-12 px-6 min-w-[140px]",
+          "bg-emerald-600 hover:bg-emerald-700",
+          "text-base font-semibold shadow-lg"
+        )}
+      >
+        PROCEED →
+      </Button>
+    </div>
+  </div>
+);
+```
+
+---
+
+## Part 6: Business Diary Integration
+
+### Real-Time Sync Flow
+The POS is already connected to Business Diary through the `pos_transactions` table. The `useBusinessDiaryQueries` hook subscribes to changes:
+
+```typescript
+// Already implemented in useBusinessDiaryQueries.ts lines 579-595
+.on('postgres_changes', { event: '*', schema: 'public', table: 'pos_transactions' }, debouncedInvalidate)
+.on('postgres_changes', { event: '*', schema: 'public', table: 'pos_transaction_items' }, debouncedInvalidate)
+```
+
+### Ensure Payment Status Sync
+```typescript
+// In handleCompleteSale - Already correctly implements:
+payment_status: finalPaymentStatus, // 'paid' | 'partial' | 'due'
+notes: finalPaymentStatus === 'partial' ? `Paid: ৳${actualAmountPaid}, Remaining: ৳${remainingDue}` : null,
+```
+
+### Customer Module Sync
+```typescript
+// Customer dues are updated correctly (lines 1247-1278)
+if ((finalPaymentStatus === 'due' || finalPaymentStatus === 'partial') && customerId) {
+  await supabase.from('customers').update({
+    total_due: (customer.total_due || 0) + remainingDue,
+    cylinders_due: (customer.cylinders_due || 0) + totalCylinderDebt,
+    billing_status: remainingDue > 0 ? 'pending' : 'clear',
+    last_order_date: new Date().toISOString()
+  }).eq('id', customerId);
+}
+```
+
+---
+
+## Part 7: Online Order Integration
+
+### Accept Online Orders in POS
+When an online order is accepted, it should auto-populate POS:
+
+```typescript
+// Add to POSModule
+const handleAcceptOnlineOrder = useCallback(async (orderId: string) => {
+  // Fetch order details
+  const { data: order } = await supabase
+    .from('community_orders')
+    .select(`
+      *,
+      community_order_items (*)
+    `)
+    .eq('id', orderId)
+    .single();
+  
+  if (!order) return;
+  
+  // Pre-fill customer
+  setPhoneQuery(order.customer_phone);
+  setCustomerName(order.customer_name);
+  
+  // Add items to cart
+  order.community_order_items.forEach(item => {
+    const saleItem: SaleItem = {
+      id: `online-${item.id}`,
+      type: 'lpg',
+      name: item.brand_name,
+      details: `${item.weight} • ${item.product_type} • Online Order`,
+      price: Number(item.price),
+      quantity: item.quantity,
+      cylinderType: 'refill',
+      brandId: item.product_id,
+      weight: item.weight,
+      mouthSize: '22mm',
+      brandColor: '#3b82f6'
+    };
+    setSaleItems(prev => [...prev, saleItem]);
+  });
+  
+  // Add return cylinders
+  order.community_order_items
+    .filter(item => item.return_cylinder_qty > 0)
+    .forEach(item => {
+      setReturnItems(prev => [...prev, {
+        id: `return-online-${item.id}`,
+        brandId: item.product_id || '',
+        brandName: item.return_cylinder_brand || item.brand_name,
+        brandColor: '#6b7280',
+        quantity: item.return_cylinder_qty,
+        isLeaked: false,
+        weight: item.weight || '12kg'
+      }]);
+    });
+  
+  toast.success('Online order loaded into POS');
+}, []);
+```
+
+---
+
+## Part 8: Touch Target Optimization
+
+### Ensure 48px Minimum Touch Targets
+```typescript
+// Product cards: min-h-[88px] (already good)
+// Buttons: h-10 minimum (need to verify)
+// Input fields: h-11 with input-accessible class
+
+// Update all interactive elements:
+<Button size="sm" className="h-10 min-w-[44px]" /> // Not h-8
+<Input className="h-11 input-accessible" /> // Not h-10
+<Select>
+  <SelectTrigger className="h-10" />
+</Select>
 ```
 
 ---
@@ -419,43 +517,59 @@ const [selectedSale, setSelectedSale] = useState<SaleEntry | null>(null);
 
 | Step | File | Action | Priority |
 |------|------|--------|----------|
-| 1 | `useBusinessDiaryQueries.ts` | Add staff_payments & vehicle_costs to expense fetch | Critical |
-| 2 | `useBusinessDiaryQueries.ts` | Add staff_payments & vehicle_costs real-time subscriptions | Critical |
-| 3 | `BusinessDiaryModule.tsx` | Add customer debt summary calculation | High |
-| 4 | `BusinessDiaryModule.tsx` | Expand to 6-card summary grid | High |
-| 5 | `BusinessDiaryModule.tsx` | Add payment status filter tabs | High |
-| 6 | `BusinessDiaryModule.tsx` | Add date range selector | Medium |
-| 7 | `BusinessDiaryModule.tsx` | Add expense source filter | Medium |
-| 8 | `BusinessDiaryModule.tsx` | Add view details dialogs | Medium |
-| 9 | `SaleEntryCard.tsx` | Pass onViewDetails handler | Medium |
-| 10 | `ExpenseEntryCard.tsx` | Add onViewDetails handler | Medium |
-| 11 | Delete | `useBusinessDiaryData.ts` (keep as backup/analytics) | Low |
+| 1 | `src/hooks/usePOSData.ts` | Create centralized data hook | Critical |
+| 2 | `src/hooks/usePOSCart.ts` | Create cart state hook | Critical |
+| 3 | `src/components/pos/POSProductCard.tsx` | Extract product card component | High |
+| 4 | `src/components/pos/POSSkeleton.tsx` | Add loading skeleton | High |
+| 5 | `src/components/pos/POSQuickStats.tsx` | Add today's stats bar | High |
+| 6 | `src/components/pos/POSStickyFooter.tsx` | Fix mobile footer overlap | High |
+| 7 | `src/components/pos/POSPaymentDrawer.tsx` | Extract payment modal | Medium |
+| 8 | `src/components/pos/POSCustomerLookup.tsx` | Extract customer section | Medium |
+| 9 | `POSModule.tsx` | Refactor to use new hooks/components | High |
+| 10 | `POSModule.tsx` | Add online order integration handler | Medium |
 
 ---
 
 ## Success Criteria
 
 After implementation:
-1. **Complete Data Integration**: All sales (POS + Online + Customer Payments) and expenses (POB + Staff + Vehicle + Manual) display correctly
-2. **Customer Debt Visibility**: Summary cards show Paid/Partial/Due counts and amounts
-3. **Payment Filtering**: Can filter sales by payment status
-4. **Real-Time Sync**: Changes from POS, POB, Utility Expense modules appear instantly
-5. **Mobile Optimized**: 48px touch targets, horizontal scroll summaries, responsive layout
-6. **Date Flexibility**: Can view today, yesterday, this week, this month, or custom range
-7. **Source Tracking**: Each entry shows clear source (POS, Online Order, POB, Staff Salary, Vehicle Cost, Manual)
+1. **Component Size**: Main module reduced from 2,607 lines to ~1,000 lines
+2. **Loading Experience**: Skeleton shows immediately, content loads smoothly
+3. **Mobile UX**: Footer doesn't overlap with bottom nav, 48px touch targets
+4. **Quick Stats**: Today's sales visible without leaving POS
+5. **Online Orders**: Can accept and process community orders directly in POS
+6. **Real-Time**: Inventory updates instantly, Business Diary syncs within 2 seconds
+7. **Payment Flow**: Paid/Partial/Due correctly tracked and synced to Customer module
+8. **Performance**: Product grid scrolls smoothly with 100+ products
 
 ---
 
 ## Testing Scenarios
 
-1. **POS Sale Sync**: Complete a cash sale in POS -> Should appear in Business Diary within 2 seconds
-2. **Due Sale**: Create a Due sale in POS -> Should appear in Diary with red "Due" badge
-3. **Partial Payment**: Create partial payment -> Shows in Partial section with remaining due
-4. **POB Purchase**: Add POB transaction -> Shows in Expenses as "LPG Purchase"
-5. **Staff Salary**: Pay salary in Utility Expense -> Shows in Expenses as "Staff Salary"
-6. **Vehicle Cost**: Add fuel cost -> Shows in Expenses as "Vehicle Fuel"
-7. **Manual Expense**: Add utility bill -> Shows in Expenses as "Utilities"
-8. **Filter Test**: Click "Due" summary card -> Sales list filters to only Due transactions
-9. **Date Change**: Switch to yesterday -> Shows previous day's data
-10. **Real-Time**: In another tab, complete a sale -> Diary updates without refresh
+1. **Quick Sale**: Add product -> Proceed -> Pay Full -> Verify in Business Diary (2s max)
+2. **Due Sale**: Add product -> No payment -> Save as Due -> Verify in Customer module
+3. **Partial Payment**: Enter ৳500 for ৳1000 bill -> Save -> Verify remaining ৳500 in dues
+4. **Return Cylinder**: Add Refill -> Add matching Return -> Complete sale -> Verify inventory
+5. **Online Order**: Accept pending order -> Auto-fills cart -> Complete -> Order status updates
+6. **Mobile Footer**: On mobile, footer visible above bottom nav, no overlap
+7. **Offline Handling**: Disconnect network -> Attempt sale -> Show offline warning
+8. **Large Inventory**: 50+ brands -> Grid scrolls smoothly without lag
 
+---
+
+## Files to Create/Modify
+
+### New Files:
+- `src/hooks/usePOSData.ts`
+- `src/hooks/usePOSCart.ts`
+- `src/components/pos/POSProductCard.tsx`
+- `src/components/pos/POSSkeleton.tsx`
+- `src/components/pos/POSQuickStats.tsx`
+- `src/components/pos/POSStickyFooter.tsx`
+- `src/components/pos/POSPaymentDrawer.tsx`
+- `src/components/pos/POSCustomerLookup.tsx`
+- `src/components/pos/POSSaleTable.tsx`
+- `src/components/pos/POSReturnTable.tsx`
+
+### Modified Files:
+- `src/components/dashboard/modules/POSModule.tsx` (Major refactor)
