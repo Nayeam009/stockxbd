@@ -66,7 +66,6 @@ export const DashboardHeader = ({
   const getRoleColor = (role: string) => {
     switch (role) {
       case 'owner':
-      case 'super_admin':
         return 'bg-primary/15 text-primary border-primary/30';
       case 'manager':
         return 'bg-secondary/15 text-secondary border-secondary/30';
@@ -79,8 +78,6 @@ export const DashboardHeader = ({
     switch (role) {
       case 'owner':
         return language === 'bn' ? 'মালিক' : 'Owner';
-      case 'super_admin':
-        return language === 'bn' ? 'সুপার অ্যাডমিন' : 'Super Admin';
       case 'manager':
         return language === 'bn' ? 'ম্যানেজার' : 'Manager';
       default:

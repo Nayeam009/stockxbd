@@ -62,7 +62,6 @@ export const AppSidebar = ({
   const getRoleBadgeVariant = (role: string) => {
     switch (role) {
       case 'owner':
-      case 'super_admin':
         return 'bg-primary/15 text-primary border-primary/30';
       case 'manager':
         return 'bg-secondary/15 text-secondary-foreground border-secondary/30';
