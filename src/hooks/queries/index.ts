@@ -10,6 +10,8 @@ export {
   useBusinessSales,
   useBusinessExpenses,
   useBusinessDiaryRealtime,
+  useCustomerDebtSummary,
   type SaleEntry,
   type ExpenseEntry,
+  type CustomerDebtSummary,
 } from './useBusinessDiaryQueries';

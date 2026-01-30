@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
 import { format } from "date-fns";
-import { SaleEntry } from "@/hooks/useBusinessDiaryData";
+import { SaleEntry } from "@/hooks/queries/useBusinessDiaryQueries";
 
 interface SaleEntryCardProps {
   entry: SaleEntry;
@@ -51,19 +51,14 @@ const staffRoleConfig: Record<string, { icon: React.ComponentType<any>; color: s
 };
 
 export const SaleEntryCard = ({ entry, onViewDetails }: SaleEntryCardProps) => {
-  // Safely get payment config with fallback
   const paymentConfig = paymentMethodConfig[entry.paymentMethod] || paymentMethodConfig.cash;
   const PaymentIcon = paymentConfig.icon;
-
-  // Status is already normalized by the hook - trust it directly
   const statusConf = statusConfig[entry.paymentStatus] || statusConfig.paid;
   const roleConf = staffRoleConfig[entry.staffRole] || staffRoleConfig.unknown;
   const RoleIcon = roleConf.icon;
-
   const isPayment = entry.type === 'payment';
   const hasReturnCylinders = entry.returnCylinders && entry.returnCylinders.length > 0;
 
-  // Get status bar color based on payment status
   const getStatusBarColor = () => {
     if (entry.paymentStatus === 'paid') return 'bg-emerald-400';
     if (entry.paymentStatus === 'due') return 'bg-rose-400';
@@ -71,137 +66,105 @@ export const SaleEntryCard = ({ entry, onViewDetails }: SaleEntryCardProps) => {
   };
 
   return (
-    <Card className={`
-      border overflow-hidden transition-all duration-300 hover:shadow-lg group
-      ${isPayment
-        ? 'bg-gradient-to-r from-emerald-50/80 to-card dark:from-emerald-950/30 dark:to-card border-emerald-200/60 dark:border-emerald-800/40'
-        : 'bg-card hover:bg-gradient-to-r hover:from-muted/30 hover:to-card border-border/60'
-      }
-    `}>
-      {/* Top Color Bar - Based on Payment Status */}
+    <Card className={`border overflow-hidden transition-all duration-300 hover:shadow-lg group
+      ${isPayment ? 'bg-gradient-to-r from-emerald-50/80 to-card dark:from-emerald-950/30 dark:to-card border-emerald-200/60 dark:border-emerald-800/40'
+        : 'bg-card hover:bg-gradient-to-r hover:from-muted/30 hover:to-card border-border/60'}`}>
       <div className={`h-1 ${getStatusBarColor()}`} />
-
-      <CardContent className="p-3.5 sm:p-4">
-        <div className="flex items-start justify-between gap-3">
+      <CardContent className="p-3 sm:p-3.5">
+        <div className="flex items-start justify-between gap-2.5">
           {/* Left: Product/Transaction Info */}
-          <div className="flex-1 min-w-0 space-y-2.5">
-            {/* Header Row with Badges */}
-            <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex-1 min-w-0 space-y-2">
+            {/* Header Badges */}
+            <div className="flex items-center gap-1.5 flex-wrap">
               {isPayment ? (
-                <Badge variant="outline" className="bg-success/15 text-success border-success/30 text-xs font-medium">
-                  <ArrowUpRight className="h-3 w-3 mr-1" />
-                  Payment
+                <Badge variant="outline" className="bg-success/15 text-success border-success/30 text-[10px] font-medium h-5">
+                  <ArrowUpRight className="h-2.5 w-2.5 mr-0.5" />Payment
                 </Badge>
               ) : (
-                <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30 text-xs font-medium">
-                  <Receipt className="h-3 w-3 mr-1" />
-                  Sale
+                <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30 text-[10px] font-medium h-5">
+                  <Receipt className="h-2.5 w-2.5 mr-0.5" />Sale
                 </Badge>
               )}
               {entry.isOnlineOrder && (
-                <Badge className="bg-primary text-primary-foreground text-xs font-medium">
-                  <Globe className="h-3 w-3 mr-1" />
-                  Online
+                <Badge className="bg-primary text-primary-foreground text-[10px] font-medium h-5">
+                  <Globe className="h-2.5 w-2.5 mr-0.5" />Online
                 </Badge>
               )}
-              <Badge variant="outline" className={`${statusConf.bgColor} ${statusConf.color} text-xs font-medium border`} aria-label={`Payment status: ${statusConf.label}`}>
+              <Badge variant="outline" className={`${statusConf.bgColor} ${statusConf.color} text-[10px] font-medium border h-5`}>
                 {statusConf.label}
               </Badge>
               {entry.transactionType === 'wholesale' && (
-                <Badge variant="secondary" className="text-xs bg-secondary/20 text-secondary-foreground dark:bg-secondary/30 border-0">
-                  Wholesale
-                </Badge>
+                <Badge variant="secondary" className="text-[10px] bg-secondary/20 h-5">Wholesale</Badge>
               )}
             </div>
 
             {/* Product Name */}
             <div>
-              <h4 className="font-semibold text-sm sm:text-base text-foreground leading-tight line-clamp-1 group-hover:text-primary transition-colors">
+              <h4 className="font-semibold text-sm text-foreground leading-tight line-clamp-1 group-hover:text-primary transition-colors">
                 {entry.productName}
               </h4>
               {entry.productDetails && (
-                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{entry.productDetails}</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-1">{entry.productDetails}</p>
               )}
             </div>
 
-            {/* Return Cylinders (only for Refill sales) */}
+            {/* Return Cylinders */}
             {hasReturnCylinders && (
-              <div className="flex items-center gap-2 flex-wrap">
-                <Badge variant="outline" className="bg-accent/15 text-accent border-accent/30 text-xs">
-                  <RotateCcw className="h-3 w-3 mr-1" />
-                  Return: {entry.returnCylinders.map(r => `${r.quantity}x ${r.brand}`).join(', ')}
-                </Badge>
-              </div>
+              <Badge variant="outline" className="bg-accent/15 text-accent border-accent/30 text-[10px] h-5">
+                <RotateCcw className="h-2.5 w-2.5 mr-0.5" />
+                Return: {entry.returnCylinders.map(r => `${r.quantity}x ${r.brand}`).join(', ')}
+              </Badge>
             )}
 
-            {/* Customer & Time Info */}
-            <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
-              <span className="flex items-center gap-1.5 bg-muted/50 px-2 py-1 rounded-md">
-                <User className="h-3 w-3" />
-                <span className="font-medium">{entry.customerName}</span>
+            {/* Customer & Time */}
+            <div className="flex items-center gap-2 text-[10px] text-muted-foreground flex-wrap">
+              <span className="flex items-center gap-1 bg-muted/50 px-1.5 py-0.5 rounded">
+                <User className="h-2.5 w-2.5" />{entry.customerName}
               </span>
               {entry.customerPhone && (
-                <span className="flex items-center gap-1.5 bg-muted/50 px-2 py-1 rounded-md">
-                  <Phone className="h-3 w-3" />
-                  <span className="font-medium">{entry.customerPhone}</span>
+                <span className="flex items-center gap-1 bg-muted/50 px-1.5 py-0.5 rounded">
+                  <Phone className="h-2.5 w-2.5" />{entry.customerPhone}
                 </span>
               )}
-              <span className="flex items-center gap-1.5">
-                <Clock className="h-3 w-3" />
-                {format(new Date(entry.timestamp), 'hh:mm a')}
+              <span className="flex items-center gap-1">
+                <Clock className="h-2.5 w-2.5" />{format(new Date(entry.timestamp), 'hh:mm a')}
               </span>
             </div>
 
             {/* Transaction Number */}
             <div className="flex items-center gap-2">
-              <span className="text-[10px] text-muted-foreground font-mono bg-muted/70 px-2 py-1 rounded flex items-center gap-1">
-                <Hash className="h-2.5 w-2.5" />
-                {entry.transactionNumber}
+              <span className="text-[9px] text-muted-foreground font-mono bg-muted/70 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                <Hash className="h-2 w-2" />{entry.transactionNumber}
               </span>
-              <span className="text-[10px] text-muted-foreground">
-                via <span className="font-medium">{entry.source}</span>
-              </span>
+              <span className="text-[9px] text-muted-foreground">via {entry.source}</span>
             </div>
           </div>
 
-          {/* Right: Amount, Staff & Payment */}
-          <div className="flex flex-col items-end gap-2 shrink-0">
-            {/* Staff Role Badge */}
-            <Badge variant="outline" className={`${roleConf.bgColor} ${roleConf.color} border-0 text-xs font-medium px-2 py-1`}>
-              <RoleIcon className="h-3 w-3 mr-1" />
-              {roleConf.label}
+          {/* Right: Amount & Actions */}
+          <div className="flex flex-col items-end gap-1.5 shrink-0">
+            <Badge variant="outline" className={`${roleConf.bgColor} ${roleConf.color} border-0 text-[10px] font-medium px-1.5 py-0.5 h-5`}>
+              <RoleIcon className="h-2.5 w-2.5 mr-0.5" />{roleConf.label}
             </Badge>
 
-            {/* Amount with Emphasis */}
             <div className="text-right">
-              {/* Show amountPaid (actual received) for accurate income tracking */}
-              <p className="text-lg sm:text-xl lg:text-2xl font-bold text-success tabular-nums">
+              <p className="text-base sm:text-lg font-bold text-success tabular-nums">
                 +{BANGLADESHI_CURRENCY_SYMBOL}{(entry.amountPaid ?? entry.totalAmount).toLocaleString()}
               </p>
-              {/* For partial payments, show the total bill for context */}
               {entry.paymentStatus === 'partial' && entry.remainingDue > 0 && (
-                <p className="text-xs text-muted-foreground">
+                <p className="text-[10px] text-muted-foreground">
                   Total: {BANGLADESHI_CURRENCY_SYMBOL}{entry.totalAmount.toLocaleString()}
                 </p>
               )}
             </div>
 
-            {/* Payment Method Badge */}
-            <Badge variant="outline" className={`${paymentConfig.bgColor} ${paymentConfig.color} border-0 text-xs font-medium px-2.5 py-1`}>
-              <PaymentIcon className="h-3 w-3 mr-1.5" />
-              {paymentConfig.label}
+            <Badge variant="outline" className={`${paymentConfig.bgColor} ${paymentConfig.color} border-0 text-[10px] font-medium px-1.5 py-0.5 h-5`}>
+              <PaymentIcon className="h-2.5 w-2.5 mr-0.5" />{paymentConfig.label}
             </Badge>
 
-            {/* View Details Button */}
             {onViewDetails && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-10 w-10 sm:h-8 sm:w-auto sm:px-3 text-xs hover:bg-primary/10 hover:text-primary touch-manipulation"
-                onClick={() => onViewDetails(entry)}
-                aria-label={`View details for transaction ${entry.transactionNumber}`}
-              >
-                <Eye className="h-4 w-4 sm:mr-1" aria-hidden="true" />
+              <Button variant="ghost" size="sm" className="h-8 w-8 sm:h-7 sm:w-auto sm:px-2 text-[10px] hover:bg-primary/10 hover:text-primary touch-manipulation"
+                onClick={() => onViewDetails(entry)}>
+                <Eye className="h-3.5 w-3.5 sm:mr-1" />
                 <span className="hidden sm:inline">View</span>
               </Button>
             )}

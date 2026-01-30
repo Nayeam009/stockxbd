@@ -1,14 +1,15 @@
 /**
- * Business Diary TanStack Query Hooks
+ * Business Diary TanStack Query Hooks - Complete Rebuild
  * 
- * Optimized data fetching with:
- * - 30-second stale time for fast revisits
- * - 5-minute garbage collection
- * - Debounced real-time invalidation
+ * Features:
+ * - Staff payments & vehicle costs integration
+ * - Customer debt summary calculation
+ * - Real-time subscriptions for all expense tables
+ * - Optimized parallel fetching with 30s stale time
  */
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { logger } from "@/lib/logger";
 import { format } from "date-fns";
@@ -28,8 +29,8 @@ export interface SaleEntry {
   quantity: number;
   unitPrice: number;
   totalAmount: number;
-  amountPaid: number; // Actual amount received
-  remainingDue: number; // Amount still owed
+  amountPaid: number;
+  remainingDue: number;
   paymentMethod: string;
   paymentStatus: 'paid' | 'due' | 'partial';
   customerName: string;
@@ -41,10 +42,9 @@ export interface SaleEntry {
   sourceId: string;
   isOnlineOrder?: boolean;
   communityOrderId?: string | null;
-  cogs?: number; // Cost of Goods Sold
+  cogs?: number;
 }
 
-// ... existing ExpenseEntry interface ...
 export interface ExpenseEntry {
   id: string;
   type: 'pob' | 'salary' | 'vehicle' | 'manual';
@@ -66,6 +66,16 @@ export interface ExpenseEntry {
   staffPayeeName?: string;
 }
 
+export interface CustomerDebtSummary {
+  totalPaidCount: number;
+  totalPaidAmount: number;
+  partialPaidCount: number;
+  partialPaidAmount: number;
+  partialRemainingDue: number;
+  dueCount: number;
+  dueAmount: number;
+}
+
 // ===== Constants =====
 const EXPENSE_CATEGORY_MAP: Record<string, { icon: string; color: string }> = {
   'LPG Purchase': { icon: '🛢️', color: '#3b82f6' },
@@ -83,6 +93,8 @@ const EXPENSE_CATEGORY_MAP: Record<string, { icon: string; color: string }> = {
   'Vehicle': { icon: '🚗', color: '#10b981' },
   'Vehicle Fuel': { icon: '⛽', color: '#f59e0b' },
   'Vehicle Maintenance': { icon: '🔧', color: '#ef4444' },
+  'Vehicle Repair': { icon: '🔩', color: '#dc2626' },
+  'Vehicle Parts': { icon: '⚡', color: '#7c3aed' },
   'Loading': { icon: '👷', color: '#a855f7' },
   'Entertainment': { icon: '☕', color: '#f472b6' },
   'Bank': { icon: '🏦', color: '#0ea5e9' },
@@ -114,7 +126,6 @@ const parseReturnCylinders = (productName: string): { brand: string; quantity: n
   return [];
 };
 
-// Helper to parse partial payment amounts from notes
 const parsePartialPaymentFromNotes = (notes: string | null, total: number): { amountPaid: number; remainingDue: number } => {
   if (!notes) return { amountPaid: 0, remainingDue: total };
   const paidMatch = notes.match(/Paid:\s*৳?(\d+(?:,\d+)*(?:\.\d+)?)/i);
@@ -126,7 +137,6 @@ const parsePartialPaymentFromNotes = (notes: string | null, total: number): { am
   return { amountPaid: 0, remainingDue: total };
 };
 
-// Calculate payment amounts based on status and notes
 const getPaymentAmounts = (paymentStatus: string, total: number, notes: string | null): { amountPaid: number; remainingDue: number } => {
   if (paymentStatus === 'paid' || paymentStatus === 'completed') {
     return { amountPaid: total, remainingDue: 0 };
@@ -140,21 +150,6 @@ const getPaymentAmounts = (paymentStatus: string, total: number, notes: string |
 // ===== Fetch Functions =====
 async function fetchSalesData(date: string): Promise<SaleEntry[]> {
   try {
-    const startOfDay = `${date}T00:00:00.000Z`; // Assuming local time handling or UTC standard
-    const endOfDay = `${date}T23:59:59.999Z`;
-
-    // Ideally we should handle timezone offset, but for now we'll fetch a slightly wider window 
-    // or rely on the client-side date string if the DB stores simplified dates.
-    // However, timestampz columns need range.
-    // For simplicity/robustness with Supabase default UTC:
-    // We will query the 24h range. Note: If user is +6 desc, this might miss hours if not adjusted.
-    // For now, let's fetch by the specific date string if possible, or using a generous range?
-    // Actually, 'daily_expenses' has 'expense_date' (date type), 'pos_transactions' has 'created_at' (timestamptz).
-    // Let's use a simpler approach for 'pos': fetch slightly more effectively? 
-    // Or better: Use the database's date truncation if possible. 
-    // Safest client-side: Filter strictly by range.
-
-    // Parallel fetch: user_roles, pos_transactions, customer_payments, customers, product_prices
     const [userRolesResult, posResult, paymentsResult, customersResult, pricesResult] = await Promise.all([
       supabase.from('user_roles').select('user_id, role'),
       supabase
@@ -183,8 +178,8 @@ async function fetchSalesData(date: string): Promise<SaleEntry[]> {
           )
         `)
         .eq('is_voided', false)
-        .gte('created_at', format(new Date(date), "yyyy-MM-dd'T'00:00:00")) // Broad filter, we refine in JS
-        .lte('created_at', format(new Date(date), "yyyy-MM-dd'T'23:59:59.999")) // Adjust logic if TZ matters criticaly
+        .gte('created_at', format(new Date(date), "yyyy-MM-dd'T'00:00:00"))
+        .lte('created_at', format(new Date(date), "yyyy-MM-dd'T'23:59:59.999"))
         .order('created_at', { ascending: false }),
       supabase
         .from('customer_payments')
@@ -202,7 +197,7 @@ async function fetchSalesData(date: string): Promise<SaleEntry[]> {
             phone
           )
         `)
-        .eq('payment_date', date) // payment_date is usually strictly a Date column
+        .eq('payment_date', date)
         .order('created_at', { ascending: false }),
       supabase.from('customers').select('id, name, phone'),
       supabase.from('product_prices').select('product_name, company_price, is_active')
@@ -210,9 +205,8 @@ async function fetchSalesData(date: string): Promise<SaleEntry[]> {
 
     const roleMap = new Map<string, string>(userRolesResult.data?.map(r => [r.user_id, r.role]) || []);
     const customerMap = new Map(customersResult.data?.map(c => [c.id, c]) || []);
-
-    // Create price map for COGS calculation
     const priceMap = new Map<string, number>();
+    
     if (pricesResult.data) {
       pricesResult.data.forEach(p => {
         if (p.product_name) {
@@ -223,7 +217,6 @@ async function fetchSalesData(date: string): Promise<SaleEntry[]> {
 
     // Process POS transactions
     const posEntries: SaleEntry[] = (posResult.data || []).flatMap(txn => {
-      // Precise Date Filter Client-Side to handle any TZ offsets safe-guard
       if (format(new Date(txn.created_at), 'yyyy-MM-dd') !== date) return [];
 
       const customer = txn.customer_id ? customerMap.get(txn.customer_id) : null;
@@ -275,8 +268,6 @@ async function fetchSalesData(date: string): Promise<SaleEntry[]> {
         const itemProportion = itemsTotal > 0 ? itemTotal / itemsTotal : 0;
         const itemAmountPaid = paymentAmounts.amountPaid * itemProportion;
         const itemRemainingDue = paymentAmounts.remainingDue * itemProportion;
-
-        // Calculate COGS
         const productNameNormalized = (item.product_name || '').toLowerCase().trim();
         const buyPrice = priceMap.get(productNameNormalized) || 0;
         const itemCogs = buyPrice * Number(item.quantity || 0);
@@ -331,7 +322,7 @@ async function fetchSalesData(date: string): Promise<SaleEntry[]> {
         quantity: 1,
         unitPrice: paymentAmount,
         totalAmount: paymentAmount,
-        amountPaid: paymentAmount, // Due collections are fully paid
+        amountPaid: paymentAmount,
         remainingDue: 0,
         paymentMethod: 'cash',
         paymentStatus: 'paid' as const,
@@ -357,8 +348,8 @@ async function fetchSalesData(date: string): Promise<SaleEntry[]> {
 
 async function fetchExpensesData(date: string): Promise<ExpenseEntry[]> {
   try {
-    // Parallel fetch: user_roles, pob_transactions, daily_expenses
-    const [userRolesResult, pobResult, manualExpensesResult] = await Promise.all([
+    // Parallel fetch ALL expense sources including staff_payments and vehicle_costs
+    const [userRolesResult, pobResult, manualExpensesResult, staffPaymentsResult, vehicleCostsResult] = await Promise.all([
       supabase.from('user_roles').select('user_id, role'),
       supabase
         .from('pob_transactions')
@@ -388,14 +379,48 @@ async function fetchExpensesData(date: string): Promise<ExpenseEntry[]> {
         .from('daily_expenses')
         .select('*')
         .eq('expense_date', date)
-        .order('expense_date', { ascending: false })
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('staff_payments')
+        .select(`
+          id,
+          staff_id,
+          amount,
+          payment_date,
+          notes,
+          created_at,
+          created_by,
+          staff (
+            name,
+            role
+          )
+        `)
+        .eq('payment_date', date)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('vehicle_costs')
+        .select(`
+          id,
+          vehicle_id,
+          amount,
+          cost_type,
+          cost_date,
+          description,
+          liters_filled,
+          created_at,
+          created_by,
+          vehicles (
+            name
+          )
+        `)
+        .eq('cost_date', date)
+        .order('created_at', { ascending: false })
     ]);
 
     const roleMap = new Map<string, string>(userRolesResult.data?.map(r => [r.user_id, r.role]) || []);
 
-    // Process POB transactions (Filtered by Date via Query)
+    // Process POB transactions
     const pobEntries: ExpenseEntry[] = (pobResult.data || []).flatMap(txn => {
-      // Client-side date check safety 
       if (format(new Date(txn.created_at), 'yyyy-MM-dd') !== date) return [];
 
       const items = txn.pob_transaction_items || [];
@@ -403,7 +428,7 @@ async function fetchExpensesData(date: string): Promise<ExpenseEntry[]> {
       const productType = mainItem?.product_type || 'Other';
       const categoryName = productType === 'lpg_cylinder' ? 'LPG Purchase' :
         productType === 'stove' ? 'Gas Stove Purchase' :
-          productType === 'regulator' ? 'Regulator Purchase' : 'Other';
+        productType === 'regulator' ? 'Regulator Purchase' : 'Other';
       const catInfo = getCategoryInfo(categoryName);
       const staffRole = getStaffRole(roleMap, txn.created_by);
 
@@ -427,14 +452,80 @@ async function fetchExpensesData(date: string): Promise<ExpenseEntry[]> {
       }];
     });
 
-    // Process daily expenses (Includes Manual + Synced Staff/Vehicle) - Filtered by eq('expense_date', date)
-    const dailyEntries: ExpenseEntry[] = (manualExpensesResult.data || []).map(expense => {
+    // Process staff payments - CRITICAL ADDITION
+    const staffEntries: ExpenseEntry[] = (staffPaymentsResult.data || []).map(payment => {
+      const staffRole = getStaffRole(roleMap, payment.created_by);
+      const catInfo = getCategoryInfo('Staff Salary');
+      const staffInfo = payment.staff as any;
+      
+      return {
+        id: payment.id,
+        type: 'salary' as const,
+        date: payment.payment_date,
+        timestamp: payment.created_at,
+        staffName: getStaffName(staffRole),
+        staffRole,
+        staffId: payment.created_by,
+        category: 'Staff Salary',
+        categoryIcon: catInfo.icon,
+        categoryColor: catInfo.color,
+        description: payment.notes || `Salary for ${staffInfo?.name || 'Staff'}`,
+        whySpent: 'Staff salary payment',
+        amount: Number(payment.amount),
+        source: 'Staff Salary',
+        sourceId: payment.id,
+        staffPayeeName: staffInfo?.name || 'Unknown Staff'
+      };
+    });
+
+    // Process vehicle costs - CRITICAL ADDITION
+    const vehicleEntries: ExpenseEntry[] = (vehicleCostsResult.data || []).map(cost => {
+      const staffRole = getStaffRole(roleMap, cost.created_by);
+      const costType = cost.cost_type || 'fuel';
+      const categoryName = costType === 'fuel' ? 'Vehicle Fuel' : 
+        costType === 'maintenance' ? 'Vehicle Maintenance' :
+        costType === 'repair' ? 'Vehicle Repair' :
+        costType === 'parts' ? 'Vehicle Parts' : 'Vehicle';
+      const catInfo = getCategoryInfo(categoryName);
+      const vehicleInfo = cost.vehicles as any;
+      
+      return {
+        id: cost.id,
+        type: 'vehicle' as const,
+        date: cost.cost_date,
+        timestamp: cost.created_at,
+        staffName: getStaffName(staffRole),
+        staffRole,
+        staffId: cost.created_by,
+        category: categoryName,
+        categoryIcon: catInfo.icon,
+        categoryColor: catInfo.color,
+        description: cost.description || (cost.liters_filled ? `${cost.liters_filled}L fuel` : categoryName),
+        whySpent: `Vehicle ${costType} cost`,
+        amount: Number(cost.amount),
+        source: 'Vehicle Cost',
+        sourceId: cost.id,
+        vehicleName: vehicleInfo?.name || 'Unknown Vehicle'
+      };
+    });
+
+    // Process manual daily expenses (excluding staff/vehicle synced ones)
+    const manualEntries: ExpenseEntry[] = (manualExpensesResult.data || []).map(expense => {
       const catInfo = getCategoryInfo(expense.category);
       const staffRole = getStaffRole(roleMap, expense.created_by);
 
+      // Determine if this is a synced entry or manual
       let type: ExpenseEntry['type'] = 'manual';
-      if (expense.category === 'Staff' || expense.category === 'Staff Salary') type = 'salary';
-      else if (expense.category === 'Transport' || expense.category === 'Vehicle' || expense.category.includes('Vehicle')) type = 'vehicle';
+      let source = 'Manual Entry';
+      
+      // Check if category indicates synced data
+      if (expense.category === 'Staff' || expense.category === 'Staff Salary') {
+        type = 'salary';
+        source = 'Staff Salary';
+      } else if (expense.category.includes('Vehicle') || expense.category === 'Transport') {
+        type = 'vehicle';
+        source = 'Vehicle Cost';
+      }
 
       return {
         id: expense.id,
@@ -450,16 +541,20 @@ async function fetchExpensesData(date: string): Promise<ExpenseEntry[]> {
         description: expense.description || expense.category,
         whySpent: expense.category === 'Utilities' ? 'Utility bill payment' :
           expense.category === 'Rent' ? 'Shop rent payment' :
-            expense.category === 'Loading' ? 'Loading/labor cost' :
-              expense.category === 'Entertainment' ? 'Business entertainment' :
-                'General expense',
+          expense.category === 'Loading' ? 'Loading/labor cost' :
+          expense.category === 'Entertainment' ? 'Business entertainment' :
+          expense.category === 'Marketing' ? 'Marketing expense' :
+          expense.category === 'Bank' ? 'Bank charges' :
+          expense.category === 'Maintenance' ? 'Maintenance cost' :
+          'General expense',
         amount: Number(expense.amount),
-        source: type === 'manual' ? 'Manual Entry' : type === 'salary' ? 'Staff Salary Module' : 'Vehicle Module',
+        source,
         sourceId: expense.id
       };
     });
 
-    return [...pobEntries, ...dailyEntries].sort((a, b) =>
+    // Combine all and sort by timestamp
+    return [...pobEntries, ...staffEntries, ...vehicleEntries, ...manualEntries].sort((a, b) =>
       new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
     );
   } catch (error) {
@@ -473,7 +568,7 @@ export const useBusinessSales = (date: string) => {
   return useQuery({
     queryKey: ['business-diary-sales', date],
     queryFn: () => fetchSalesData(date),
-    staleTime: 1000 * 30, // 30 seconds
+    staleTime: 1000 * 30,
     gcTime: 1000 * 60 * 5,
   });
 };
@@ -487,7 +582,26 @@ export const useBusinessExpenses = (date: string) => {
   });
 };
 
-// ===== Real-time Subscription Hook with Debouncing =====
+// ===== Customer Debt Summary Hook =====
+export const useCustomerDebtSummary = (sales: SaleEntry[]): CustomerDebtSummary => {
+  return useMemo(() => {
+    const paid = sales.filter(s => s.paymentStatus === 'paid');
+    const partial = sales.filter(s => s.paymentStatus === 'partial');
+    const due = sales.filter(s => s.paymentStatus === 'due');
+
+    return {
+      totalPaidCount: paid.length,
+      totalPaidAmount: paid.reduce((sum, s) => sum + (s.amountPaid ?? s.totalAmount), 0),
+      partialPaidCount: partial.length,
+      partialPaidAmount: partial.reduce((sum, s) => sum + (s.amountPaid ?? 0), 0),
+      partialRemainingDue: partial.reduce((sum, s) => sum + (s.remainingDue ?? 0), 0),
+      dueCount: due.length,
+      dueAmount: due.reduce((sum, s) => sum + (s.totalAmount ?? 0), 0)
+    };
+  }, [sales]);
+};
+
+// ===== Real-time Subscription Hook with Complete Table Coverage =====
 export const useBusinessDiaryRealtime = (date: string) => {
   const queryClient = useQueryClient();
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
@@ -500,23 +614,24 @@ export const useBusinessDiaryRealtime = (date: string) => {
       queryClient.invalidateQueries({ queryKey: ['business-diary-expenses', date] });
     }, 1000);
   }, [queryClient, date]);
-  // ...
 
   useEffect(() => {
-    // Skip subscriptions when offline to prevent connection errors
     if (!isOnline) return;
 
-    // Single consolidated channel for all diary-related tables
+    // Consolidated channel for ALL diary-related tables
     const channel = supabase
-      .channel('diary-combined-realtime-v2')
+      .channel('diary-complete-realtime-v3')
+      // Sales tables
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pos_transactions' }, debouncedInvalidate)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pos_transaction_items' }, debouncedInvalidate)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'customer_payments' }, debouncedInvalidate)
+      // Expense tables
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pob_transactions' }, debouncedInvalidate)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pob_transaction_items' }, debouncedInvalidate)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_expenses' }, debouncedInvalidate)
+      // CRITICAL: Staff & Vehicle tables
       .on('postgres_changes', { event: '*', schema: 'public', table: 'staff_payments' }, debouncedInvalidate)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicle_costs' }, debouncedInvalidate)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_expenses' }, debouncedInvalidate)
       .subscribe();
 
     return () => {
