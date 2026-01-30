@@ -220,18 +220,32 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
         }
       }
 
-      // Prepare invoice
+      // Prepare invoice data
       setLastTransaction({
         invoiceNumber: transactionNumber,
         date: new Date(),
-        customer: { name: customerState.customer?.name || customerState.newCustomerName || "Customer", phone: customerState.phoneQuery, address: customerState.customer?.address || customerState.newCustomerAddress || "" },
-        items: cart.saleItems.map(i => ({ name: i.name, description: i.details, quantity: i.quantity, unitPrice: i.price, total: i.price * i.quantity })),
-        returnItems: cart.returnItems.map(r => ({ brandName: r.brandName, quantity: r.quantity, isLeaked: r.isLeaked })),
+        customer: { 
+          name: customerState.customer?.name || customerState.newCustomerName || "Customer", 
+          phone: customerState.phoneQuery, 
+          address: customerState.customer?.address || customerState.newCustomerAddress || "" 
+        },
+        items: cart.saleItems.map(i => ({ 
+          name: i.name, 
+          description: i.details, 
+          quantity: i.quantity, 
+          unitPrice: i.price, 
+          total: i.price * i.quantity 
+        })),
         subtotal: cart.subtotal,
         discount: cart.discount,
         total: cart.total,
+        paid: paidAmount,
+        due: remainingDue,
         paymentStatus: finalPaymentStatus,
-        paymentMethod: 'cash'
+        paymentMethod: 'cash',
+        notes: cart.returnItems.length > 0 
+          ? `Return: ${cart.returnItems.map(r => `${r.quantity}x ${r.brandName}${r.isLeaked ? ' (Leaked)' : ''}`).join(', ')}` 
+          : undefined
       });
 
       setShowPaymentDrawer(false);
@@ -399,7 +413,12 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
         <BarcodeScanner open={showBarcodeScanner} onOpenChange={setShowBarcodeScanner} onProductFound={(product) => { setShowBarcodeScanner(false); toast({ title: "Product scanned", description: product.name }); }} />
 
         {/* Invoice Dialog */}
-        <InvoiceDialog open={showInvoiceDialog} onOpenChange={setShowInvoiceDialog} transaction={lastTransaction} />
+        <InvoiceDialog 
+          open={showInvoiceDialog} 
+          onOpenChange={setShowInvoiceDialog} 
+          invoiceData={lastTransaction}
+          businessName="Stock-X LPG"
+        />
 
         {/* Print Type Dialog */}
         <Dialog open={showPrintTypeDialog} onOpenChange={setShowPrintTypeDialog}>
