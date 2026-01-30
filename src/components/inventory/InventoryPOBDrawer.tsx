@@ -8,83 +8,33 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { 
   Plus, 
-  Minus, 
-  Trash2, 
-  ShoppingBag, 
   ShoppingCart,
   Loader2,
   Cylinder,
-  CheckCircle2,
-  CreditCard,
   Calculator,
-  CircleDot,
   CircleDashed,
   Flame,
   ChefHat,
   Gauge,
-  Info,
-  Building2,
-  ChevronDown
+  Info
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
-import { getLpgBrandColor, getLpgColorByValveSize, validateCustomBrand, calculateDefaultPrices } from "@/lib/brandConstants";
+import { getLpgBrandColor, validateCustomBrand } from "@/lib/brandConstants";
 import { supabase } from "@/integrations/supabase/client";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { logger } from "@/lib/logger";
 import { BrandSelect } from "@/components/shared/BrandSelect";
+import { usePOBCart, type POBCartItem } from "@/hooks/usePOBCart";
+import { POBCartView } from "./POBCartView";
+import { ValveSizeQuantityCard, BurnerTypeQuantityCard } from "./POBQuantityCard";
+import { cn } from "@/lib/utils";
 
-// Interfaces
-interface LPGBrand {
-  id: string;
-  name: string;
-  size: string;
-  weight: string;
-  refill_cylinder: number;
-  package_cylinder: number;
-  empty_cylinder: number;
-  problem_cylinder: number;
-  color: string;
-}
-
-interface Stove {
-  id: string;
-  brand: string;
-  model: string;
-  burners: number;
-  price: number;
-  quantity: number;
-}
-
-interface Regulator {
-  id: string;
-  brand: string;
-  type: string;
-  quantity: number;
-  price?: number;
-}
-
-interface PurchaseItem {
-  id: string;
-  type: 'lpg' | 'stove' | 'regulator';
-  name: string;
-  details: string;
-  companyPrice: number;
-  quantity: number;
-  cylinderType?: 'refill' | 'package';
-  brandId?: string;
-  stoveId?: string;
-  regulatorId?: string;
-  weight?: string;
-  valveSize?: string;
-  brandColor?: string;
-  burnerType?: 'single' | 'double';
-  model?: string;
-  regulatorType?: string;
-}
+// Weight options
+const WEIGHT_OPTIONS_22MM = ["5.5kg", "12kg", "12.5kg", "25kg", "35kg", "45kg"];
+const WEIGHT_OPTIONS_20MM = ["5kg", "10kg", "12kg", "15kg", "21kg", "35kg"];
 
 interface InventoryPOBDrawerProps {
   open: boolean;
@@ -92,10 +42,6 @@ interface InventoryPOBDrawerProps {
   productType: 'lpg' | 'stove' | 'regulator';
   onPurchaseComplete: () => void;
 }
-
-// Weight options
-const WEIGHT_OPTIONS_22MM = ["5.5kg", "12kg", "12.5kg", "25kg", "35kg", "45kg"];
-const WEIGHT_OPTIONS_20MM = ["5kg", "10kg", "12kg", "15kg", "21kg", "35kg"];
 
 export const InventoryPOBDrawer = ({ 
   open, 
@@ -105,58 +51,51 @@ export const InventoryPOBDrawer = ({
 }: InventoryPOBDrawerProps) => {
   const isMobile = useIsMobile();
   
-  // Data state
+  // Use centralized cart hook
+  const {
+    items: purchaseItems,
+    addItems,
+    removeItem,
+    subtotal,
+    totalQty: purchaseItemsCount,
+    supplierName,
+    setSupplierName,
+    pobMode,
+    setPobMode,
+    mobileStep,
+    setMobileStep,
+    showSupplierInput,
+    setShowSupplierInput,
+    formState,
+    updateFormField,
+    lpgTotalQty,
+    stoveTotalQty,
+    regTotalQty,
+    lpgCompanyPrice,
+    stoveCompanyPrice,
+    regulatorCompanyPrice,
+    resetLPGForm,
+    resetStoveForm,
+    resetRegulatorForm,
+    resetAllForms
+  } = usePOBCart();
+  
+  // Local state
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
-  const [lpgBrands, setLpgBrands] = useState<LPGBrand[]>([]);
-  const [stoves, setStoves] = useState<Stove[]>([]);
-  const [regulators, setRegulators] = useState<Regulator[]>([]);
   
-  // Mobile step and POB mode - simplified to 2 steps
-  const [mobileStep, setMobileStep] = useState<'product' | 'cart'>('product');
-  const [pobMode, setPobMode] = useState<'buy' | 'add'>('buy');
-  const [showSupplierInput, setShowSupplierInput] = useState(false);
-  
-  // LPG Config
-  const [lpgBrandName, setLpgBrandName] = useState("");
-  const [lpgCylinderType, setLpgCylinderType] = useState<'refill' | 'package'>("refill");
-  const [lpgWeight, setLpgWeight] = useState("12kg");
-  const [lpgQty22mm, setLpgQty22mm] = useState(0);
-  const [lpgQty20mm, setLpgQty20mm] = useState(0);
-  const [lpgTotalDO, setLpgTotalDO] = useState(0);
-  
-  // Stove Config
-  const [stoveBrand, setStoveBrand] = useState("");
-  const [stoveModel, setStoveModel] = useState("");
-  const [stoveQtySingle, setStoveQtySingle] = useState(0);
-  const [stoveQtyDouble, setStoveQtyDouble] = useState(0);
-  const [stoveTotalAmount, setStoveTotalAmount] = useState(0);
-  
-  // Regulator Config
-  const [regulatorBrand, setRegulatorBrand] = useState("");
-  const [regQty22mm, setRegQty22mm] = useState(0);
-  const [regQty20mm, setRegQty20mm] = useState(0);
-  const [regulatorTotalAmount, setRegulatorTotalAmount] = useState(0);
-  
-  // Cart
-  const [purchaseItems, setPurchaseItems] = useState<PurchaseItem[]>([]);
-  
-  // Supplier
-  const [supplierName, setSupplierName] = useState("");
+  // Fetched data for stock stats
+  const [lpgBrands, setLpgBrands] = useState<any[]>([]);
+  const [stoves, setStoves] = useState<any[]>([]);
+  const [regulators, setRegulators] = useState<any[]>([]);
 
-  // Computed totals
-  const lpgTotalQty = lpgQty22mm + lpgQty20mm;
-  const stoveTotalQty = stoveQtySingle + stoveQtyDouble;
-  const regTotalQty = regQty22mm + regQty20mm;
-
-  // Fetch data
+  // Fetch data on open
   const fetchData = useCallback(async () => {
     const [brandsRes, stovesRes, regulatorsRes] = await Promise.all([
       supabase.from('lpg_brands').select('*').eq('is_active', true),
       supabase.from('stoves').select('*').eq('is_active', true),
       supabase.from('regulators').select('*').eq('is_active', true)
     ]);
-
     if (brandsRes.data) setLpgBrands(brandsRes.data);
     if (stovesRes.data) setStoves(stovesRes.data);
     if (regulatorsRes.data) setRegulators(regulatorsRes.data);
@@ -168,82 +107,47 @@ export const InventoryPOBDrawer = ({
       fetchData().finally(() => setLoading(false));
       setMobileStep('product');
     }
-  }, [open, fetchData]);
+  }, [open, fetchData, setMobileStep]);
 
-  // Stock stats
+  // Stock stats computations
   const valveSizeStats = useMemo(() => {
-    const stats22mm = lpgBrands
-      .filter(b => b.size === "22mm")
-      .reduce((acc, b) => ({
-        refill: acc.refill + b.refill_cylinder,
-        package: acc.package + b.package_cylinder,
-        total: acc.total + b.refill_cylinder + b.package_cylinder
-      }), { refill: 0, package: 0, total: 0 });
+    const stats22mm = lpgBrands.filter(b => b.size === "22mm").reduce((acc, b) => ({
+      refill: acc.refill + b.refill_cylinder,
+      package: acc.package + b.package_cylinder,
+      total: acc.total + b.refill_cylinder + b.package_cylinder
+    }), { refill: 0, package: 0, total: 0 });
 
-    const stats20mm = lpgBrands
-      .filter(b => b.size === "20mm")
-      .reduce((acc, b) => ({
-        refill: acc.refill + b.refill_cylinder,
-        package: acc.package + b.package_cylinder,
-        total: acc.total + b.refill_cylinder + b.package_cylinder
-      }), { refill: 0, package: 0, total: 0 });
+    const stats20mm = lpgBrands.filter(b => b.size === "20mm").reduce((acc, b) => ({
+      refill: acc.refill + b.refill_cylinder,
+      package: acc.package + b.package_cylinder,
+      total: acc.total + b.refill_cylinder + b.package_cylinder
+    }), { refill: 0, package: 0, total: 0 });
 
     return { "22mm": stats22mm, "20mm": stats20mm };
   }, [lpgBrands]);
 
-  const regulatorValveStats = useMemo(() => {
-    const stats22mm = regulators.filter(r => r.type === "22mm").reduce((sum, r) => sum + r.quantity, 0);
-    const stats20mm = regulators.filter(r => r.type === "20mm").reduce((sum, r) => sum + r.quantity, 0);
-    return { "22mm": stats22mm, "20mm": stats20mm };
-  }, [regulators]);
+  const regulatorValveStats = useMemo(() => ({
+    "22mm": regulators.filter(r => r.type === "22mm").reduce((sum, r) => sum + r.quantity, 0),
+    "20mm": regulators.filter(r => r.type === "20mm").reduce((sum, r) => sum + r.quantity, 0)
+  }), [regulators]);
 
-  const stoveBurnerStats = useMemo(() => {
-    const singleBurner = stoves.filter(s => s.burners === 1).reduce((sum, s) => sum + s.quantity, 0);
-    const doubleBurner = stoves.filter(s => s.burners === 2).reduce((sum, s) => sum + s.quantity, 0);
-    return { single: singleBurner, double: doubleBurner };
-  }, [stoves]);
+  const stoveBurnerStats = useMemo(() => ({
+    single: stoves.filter(s => s.burners === 1).reduce((sum, s) => sum + s.quantity, 0),
+    double: stoves.filter(s => s.burners === 2).reduce((sum, s) => sum + s.quantity, 0)
+  }), [stoves]);
 
-  // Calculated prices
-  const lpgCompanyPrice = useMemo(() => {
-    if (lpgTotalQty <= 0 || lpgTotalDO <= 0) return 0;
-    return Math.round(lpgTotalDO / lpgTotalQty);
-  }, [lpgTotalQty, lpgTotalDO]);
-
-  const stoveCompanyPrice = useMemo(() => {
-    if (stoveTotalQty <= 0 || stoveTotalAmount <= 0) return 0;
-    return Math.round(stoveTotalAmount / stoveTotalQty);
-  }, [stoveTotalQty, stoveTotalAmount]);
-
-  const regulatorCompanyPrice = useMemo(() => {
-    if (regTotalQty <= 0 || regulatorTotalAmount <= 0) return 0;
-    return Math.round(regulatorTotalAmount / regTotalQty);
-  }, [regTotalQty, regulatorTotalAmount]);
-
-  // Cart calculations
-  const subtotal = purchaseItems.reduce((sum, item) => sum + item.companyPrice * item.quantity, 0);
-  const total = subtotal;
-  const purchaseItemsCount = purchaseItems.reduce((s, i) => s + i.quantity, 0);
-
-  // Update product pricing with price change detection
+  // Update product pricing helper
   const updateProductPricing = async (
     type: 'lpg' | 'stove' | 'regulator',
     productName: string,
     companyPrice: number,
-    options: {
-      brandId?: string;
-      weight?: string;
-      valveSize?: string;
-      cylinderType?: 'refill' | 'package';
-      burnerType?: string;
-      regulatorType?: string;
-    }
+    options: { brandId?: string; weight?: string; valveSize?: string; cylinderType?: 'refill' | 'package'; burnerType?: string; regulatorType?: string }
   ): Promise<{ priceChanged: boolean; oldPrice?: number }> => {
     try {
       if (type === 'lpg' && options.brandId) {
         const variant = options.cylinderType === 'refill' ? 'Refill' : 'Package';
         const fullProductName = `${productName} LP Gas ${options.weight} Cylinder (${options.valveSize}) ${variant}`;
-
-        // Case-insensitive search for existing pricing by brand name + variant
+        
         const { data: existingPrice } = await supabase
           .from('product_prices')
           .select('id, company_price, package_price')
@@ -254,37 +158,21 @@ export const InventoryPOBDrawer = ({
           .maybeSingle();
 
         if (existingPrice) {
-          const currentPrice = options.cylinderType === 'package' 
-            ? existingPrice.package_price 
-            : existingPrice.company_price;
-          
+          const currentPrice = options.cylinderType === 'package' ? existingPrice.package_price : existingPrice.company_price;
           const priceChanged = currentPrice !== companyPrice && currentPrice > 0;
-          
-          // Always update with latest price and link to canonical brand_id
           const updateData: Record<string, unknown> = { 
             updated_at: new Date().toISOString(),
             product_name: fullProductName,
-            brand_id: options.brandId  // Link to canonical brand
+            brand_id: options.brandId
           };
-          
           if (options.cylinderType === 'package') {
             updateData.package_price = companyPrice;
           } else {
             updateData.company_price = companyPrice;
           }
-          
-          await supabase
-            .from('product_prices')
-            .update(updateData)
-            .eq('id', existingPrice.id);
-          
-          if (priceChanged) {
-            logger.info(`Company price updated: ${productName} ${variant} ৳${currentPrice} → ৳${companyPrice}`, null, { component: 'POBDrawer' });
-          }
-          
+          await supabase.from('product_prices').update(updateData).eq('id', existingPrice.id);
           return { priceChanged, oldPrice: currentPrice };
         } else {
-          // Create new pricing record
           await supabase.from('product_prices').insert({
             product_type: 'lpg',
             product_name: fullProductName,
@@ -303,7 +191,6 @@ export const InventoryPOBDrawer = ({
         const burnerText = options.burnerType === 'single' ? 'Single' : 'Double';
         const fullProductName = `${productName} - ${burnerText} Burner`;
         
-        // Case-insensitive lookup
         const { data: existingPrice } = await supabase
           .from('product_prices')
           .select('id, company_price')
@@ -314,17 +201,12 @@ export const InventoryPOBDrawer = ({
 
         if (existingPrice) {
           const priceChanged = existingPrice.company_price !== companyPrice && existingPrice.company_price > 0;
-          
-          await supabase
-            .from('product_prices')
-            .update({ 
-              company_price: companyPrice, 
-              product_name: fullProductName,
-              size: `${burnerText} Burner`,
-              updated_at: new Date().toISOString() 
-            })
-            .eq('id', existingPrice.id);
-          
+          await supabase.from('product_prices').update({ 
+            company_price: companyPrice, 
+            product_name: fullProductName,
+            size: `${burnerText} Burner`,
+            updated_at: new Date().toISOString() 
+          }).eq('id', existingPrice.id);
           return { priceChanged, oldPrice: existingPrice.company_price };
         } else {
           await supabase.from('product_prices').insert({
@@ -342,7 +224,6 @@ export const InventoryPOBDrawer = ({
       } else if (type === 'regulator') {
         const fullProductName = `${productName} Regulator - ${options.regulatorType}`;
         
-        // Case-insensitive lookup
         const { data: existingPrice } = await supabase
           .from('product_prices')
           .select('id, company_price')
@@ -354,16 +235,11 @@ export const InventoryPOBDrawer = ({
 
         if (existingPrice) {
           const priceChanged = existingPrice.company_price !== companyPrice && existingPrice.company_price > 0;
-          
-          await supabase
-            .from('product_prices')
-            .update({ 
-              company_price: companyPrice, 
-              product_name: fullProductName,
-              updated_at: new Date().toISOString() 
-            })
-            .eq('id', existingPrice.id);
-          
+          await supabase.from('product_prices').update({ 
+            company_price: companyPrice, 
+            product_name: fullProductName,
+            updated_at: new Date().toISOString() 
+          }).eq('id', existingPrice.id);
           return { priceChanged, oldPrice: existingPrice.company_price };
         } else {
           await supabase.from('product_prices').insert({
@@ -386,52 +262,46 @@ export const InventoryPOBDrawer = ({
     }
   };
 
-  // Add LPG to cart with case-insensitive brand lookup
+  // Add LPG to cart
   const addLPGToCart = async () => {
-    if (!lpgBrandName || lpgTotalQty <= 0 || lpgTotalDO <= 0) {
+    if (!formState.lpgBrandName || lpgTotalQty <= 0 || formState.lpgTotalDO <= 0) {
       toast({ title: "Please fill all required fields", variant: "destructive" });
       return;
     }
-
-    // Validate custom brand name if needed
-    const validation = validateCustomBrand(lpgBrandName);
+    const validation = validateCustomBrand(formState.lpgBrandName);
     if (!validation.valid) {
       toast({ title: validation.error, variant: "destructive" });
       return;
     }
 
-    const companyPrice = lpgCompanyPrice;
-    const brandColor = getLpgBrandColor(lpgBrandName);
-    const itemsToAdd: PurchaseItem[] = [];
+    const brandColor = getLpgBrandColor(formState.lpgBrandName);
+    const itemsToAdd: POBCartItem[] = [];
     let priceChangedNotification = false;
     let oldPriceValue = 0;
 
     for (const valveSize of ['22mm', '20mm'] as const) {
-      const qty = valveSize === '22mm' ? lpgQty22mm : lpgQty20mm;
+      const qty = valveSize === '22mm' ? formState.lpgQty22mm : formState.lpgQty20mm;
       if (qty <= 0) continue;
 
       let brandId = "";
-      
-      // CASE-INSENSITIVE brand lookup using database query
       const { data: existingBrand } = await supabase
         .from('lpg_brands')
         .select('*')
-        .ilike('name', lpgBrandName)
+        .ilike('name', formState.lpgBrandName)
         .eq('size', valveSize)
-        .eq('weight', lpgWeight)
+        .eq('weight', formState.lpgWeight)
         .eq('is_active', true)
         .maybeSingle();
 
       if (existingBrand) {
         brandId = existingBrand.id;
       } else {
-        // Create new brand record
         const { data: newBrand, error } = await supabase
           .from('lpg_brands')
           .insert({
-            name: lpgBrandName,
+            name: formState.lpgBrandName,
             size: valveSize,
-            weight: lpgWeight,
+            weight: formState.lpgWeight,
             color: brandColor,
             refill_cylinder: 0,
             package_cylinder: 0,
@@ -442,14 +312,13 @@ export const InventoryPOBDrawer = ({
           .single();
 
         if (error) {
-          // Handle duplicate - case-insensitive fetch
           if (error.code === '23505') {
             const { data: existing } = await supabase
               .from('lpg_brands')
               .select('id')
-              .ilike('name', lpgBrandName)
+              .ilike('name', formState.lpgBrandName)
               .eq('size', valveSize)
-              .eq('weight', lpgWeight)
+              .eq('weight', formState.lpgWeight)
               .maybeSingle();
             if (existing) brandId = existing.id;
           } else {
@@ -461,14 +330,12 @@ export const InventoryPOBDrawer = ({
         }
       }
 
-      // Update pricing and detect price changes
-      const { priceChanged, oldPrice } = await updateProductPricing('lpg', lpgBrandName, companyPrice, {
+      const { priceChanged, oldPrice } = await updateProductPricing('lpg', formState.lpgBrandName, lpgCompanyPrice, {
         brandId,
-        weight: lpgWeight,
+        weight: formState.lpgWeight,
         valveSize,
-        cylinderType: lpgCylinderType
+        cylinderType: formState.lpgCylinderType
       });
-      
       if (priceChanged && oldPrice) {
         priceChangedNotification = true;
         oldPriceValue = oldPrice;
@@ -477,13 +344,13 @@ export const InventoryPOBDrawer = ({
       itemsToAdd.push({
         id: `lpg-${valveSize}-${Date.now()}`,
         type: 'lpg',
-        name: lpgBrandName,
-        details: `${lpgWeight} • ${valveSize} • ${lpgCylinderType === 'refill' ? 'Refill' : 'Package'}`,
-        companyPrice,
+        name: formState.lpgBrandName,
+        details: `${formState.lpgWeight} • ${valveSize} • ${formState.lpgCylinderType === 'refill' ? 'Refill' : 'Package'}`,
+        companyPrice: lpgCompanyPrice,
         quantity: qty,
-        cylinderType: lpgCylinderType,
+        cylinderType: formState.lpgCylinderType,
         brandId,
-        weight: lpgWeight,
+        weight: formState.lpgWeight,
         valveSize,
         brandColor
       });
@@ -494,48 +361,39 @@ export const InventoryPOBDrawer = ({
       return;
     }
 
-    setPurchaseItems([...purchaseItems, ...itemsToAdd]);
-    
-    // Show price change notification if applicable
+    addItems(itemsToAdd);
     if (priceChangedNotification) {
-      toast({ 
-        title: "Price Updated!", 
-        description: `${lpgBrandName}: ৳${oldPriceValue.toLocaleString()} → ৳${companyPrice.toLocaleString()}`,
-        variant: "default"
-      });
+      toast({ title: "Price Updated!", description: `${formState.lpgBrandName}: ৳${oldPriceValue.toLocaleString()} → ৳${lpgCompanyPrice.toLocaleString()}` });
     } else {
-      toast({ title: "Added to cart!", description: `${lpgTotalQty}x ${lpgBrandName}` });
+      toast({ title: "Added to cart!", description: `${lpgTotalQty}x ${formState.lpgBrandName}` });
     }
-    
     if (isMobile) setMobileStep('cart');
     resetLPGForm();
   };
 
-  // Add Stove to cart with case-insensitive lookup
+  // Add Stove to cart
   const addStoveToCart = async () => {
-    if (!stoveBrand || !stoveModel || stoveTotalQty <= 0 || stoveTotalAmount <= 0) {
+    if (!formState.stoveBrand || !formState.stoveModel || stoveTotalQty <= 0 || formState.stoveTotalAmount <= 0) {
       toast({ title: "Please fill all required fields", variant: "destructive" });
       return;
     }
 
-    const companyPrice = stoveCompanyPrice;
-    const itemsToAdd: PurchaseItem[] = [];
+    const itemsToAdd: POBCartItem[] = [];
     let priceChangedNotification = false;
     let oldPriceValue = 0;
 
     for (const burnerType of ['single', 'double'] as const) {
-      const qty = burnerType === 'single' ? stoveQtySingle : stoveQtyDouble;
+      const qty = burnerType === 'single' ? formState.stoveQtySingle : formState.stoveQtyDouble;
       if (qty <= 0) continue;
 
       const burners = burnerType === 'single' ? 1 : 2;
       let stoveId = "";
       
-      // CASE-INSENSITIVE stove lookup using database query
       const { data: existingStove } = await supabase
         .from('stoves')
         .select('*')
-        .ilike('brand', stoveBrand)
-        .ilike('model', stoveModel)
+        .ilike('brand', formState.stoveBrand)
+        .ilike('model', formState.stoveModel)
         .eq('burners', burners)
         .eq('is_active', true)
         .maybeSingle();
@@ -545,13 +403,7 @@ export const InventoryPOBDrawer = ({
       } else {
         const { data: newStove, error } = await supabase
           .from('stoves')
-          .insert({
-            brand: stoveBrand,
-            model: stoveModel,
-            burners,
-            price: 0,
-            quantity: 0
-          })
+          .insert({ brand: formState.stoveBrand, model: formState.stoveModel, burners, price: 0, quantity: 0 })
           .select()
           .single();
 
@@ -560,8 +412,8 @@ export const InventoryPOBDrawer = ({
             const { data: existing } = await supabase
               .from('stoves')
               .select('id')
-              .ilike('brand', stoveBrand)
-              .ilike('model', stoveModel)
+              .ilike('brand', formState.stoveBrand)
+              .ilike('model', formState.stoveModel)
               .eq('burners', burners)
               .maybeSingle();
             if (existing) stoveId = existing.id;
@@ -574,9 +426,7 @@ export const InventoryPOBDrawer = ({
         }
       }
 
-      // Update pricing and detect price changes
-      const { priceChanged, oldPrice } = await updateProductPricing('stove', `${stoveBrand} ${stoveModel}`, companyPrice, { burnerType });
-      
+      const { priceChanged, oldPrice } = await updateProductPricing('stove', `${formState.stoveBrand} ${formState.stoveModel}`, stoveCompanyPrice, { burnerType });
       if (priceChanged && oldPrice) {
         priceChangedNotification = true;
         oldPriceValue = oldPrice;
@@ -585,13 +435,13 @@ export const InventoryPOBDrawer = ({
       itemsToAdd.push({
         id: `stove-${burnerType}-${Date.now()}`,
         type: 'stove',
-        name: `${stoveBrand} ${stoveModel}`,
+        name: `${formState.stoveBrand} ${formState.stoveModel}`,
         details: `${burnerType === 'single' ? 'Single' : 'Double'} Burner`,
-        companyPrice,
+        companyPrice: stoveCompanyPrice,
         quantity: qty,
         stoveId,
         burnerType,
-        model: stoveModel
+        model: formState.stoveModel
       });
     }
 
@@ -600,46 +450,36 @@ export const InventoryPOBDrawer = ({
       return;
     }
 
-    setPurchaseItems([...purchaseItems, ...itemsToAdd]);
-    
-    // Show price change notification
+    addItems(itemsToAdd);
     if (priceChangedNotification) {
-      toast({ 
-        title: "Price Updated!", 
-        description: `${stoveBrand} ${stoveModel}: ৳${oldPriceValue.toLocaleString()} → ৳${companyPrice.toLocaleString()}`,
-        variant: "default"
-      });
+      toast({ title: "Price Updated!", description: `${formState.stoveBrand} ${formState.stoveModel}: ৳${oldPriceValue.toLocaleString()} → ৳${stoveCompanyPrice.toLocaleString()}` });
     } else {
-      toast({ title: "Added to cart!", description: `${stoveTotalQty}x ${stoveBrand} ${stoveModel}` });
+      toast({ title: "Added to cart!", description: `${stoveTotalQty}x ${formState.stoveBrand} ${formState.stoveModel}` });
     }
-    
     if (isMobile) setMobileStep('cart');
     resetStoveForm();
   };
 
-  // Add Regulator to cart with case-insensitive lookup
+  // Add Regulator to cart
   const addRegulatorToCart = async () => {
-    if (!regulatorBrand || regTotalQty <= 0 || regulatorTotalAmount <= 0) {
+    if (!formState.regulatorBrand || regTotalQty <= 0 || formState.regulatorTotalAmount <= 0) {
       toast({ title: "Please fill all required fields", variant: "destructive" });
       return;
     }
 
-    const companyPrice = regulatorCompanyPrice;
-    const itemsToAdd: PurchaseItem[] = [];
+    const itemsToAdd: POBCartItem[] = [];
     let priceChangedNotification = false;
     let oldPriceValue = 0;
 
     for (const valveType of ['22mm', '20mm'] as const) {
-      const qty = valveType === '22mm' ? regQty22mm : regQty20mm;
+      const qty = valveType === '22mm' ? formState.regQty22mm : formState.regQty20mm;
       if (qty <= 0) continue;
 
       let regId = "";
-      
-      // CASE-INSENSITIVE regulator lookup using database query
       const { data: existingReg } = await supabase
         .from('regulators')
         .select('*')
-        .ilike('brand', regulatorBrand)
+        .ilike('brand', formState.regulatorBrand)
         .eq('type', valveType)
         .eq('is_active', true)
         .maybeSingle();
@@ -649,12 +489,7 @@ export const InventoryPOBDrawer = ({
       } else {
         const { data: newReg, error } = await supabase
           .from('regulators')
-          .insert({
-            brand: regulatorBrand,
-            type: valveType,
-            quantity: 0,
-            price: 0
-          })
+          .insert({ brand: formState.regulatorBrand, type: valveType, quantity: 0, price: 0 })
           .select()
           .single();
 
@@ -663,7 +498,7 @@ export const InventoryPOBDrawer = ({
             const { data: existing } = await supabase
               .from('regulators')
               .select('id')
-              .ilike('brand', regulatorBrand)
+              .ilike('brand', formState.regulatorBrand)
               .eq('type', valveType)
               .maybeSingle();
             if (existing) regId = existing.id;
@@ -676,9 +511,7 @@ export const InventoryPOBDrawer = ({
         }
       }
 
-      // Update pricing and detect price changes
-      const { priceChanged, oldPrice } = await updateProductPricing('regulator', regulatorBrand, companyPrice, { regulatorType: valveType });
-      
+      const { priceChanged, oldPrice } = await updateProductPricing('regulator', formState.regulatorBrand, regulatorCompanyPrice, { regulatorType: valveType });
       if (priceChanged && oldPrice) {
         priceChangedNotification = true;
         oldPriceValue = oldPrice;
@@ -687,9 +520,9 @@ export const InventoryPOBDrawer = ({
       itemsToAdd.push({
         id: `regulator-${valveType}-${Date.now()}`,
         type: 'regulator',
-        name: `${regulatorBrand} Regulator`,
+        name: `${formState.regulatorBrand} Regulator`,
         details: `${valveType} Valve`,
-        companyPrice,
+        companyPrice: regulatorCompanyPrice,
         quantity: qty,
         regulatorId: regId,
         regulatorType: valveType
@@ -701,56 +534,14 @@ export const InventoryPOBDrawer = ({
       return;
     }
 
-    setPurchaseItems([...purchaseItems, ...itemsToAdd]);
-    
-    // Show price change notification
+    addItems(itemsToAdd);
     if (priceChangedNotification) {
-      toast({ 
-        title: "Price Updated!", 
-        description: `${regulatorBrand}: ৳${oldPriceValue.toLocaleString()} → ৳${companyPrice.toLocaleString()}`,
-        variant: "default"
-      });
+      toast({ title: "Price Updated!", description: `${formState.regulatorBrand}: ৳${oldPriceValue.toLocaleString()} → ৳${regulatorCompanyPrice.toLocaleString()}` });
     } else {
-      toast({ title: "Added to cart!", description: `${regTotalQty}x ${regulatorBrand}` });
+      toast({ title: "Added to cart!", description: `${regTotalQty}x ${formState.regulatorBrand}` });
     }
-    
     if (isMobile) setMobileStep('cart');
     resetRegulatorForm();
-  };
-
-  // Reset forms
-  const resetLPGForm = () => {
-    setLpgBrandName("");
-    setLpgCylinderType("refill");
-    setLpgWeight("12kg");
-    setLpgQty22mm(0);
-    setLpgQty20mm(0);
-    setLpgTotalDO(0);
-  };
-
-  const resetStoveForm = () => {
-    setStoveBrand("");
-    setStoveModel("");
-    setStoveQtySingle(0);
-    setStoveQtyDouble(0);
-    setStoveTotalAmount(0);
-  };
-
-  const resetRegulatorForm = () => {
-    setRegulatorBrand("");
-    setRegQty22mm(0);
-    setRegQty20mm(0);
-    setRegulatorTotalAmount(0);
-  };
-
-  // Cart actions
-  const removeItem = (id: string) => {
-    setPurchaseItems(purchaseItems.filter(i => i.id !== id));
-  };
-
-  const clearCart = () => {
-    setPurchaseItems([]);
-    toast({ title: "Cart cleared" });
   };
 
   // Complete purchase
@@ -763,20 +554,14 @@ export const InventoryPOBDrawer = ({
     setProcessing(true);
 
     try {
-      // Get current user for created_by tracking
       const { data: userData } = await supabase.auth.getUser();
       const userId = userData.user?.id || null;
 
       const today = new Date();
       const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
-      const { count } = await supabase
-        .from('pob_transactions')
-        .select('*', { count: 'exact', head: true })
-        .gte('created_at', today.toISOString().slice(0, 10));
+      const { count } = await supabase.from('pob_transactions').select('*', { count: 'exact', head: true }).gte('created_at', today.toISOString().slice(0, 10));
       const txnNumber = `POB-${dateStr}-${String((count || 0) + 1).padStart(4, '0')}`;
 
-      // Create transaction with created_by tracking
-      // Default supplier to first item's brand name or "Direct Purchase" if not provided
       const defaultSupplier = purchaseItems[0]?.name || 'Direct Purchase';
       const { data: txnData, error: txnError } = await supabase
         .from('pob_transactions')
@@ -784,7 +569,7 @@ export const InventoryPOBDrawer = ({
           transaction_number: txnNumber,
           supplier_name: supplierName.trim() || defaultSupplier,
           subtotal: subtotal,
-          total: total,
+          total: subtotal,
           payment_method: 'cash',
           payment_status: paymentStatus,
           created_by: userId
@@ -794,7 +579,6 @@ export const InventoryPOBDrawer = ({
 
       if (txnError) throw txnError;
 
-      // Create transaction items with created_by
       const items = purchaseItems.map(item => ({
         transaction_id: txnData.id,
         product_type: item.type,
@@ -811,12 +595,10 @@ export const InventoryPOBDrawer = ({
 
       await supabase.from('pob_transaction_items').insert(items);
 
-      // Update inventory - INCREASE stock using direct DB queries (not in-memory)
+      // Update inventory
       for (const item of purchaseItems) {
         if (item.type === 'lpg' && item.brandId) {
           const stockField = item.cylinderType === 'refill' ? 'refill_cylinder' : 'package_cylinder';
-          
-          // Fetch current stock from DB (not in-memory) to avoid stale data
           const { data: currentBrand } = await supabase
             .from('lpg_brands')
             .select(`${stockField}, empty_cylinder`)
@@ -827,75 +609,45 @@ export const InventoryPOBDrawer = ({
             const currentStock = currentBrand[stockField as keyof typeof currentBrand] as number || 0;
             const currentEmpty = currentBrand.empty_cylinder || 0;
             
-            // D.O. Mode (buy with money) for refill cylinders:
-            // - Reduce empty cylinder count (sent to plant for refilling)
-            // - Add refill cylinder count (refilled cylinders return)
-            // Add Mode: Only add to stock without reducing empty
             if (pobMode === 'buy' && item.cylinderType === 'refill') {
-              // D.O. exchange: empty goes to plant, refill comes back
-              await supabase
-                .from('lpg_brands')
-                .update({ 
-                  [stockField]: currentStock + item.quantity,
-                  empty_cylinder: Math.max(0, currentEmpty - item.quantity),
-                  updated_at: new Date().toISOString()
-                })
-                .eq('id', item.brandId);
+              await supabase.from('lpg_brands').update({ 
+                [stockField]: currentStock + item.quantity,
+                empty_cylinder: Math.max(0, currentEmpty - item.quantity),
+                updated_at: new Date().toISOString()
+              }).eq('id', item.brandId);
             } else {
-              // Package or Add mode: just add to stock (no empty reduction)
-              await supabase
-                .from('lpg_brands')
-                .update({ 
-                  [stockField]: currentStock + item.quantity,
-                  updated_at: new Date().toISOString()
-                })
-                .eq('id', item.brandId);
+              await supabase.from('lpg_brands').update({ 
+                [stockField]: currentStock + item.quantity,
+                updated_at: new Date().toISOString()
+              }).eq('id', item.brandId);
             }
           }
         } else if (item.type === 'stove' && item.stoveId) {
-          // Fetch current stock from DB
-          const { data: currentStove } = await supabase
-            .from('stoves')
-            .select('quantity')
-            .eq('id', item.stoveId)
-            .single();
-          
+          const { data: currentStove } = await supabase.from('stoves').select('quantity').eq('id', item.stoveId).single();
           if (currentStove) {
-            await supabase
-              .from('stoves')
-              .update({ 
-                quantity: (currentStove.quantity || 0) + item.quantity,
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', item.stoveId);
+            await supabase.from('stoves').update({ 
+              quantity: (currentStove.quantity || 0) + item.quantity,
+              updated_at: new Date().toISOString()
+            }).eq('id', item.stoveId);
           }
         } else if (item.type === 'regulator' && item.regulatorId) {
-          // Fetch current stock from DB
-          const { data: currentReg } = await supabase
-            .from('regulators')
-            .select('quantity')
-            .eq('id', item.regulatorId)
-            .single();
-          
+          const { data: currentReg } = await supabase.from('regulators').select('quantity').eq('id', item.regulatorId).single();
           if (currentReg) {
-            await supabase
-              .from('regulators')
-              .update({ 
-                quantity: (currentReg.quantity || 0) + item.quantity
-              })
-              .eq('id', item.regulatorId);
+            await supabase.from('regulators').update({ 
+              quantity: (currentReg.quantity || 0) + item.quantity
+            }).eq('id', item.regulatorId);
           }
         }
       }
 
-      // Create expense entry with created_by
+      // Create expense entry for Business Diary sync
       const expenseCategory = purchaseItems.some(i => i.type === 'lpg') ? 'LPG Purchase' : 'Inventory Purchase';
       const itemNames = purchaseItems.map(i => `${i.quantity}x ${i.name}`).join(', ');
       const finalSupplier = supplierName.trim() || defaultSupplier;
       
       await supabase.from('daily_expenses').insert({
         category: expenseCategory,
-        amount: total,
+        amount: subtotal,
         description: `${txnNumber}: ${finalSupplier} - ${itemNames}`,
         expense_date: today.toISOString().slice(0, 10),
         created_by: userId
@@ -903,10 +655,10 @@ export const InventoryPOBDrawer = ({
 
       toast({
         title: paymentStatus === 'completed' ? "Purchase Completed!" : "Purchase Saved as Credit",
-        description: `${txnNumber} • ${BANGLADESHI_CURRENCY_SYMBOL}${total.toLocaleString()}`
+        description: `${txnNumber} • ${BANGLADESHI_CURRENCY_SYMBOL}${subtotal.toLocaleString()}`
       });
 
-      setPurchaseItems([]);
+      resetAllForms();
       onPurchaseComplete();
       onOpenChange(false);
 
@@ -918,148 +670,164 @@ export const InventoryPOBDrawer = ({
     }
   };
 
-  // Valve Size Quantity Card - Compact for mobile
-  const ValveSizeQuantityCard = ({ 
-    value, 
-    onChange, 
-    valveSize, 
-    stockLabel
-  }: { 
-    value: number; 
-    onChange: (v: number) => void;
-    valveSize: '22mm' | '20mm';
-    stockLabel?: string;
-  }) => {
-    const is22mm = valveSize === '22mm';
-    const borderColor = is22mm ? 'border-primary/30' : 'border-warning/30';
-    const badgeBg = is22mm ? 'bg-primary' : 'bg-warning';
-    const textColor = is22mm ? 'text-primary' : 'text-warning';
-    
-    return (
-      <Card className={`overflow-hidden border-2 ${borderColor}`}>
-        <div className={`p-2 text-center border-b ${borderColor} bg-gradient-to-br ${is22mm ? 'from-primary/10 to-primary/5' : 'from-warning/10 to-warning/5'}`}>
-          <div className={`inline-flex items-center justify-center ${badgeBg} text-white px-2.5 py-1 rounded-full`}>
-            <CircleDot className="h-3 w-3 mr-1" />
-            <span className="text-xs font-bold">{valveSize}</span>
-          </div>
-          {stockLabel && (
-            <p className="text-[10px] font-medium text-muted-foreground mt-1">
-              Stock: <span className={`font-bold ${textColor}`}>{stockLabel}</span>
-            </p>
-          )}
-        </div>
-        <CardContent className="p-2 space-y-1.5">
-          <Input
-            type="number"
-            inputMode="numeric"
-            value={value || ""}
-            onChange={(e) => onChange(Math.max(0, parseInt(e.target.value) || 0))}
-            className={`w-full h-12 text-center text-xl font-extrabold border-2 ${borderColor} ${textColor}`}
-            placeholder="0"
-          />
-          <div className="grid grid-cols-2 gap-1.5">
-            <Button type="button" variant="outline" className="h-10 font-bold text-xs" onClick={() => onChange(Math.max(0, value - 10))}>
-              <Minus className="h-3 w-3 mr-1" />10
-            </Button>
-            <Button type="button" variant="outline" className="h-10 font-bold text-xs" onClick={() => onChange(value + 10)}>
-              <Plus className="h-3 w-3 mr-1" />10
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    );
+  // Quick add to stock (Add mode)
+  const quickAddToStock = async () => {
+    setProcessing(true);
+    try {
+      if (productType === 'lpg') {
+        if (!formState.lpgBrandName || lpgTotalQty <= 0) {
+          toast({ title: "Please select brand and enter quantity", variant: "destructive" });
+          setProcessing(false);
+          return;
+        }
+        const validation = validateCustomBrand(formState.lpgBrandName);
+        if (!validation.valid) {
+          toast({ title: validation.error, variant: "destructive" });
+          setProcessing(false);
+          return;
+        }
+
+        for (const valveSize of ['22mm', '20mm'] as const) {
+          const qty = valveSize === '22mm' ? formState.lpgQty22mm : formState.lpgQty20mm;
+          if (qty <= 0) continue;
+
+          const { data: existingBrand } = await supabase
+            .from('lpg_brands')
+            .select('id, refill_cylinder, package_cylinder')
+            .ilike('name', formState.lpgBrandName)
+            .eq('size', valveSize)
+            .eq('weight', formState.lpgWeight)
+            .eq('is_active', true)
+            .maybeSingle();
+
+          if (existingBrand) {
+            const stockField = formState.lpgCylinderType === 'refill' ? 'refill_cylinder' : 'package_cylinder';
+            const currentStock = existingBrand[stockField as keyof typeof existingBrand] as number || 0;
+            await supabase.from('lpg_brands').update({ 
+              [stockField]: currentStock + qty,
+              updated_at: new Date().toISOString()
+            }).eq('id', existingBrand.id);
+          } else {
+            const brandColor = getLpgBrandColor(formState.lpgBrandName);
+            await supabase.from('lpg_brands').insert({
+              name: formState.lpgBrandName,
+              size: valveSize,
+              weight: formState.lpgWeight,
+              color: brandColor,
+              refill_cylinder: formState.lpgCylinderType === 'refill' ? qty : 0,
+              package_cylinder: formState.lpgCylinderType === 'package' ? qty : 0,
+              empty_cylinder: 0,
+              problem_cylinder: 0
+            });
+          }
+        }
+        toast({ title: "Stock Added!", description: `${lpgTotalQty} ${formState.lpgBrandName} cylinders added` });
+      } else if (productType === 'stove') {
+        if (!formState.stoveBrand || !formState.stoveModel || stoveTotalQty <= 0) {
+          toast({ title: "Please fill brand, model and quantity", variant: "destructive" });
+          setProcessing(false);
+          return;
+        }
+
+        for (const burnerType of ['single', 'double'] as const) {
+          const qty = burnerType === 'single' ? formState.stoveQtySingle : formState.stoveQtyDouble;
+          if (qty <= 0) continue;
+          const burners = burnerType === 'single' ? 1 : 2;
+          
+          const { data: existingStove } = await supabase
+            .from('stoves')
+            .select('id, quantity')
+            .ilike('brand', formState.stoveBrand)
+            .ilike('model', formState.stoveModel)
+            .eq('burners', burners)
+            .eq('is_active', true)
+            .maybeSingle();
+
+          if (existingStove) {
+            await supabase.from('stoves').update({ 
+              quantity: (existingStove.quantity || 0) + qty,
+              updated_at: new Date().toISOString()
+            }).eq('id', existingStove.id);
+          } else {
+            await supabase.from('stoves').insert({ brand: formState.stoveBrand, model: formState.stoveModel, burners, quantity: qty, price: 0 });
+          }
+        }
+        toast({ title: "Stock Added!", description: `${stoveTotalQty} ${formState.stoveBrand} stoves added` });
+      } else if (productType === 'regulator') {
+        if (!formState.regulatorBrand || regTotalQty <= 0) {
+          toast({ title: "Please select brand and enter quantity", variant: "destructive" });
+          setProcessing(false);
+          return;
+        }
+
+        for (const valveType of ['22mm', '20mm'] as const) {
+          const qty = valveType === '22mm' ? formState.regQty22mm : formState.regQty20mm;
+          if (qty <= 0) continue;
+
+          const { data: existingReg } = await supabase
+            .from('regulators')
+            .select('id, quantity')
+            .ilike('brand', formState.regulatorBrand)
+            .eq('type', valveType)
+            .eq('is_active', true)
+            .maybeSingle();
+
+          if (existingReg) {
+            await supabase.from('regulators').update({ quantity: (existingReg.quantity || 0) + qty }).eq('id', existingReg.id);
+          } else {
+            await supabase.from('regulators').insert({ brand: formState.regulatorBrand, type: valveType, quantity: qty });
+          }
+        }
+        toast({ title: "Stock Added!", description: `${regTotalQty} ${formState.regulatorBrand} regulators added` });
+      }
+
+      resetAllForms();
+      onPurchaseComplete();
+      onOpenChange(false);
+    } catch (error: any) {
+      logger.error('Quick add error', error, { component: 'POBDrawer' });
+      toast({ title: "Error adding stock", description: error.message, variant: "destructive" });
+    } finally {
+      setProcessing(false);
+    }
   };
 
-  // Burner Type Quantity Card - Compact for mobile
-  const BurnerTypeQuantityCard = ({ 
-    value, 
-    onChange, 
-    burnerType, 
-    stockLabel
-  }: { 
-    value: number; 
-    onChange: (v: number) => void;
-    burnerType: 'single' | 'double';
-    stockLabel?: string;
-  }) => {
-    const isSingle = burnerType === 'single';
-    const borderColor = isSingle ? 'border-warning/40' : 'border-orange-500/40';
-    const badgeBg = isSingle ? 'bg-warning' : 'bg-orange-500';
-    const textColor = isSingle ? 'text-warning' : 'text-orange-500';
-    const label = isSingle ? 'Single' : 'Double';
-    
-    return (
-      <Card className={`overflow-hidden border-2 ${borderColor}`}>
-        <div className={`p-2 text-center border-b ${borderColor} bg-gradient-to-br ${isSingle ? 'from-warning/10 to-warning/5' : 'from-orange-500/10 to-orange-500/5'}`}>
-          <div className={`inline-flex items-center justify-center ${badgeBg} text-white px-2.5 py-1 rounded-full`}>
-            <Flame className="h-3 w-3 mr-1" />
-            <span className="text-xs font-bold">{label}</span>
-          </div>
-          {stockLabel && (
-            <p className="text-[10px] font-medium text-muted-foreground mt-1">
-              Stock: <span className={`font-bold ${textColor}`}>{stockLabel}</span>
-            </p>
-          )}
-        </div>
-        <CardContent className="p-2 space-y-1.5">
-          <Input
-            type="number"
-            inputMode="numeric"
-            value={value || ""}
-            onChange={(e) => onChange(Math.max(0, parseInt(e.target.value) || 0))}
-            className={`w-full h-12 text-center text-xl font-extrabold border-2 ${borderColor} ${textColor}`}
-            placeholder="0"
-          />
-          <div className="grid grid-cols-2 gap-1.5">
-            <Button type="button" variant="outline" className="h-10 font-bold text-xs" onClick={() => onChange(Math.max(0, value - 5))}>
-              <Minus className="h-3 w-3 mr-1" />5
-            </Button>
-            <Button type="button" variant="outline" className="h-10 font-bold text-xs" onClick={() => onChange(value + 5)}>
-              <Plus className="h-3 w-3 mr-1" />5
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  };
-
-  // Product form based on type
+  // Render product form based on type
   const renderProductForm = () => {
     const isBuyMode = pobMode === 'buy';
 
     if (productType === 'lpg') {
       return (
         <div className="space-y-3">
-          {/* Unified Row: Cylinder Type + Weight */}
+          {/* Cylinder Type + Weight */}
           <div className="flex items-center gap-2">
-            {/* Cylinder Type + Separator */}
             <div className="flex bg-muted/60 rounded-full p-1 border border-border/50 flex-1">
               <button
                 type="button"
-                onClick={() => setLpgCylinderType("refill")}
-                className={`flex-1 h-10 px-2 rounded-full font-semibold text-xs transition-all ${
-                  lpgCylinderType === 'refill' 
+                onClick={() => updateFormField('lpgCylinderType', 'refill')}
+                className={cn(
+                  "flex-1 h-10 px-2 rounded-full font-semibold text-xs transition-all",
+                  formState.lpgCylinderType === 'refill' 
                     ? 'bg-primary text-primary-foreground shadow-md' 
                     : 'text-muted-foreground hover:text-foreground'
-                }`}
+                )}
               >
                 Refill
               </button>
               <button
                 type="button"
-                onClick={() => setLpgCylinderType("package")}
-                className={`flex-1 h-10 px-2 rounded-full font-semibold text-xs transition-all ${
-                  lpgCylinderType === 'package' 
+                onClick={() => updateFormField('lpgCylinderType', 'package')}
+                className={cn(
+                  "flex-1 h-10 px-2 rounded-full font-semibold text-xs transition-all",
+                  formState.lpgCylinderType === 'package' 
                     ? 'bg-secondary text-secondary-foreground shadow-md' 
                     : 'text-muted-foreground hover:text-foreground'
-                }`}
+                )}
               >
                 Package
               </button>
             </div>
-            
-            {/* Weight Dropdown */}
-            <Select value={lpgWeight} onValueChange={setLpgWeight}>
+            <Select value={formState.lpgWeight} onValueChange={(v) => updateFormField('lpgWeight', v)}>
               <SelectTrigger className="h-10 w-24 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {[...new Set([...WEIGHT_OPTIONS_22MM, ...WEIGHT_OPTIONS_20MM])].sort((a, b) => parseFloat(a) - parseFloat(b)).map(w => (
@@ -1069,46 +837,55 @@ export const InventoryPOBDrawer = ({
             </Select>
           </div>
 
-          {/* Brand - Using BrandSelect */}
+          {/* Brand */}
           <div className="space-y-1.5">
             <Label className="text-xs font-medium">Brand Name</Label>
             <BrandSelect
               type="lpg"
-              value={lpgBrandName}
-              onChange={(value) => setLpgBrandName(value)}
+              value={formState.lpgBrandName}
+              onChange={(v) => updateFormField('lpgBrandName', v)}
               allowCustom={true}
               className="h-12"
             />
           </div>
 
-          {/* Quantity by Valve Size */}
+          {/* Quantity */}
           <div className="space-y-2">
             <div className="flex items-center gap-2 pb-1 border-b">
               <CircleDashed className="h-4 w-4 text-primary" />
               <Label className="text-sm font-bold">Quantity (By Valve Size)</Label>
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <ValveSizeQuantityCard value={lpgQty22mm} onChange={setLpgQty22mm} valveSize="22mm" stockLabel={`${valveSizeStats["22mm"].refill}R + ${valveSizeStats["22mm"].package}P`} />
-              <ValveSizeQuantityCard value={lpgQty20mm} onChange={setLpgQty20mm} valveSize="20mm" stockLabel={`${valveSizeStats["20mm"].refill}R + ${valveSizeStats["20mm"].package}P`} />
+              <ValveSizeQuantityCard 
+                value={formState.lpgQty22mm} 
+                onChange={(v) => updateFormField('lpgQty22mm', v)} 
+                valveSize="22mm" 
+                stockLabel={`${valveSizeStats["22mm"].refill}R + ${valveSizeStats["22mm"].package}P`} 
+              />
+              <ValveSizeQuantityCard 
+                value={formState.lpgQty20mm} 
+                onChange={(v) => updateFormField('lpgQty20mm', v)} 
+                valveSize="20mm" 
+                stockLabel={`${valveSizeStats["20mm"].refill}R + ${valveSizeStats["20mm"].package}P`} 
+              />
             </div>
-            {/* Legend */}
             <div className="flex items-center justify-center gap-3 text-[10px] text-muted-foreground bg-muted/50 rounded-md py-1.5 px-2">
               <Info className="h-3 w-3" />
-              <span><strong>R</strong> = Refill Cylinder</span>
-              <span><strong>P</strong> = Package Cylinder</span>
+              <span><strong>R</strong> = Refill</span>
+              <span><strong>P</strong> = Package</span>
             </div>
             {lpgTotalQty > 0 && (
               <div className="flex items-center justify-between p-2 bg-primary/10 rounded-lg border border-primary/20">
                 <span className="font-medium text-sm">Total: {lpgTotalQty} cylinders</span>
                 <div className="flex gap-1">
-                  <Badge variant="outline" className="text-[10px]">22mm: {lpgQty22mm}</Badge>
-                  <Badge variant="outline" className="text-[10px]">20mm: {lpgQty20mm}</Badge>
+                  <Badge variant="outline" className="text-[10px]">22mm: {formState.lpgQty22mm}</Badge>
+                  <Badge variant="outline" className="text-[10px]">20mm: {formState.lpgQty20mm}</Badge>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Total D.O. - Only in Buy Mode */}
+          {/* D.O. Amount - Buy Mode Only */}
           {isBuyMode && (
             <>
               <Separator />
@@ -1118,28 +895,24 @@ export const InventoryPOBDrawer = ({
                   type="number" 
                   inputMode="numeric" 
                   placeholder="Enter total amount..." 
-                  value={lpgTotalDO || ""} 
-                  onChange={(e) => setLpgTotalDO(parseInt(e.target.value) || 0)} 
+                  value={formState.lpgTotalDO || ""} 
+                  onChange={(e) => updateFormField('lpgTotalDO', parseInt(e.target.value) || 0)} 
                   className="h-12 text-lg font-semibold" 
                 />
               </div>
-
-              {/* Unit Price */}
               <div className="flex items-center justify-between p-3 bg-primary/10 rounded-xl border border-primary/20">
                 <div className="flex items-center gap-2">
                   <Calculator className="h-4 w-4 text-primary" />
                   <span className="font-medium text-sm">Unit Price</span>
                 </div>
-                <span className="text-xl font-extrabold text-primary">{BANGLADESHI_CURRENCY_SYMBOL}{lpgCompanyPrice.toLocaleString()}</span>
+                <span className="text-xl font-extrabold text-primary tabular-nums">{BANGLADESHI_CURRENCY_SYMBOL}{lpgCompanyPrice.toLocaleString()}</span>
               </div>
-
-              {/* Add to Cart */}
               <Button 
                 type="button" 
                 size="lg" 
                 className="w-full h-12 font-semibold" 
                 onClick={addLPGToCart} 
-                disabled={!lpgBrandName || lpgTotalQty <= 0 || lpgTotalDO <= 0}
+                disabled={!formState.lpgBrandName || lpgTotalQty <= 0 || formState.lpgTotalDO <= 0}
               >
                 <Plus className="h-5 w-5 mr-2" />Add to Cart
               </Button>
@@ -1152,79 +925,36 @@ export const InventoryPOBDrawer = ({
     if (productType === 'stove') {
       return (
         <div className="space-y-4">
-          {/* Brand - Using BrandSelect */}
           <div className="space-y-2">
             <Label className="text-sm font-medium">Brand Name</Label>
-            <BrandSelect
-              type="stove"
-              value={stoveBrand}
-              onChange={(value) => setStoveBrand(value)}
-              allowCustom={true}
-              className="h-12"
-            />
+            <BrandSelect type="stove" value={formState.stoveBrand} onChange={(v) => updateFormField('stoveBrand', v)} allowCustom={true} className="h-12" />
           </div>
-
-          {/* Model */}
           <div className="space-y-2">
             <Label className="text-sm font-medium">Model Number</Label>
-            <Input 
-              placeholder="e.g., GS-102, RFL-200..." 
-              value={stoveModel} 
-              onChange={(e) => setStoveModel(e.target.value)} 
-              className="h-12" 
-            />
+            <Input placeholder="e.g., GS-102, RFL-200..." value={formState.stoveModel} onChange={(e) => updateFormField('stoveModel', e.target.value)} className="h-12" />
           </div>
-
-          {/* Quantity by Burner Type */}
           <div className="space-y-3">
             <div className="flex items-center gap-2 pb-1 border-b">
-              <Flame className="h-5 w-5 text-warning" />
+              <Flame className="h-5 w-5 text-amber-500" />
               <Label className="text-base font-bold">Quantity (By Burner Type)</Label>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <BurnerTypeQuantityCard value={stoveQtySingle} onChange={setStoveQtySingle} burnerType="single" stockLabel={`${stoveBurnerStats.single} pcs`} />
-              <BurnerTypeQuantityCard value={stoveQtyDouble} onChange={setStoveQtyDouble} burnerType="double" stockLabel={`${stoveBurnerStats.double} pcs`} />
+              <BurnerTypeQuantityCard value={formState.stoveQtySingle} onChange={(v) => updateFormField('stoveQtySingle', v)} burnerType="single" stockLabel={`${stoveBurnerStats.single} pcs`} />
+              <BurnerTypeQuantityCard value={formState.stoveQtyDouble} onChange={(v) => updateFormField('stoveQtyDouble', v)} burnerType="double" stockLabel={`${stoveBurnerStats.double} pcs`} />
             </div>
-            {stoveTotalQty > 0 && (
-              <div className="flex items-center justify-between p-3 bg-warning/10 rounded-lg border border-warning/20">
-                <span className="font-medium">Total: {stoveTotalQty} stoves</span>
-              </div>
-            )}
           </div>
-
-          {/* Total Amount - Only in Buy Mode */}
           {isBuyMode && (
             <>
               <Separator />
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Total D.O. Amount ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
-                <Input 
-                  type="number" 
-                  inputMode="numeric" 
-                  placeholder="Enter total amount..." 
-                  value={stoveTotalAmount || ""} 
-                  onChange={(e) => setStoveTotalAmount(parseInt(e.target.value) || 0)} 
-                  className="h-14 text-lg font-semibold" 
-                />
+                <Input type="number" inputMode="numeric" placeholder="Enter total amount..." value={formState.stoveTotalAmount || ""} onChange={(e) => updateFormField('stoveTotalAmount', parseInt(e.target.value) || 0)} className="h-14 text-lg font-semibold" />
               </div>
-
-              {/* Unit Price */}
-              <div className="flex items-center justify-between p-4 bg-warning/10 rounded-xl border border-warning/20">
-                <div className="flex items-center gap-2">
-                  <Calculator className="h-5 w-5 text-warning" />
-                  <span className="font-medium">Unit Price</span>
-                </div>
-                <span className="text-2xl font-extrabold text-warning">{BANGLADESHI_CURRENCY_SYMBOL}{stoveCompanyPrice.toLocaleString()}</span>
+              <div className="flex items-center justify-between p-4 bg-amber-500/10 rounded-xl border border-amber-500/20">
+                <div className="flex items-center gap-2"><Calculator className="h-5 w-5 text-amber-500" /><span className="font-medium">Unit Price</span></div>
+                <span className="text-2xl font-extrabold text-amber-500 tabular-nums">{BANGLADESHI_CURRENCY_SYMBOL}{stoveCompanyPrice.toLocaleString()}</span>
               </div>
-
-              {/* Add to Cart */}
-              <Button 
-                type="button" 
-                size="lg" 
-                className="w-full h-14 font-semibold bg-gradient-to-r from-warning to-orange-500 text-white" 
-                onClick={addStoveToCart} 
-                disabled={!stoveBrand || !stoveModel || stoveTotalQty <= 0 || stoveTotalAmount <= 0}
-              >
+              <Button type="button" size="lg" className="w-full h-14 font-semibold bg-gradient-to-r from-amber-500 to-orange-500 text-white" onClick={addStoveToCart} disabled={!formState.stoveBrand || !formState.stoveModel || stoveTotalQty <= 0 || formState.stoveTotalAmount <= 0}>
                 <Plus className="h-5 w-5 mr-2" />Add to Cart
               </Button>
             </>
@@ -1236,68 +966,32 @@ export const InventoryPOBDrawer = ({
     if (productType === 'regulator') {
       return (
         <div className="space-y-4">
-          {/* Brand - Using BrandSelect */}
           <div className="space-y-2">
             <Label className="text-sm font-medium">Brand Name</Label>
-            <BrandSelect
-              type="regulator"
-              value={regulatorBrand}
-              onChange={(value) => setRegulatorBrand(value)}
-              allowCustom={true}
-              className="h-12"
-            />
+            <BrandSelect type="regulator" value={formState.regulatorBrand} onChange={(v) => updateFormField('regulatorBrand', v)} allowCustom={true} className="h-12" />
           </div>
-
-          {/* Quantity by Valve Type */}
           <div className="space-y-3">
             <div className="flex items-center gap-2 pb-1 border-b">
-              <Gauge className="h-5 w-5 text-info" />
+              <Gauge className="h-5 w-5 text-blue-500" />
               <Label className="text-base font-bold">Quantity (By Valve Type)</Label>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <ValveSizeQuantityCard value={regQty22mm} onChange={setRegQty22mm} valveSize="22mm" stockLabel={`${regulatorValveStats["22mm"]} pcs`} />
-              <ValveSizeQuantityCard value={regQty20mm} onChange={setRegQty20mm} valveSize="20mm" stockLabel={`${regulatorValveStats["20mm"]} pcs`} />
+              <ValveSizeQuantityCard value={formState.regQty22mm} onChange={(v) => updateFormField('regQty22mm', v)} valveSize="22mm" stockLabel={`${regulatorValveStats["22mm"]} pcs`} />
+              <ValveSizeQuantityCard value={formState.regQty20mm} onChange={(v) => updateFormField('regQty20mm', v)} valveSize="20mm" stockLabel={`${regulatorValveStats["20mm"]} pcs`} />
             </div>
-            {regTotalQty > 0 && (
-              <div className="flex items-center justify-between p-3 bg-info/10 rounded-lg border border-info/20">
-                <span className="font-medium">Total: {regTotalQty} regulators</span>
-              </div>
-            )}
           </div>
-
-          {/* Total Amount - Only in Buy Mode */}
           {isBuyMode && (
             <>
               <Separator />
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Total D.O. Amount ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
-                <Input 
-                  type="number" 
-                  inputMode="numeric" 
-                  placeholder="Enter total amount..." 
-                  value={regulatorTotalAmount || ""} 
-                  onChange={(e) => setRegulatorTotalAmount(parseInt(e.target.value) || 0)} 
-                  className="h-14 text-lg font-semibold" 
-                />
+                <Input type="number" inputMode="numeric" placeholder="Enter total amount..." value={formState.regulatorTotalAmount || ""} onChange={(e) => updateFormField('regulatorTotalAmount', parseInt(e.target.value) || 0)} className="h-14 text-lg font-semibold" />
               </div>
-
-              {/* Unit Price */}
-              <div className="flex items-center justify-between p-4 bg-info/10 rounded-xl border border-info/20">
-                <div className="flex items-center gap-2">
-                  <Calculator className="h-5 w-5 text-info" />
-                  <span className="font-medium">Unit Price</span>
-                </div>
-                <span className="text-2xl font-extrabold text-info">{BANGLADESHI_CURRENCY_SYMBOL}{regulatorCompanyPrice.toLocaleString()}</span>
+              <div className="flex items-center justify-between p-4 bg-blue-500/10 rounded-xl border border-blue-500/20">
+                <div className="flex items-center gap-2"><Calculator className="h-5 w-5 text-blue-500" /><span className="font-medium">Unit Price</span></div>
+                <span className="text-2xl font-extrabold text-blue-500 tabular-nums">{BANGLADESHI_CURRENCY_SYMBOL}{regulatorCompanyPrice.toLocaleString()}</span>
               </div>
-
-              {/* Add to Cart */}
-              <Button 
-                type="button" 
-                size="lg" 
-                className="w-full h-14 font-semibold bg-gradient-to-r from-info to-cyan-500 text-white" 
-                onClick={addRegulatorToCart} 
-                disabled={!regulatorBrand || regTotalQty <= 0 || regulatorTotalAmount <= 0}
-              >
+              <Button type="button" size="lg" className="w-full h-14 font-semibold bg-gradient-to-r from-blue-500 to-cyan-500 text-white" onClick={addRegulatorToCart} disabled={!formState.regulatorBrand || regTotalQty <= 0 || formState.regulatorTotalAmount <= 0}>
                 <Plus className="h-5 w-5 mr-2" />Add to Cart
               </Button>
             </>
@@ -1305,508 +999,43 @@ export const InventoryPOBDrawer = ({
         </div>
       );
     }
-
     return null;
   };
 
-  // Cart view with integrated checkout (2-step flow)
-  const renderCart = () => (
-    <div className="flex flex-col h-full">
-      <ScrollArea className="flex-1">
-        {purchaseItems.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-            <ShoppingBag className="h-16 w-16 opacity-30 mb-4" />
-            <p className="font-semibold">Cart is empty</p>
-            <p className="text-sm">Add products to get started</p>
-          </div>
-        ) : (
-          <div className="p-4 space-y-3">
-            {purchaseItems.map((item) => (
-              <Card key={item.id} className="overflow-hidden border" style={{ borderLeftWidth: '4px', borderLeftColor: item.brandColor || (item.type === 'stove' ? 'hsl(var(--warning))' : item.type === 'regulator' ? 'hsl(var(--info))' : 'hsl(var(--primary))') }}>
-                <div className="flex items-center justify-between p-3">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-lg flex items-center justify-center bg-muted">
-                      {item.type === 'lpg' && <Cylinder className="h-5 w-5" style={{ color: item.brandColor || 'hsl(var(--primary))' }} />}
-                      {item.type === 'stove' && <ChefHat className="h-5 w-5 text-warning" />}
-                      {item.type === 'regulator' && <Gauge className="h-5 w-5 text-info" />}
-                    </div>
-                    <div>
-                      <p className="font-semibold text-sm">{item.name}</p>
-                      <p className="text-xs text-muted-foreground">{item.details}</p>
-                      <p className="text-xs font-medium text-primary">{item.quantity} × {BANGLADESHI_CURRENCY_SYMBOL}{item.companyPrice.toLocaleString()}</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-bold">{BANGLADESHI_CURRENCY_SYMBOL}{(item.quantity * item.companyPrice).toLocaleString()}</p>
-                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => removeItem(item.id)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </Card>
-            ))}
-          </div>
-        )}
-      </ScrollArea>
-      
-      {purchaseItems.length > 0 && (
-        <div className="p-4 bg-muted/50 border-t space-y-3">
-          {/* Summary Cards */}
-          <div className="grid grid-cols-2 gap-3">
-            <Card className="border-2 border-success/30 bg-success/10">
-              <CardContent className="p-3 text-center">
-                <p className="text-xs font-bold text-success">Total Qty</p>
-                <p className="text-2xl font-black text-success">{purchaseItemsCount}</p>
-              </CardContent>
-            </Card>
-            <Card className="border-2 border-primary/30 bg-primary/10">
-              <CardContent className="p-3 text-center">
-                <p className="text-xs font-bold text-primary">Total D.O.</p>
-                <p className="text-xl font-black text-primary">{BANGLADESHI_CURRENCY_SYMBOL}{total.toLocaleString()}</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Optional Supplier - Collapsible */}
-          <Collapsible open={showSupplierInput} onOpenChange={setShowSupplierInput}>
-            <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-muted rounded-lg hover:bg-muted/80 transition-colors">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Building2 className="h-4 w-4" />
-                <span>Add Supplier (Optional)</span>
-              </div>
-              <ChevronDown className={`h-4 w-4 transition-transform ${showSupplierInput ? 'rotate-180' : ''}`} />
-            </CollapsibleTrigger>
-            <CollapsibleContent className="pt-2">
-              <Input
-                placeholder="Enter supplier name..."
-                value={supplierName}
-                onChange={(e) => setSupplierName(e.target.value)}
-                className="h-11"
-              />
-              <p className="text-[10px] text-muted-foreground mt-1 text-center">
-                If left empty, brand name will be used as supplier
-              </p>
-            </CollapsibleContent>
-          </Collapsible>
-
-          {/* Complete Purchase Buttons */}
-          <div className="space-y-2">
-            <Button 
-              type="button" 
-              size="lg" 
-              className="w-full h-12 font-bold bg-gradient-to-r from-success to-emerald-600 hover:from-success/90 hover:to-emerald-600/90" 
-              onClick={() => handleCompletePurchase('completed')}
-              disabled={processing}
-            >
-              {processing ? (
-                <Loader2 className="h-5 w-5 animate-spin mr-2" />
-              ) : (
-                <CheckCircle2 className="h-5 w-5 mr-2" />
-              )}
-              Complete (Paid)
-            </Button>
-            <Button 
-              type="button" 
-              size="lg" 
-              variant="outline"
-              className="w-full h-12 font-bold border-2 border-warning text-warning hover:bg-warning/10" 
-              onClick={() => handleCompletePurchase('pending')}
-              disabled={processing}
-            >
-              {processing ? (
-                <Loader2 className="h-5 w-5 animate-spin mr-2" />
-              ) : (
-                <CreditCard className="h-5 w-5 mr-2" />
-              )}
-              Save as Credit
-            </Button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-
-  // Get title based on product type
-  const getTitle = () => {
-    switch (productType) {
-      case 'lpg': return 'Buy LPG Cylinders';
-      case 'stove': return 'Buy Gas Stoves';
-      case 'regulator': return 'Buy Regulators';
-      default: return 'Buy Products';
-    }
-  };
-
+  // Helper functions
   const getIcon = () => {
-    switch (productType) {
-      case 'lpg': return <Cylinder className="h-5 w-5" />;
-      case 'stove': return <ChefHat className="h-5 w-5" />;
-      case 'regulator': return <Gauge className="h-5 w-5" />;
-      default: return <ShoppingBag className="h-5 w-5" />;
-    }
+    if (productType === 'lpg') return <Cylinder className="h-5 w-5" />;
+    if (productType === 'stove') return <ChefHat className="h-5 w-5" />;
+    return <Gauge className="h-5 w-5" />;
   };
 
-  // Mobile cart view with integrated checkout (2-step flow)
-  const renderCartMobile = () => (
-    <div className="pb-6">
-      {purchaseItems.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-          <ShoppingBag className="h-16 w-16 opacity-30 mb-4" />
-          <p className="font-semibold">Cart is empty</p>
-          <p className="text-sm">Add products to get started</p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {purchaseItems.map((item) => (
-            <Card key={item.id} className="overflow-hidden border" style={{ borderLeftWidth: '4px', borderLeftColor: item.brandColor || (item.type === 'stove' ? 'hsl(var(--warning))' : item.type === 'regulator' ? 'hsl(var(--info))' : 'hsl(var(--primary))') }}>
-              <div className="flex items-center justify-between p-3">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-lg flex items-center justify-center bg-muted">
-                    {item.type === 'lpg' && <Cylinder className="h-5 w-5" style={{ color: item.brandColor || 'hsl(var(--primary))' }} />}
-                    {item.type === 'stove' && <ChefHat className="h-5 w-5 text-warning" />}
-                    {item.type === 'regulator' && <Gauge className="h-5 w-5 text-info" />}
-                  </div>
-                  <div>
-                    <p className="font-semibold text-sm">{item.name}</p>
-                    <p className="text-xs text-muted-foreground">{item.details}</p>
-                    <p className="text-xs font-medium text-primary">{item.quantity} × {BANGLADESHI_CURRENCY_SYMBOL}{item.companyPrice.toLocaleString()}</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="font-bold">{BANGLADESHI_CURRENCY_SYMBOL}{(item.quantity * item.companyPrice).toLocaleString()}</p>
-                  <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => removeItem(item.id)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </Card>
-          ))}
-          
-          {/* Cart Summary with Checkout */}
-          <div className="pt-4 space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <Card className="border-2 border-success/30 bg-success/10">
-                <CardContent className="p-3 text-center">
-                  <p className="text-xs font-bold text-success">Total Qty</p>
-                  <p className="text-2xl font-black text-success">{purchaseItemsCount}</p>
-                </CardContent>
-              </Card>
-              <Card className="border-2 border-primary/30 bg-primary/10">
-                <CardContent className="p-3 text-center">
-                  <p className="text-xs font-bold text-primary">Total D.O.</p>
-                  <p className="text-xl font-black text-primary">{BANGLADESHI_CURRENCY_SYMBOL}{total.toLocaleString()}</p>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Optional Supplier - Collapsible */}
-            <Collapsible open={showSupplierInput} onOpenChange={setShowSupplierInput}>
-              <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-muted rounded-lg hover:bg-muted/80 transition-colors">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Building2 className="h-4 w-4" />
-                  <span>Add Supplier (Optional)</span>
-                </div>
-                <ChevronDown className={`h-4 w-4 transition-transform ${showSupplierInput ? 'rotate-180' : ''}`} />
-              </CollapsibleTrigger>
-              <CollapsibleContent className="pt-2">
-                <Input
-                  placeholder="Enter supplier name..."
-                  value={supplierName}
-                  onChange={(e) => setSupplierName(e.target.value)}
-                  className="h-11"
-                />
-                <p className="text-[10px] text-muted-foreground mt-1 text-center">
-                  If left empty, brand name will be used as supplier
-                </p>
-              </CollapsibleContent>
-            </Collapsible>
-
-            {/* Complete Purchase Buttons */}
-            <div className="space-y-2">
-              <Button 
-                type="button" 
-                size="lg" 
-                className="w-full h-14 font-bold bg-gradient-to-r from-success to-emerald-600 hover:from-success/90 hover:to-emerald-600/90" 
-                onClick={() => handleCompletePurchase('completed')}
-                disabled={processing}
-              >
-                {processing ? (
-                  <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                ) : (
-                  <CheckCircle2 className="h-5 w-5 mr-2" />
-                )}
-                Complete (Paid)
-              </Button>
-              <Button 
-                type="button" 
-                size="lg" 
-                variant="outline"
-                className="w-full h-14 font-bold border-2 border-warning text-warning hover:bg-warning/10" 
-                onClick={() => handleCompletePurchase('pending')}
-                disabled={processing}
-              >
-                {processing ? (
-                  <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                ) : (
-                  <CreditCard className="h-5 w-5 mr-2" />
-                )}
-                Save as Credit
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-
-  // Quick Add to Stock (without cart/checkout flow) - CASE-INSENSITIVE DB QUERIES
-  const quickAddToStock = async () => {
-    setProcessing(true);
-    try {
-      if (productType === 'lpg') {
-        if (!lpgBrandName || lpgTotalQty <= 0) {
-          toast({ title: "Please select brand and enter quantity", variant: "destructive" });
-          setProcessing(false);
-          return;
-        }
-
-        // Validate brand name
-        const validation = validateCustomBrand(lpgBrandName);
-        if (!validation.valid) {
-          toast({ title: validation.error, variant: "destructive" });
-          setProcessing(false);
-          return;
-        }
-
-        for (const valveSize of ['22mm', '20mm'] as const) {
-          const qty = valveSize === '22mm' ? lpgQty22mm : lpgQty20mm;
-          if (qty <= 0) continue;
-
-          // CASE-INSENSITIVE DB lookup
-          const { data: existingBrand } = await supabase
-            .from('lpg_brands')
-            .select('id, refill_cylinder, package_cylinder')
-            .ilike('name', lpgBrandName)
-            .eq('size', valveSize)
-            .eq('weight', lpgWeight)
-            .eq('is_active', true)
-            .maybeSingle();
-
-          if (existingBrand) {
-            const stockField = lpgCylinderType === 'refill' ? 'refill_cylinder' : 'package_cylinder';
-            const currentStock = existingBrand[stockField as keyof typeof existingBrand] as number || 0;
-            await supabase
-              .from('lpg_brands')
-              .update({ 
-                [stockField]: currentStock + qty,
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', existingBrand.id);
-          } else {
-            const brandColor = getLpgBrandColor(lpgBrandName);
-            const { error: insertError } = await supabase
-              .from('lpg_brands')
-              .insert({
-                name: lpgBrandName,
-                size: valveSize,
-                weight: lpgWeight,
-                color: brandColor,
-                refill_cylinder: lpgCylinderType === 'refill' ? qty : 0,
-                package_cylinder: lpgCylinderType === 'package' ? qty : 0,
-                empty_cylinder: 0,
-                problem_cylinder: 0
-              });
-            
-            // Handle duplicate (race condition) - update instead
-            if (insertError?.code === '23505') {
-              const { data: duplicate } = await supabase
-                .from('lpg_brands')
-                .select('id, refill_cylinder, package_cylinder')
-                .ilike('name', lpgBrandName)
-                .eq('size', valveSize)
-                .eq('weight', lpgWeight)
-                .maybeSingle();
-              
-              if (duplicate) {
-                const stockField = lpgCylinderType === 'refill' ? 'refill_cylinder' : 'package_cylinder';
-                const currentStock = duplicate[stockField as keyof typeof duplicate] as number || 0;
-                await supabase
-                  .from('lpg_brands')
-                  .update({ [stockField]: currentStock + qty })
-                  .eq('id', duplicate.id);
-              }
-            }
-          }
-        }
-        toast({ title: "Stock Added!", description: `${lpgTotalQty} ${lpgBrandName} cylinders added` });
-      } else if (productType === 'stove') {
-        if (!stoveBrand || !stoveModel || stoveTotalQty <= 0) {
-          toast({ title: "Please fill brand, model and quantity", variant: "destructive" });
-          setProcessing(false);
-          return;
-        }
-
-        for (const burnerType of ['single', 'double'] as const) {
-          const qty = burnerType === 'single' ? stoveQtySingle : stoveQtyDouble;
-          if (qty <= 0) continue;
-
-          const burners = burnerType === 'single' ? 1 : 2;
-          
-          // CASE-INSENSITIVE DB lookup
-          const { data: existingStove } = await supabase
-            .from('stoves')
-            .select('id, quantity')
-            .ilike('brand', stoveBrand)
-            .ilike('model', stoveModel)
-            .eq('burners', burners)
-            .eq('is_active', true)
-            .maybeSingle();
-
-          if (existingStove) {
-            await supabase
-              .from('stoves')
-              .update({ 
-                quantity: (existingStove.quantity || 0) + qty,
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', existingStove.id);
-          } else {
-            const { error: insertError } = await supabase
-              .from('stoves')
-              .insert({
-                brand: stoveBrand,
-                model: stoveModel,
-                burners,
-                quantity: qty,
-                price: 0
-              });
-            
-            // Handle duplicate
-            if (insertError?.code === '23505') {
-              const { data: duplicate } = await supabase
-                .from('stoves')
-                .select('id, quantity')
-                .ilike('brand', stoveBrand)
-                .ilike('model', stoveModel)
-                .eq('burners', burners)
-                .maybeSingle();
-              
-              if (duplicate) {
-                await supabase
-                  .from('stoves')
-                  .update({ quantity: (duplicate.quantity || 0) + qty })
-                  .eq('id', duplicate.id);
-              }
-            }
-          }
-        }
-        toast({ title: "Stock Added!", description: `${stoveTotalQty} ${stoveBrand} stoves added` });
-      } else if (productType === 'regulator') {
-        if (!regulatorBrand || regTotalQty <= 0) {
-          toast({ title: "Please select brand and enter quantity", variant: "destructive" });
-          setProcessing(false);
-          return;
-        }
-
-        for (const valveType of ['22mm', '20mm'] as const) {
-          const qty = valveType === '22mm' ? regQty22mm : regQty20mm;
-          if (qty <= 0) continue;
-
-          // CASE-INSENSITIVE DB lookup
-          const { data: existingReg } = await supabase
-            .from('regulators')
-            .select('id, quantity')
-            .ilike('brand', regulatorBrand)
-            .eq('type', valveType)
-            .eq('is_active', true)
-            .maybeSingle();
-
-          if (existingReg) {
-            await supabase
-              .from('regulators')
-              .update({ quantity: (existingReg.quantity || 0) + qty })
-              .eq('id', existingReg.id);
-          } else {
-            const { error: insertError } = await supabase
-              .from('regulators')
-              .insert({
-                brand: regulatorBrand,
-                type: valveType,
-                quantity: qty
-              });
-            
-            // Handle duplicate
-            if (insertError?.code === '23505') {
-              const { data: duplicate } = await supabase
-                .from('regulators')
-                .select('id, quantity')
-                .ilike('brand', regulatorBrand)
-                .eq('type', valveType)
-                .maybeSingle();
-              
-              if (duplicate) {
-                await supabase
-                  .from('regulators')
-                  .update({ quantity: (duplicate.quantity || 0) + qty })
-                  .eq('id', duplicate.id);
-              }
-            }
-          }
-        }
-        toast({ title: "Stock Added!", description: `${regTotalQty} ${regulatorBrand} regulators added` });
-      }
-
-      // Reset form and close
-      resetFormFields();
-      onPurchaseComplete();
-      onOpenChange(false);
-    } catch (error: any) {
-      logger.error('Quick add error', error, { component: 'POBDrawer' });
-      toast({ title: "Error adding stock", description: error.message, variant: "destructive" });
-    } finally {
-      setProcessing(false);
-    }
-  };
-
-  // Reset form fields helper
-  const resetFormFields = () => {
-    setLpgBrandName("");
-    setLpgQty22mm(0);
-    setLpgQty20mm(0);
-    setLpgTotalDO(0);
-    setStoveBrand("");
-    setStoveModel("");
-    setStoveQtySingle(0);
-    setStoveQtyDouble(0);
-    setStoveTotalAmount(0);
-    setRegulatorBrand("");
-    setRegQty22mm(0);
-    setRegQty20mm(0);
-    setRegulatorTotalAmount(0);
-    setPurchaseItems([]);
-    setMobileStep('product');
-    setPobMode('buy');
-    setSupplierName("");
-    setShowSupplierInput(false);
+  const getTitle = () => {
+    if (productType === 'lpg') return 'LPG Cylinder';
+    if (productType === 'stove') return 'Gas Stove';
+    return 'Regulator';
   };
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent 
         side={isMobile ? "bottom" : "right"} 
-        className={isMobile 
-          ? "h-[95vh] rounded-t-2xl flex flex-col overflow-hidden p-0" 
-          : "w-full sm:max-w-xl flex flex-col p-0"
-        }
+        className={cn(
+          isMobile 
+            ? "h-[95vh] rounded-t-2xl flex flex-col overflow-hidden p-0" 
+            : "w-full sm:max-w-xl flex flex-col p-0",
+          "pb-[env(safe-area-inset-bottom)]"
+        )}
       >
-        {/* Compact Fixed Header */}
+        {/* Header */}
         <div className="flex-shrink-0 px-4 pt-4 pb-3 border-b bg-background">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
-              <div className={`h-9 w-9 rounded-xl flex items-center justify-center ${
+              <div className={cn(
+                "h-9 w-9 rounded-xl flex items-center justify-center",
                 productType === 'lpg' ? 'bg-primary/10 text-primary' :
                 productType === 'stove' ? 'bg-orange-500/10 text-orange-500' :
                 'bg-violet-500/10 text-violet-500'
-              }`}>
+              )}>
                 {getIcon()}
               </div>
               <div>
@@ -1821,25 +1050,11 @@ export const InventoryPOBDrawer = ({
           
           {/* Mode Toggle */}
           <div className="flex bg-muted/50 rounded-lg p-1 mt-3">
-            <Button 
-              type="button"
-              variant={pobMode === 'buy' ? 'default' : 'ghost'} 
-              size="sm" 
-              className="flex-1 h-10 text-xs font-medium gap-1.5" 
-              onClick={() => setPobMode('buy')}
-            >
-              <ShoppingCart className="h-3.5 w-3.5" />
-              Buy from Company
+            <Button type="button" variant={pobMode === 'buy' ? 'default' : 'ghost'} size="sm" className="flex-1 h-10 text-xs font-medium gap-1.5" onClick={() => setPobMode('buy')}>
+              <ShoppingCart className="h-3.5 w-3.5" />Buy from Company
             </Button>
-            <Button 
-              type="button"
-              variant={pobMode === 'add' ? 'secondary' : 'ghost'} 
-              size="sm" 
-              className="flex-1 h-10 text-xs font-medium gap-1.5" 
-              onClick={() => setPobMode('add')}
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Add Existing Stock
+            <Button type="button" variant={pobMode === 'add' ? 'secondary' : 'ghost'} size="sm" className="flex-1 h-10 text-xs font-medium gap-1.5" onClick={() => setPobMode('add')}>
+              <Plus className="h-3.5 w-3.5" />Add Existing Stock
             </Button>
           </div>
         </div>
@@ -1849,52 +1064,32 @@ export const InventoryPOBDrawer = ({
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         ) : pobMode === 'add' ? (
-          /* Quick Add Mode - Simplified Form */
           <ScrollArea className="flex-1 min-h-0">
             <div className="p-4 pb-8 space-y-4">
               {renderProductForm()}
-              
-              {/* Quick Add Button */}
               <Button 
                 type="button" 
                 size="lg" 
-                className="w-full h-14 font-bold bg-gradient-to-r from-success to-emerald-600 hover:from-success/90 hover:to-emerald-600/90" 
+                className="w-full h-14 font-bold bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-500/90 hover:to-emerald-600/90" 
                 onClick={quickAddToStock}
-                disabled={processing || (productType === 'lpg' && (!lpgBrandName || lpgTotalQty <= 0)) || 
-                  (productType === 'stove' && (!stoveBrand || !stoveModel || stoveTotalQty <= 0)) ||
-                  (productType === 'regulator' && (!regulatorBrand || regTotalQty <= 0))}
+                disabled={processing || (productType === 'lpg' && (!formState.lpgBrandName || lpgTotalQty <= 0)) || 
+                  (productType === 'stove' && (!formState.stoveBrand || !formState.stoveModel || stoveTotalQty <= 0)) ||
+                  (productType === 'regulator' && (!formState.regulatorBrand || regTotalQty <= 0))}
               >
-                {processing ? (
-                  <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                ) : (
-                  <Plus className="h-5 w-5 mr-2" />
-                )}
+                {processing ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <Plus className="h-5 w-5 mr-2" />}
                 Add to Inventory
               </Button>
             </div>
           </ScrollArea>
         ) : (
-          /* Buy Mode - Full Cart/Checkout Flow */
           <>
-            {/* Mobile Step Navigation - 2 Steps */}
+            {/* Mobile Step Navigation */}
             {isMobile && (
               <div className="flex items-center bg-muted/30 p-1 mx-3 mt-2 rounded-lg flex-shrink-0">
-                <Button 
-                  type="button"
-                  variant={mobileStep === 'product' ? 'default' : 'ghost'} 
-                  size="sm" 
-                  className="flex-1 h-10 text-xs font-medium" 
-                  onClick={() => setMobileStep('product')}
-                >
+                <Button type="button" variant={mobileStep === 'product' ? 'default' : 'ghost'} size="sm" className="flex-1 h-10 text-xs font-medium" onClick={() => setMobileStep('product')}>
                   1. Product
                 </Button>
-                <Button 
-                  type="button"
-                  variant={mobileStep === 'cart' ? 'default' : 'ghost'} 
-                  size="sm" 
-                  className="flex-1 h-10 relative text-xs font-medium" 
-                  onClick={() => setMobileStep('cart')}
-                >
+                <Button type="button" variant={mobileStep === 'cart' ? 'default' : 'ghost'} size="sm" className="flex-1 h-10 relative text-xs font-medium" onClick={() => setMobileStep('cart')}>
                   2. Cart & Pay
                   {purchaseItemsCount > 0 && (
                     <Badge className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center text-[9px]">{purchaseItemsCount}</Badge>
@@ -1903,26 +1098,44 @@ export const InventoryPOBDrawer = ({
               </div>
             )}
 
-            {/* Mobile: Scrollable Content Area */}
             {isMobile ? (
               <ScrollArea className="flex-1 min-h-0">
                 <div className="px-4 pb-8 pt-3">
-                  {mobileStep === 'product' && (
-                    <div className="space-y-4">
-                      {renderProductForm()}
-                    </div>
+                  {mobileStep === 'product' && <div className="space-y-4">{renderProductForm()}</div>}
+                  {mobileStep === 'cart' && (
+                    <POBCartView
+                      items={purchaseItems}
+                      onRemoveItem={removeItem}
+                      subtotal={subtotal}
+                      totalQty={purchaseItemsCount}
+                      supplierName={supplierName}
+                      onSupplierChange={setSupplierName}
+                      showSupplierInput={showSupplierInput}
+                      onShowSupplierInputChange={setShowSupplierInput}
+                      onCompletePurchase={handleCompletePurchase}
+                      processing={processing}
+                    />
                   )}
-                  {mobileStep === 'cart' && renderCartMobile()}
                 </div>
               </ScrollArea>
             ) : (
-              /* Desktop: Side-by-side scrollable */
               <div className="flex flex-col flex-1 min-h-0">
                 <ScrollArea className="flex-1">
                   <div className="p-4 space-y-4">
                     {renderProductForm()}
                     <Separator className="my-4" />
-                    {renderCart()}
+                    <POBCartView
+                      items={purchaseItems}
+                      onRemoveItem={removeItem}
+                      subtotal={subtotal}
+                      totalQty={purchaseItemsCount}
+                      supplierName={supplierName}
+                      onSupplierChange={setSupplierName}
+                      showSupplierInput={showSupplierInput}
+                      onShowSupplierInputChange={setShowSupplierInput}
+                      onCompletePurchase={handleCompletePurchase}
+                      processing={processing}
+                    />
                   </div>
                 </ScrollArea>
               </div>
