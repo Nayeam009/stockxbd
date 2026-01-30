@@ -59,9 +59,6 @@ const Dashboard = () => {
     }
   }, [location.search]);
 
-  // Safety timeout to prevent infinite loading
-  const [safetyTimeoutReached, setSafetyTimeoutReached] = useState(false);
-
   // Smooth module switching with transitions
   const handleModuleChange = useCallback((module: string) => {
     startTransition(() => {

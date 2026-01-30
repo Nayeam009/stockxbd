@@ -33,7 +33,7 @@ export const DashboardOverview = ({
 
   // Use analytics data directly
   const todaySales = analytics.todayCashRevenue || 0;
-  const todayExpenses = 0; // Will be calculated from expenses module
+  const todayExpenses = analytics.todayExpenses || 0;
   const todayProfit = analytics.todayRevenue - todayExpenses;
   const activeOrders = {
     total_active: analytics.activeOrders || 0,
@@ -280,7 +280,7 @@ export const DashboardOverview = ({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setActiveModule?.('lpg-stock')}
+                onClick={() => setActiveModule?.('inventory')}
               >
                 Manage Stock
               </Button>
