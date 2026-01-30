@@ -109,6 +109,7 @@ export interface DashboardAnalytics {
   todayRevenue: number;
   todayCashRevenue: number;
   todayDueRevenue: number;
+  todayExpenses: number;
   monthlyRevenue: number;
   lastMonthRevenue: number;
   monthlyGrowthPercent: number;
@@ -134,6 +135,7 @@ export const useDashboardData = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
+  const [todayExpenses, setTodayExpenses] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [softLoading, setSoftLoading] = useState(false);
 
@@ -166,7 +168,8 @@ export const useDashboardData = () => {
         ordersDataResult,
         lpgBrandsResult,
         stovesResult,
-        userRolesResult
+        userRolesResult,
+        expensesResult
       ] = await Promise.all([
         supabase
           .from('pos_transactions')
@@ -214,7 +217,8 @@ export const useDashboardData = () => {
           .limit(500),
         supabase.from('lpg_brands').select('*').eq('is_active', true),
         supabase.from('stoves').select('*').eq('is_active', true),
-        supabase.from('user_roles').select('user_id, role').eq('role', 'manager')
+        supabase.from('user_roles').select('user_id, role').eq('role', 'manager'),
+        supabase.from('daily_expenses').select('amount').eq('expense_date', today)
       ]);
 
       const transactions = transactionsResult.data;
@@ -223,6 +227,11 @@ export const useDashboardData = () => {
       const lpgBrands = lpgBrandsResult.data;
       const stoves = stovesResult.data;
       const userRoles = userRolesResult.data;
+      const expenses = expensesResult.data;
+
+      // Calculate today's expenses
+      const calculatedTodayExpenses = expenses?.reduce((sum, e) => sum + Number(e.amount || 0), 0) || 0;
+      setTodayExpenses(calculatedTodayExpenses);
 
       const formattedSales: SalesData[] = transactions
         ? transactions.flatMap(txn =>
@@ -437,6 +446,7 @@ export const useDashboardData = () => {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pos_transactions' }, debouncedRefetch)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'lpg_brands' }, debouncedRefetch)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'customers' }, debouncedRefetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_expenses' }, debouncedRefetch)
       .subscribe();
 
     channelRef.current = channel;
@@ -497,6 +507,7 @@ export const useDashboardData = () => {
       todayRevenue: todayCashRevenue || 0,
       todayCashRevenue: todayCashRevenue || 0,
       todayDueRevenue: todayDueRevenue || 0,
+      todayExpenses: todayExpenses || 0,
       monthlyRevenue: monthlyRevenue || 0,
       lastMonthRevenue: lastMonthRevenue || 0,
       monthlyGrowthPercent: isNaN(monthlyGrowthPercent) ? 0 : monthlyGrowthPercent,
@@ -512,7 +523,7 @@ export const useDashboardData = () => {
       lostCustomers: lostCustomers || 0,
       activeDrivers: drivers.filter(driver => driver.status === 'active').length,
     };
-  }, [salesData, stockData, cylinderStock, customers, orders, drivers]);
+  }, [salesData, stockData, cylinderStock, customers, orders, drivers, todayExpenses]);
 
   return {
     salesData,

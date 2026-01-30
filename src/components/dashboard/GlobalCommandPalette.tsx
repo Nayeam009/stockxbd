@@ -128,12 +128,12 @@ export const GlobalCommandPalette = ({ userRole, setActiveModule }: GlobalComman
         setTimeout(() => toast.info('Click "Add Expense" to record a new expense'), 500);
         break;
       case 'action-add-stock':
-        setActiveModule('lpg-stock');
+        setActiveModule('inventory');
         setTimeout(() => toast.info('Click "Add Brand" to add new stock'), 500);
         break;
       case 'action-pay-salary':
-        setActiveModule('staff-salary');
-        setTimeout(() => toast.info('Click "Pay" on a staff member to make payment'), 500);
+        setActiveModule('utility-expense');
+        setTimeout(() => toast.info('Go to Staff Salary tab to make payment'), 500);
         break;
       case 'action-collect-due':
         setActiveModule('customers');
