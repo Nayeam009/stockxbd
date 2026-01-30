@@ -1,260 +1,221 @@
 
-# Complete Authentication System Rebuild Plan
+# Dashboard Rebuild Plan
 
 ## Current State Analysis
 
-The existing authentication system has several issues:
-1. **Loading loop problems** - Infinite loading states due to race conditions
-2. **Complex role management** - Mixing of `super_admin` with other roles
-3. **Synthetic email confusion** - Using `@customer.stockx` and `@manager.stockx` domains
-4. **Hardcoded storage keys** - Causing session detection failures across environments
+After thorough examination of the codebase, I identified the following issues that need fixing:
+
+### Issues Found
+
+| Issue | Location | Impact |
+|-------|----------|--------|
+| 1. **Legacy `super_admin` role reference** | `MobileBottomNav.tsx` line 10 | Type mismatch, unnecessary role |
+| 2. **Unused `safetyTimeoutReached` state** | `Dashboard.tsx` line 63 | Dead code, memory waste |
+| 3. **Missing expenses integration** | `DashboardOverview.tsx` line 36 | Hardcoded `todayExpenses = 0` |
+| 4. **Stale module references in navigation** | Multiple files | `lpg-stock`, `staff-salary` not mapped |
+| 5. **Incomplete role cleanup in types** | `MobileBottomNav.tsx` | Contains `super_admin` in interface |
 
 ---
 
-## New Architecture: 4-Tier User Hierarchy
+## Rebuild Architecture
+
+### Dashboard Shell Structure
 
 ```text
-+------------------+----------------------------------------+-------------------+
-|     Role         |              Access                    |   Login Method    |
-+------------------+----------------------------------------+-------------------+
-| Admin            | Super Admin + Shop Owner privileges    | Email + Password  |
-| (khnayeam009@)   | Global user management, Admin Panel    |                   |
-+------------------+----------------------------------------+-------------------+
-| Shop Owner       | Full shop management, Dashboard        | Email + Password  |
-|                  | POS, Inventory, Team Management        |                   |
-+------------------+----------------------------------------+-------------------+
-| Manager          | Dashboard access (no admin panel)      | Invite Link only  |
-|                  | POS, Inventory, Customer management    | Username+Password |
-+------------------+----------------------------------------+-------------------+
-| Customer         | LPG Community marketplace only         | Phone + Password  |
-|                  | Order, Profile, Shop discovery         |                   |
-+------------------+----------------------------------------+-------------------+
+┌─────────────────────────────────────────────────────────────────┐
+│  SidebarProvider (defaultOpen=false)                            │
+├─────────────┬───────────────────────────────────────────────────┤
+│  AppSidebar │              Main Content Area                    │
+│  (Desktop)  │  ┌────────────────────────────────────────────┐   │
+│             │  │  DashboardHeader                           │   │
+│  - Overview │  │  (Search, Notifications, Admin, Settings)  │   │
+│  - Admin    │  ├────────────────────────────────────────────┤   │
+│  - Diary    │  │                                            │   │
+│  - POS      │  │  Active Module Content                     │   │
+│  - My Shop  │  │  (Lazy loaded with Suspense)               │   │
+│  - Inventory│  │                                            │   │
+│  - Pricing  │  │  Wrapped in OfflineErrorBoundary           │   │
+│  - Customers│  │                                            │   │
+│  - Expenses │  ├────────────────────────────────────────────┤   │
+│  - Analysis │  │  MobileBottomNav (md:hidden)               │   │
+│  - Settings │  │  (Home, Diary, POS, MyShop, More)          │   │
+│             │  └────────────────────────────────────────────┘   │
+└─────────────┴───────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Part 1: Database Schema (Foundation)
+## Part 1: Fix Type Consistency
 
-### Tables to Keep (Already Exist)
-- `user_roles` - Stores role assignments (owner, manager, customer)
-- `admin_users` - Super admin designation (separate for security)
-- `profiles` - User profile data (name, phone, avatar)
-- `team_members` - Links managers to shop owners
-- `team_invites` - Secure invitation codes for managers
+### File: `src/components/dashboard/MobileBottomNav.tsx`
 
-### Database Functions to Verify/Update
+**Current (Line 10)**:
+```typescript
+userRole: 'owner' | 'manager' | 'super_admin';
+```
 
-1. **`has_role(user_id, role)`** - Check if user has specific role
-2. **`is_admin(user_id)`** - Check if user is owner OR manager
-3. **`is_super_admin(user_id)`** - Check admin_users table
-4. **`handle_new_user_role()`** - Trigger to assign default role on signup
-5. **`get_owner_id()`** - Get the canonical owner for multi-tenant isolation
+**Fixed**:
+```typescript
+userRole: 'owner' | 'manager';
+```
 
-### Migration Required
-- Remove any remaining `driver` or `staff` role references
-- Ensure `app_role` enum only has: `owner`, `manager`, `customer`
+**Additional Changes**:
+- Remove all `super_admin` from `roles` arrays in navItems (lines 14-34, 37-67)
+- These items should only have `['owner', 'manager']`
 
 ---
 
-## Part 2: Authentication Flow Redesign
+## Part 2: Clean Dead Code in Dashboard.tsx
 
-### Sign Up Flows
+### Remove Unused State (Line 63)
 
-**A. Customer Sign Up (Phone-based)**
-```text
-1. User selects "Customer" category
-2. Enters: Phone Number + Password + Name (optional)
-3. System creates synthetic email: 880XXXXXXXXX@customer.stockx
-4. Creates user in auth.users
-5. Trigger creates profile + assigns role='customer'
-6. Redirect to /community
+**Current**:
+```typescript
+const [safetyTimeoutReached, setSafetyTimeoutReached] = useState(false);
 ```
 
-**B. Shop Owner Sign Up (Email-based)**
-```text
-1. User selects "Shop Owner" category
-2. Enters: Email + Password + Name + Phone (optional)
-3. Creates user in auth.users
-4. Trigger creates profile + assigns role='owner'
-5. Redirect to /dashboard
-```
-
-**C. Manager Sign Up (Invite-only)**
-```text
-1. Manager clicks invite link from owner
-2. System validates invite code via validate_invite()
-3. Manager enters: Username + Password + Name + Phone
-4. Creates synthetic email: username@manager.stockx
-5. mark_invite_used() links manager to owner
-6. Assigns role='manager' + creates team_member record
-7. Redirect to /dashboard
-```
-
-### Sign In Flow (Universal)
-```text
-1. User enters: Login ID + Password
-2. Smart ID Resolution:
-   - Contains @ -> Email (Owner/Admin login)
-   - Matches BD phone pattern -> 880XXXXXXXXX@customer.stockx
-   - Otherwise -> username@manager.stockx
-3. Supabase signInWithPassword()
-4. Fetch role from user_roles
-5. Redirect based on role:
-   - customer -> /community
-   - owner/manager -> /dashboard
-```
+**Action**: Delete this line - it's never used anywhere in the component.
 
 ---
 
-## Part 3: Protected Route Logic
+## Part 3: Fix Expenses Integration in DashboardOverview
 
-### New ProtectedRoute.tsx Strategy
+### Current Issue (Line 36)
 
-```text
-┌─────────────────────────────────────────────────────┐
-│                   Component Mount                    │
-└─────────────────────────────────────────────────────┘
-                         │
-                         ▼
-┌─────────────────────────────────────────────────────┐
-│   1. Check localStorage for cached session          │
-│      hasValidStoredSession() -> boolean             │
-└─────────────────────────────────────────────────────┘
-                         │
-            ┌────────────┴────────────┐
-            │                         │
-         Yes │                         │ No
-            ▼                         ▼
-┌───────────────────┐    ┌───────────────────────────┐
-│ Render immediately │    │ Show loading spinner      │
-│ (optimistic)       │    │ Call getSession() with    │
-│                    │    │ 8s timeout                │
-└───────────────────┘    └───────────────────────────┘
-            │                         │
-            ▼                         ▼
-┌─────────────────────────────────────────────────────┐
-│   2. onAuthStateChange listener (runs async)        │
-│      - SIGNED_IN -> set authenticated=true          │
-│      - SIGNED_OUT -> clear session, redirect        │
-│      - TOKEN_REFRESHED -> skip role fetch           │
-└─────────────────────────────────────────────────────┘
-                         │
-                         ▼
-┌─────────────────────────────────────────────────────┐
-│   3. Safety Timeout (5s with session, 10s without)  │
-│      - Prevents infinite loading                    │
-│      - If hasStoredSession -> allow access anyway   │
-│      - If no session -> redirect to /auth           │
-└─────────────────────────────────────────────────────┘
-                         │
-                         ▼
-┌─────────────────────────────────────────────────────┐
-│   4. Role-based Redirect                            │
-│      - customer on /dashboard -> /community         │
-│      - owner/manager -> allow /dashboard            │
-└─────────────────────────────────────────────────────┘
+```typescript
+const todayExpenses = 0; // Will be calculated from expenses module
+```
+
+This is hardcoded to 0, making the profit calculation inaccurate.
+
+### Solution
+
+Integrate with `useBusinessDiaryData` hook or pass expenses from parent:
+
+1. Modify `useDashboardData.ts` to also fetch today's expenses from `daily_expenses` table
+2. Add `todayExpenses` to the `DashboardAnalytics` interface
+3. Pass real expense data to `DashboardOverview`
+
+**New Analytics Field**:
+```typescript
+// In useDashboardData.ts
+interface DashboardAnalytics {
+  // ... existing fields
+  todayExpenses: number; // Add this
+}
+```
+
+**Fetch Logic**:
+```typescript
+// Add to parallel fetch
+const expensesResult = await supabase
+  .from('daily_expenses')
+  .select('amount')
+  .eq('expense_date', today);
+
+const todayExpenses = expensesResult.data?.reduce((sum, e) => sum + Number(e.amount), 0) || 0;
 ```
 
 ---
 
-## Part 4: Auth Utilities Optimization
+## Part 4: Fix Navigation Module Mappings
 
-### authUtils.ts Functions
+### Issue in GlobalCommandPalette.tsx
 
-| Function | Purpose | Timeout |
-|----------|---------|---------|
-| `getAuthTokenStorageKey()` | Dynamic key detection (sb-*-auth-token) | N/A |
-| `getStoredSessionSnapshot()` | Extract userId, email, expiresAt from localStorage | N/A |
-| `hasValidStoredSession()` | Check if stored session is valid (60s buffer) | N/A |
-| `clearStoredAuthSession()` | Clear all auth data + cached roles | N/A |
-| `getSessionWithTimeout()` | Fetch session with timeout protection | 8000ms |
-| `isRefreshTokenError()` | Detect stale refresh token errors | N/A |
+Actions reference modules that don't exist in the switch statement:
+- `action-add-stock` → navigates to `lpg-stock` (should be `inventory`)
+- `action-pay-salary` → navigates to `staff-salary` (doesn't exist)
 
----
+### Fix Actions (lines 130-137)
 
-## Part 5: Role Hook Optimization
+```typescript
+case 'action-add-stock':
+  setActiveModule('inventory');  // Changed from 'lpg-stock'
+  setTimeout(() => toast.info('Click "Add Brand" to add new stock'), 500);
+  break;
+case 'action-pay-salary':
+  setActiveModule('utility-expense');  // Changed from 'staff-salary'
+  setTimeout(() => toast.info('Go to Staff Salary tab to make payment'), 500);
+  break;
+```
 
-### useUserRole.ts Strategy
+### DashboardOverview Quick Action (Line 283)
 
-```text
-1. SYNC: Read cached role from sessionStorage
-2. RENDER: Show UI immediately with cached role
-3. ASYNC: Fetch fresh role from database (non-blocking)
-4. UPDATE: Cache new role, update UI if changed
-5. TIMEOUT: 5s max for database fetch
+```typescript
+onClick={() => setActiveModule?.('inventory')}  // Changed from 'lpg-stock'
 ```
 
 ---
 
-## Part 6: Files to Modify
+## Part 5: Module Navigation Order Consistency
 
-### Core Auth Files
-| File | Changes |
-|------|---------|
-| `src/pages/Auth.tsx` | Simplify, fix role assignment |
-| `src/components/auth/ProtectedRoute.tsx` | Hardened timeout logic |
-| `src/lib/authUtils.ts` | Dynamic key detection |
-| `src/hooks/useUserRole.ts` | Cached role with background refresh |
+### File: `src/hooks/useSwipeNavigation.ts`
 
-### Dashboard Files
-| File | Changes |
-|------|---------|
-| `src/pages/Dashboard.tsx` | Remove loading loops |
-| `src/hooks/useDashboardData.ts` | Add timeout protection |
-| `src/components/dashboard/AppSidebar.tsx` | Role-based menu |
-| `src/components/dashboard/DashboardHeader.tsx` | Admin badge logic |
+Ensure module order matches sidebar order:
 
-### Edge Functions
-| File | Changes |
-|------|---------|
-| `supabase/functions/register-team-member/index.ts` | Keep as-is (secure) |
-| `supabase/functions/verify-owner/index.ts` | Review for role validation |
+```typescript
+const allModules = [
+  { id: 'overview', roles: ['owner', 'manager'] },
+  { id: 'business-diary', roles: ['owner', 'manager'] },
+  { id: 'pos', roles: ['owner', 'manager'] },
+  { id: 'my-shop', roles: ['owner', 'manager'] },
+  { id: 'inventory', roles: ['owner', 'manager'] },
+  { id: 'product-pricing', roles: ['owner', 'manager'] },
+  { id: 'customers', roles: ['owner', 'manager'] },
+  { id: 'utility-expense', roles: ['owner', 'manager'] },
+  { id: 'analysis-search', roles: ['owner', 'manager'] },
+  { id: 'settings', roles: ['owner', 'manager'] },
+];
+```
 
 ---
 
-## Part 7: Security Checklist
+## Part 6: Add Real-Time Expense Sync
 
-1. **Roles in separate table** - user_roles with RLS
-2. **Admin check server-side** - is_super_admin() is SECURITY DEFINER
-3. **No hardcoded admin check** - Always query admin_users table
-4. **Rate limiting** - rate_limit_attempts table + check_rate_limit()
-5. **Invite validation** - Server-side via validate_invite()
-6. **Session cleanup** - Clear all sensitive data on logout
+### File: `src/hooks/useDashboardData.ts`
 
----
+Add expense subscription to the real-time channel (Line 436):
 
-## Implementation Order
-
-| Step | Task | Priority |
-|------|------|----------|
-| 1 | Verify database schema (roles, admin_users) | High |
-| 2 | Fix authUtils.ts dynamic key detection | High |
-| 3 | Harden ProtectedRoute.tsx with timeouts | High |
-| 4 | Optimize useUserRole.ts caching | High |
-| 5 | Simplify Auth.tsx sign up/in flows | High |
-| 6 | Add timeout protection to useDashboardData.ts | Medium |
-| 7 | Update Dashboard.tsx loading logic | Medium |
-| 8 | Test all 4 user types end-to-end | High |
+```typescript
+.on('postgres_changes', { event: '*', schema: 'public', table: 'daily_expenses' }, debouncedRefetch)
+```
 
 ---
 
-## Testing Scenarios
+## Implementation Checklist
 
-1. **New Customer**: Phone signup -> /community redirect
-2. **New Owner**: Email signup -> /dashboard redirect  
-3. **New Manager**: Invite link -> join team -> /dashboard
-4. **Returning User**: Login with any ID type -> correct redirect
-5. **Session Expiry**: Refresh with stale token -> clear + redirect to /auth
-6. **Offline**: No network -> show offline error, allow retry
-7. **Admin Access**: khnayeam009@gmail.com -> Admin panel visible
+| Step | File | Action | Priority |
+|------|------|--------|----------|
+| 1 | `MobileBottomNav.tsx` | Remove `super_admin` from interface and arrays | High |
+| 2 | `Dashboard.tsx` | Remove unused `safetyTimeoutReached` state | Medium |
+| 3 | `useDashboardData.ts` | Add `todayExpenses` fetch and real-time sync | High |
+| 4 | `DashboardOverview.tsx` | Use `analytics.todayExpenses` instead of hardcoded 0 | High |
+| 5 | `GlobalCommandPalette.tsx` | Fix module navigation mappings | Medium |
+| 6 | `useSwipeNavigation.ts` | Verify module order matches sidebar | Low |
 
 ---
 
 ## Success Criteria
 
-- No infinite loading loops on any route
-- All 4 user types can sign up and sign in
-- Role-based redirects work correctly
-- Dashboard loads within 3 seconds
-- Session persistence works across page refreshes
-- Stale sessions are detected and cleared automatically
+After implementing this plan:
+
+1. **No TypeScript errors** - All role types are consistent (`'owner' | 'manager'`)
+2. **Accurate profit calculation** - Dashboard shows real expenses from `daily_expenses` table
+3. **Working quick actions** - All navigation commands route to valid modules
+4. **Real-time sync** - Expenses update automatically when added via Business Diary
+5. **Clean code** - No dead code or unused state variables
+6. **Consistent navigation** - Swipe gestures match sidebar order
+
+---
+
+## Testing Requirements
+
+After implementation, verify:
+
+1. Dashboard loads within 3 seconds for authenticated users
+2. KPI cards show accurate Today's Sale, Expense, and Profit
+3. Quick Actions navigate to correct modules
+4. Swipe gestures work on mobile (left/right)
+5. Real-time updates work when sales/expenses are added
+6. Admin panel only visible to admin user (khnayeam009@gmail.com)
+7. Customer users redirect to /community (not dashboard)
