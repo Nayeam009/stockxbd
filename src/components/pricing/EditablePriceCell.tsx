@@ -23,16 +23,24 @@ export const EditablePriceCell = ({
   icon: Icon,
   colorClass,
   isModified,
-  onValueChange,
-  customerType
+  onValueChange
 }: EditablePriceCellProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [localValue, setLocalValue] = useState(value);
   const inputRef = useRef<HTMLInputElement>(null);
+  const companyCommitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setLocalValue(value);
   }, [value]);
+
+  useEffect(() => {
+    return () => {
+      if (companyCommitTimerRef.current) {
+        clearTimeout(companyCommitTimerRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -84,7 +92,20 @@ export const EditablePriceCell = ({
             ref={inputRef}
             type="number"
             value={localValue}
-            onChange={(e) => setLocalValue(Number(e.target.value))}
+            onChange={(e) => {
+              const nextValue = Number(e.target.value);
+              setLocalValue(nextValue);
+
+              // Live update for Company price so LPG can auto-fill Wholesale/Retail immediately.
+              if (field === 'company_price') {
+                if (companyCommitTimerRef.current) {
+                  clearTimeout(companyCommitTimerRef.current);
+                }
+                companyCommitTimerRef.current = setTimeout(() => {
+                  onValueChange(productId, field, nextValue);
+                }, 150);
+              }
+            }}
             onBlur={handleBlur}
             onKeyDown={handleKeyDown}
             className="h-7 text-center font-semibold border-0 bg-transparent p-0 text-base focus-visible:ring-0"
@@ -95,11 +116,7 @@ export const EditablePriceCell = ({
             <span className="font-semibold text-sm sm:text-base tabular-nums">
               ৳{value.toLocaleString()}
             </span>
-            {customerType && (
-              <span className="text-[9px] text-muted-foreground/80 mt-0.5">
-                {customerType === 'retail' ? '(Retail)' : '(Wholesale)'}
-              </span>
-            )}
+            {/* Removed extra helper text for cleaner cards */}
           </div>
         )}
       </div>
