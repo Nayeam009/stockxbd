@@ -50,6 +50,9 @@ const Dashboard = () => {
   const [loadedModules, setLoadedModules] = useState<Set<string>>(new Set(['overview']));
   const [hasInitiallyLoaded, setHasInitiallyLoaded] = useState(false);
 
+  // Track module loading state for watchdog - MUST be before any conditionals
+  const [moduleLoading, setModuleLoading] = useState(false);
+
   // Sync activeModule with URL changes
   useEffect(() => {
     const param = params.get('module');
@@ -188,7 +191,12 @@ const Dashboard = () => {
     setOrders,
   } = useDashboardData();
 
-  // Never block on loading - always show dashboard with skeleton states
+  // Handle module retry from watchdog - MUST be before any conditionals
+  const handleModuleRetry = useCallback(() => {
+    refetch();
+    setModuleLoading(true);
+    setTimeout(() => setModuleLoading(false), 500);
+  }, [refetch, setModuleLoading]);
   // Auth is already verified by ProtectedRoute
   
   // Brief loading state only if auth is still initializing AND no userId yet
@@ -235,16 +243,6 @@ const Dashboard = () => {
   // Managers and owners are the only valid dashboard roles
   const dashboardRole: 'owner' | 'manager' = userRole === 'owner' ? 'owner' : 'manager';
   const navRole = dashboardRole;
-
-  // Track module loading state for watchdog
-  const [moduleLoading, setModuleLoading] = useState(false);
-
-  // Handle module retry from watchdog
-  const handleModuleRetry = useCallback(() => {
-    refetch();
-    setModuleLoading(true);
-    setTimeout(() => setModuleLoading(false), 500);
-  }, [refetch]);
 
   const renderActiveModule = () => {
     // Check if this module was previously loaded for faster revisit

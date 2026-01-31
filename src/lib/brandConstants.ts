@@ -338,19 +338,23 @@ export const REGULATOR_SUPPLIERS: SupplierInfo[] = [
 
 // ============= DEFAULT PRICING CONSTANTS =============
 // Default pricing formulas for cylinders (owner can edit as needed)
+// Refill: Company + 30 = Wholesale, Company + 50 = Retail
+// Package: Company + 50 = Wholesale, Company + 150 = Retail
 export const DEFAULT_PRICING = {
   refill: {
     wholesaleMarkup: 30,  // Company + 30 = Wholesale
-    retailMarkup: 20,     // Wholesale + 20 = Retail
+    retailMarkup: 50,     // Company + 50 = Retail (NOT Wholesale + 20)
   },
   package: {
-    wholesaleMarkup: 50,  // Company + 50 = Wholesale
-    retailMarkup: 100,    // Wholesale + 100 = Retail
+    wholesaleMarkup: 50,   // Company + 50 = Wholesale
+    retailMarkup: 150,     // Company + 150 = Retail (NOT Wholesale + 100)
   }
 };
 
 /**
  * Calculate default prices based on company price
+ * Refill: Wholesale = Company + 30, Retail = Company + 50
+ * Package: Wholesale = Company + 50, Retail = Company + 150
  */
 export const calculateDefaultPrices = (
   companyPrice: number, 
@@ -358,7 +362,7 @@ export const calculateDefaultPrices = (
 ): { wholesale: number; retail: number } => {
   const config = DEFAULT_PRICING[cylinderType];
   const wholesale = companyPrice + config.wholesaleMarkup;
-  const retail = wholesale + config.retailMarkup;
+  const retail = companyPrice + config.retailMarkup;
   return { wholesale, retail };
 };
 
