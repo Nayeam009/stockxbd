@@ -32,7 +32,8 @@ interface Profile {
 
 export const ProfileModule = () => {
   const { t } = useLanguage();
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -49,139 +50,91 @@ export const ProfileModule = () => {
 
   useEffect(() => {
     const initProfile = async () => {
+      setLoadError(null);
+
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+        // Add timeout protection
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Request timeout')), 10000)
+        );
 
-        setUserEmail(user.email || "");
+        const fetchPromise = (async () => {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) return null;
 
-        // Fetch user role
-        const { data: roleData } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', user.id)
-          .maybeSingle();
+          setUserEmail(user.email || "");
 
-        if (roleData) {
-          setUserRole(roleData.role);
-        }
+          // Fetch user role
+          const { data: roleData } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', user.id)
+            .maybeSingle();
 
-        // Check if user is admin
-        const { data: adminData, error: adminError } = await supabase
-          .from('admin_users')
-          .select('id')
-          .eq('user_id', user.id)
-          .maybeSingle();
+          if (roleData) {
+            setUserRole(roleData.role);
+          }
 
-        const isAdminUser = !!adminData;
-        setIsAdmin(isAdminUser);
+          // Check if user is admin
+          const { data: adminData } = await supabase
+            .from('admin_users')
+            .select('id')
+            .eq('user_id', user.id)
+            .maybeSingle();
 
-        // Fetch profile
-        const { data: profileData, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('user_id', user.id)
-          .single();
+          setIsAdmin(!!adminData);
 
-        if (error && error.code !== 'PGRST116') {
-          throw error;
-        }
+          // Fetch profile
+          const { data: profileData, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('user_id', user.id)
+            .single();
 
+          if (error && error.code !== 'PGRST116') {
+            throw error;
+          }
+
+          if (profileData) {
+            return profileData;
+          } else {
+            // Create profile if doesn't exist
+            const { data: newProfile, error: insertError } = await supabase
+              .from('profiles')
+              .insert({
+                user_id: user.id,
+                full_name: user.email?.split('@')[0] || 'User',
+              })
+              .select()
+              .single();
+
+            if (!insertError && newProfile) {
+              return newProfile;
+            }
+          }
+          return null;
+        })();
+
+        const profileData = await Promise.race([fetchPromise, timeoutPromise]);
+        
         if (profileData) {
           setProfile(profileData);
           setFormData({
             full_name: profileData.full_name || "",
             phone: profileData.phone || "",
           });
-        } else {
-          // Create profile if doesn't exist
-          const { data: newProfile, error: insertError } = await supabase
-            .from('profiles')
-            .insert({
-              user_id: user.id,
-              full_name: user.email?.split('@')[0] || 'User',
-            })
-            .select()
-            .single();
-
-          if (!insertError && newProfile) {
-            setProfile(newProfile);
-            setFormData({
-              full_name: newProfile.full_name || "",
-              phone: newProfile.phone || "",
-            });
-          }
         }
       } catch (error: any) {
         console.error('Error fetching profile:', error);
+        setLoadError(error.message || 'Failed to load profile');
       } finally {
-        setLoading(false);
+        setInitialLoading(false);
       }
     };
     initProfile();
   }, []);
 
-  const fetchProfile = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      setUserEmail(user.email || "");
-
-      // Fetch user role
-      const { data: roleData } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .single();
-
-      if (roleData) {
-        setUserRole(roleData.role);
-      }
-
-      // Fetch profile
-      const { data: profileData, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-
-      if (error && error.code !== 'PGRST116') {
-        throw error;
-      }
-
-      if (profileData) {
-        setProfile(profileData);
-        setFormData({
-          full_name: profileData.full_name || "",
-          phone: profileData.phone || "",
-        });
-      } else {
-        // Create profile if doesn't exist
-        const { data: newProfile, error: insertError } = await supabase
-          .from('profiles')
-          .insert({
-            user_id: user.id,
-            full_name: user.email?.split('@')[0] || 'User',
-          })
-          .select()
-          .single();
-
-        if (!insertError && newProfile) {
-          setProfile(newProfile);
-          setFormData({
-            full_name: newProfile.full_name || "",
-            phone: newProfile.phone || "",
-          });
-        }
-      }
-    } catch (error: any) {
-      console.error('Error fetching profile:', error);
-      toast.error(t('error_loading_profile'));
-    } finally {
-      setLoading(false);
-    }
-  };
+  // fetchProfile is now handled by initProfile - remove duplicate function
 
   const handleSaveProfile = async () => {
     if (!profile) return;
@@ -283,10 +236,23 @@ export const ProfileModule = () => {
     }
   };
 
-  if (loading) {
+  // Show skeleton during initial load
+  if (initialLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="space-y-6 max-w-3xl mx-auto animate-pulse">
+        <div className="h-8 w-48 bg-muted rounded" />
+        <div className="h-64 bg-muted rounded-lg" />
+        <div className="h-48 bg-muted rounded-lg" />
+      </div>
+    );
+  }
+
+  // Show error state
+  if (loadError && !profile) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-4">
+        <p className="text-destructive">{loadError}</p>
+        <Button onClick={() => window.location.reload()}>Retry</Button>
       </div>
     );
   }

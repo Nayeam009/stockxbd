@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -110,7 +110,9 @@ export const CustomerManagementModule = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [payments, setPayments] = useState<CustomerPayment[]>([]);
   const [salesHistory, setSalesHistory] = useState<POSTransaction[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [softLoading, setSoftLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [settleDialogOpen, setSettleDialogOpen] = useState(false);
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
@@ -137,43 +139,42 @@ export const CustomerManagementModule = () => {
   const [selectedTransaction, setSelectedTransaction] = useState<POSTransaction | null>(null);
   const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
 
-  useEffect(() => {
-    fetchCustomers();
-    fetchPayments();
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
-    // Real-time subscription
-    const channel = supabase
-      .channel('customer-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'customers' }, () => {
-        fetchCustomers();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pos_transactions' }, () => {
-        if (selectedCustomer) {
-          fetchCustomerSalesHistory(selectedCustomer.id);
-        }
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [selectedCustomer]);
-
-  const fetchCustomers = async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('customers')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      logger.error('Error fetching customers', error, { component: 'CustomerManagement' });
-      toast({ title: "Error fetching customers", description: error.message, variant: "destructive" });
+  const fetchCustomers = useCallback(async (isSoftRefresh = false) => {
+    if (!isSoftRefresh && customers.length === 0) {
+      setInitialLoading(true);
     } else {
-      setCustomers(data || []);
+      setSoftLoading(true);
     }
-    setLoading(false);
-  };
+    setLoadError(null);
+
+    try {
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Request timeout')), 10000)
+      );
+
+      const fetchPromise = supabase
+        .from('customers')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as any;
+
+      if (error) {
+        throw error;
+      }
+      setCustomers(data || []);
+    } catch (error: any) {
+      logger.error('Error fetching customers', error, { component: 'CustomerManagement' });
+      if (customers.length === 0) {
+        setLoadError(error.message || 'Failed to load customers');
+      }
+    } finally {
+      setInitialLoading(false);
+      setSoftLoading(false);
+    }
+  }, [customers.length]);
 
   const fetchPayments = async () => {
     const { data, error } = await supabase

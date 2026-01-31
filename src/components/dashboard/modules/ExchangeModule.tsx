@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -55,7 +55,9 @@ const ALL_WEIGHTS = [...new Set([...WEIGHT_OPTIONS_22MM, ...WEIGHT_OPTIONS_20MM]
 export const ExchangeModule = ({ onBack }: ExchangeModuleProps) => {
   const [exchanges, setExchanges] = useState<Exchange[]>([]);
   const [brands, setBrands] = useState<LPGBrand[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [softLoading, setSoftLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [userName, setUserName] = useState("User");
@@ -65,6 +67,58 @@ export const ExchangeModule = ({ onBack }: ExchangeModuleProps) => {
   const [toBrand, setToBrand] = useState("");
   const [toWeight, setToWeight] = useState("");
   const [quantity, setQuantity] = useState(1);
+
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+
+  const fetchExchanges = useCallback(async (isSoftRefresh = false) => {
+    if (!isSoftRefresh && exchanges.length === 0) {
+      setInitialLoading(true);
+    } else {
+      setSoftLoading(true);
+    }
+    setLoadError(null);
+
+    try {
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Request timeout')), 10000)
+      );
+
+      const fetchPromise = supabase
+        .from('cylinder_exchanges')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as any;
+
+      if (error) {
+        throw error;
+      }
+      setExchanges(data || []);
+    } catch (error: any) {
+      if (exchanges.length === 0) {
+        setLoadError(error.message || 'Failed to load exchanges');
+      }
+      toast.error("Failed to load exchanges");
+    } finally {
+      setInitialLoading(false);
+      setSoftLoading(false);
+    }
+  }, [exchanges.length]);
+
+  const fetchBrands = async () => {
+    const { data } = await supabase
+      .from('lpg_brands')
+      .select('id, name, size, weight')
+      .eq('is_active', true)
+      .order('name');
+    
+    setBrands(data || []);
+  };
+
+  const debouncedFetch = useCallback(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => fetchExchanges(true), 1000);
+  }, [fetchExchanges]);
 
   useEffect(() => {
     const init = async () => {
@@ -77,43 +131,19 @@ export const ExchangeModule = ({ onBack }: ExchangeModuleProps) => {
     };
     init();
 
-    // Subscribe to realtime updates
+    // Subscribe to realtime updates with debouncing
     const channel = supabase
       .channel('exchanges')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cylinder_exchanges' }, () => {
-        fetchExchanges();
+        debouncedFetch();
       })
       .subscribe();
 
     return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
       supabase.removeChannel(channel);
     };
-  }, []);
-
-  const fetchExchanges = async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('cylinder_exchanges')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      toast.error("Failed to load exchanges");
-    } else {
-      setExchanges(data || []);
-    }
-    setLoading(false);
-  };
-
-  const fetchBrands = async () => {
-    const { data } = await supabase
-      .from('lpg_brands')
-      .select('id, name, size, weight')
-      .eq('is_active', true)
-      .order('name');
-    
-    setBrands(data || []);
-  };
+  }, [fetchExchanges, debouncedFetch]);
 
   const handleSubmit = async () => {
     if (!fromBrand || !fromWeight || !toBrand || !toWeight) {
@@ -186,7 +216,7 @@ export const ExchangeModule = ({ onBack }: ExchangeModuleProps) => {
       setToBrand("");
       setToWeight("");
       setQuantity(1);
-      await fetchExchanges();
+      await fetchExchanges(true);
     } catch (error: any) {
       toast.error(error.message || "Failed to create exchange");
     } finally {
@@ -209,10 +239,23 @@ export const ExchangeModule = ({ onBack }: ExchangeModuleProps) => {
     }
   };
 
-  if (loading) {
+  // Show skeleton during initial load
+  if (initialLoading && exchanges.length === 0) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="space-y-6 animate-pulse">
+        <div className="h-8 w-48 bg-muted rounded" />
+        <div className="h-64 bg-muted rounded-lg" />
+        <div className="h-48 bg-muted rounded-lg" />
+      </div>
+    );
+  }
+
+  // Show error state
+  if (loadError && exchanges.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-4">
+        <p className="text-destructive">{loadError}</p>
+        <Button onClick={() => fetchExchanges()}>Retry</Button>
       </div>
     );
   }

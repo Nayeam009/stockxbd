@@ -71,6 +71,14 @@ const Auth = () => {
     window.location.reload();
   }, []);
 
+  // Helper: wrap promise with timeout
+  const withAuthTimeout = async <T,>(promise: Promise<T>, ms: number, label: string): Promise<T> => {
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
+    );
+    return Promise.race([promise, timeout]);
+  };
+
   // System state check on mount
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
@@ -79,16 +87,19 @@ const Auth = () => {
     const checkSystemState = async () => {
       if (!mounted) return;
 
-      // Safety timeout
+      // Safety timeout - show form even if network is slow
       timeoutId = setTimeout(() => {
-        if (mounted) {
-          setLoadError('Connection is slow. Please check your internet and try again.');
+        if (mounted && checkingSystem) {
+          console.warn('[Auth] Safety timeout reached - showing form anyway');
+          setCheckingSystem(false);
+          setLoadError('Connection is slow. You can still try signing in.');
         }
-      }, 15000);
+      }, 12000);
 
       try {
         // Check if already logged in
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: sessionData } = await supabase.auth.getSession();
+        const session = sessionData.session;
         
         if (session) {
           // Get role and redirect
@@ -122,16 +133,17 @@ const Auth = () => {
             setInviteData({ role: inviteResult[0].role, created_by: inviteResult[0].created_by });
             setAuthMode('manager-invite');
 
-            // Get shop name
-            const { data: shopData } = await supabase
+            // Get shop name (non-blocking)
+            supabase
               .from('shop_profiles')
               .select('shop_name')
               .eq('owner_id', inviteResult[0].created_by)
-              .maybeSingle();
-
-            if (shopData) {
-              setOwnerShopName(shopData.shop_name);
-            }
+              .maybeSingle()
+              .then(({ data: shopData }) => {
+                if (shopData && mounted) {
+                  setOwnerShopName(shopData.shop_name);
+                }
+              });
           }
         } else {
           // Check if any owners exist
@@ -139,13 +151,13 @@ const Auth = () => {
 
           if (mounted) {
             setOwnersExist(error ? true : (hasOwners || false));
-            setAuthMode(hasOwners ? 'signin' : 'signup');
           }
         }
       } catch (err) {
         console.error('Error checking system state:', err);
         if (mounted) {
-          setLoadError('Failed to connect to server. Please try again.');
+          // Don't block the form - show it with a warning
+          setLoadError('Network issue detected. You can still try signing in.');
         }
       } finally {
         if (mounted) {

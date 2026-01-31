@@ -38,33 +38,55 @@ export const InventoryPricingCard = ({
   sizeFilter,
 }: InventoryPricingCardProps) => {
   const [products, setProducts] = useState<ProductPrice[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [softLoading, setSoftLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [editedPrices, setEditedPrices] = useState<Record<string, Partial<ProductPrice>>>({});
   const [saving, setSaving] = useState(false);
 
-  const fetchProducts = useCallback(async () => {
-    try {
-      setLoading(true);
-      let query = supabase
-        .from("product_prices")
-        .select("*")
-        .eq("is_active", true)
-        .eq("product_type", productType)
-        .order("product_name");
-
-      if (sizeFilter) {
-        query = query.ilike("size", `%${sizeFilter}%`);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-      setProducts(data || []);
-    } catch (error) {
-      console.error("Error fetching products:", error);
-    } finally {
-      setLoading(false);
+  const fetchProducts = useCallback(async (isSoftRefresh = false) => {
+    if (!isSoftRefresh && products.length === 0) {
+      setInitialLoading(true);
+    } else {
+      setSoftLoading(true);
     }
-  }, [productType, sizeFilter]);
+    setLoadError(null);
+
+    try {
+      // Add timeout protection
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Request timeout')), 10000)
+      );
+
+      const fetchPromise = (async () => {
+        let query = supabase
+          .from("product_prices")
+          .select("*")
+          .eq("is_active", true)
+          .eq("product_type", productType)
+          .order("product_name");
+
+        if (sizeFilter) {
+          query = query.ilike("size", `%${sizeFilter}%`);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+        return data || [];
+      })();
+
+      const data = await Promise.race([fetchPromise, timeoutPromise]);
+      setProducts(data);
+    } catch (error: any) {
+      console.error("Error fetching products:", error);
+      if (products.length === 0) {
+        setLoadError(error.message || 'Failed to load pricing data');
+      }
+    } finally {
+      setInitialLoading(false);
+      setSoftLoading(false);
+    }
+  }, [productType, sizeFilter, products.length]);
 
   useEffect(() => {
     fetchProducts();
@@ -96,7 +118,7 @@ export const InventoryPricingCard = ({
 
       toast.success("Prices updated successfully");
       setEditedPrices({});
-      fetchProducts();
+      fetchProducts(true); // soft refresh
     } catch (error) {
       console.error("Error saving prices:", error);
       toast.error("Failed to update prices");
@@ -111,11 +133,31 @@ export const InventoryPricingCard = ({
 
   const hasChanges = Object.keys(editedPrices).length > 0;
 
-  if (loading) {
+  // Show skeleton during initial load only
+  if (initialLoading && products.length === 0) {
     return (
       <Card className="border-border bg-card/50">
-        <CardContent className="flex items-center justify-center py-8">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <CardContent className="py-8 space-y-3">
+          <div className="h-6 w-32 bg-muted animate-pulse rounded" />
+          <div className="space-y-2">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="h-12 bg-muted animate-pulse rounded" />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Show error state
+  if (loadError && products.length === 0) {
+    return (
+      <Card className="border-border bg-card/50">
+        <CardContent className="py-8 text-center">
+          <p className="text-sm text-destructive mb-3">{loadError}</p>
+          <Button size="sm" variant="outline" onClick={() => fetchProducts()}>
+            Retry
+          </Button>
         </CardContent>
       </Card>
     );
