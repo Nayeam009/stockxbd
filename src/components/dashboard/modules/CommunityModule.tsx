@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { logger } from "@/lib/logger";
@@ -137,7 +137,9 @@ interface ShopProfile {
 export const CommunityModule = () => {
   const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState("posts");
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [softLoading, setSoftLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [shopId, setShopId] = useState<string | null>(null);
   const [shopProfile, setShopProfile] = useState<ShopProfile | null>(null);
   const [currentUser, setCurrentUser] = useState<{ id: string; name: string; avatar: string | null } | null>(null);
@@ -170,160 +172,190 @@ export const CommunityModule = () => {
   const [exchangeQty, setExchangeQty] = useState("");
   const [exchangeNotes, setExchangeNotes] = useState("");
 
-  // Fetch initial data
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+  // Debounce timer ref
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
-      // Get user profile
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('full_name, avatar_url')
-        .eq('user_id', user.id)
-        .single();
-
-      setCurrentUser({
-        id: user.id,
-        name: profile?.full_name || user.email || 'User',
-        avatar: profile?.avatar_url
-      });
-
-      // Get shop owner ID (handles both Owner and Manager)
-      const { data: ownerId } = await supabase.rpc("get_owner_id");
-
-      // Get user's shop
-      const { data: shop } = await supabase
-        .from('shop_profiles')
-        .select('id, shop_name, is_open, total_orders, rating')
-        .eq('owner_id', ownerId || user.id)
-        .single();
-
-      if (shop) {
-        setShopId(shop.id);
-        setShopProfile(shop as ShopProfile);
-
-        // Fetch orders for shop
-        const { data: ordersData } = await supabase
-          .from('community_orders')
-          .select('*')
-          .eq('shop_id', shop.id)
-          .order('created_at', { ascending: false });
-
-        setOrders((ordersData || []) as CommunityOrder[]);
-
-        // Fetch order items
-        if (ordersData && ordersData.length > 0) {
-          const orderIds = ordersData.map(o => o.id);
-          const { data: items } = await supabase
-            .from('community_order_items')
-            .select('*')
-            .in('order_id', orderIds);
-
-          const itemsByOrder: Record<string, OrderItem[]> = {};
-          (items || []).forEach((item: any) => {
-            if (!itemsByOrder[item.order_id]) {
-              itemsByOrder[item.order_id] = [];
-            }
-            itemsByOrder[item.order_id].push(item as OrderItem);
-          });
-          setOrderItems(itemsByOrder);
-        }
-      }
-
-      // Fetch posts
-      const { data: postsData } = await supabase
-        .from('community_posts')
-        .select('*')
-        .eq('is_active', true)
-        .order('created_at', { ascending: false });
-
-      if (postsData) {
-        // Get likes for current user
-        const { data: likes } = await supabase
-          .from('community_post_likes')
-          .select('post_id')
-          .eq('user_id', user.id);
-
-        const likedPostIds = new Set((likes || []).map(l => l.post_id));
-
-        setPosts(postsData.map(post => ({
-          ...post,
-          is_liked: likedPostIds.has(post.id)
-        })) as Post[]);
-      }
-
-      // Fetch exchanges - using correct column structure
-      const { data: exchangesData } = await supabase
-        .from('cylinder_exchanges')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(50);
-
-      if (exchangesData) {
-        setExchanges(exchangesData.map((e: any) => ({
-          id: e.id,
-          from_brand_id: e.id,
-          from_brand_name: e.from_brand || 'Unknown',
-          to_brand_id: e.id,
-          to_brand_name: e.to_brand || 'Unknown',
-          quantity: e.quantity || 0,
-          weight: e.from_weight || '12kg',
-          status: e.status || 'active',
-          notes: null,
-          created_by: e.user_id,
-          created_at: e.created_at
-        })));
-      }
-
-      // Fetch brands for exchange form
-      const { data: brandsData } = await supabase
-        .from('lpg_brands')
-        .select('id, name, size, weight')
-        .eq('is_active', true)
-        .order('name');
-
-      setBrands((brandsData || []) as LPGBrand[]);
-
-    } catch (error) {
-      logger.error('Error fetching community data:', error);
-    } finally {
-      setLoading(false);
+  // Fetch initial data with timeout protection
+  const fetchData = useCallback(async (isSoftRefresh = false) => {
+    if (!isSoftRefresh && orders.length === 0) {
+      setInitialLoading(true);
+    } else {
+      setSoftLoading(true);
     }
-  }, []);
+    setLoadError(null);
+
+    try {
+      // Add timeout to prevent hanging
+      const timeoutPromise = new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error('Request timeout')), 12000)
+      );
+
+      const fetchPromise = (async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        // Get user profile
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('full_name, avatar_url')
+          .eq('user_id', user.id)
+          .single();
+
+        setCurrentUser({
+          id: user.id,
+          name: profile?.full_name || user.email || 'User',
+          avatar: profile?.avatar_url
+        });
+
+        // Get shop owner ID (handles both Owner and Manager)
+        const { data: ownerId } = await supabase.rpc("get_owner_id");
+
+        // Get user's shop
+        const { data: shop } = await supabase
+          .from('shop_profiles')
+          .select('id, shop_name, is_open, total_orders, rating')
+          .eq('owner_id', ownerId || user.id)
+          .single();
+
+        if (shop) {
+          setShopId(shop.id);
+          setShopProfile(shop as ShopProfile);
+
+          // Batch fetch orders with items in one query
+          const { data: ordersData } = await supabase
+            .from('community_orders')
+            .select(`
+              *,
+              community_order_items (*)
+            `)
+            .eq('shop_id', shop.id)
+            .order('created_at', { ascending: false })
+            .limit(100);
+
+          if (ordersData) {
+            setOrders(ordersData as CommunityOrder[]);
+
+            // Extract order items from nested response
+            const itemsByOrder: Record<string, OrderItem[]> = {};
+            ordersData.forEach((order: any) => {
+              if (order.community_order_items) {
+                itemsByOrder[order.id] = order.community_order_items as OrderItem[];
+              }
+            });
+            setOrderItems(itemsByOrder);
+          }
+        }
+
+        // Fetch posts
+        const { data: postsData } = await supabase
+          .from('community_posts')
+          .select('*')
+          .eq('is_active', true)
+          .order('created_at', { ascending: false })
+          .limit(50);
+
+        if (postsData) {
+          // Get likes for current user
+          const { data: likes } = await supabase
+            .from('community_post_likes')
+            .select('post_id')
+            .eq('user_id', user.id);
+
+          const likedPostIds = new Set((likes || []).map(l => l.post_id));
+
+          setPosts(postsData.map(post => ({
+            ...post,
+            is_liked: likedPostIds.has(post.id)
+          })) as Post[]);
+        }
+
+        // Fetch exchanges
+        const { data: exchangesData } = await supabase
+          .from('cylinder_exchanges')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(50);
+
+        if (exchangesData) {
+          setExchanges(exchangesData.map((e: any) => ({
+            id: e.id,
+            from_brand_id: e.id,
+            from_brand_name: e.from_brand || 'Unknown',
+            to_brand_id: e.id,
+            to_brand_name: e.to_brand || 'Unknown',
+            quantity: e.quantity || 0,
+            weight: e.from_weight || '12kg',
+            status: e.status || 'active',
+            notes: null,
+            created_by: e.user_id,
+            created_at: e.created_at
+          })));
+        }
+
+        // Fetch brands for exchange form
+        const { data: brandsData } = await supabase
+          .from('lpg_brands')
+          .select('id, name, size, weight')
+          .eq('is_active', true)
+          .order('name');
+
+        setBrands((brandsData || []) as LPGBrand[]);
+      })();
+
+      await Promise.race([fetchPromise, timeoutPromise]);
+    } catch (error: any) {
+      logger.error('Error fetching community data:', error);
+      if (orders.length === 0) {
+        setLoadError(error.message || 'Failed to load data');
+      }
+    } finally {
+      setInitialLoading(false);
+      setSoftLoading(false);
+    }
+  }, [orders.length]);
+
+  // Debounced fetch for realtime updates
+  const debouncedFetch = useCallback(() => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+    debounceRef.current = setTimeout(() => {
+      fetchData(true); // soft refresh
+    }, 1000);
+  }, [fetchData]);
 
   useEffect(() => {
     fetchData();
 
-    // Real-time subscriptions
+    // Real-time subscriptions with debouncing
     const ordersChannel = supabase
       .channel('community_orders_changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'community_orders' }, () => {
-        fetchData();
+        debouncedFetch();
       })
       .subscribe();
 
     const postsChannel = supabase
       .channel('community_posts_changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'community_posts' }, () => {
-        fetchData();
+        debouncedFetch();
       })
       .subscribe();
 
     const exchangesChannel = supabase
       .channel('cylinder_exchanges_changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cylinder_exchanges' }, () => {
-        fetchData();
+        debouncedFetch();
       })
       .subscribe();
 
     return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
       supabase.removeChannel(ordersChannel);
       supabase.removeChannel(postsChannel);
       supabase.removeChannel(exchangesChannel);
     };
-  }, [fetchData]);
+  }, [fetchData, debouncedFetch]);
 
   // Order handlers
   const updateOrderStatus = useCallback(async (orderId: string, status: CommunityOrder['status'], reason?: string) => {
@@ -599,7 +631,7 @@ export const CommunityModule = () => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
-  if (loading) {
+  if (initialLoading && orders.length === 0) {
     return (
       <div className="space-y-4 p-4">
         <Skeleton className="h-20 w-full" />

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,7 +41,9 @@ const FUEL_EFFICIENCY_THRESHOLD = 3;
 export const VehicleCostModule = () => {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [costs, setCosts] = useState<VehicleCost[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [softLoading, setSoftLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [costDialogOpen, setCostDialogOpen] = useState(false);
   const [vehicleDialogOpen, setVehicleDialogOpen] = useState(false);
 
@@ -60,37 +62,67 @@ export const VehicleCostModule = () => {
     license_plate: "",
   });
 
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+
+  const fetchData = useCallback(async (isSoftRefresh = false) => {
+    if (!isSoftRefresh && costs.length === 0) {
+      setInitialLoading(true);
+    } else {
+      setSoftLoading(true);
+    }
+    setLoadError(null);
+
+    try {
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Request timeout')), 10000)
+      );
+
+      const fetchPromise = Promise.all([
+        supabase.from("vehicles").select("*").eq("is_active", true).order("name"),
+        supabase.from("vehicle_costs").select("*, vehicle:vehicles(*)").order("cost_date", { ascending: false }),
+      ]);
+
+      const [vehiclesRes, costsRes] = await Promise.race([fetchPromise, timeoutPromise]) as any;
+
+      if (vehiclesRes.data) setVehicles(vehiclesRes.data);
+      if (costsRes.data) setCosts(costsRes.data as VehicleCost[]);
+    } catch (error: any) {
+      if (costs.length === 0) {
+        setLoadError(error.message || 'Failed to load data');
+      }
+    } finally {
+      setInitialLoading(false);
+      setSoftLoading(false);
+    }
+  }, [costs.length]);
+
+  const debouncedFetch = useCallback(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => fetchData(true), 1000);
+  }, [fetchData]);
+
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
 
-  // Real-time vehicle sync
+  // Real-time vehicle sync with debouncing
   useEffect(() => {
     const channels = [
       supabase.channel('vehicles-realtime').on('postgres_changes', 
         { event: '*', schema: 'public', table: 'vehicles' }, 
-        () => fetchData()
+        () => debouncedFetch()
       ).subscribe(),
       supabase.channel('vehicle-costs-realtime').on('postgres_changes', 
         { event: '*', schema: 'public', table: 'vehicle_costs' }, 
-        () => fetchData()
+        () => debouncedFetch()
       ).subscribe(),
     ];
     
-    return () => channels.forEach(ch => supabase.removeChannel(ch));
-  }, []);
-
-  const fetchData = async () => {
-    setLoading(true);
-    const [vehiclesRes, costsRes] = await Promise.all([
-      supabase.from("vehicles").select("*").eq("is_active", true).order("name"),
-      supabase.from("vehicle_costs").select("*, vehicle:vehicles(*)").order("cost_date", { ascending: false }),
-    ]);
-
-    if (vehiclesRes.data) setVehicles(vehiclesRes.data);
-    if (costsRes.data) setCosts(costsRes.data as VehicleCost[]);
-    setLoading(false);
-  };
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      channels.forEach(ch => supabase.removeChannel(ch));
+    };
+  }, [debouncedFetch]);
 
   const handleAddCost = async () => {
     if (!newCost.vehicle_id || !newCost.amount) {
@@ -152,7 +184,7 @@ export const VehicleCostModule = () => {
         liters_filled: 0,
         odometer_reading: 0,
       });
-      fetchData();
+      fetchData(true);
     }
   };
 
@@ -176,7 +208,7 @@ export const VehicleCostModule = () => {
       toast({ title: "Vehicle added successfully" });
       setVehicleDialogOpen(false);
       setNewVehicle({ name: "", license_plate: "" });
-      fetchData();
+      fetchData(true);
     }
   };
 
@@ -186,7 +218,7 @@ export const VehicleCostModule = () => {
       toast({ title: "Error deleting cost", variant: "destructive" });
     } else {
       toast({ title: "Cost deleted" });
-      fetchData();
+      fetchData(true);
     }
   };
 
@@ -256,10 +288,25 @@ export const VehicleCostModule = () => {
     return vehicle?.last_odometer || 0;
   };
 
-  if (loading) {
+  // Show skeleton during initial load
+  if (initialLoading && costs.length === 0) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      <div className="space-y-4 animate-pulse">
+        <div className="h-10 w-48 bg-muted rounded" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {[1, 2, 3, 4].map(i => <div key={i} className="h-24 bg-muted rounded-lg" />)}
+        </div>
+        <div className="h-64 bg-muted rounded-lg" />
+      </div>
+    );
+  }
+
+  // Show error state
+  if (loadError && costs.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 gap-4">
+        <p className="text-destructive">{loadError}</p>
+        <Button onClick={() => fetchData()}>Retry</Button>
       </div>
     );
   }

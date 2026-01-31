@@ -6,6 +6,7 @@ import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { GlobalCommandPalette } from "@/components/dashboard/GlobalCommandPalette";
 import { MobileBottomNav } from "@/components/dashboard/MobileBottomNav";
 import { ModuleSkeleton, QuickLoader } from "@/components/dashboard/ModuleSkeleton";
+import { ModuleWatchdog } from "@/components/dashboard/ModuleWatchdog";
 import { OfflineIndicator } from "@/components/shared/OfflineIndicator";
 import { OfflineErrorBoundary } from "@/components/shared/OfflineErrorBoundary";
 import { useDashboardData } from "@/hooks/useDashboardData";
@@ -16,7 +17,6 @@ import { useNetwork } from "@/contexts/NetworkContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
-
 // Lazy load heavy modules for faster initial render
 const DashboardOverview = lazy(() => import("@/components/dashboard/modules/DashboardOverview").then(m => ({ default: m.DashboardOverview })));
 const BusinessDiaryModule = lazy(() => import("@/components/dashboard/modules/BusinessDiaryModule").then(m => ({ default: m.BusinessDiaryModule })));
@@ -236,6 +236,16 @@ const Dashboard = () => {
   const dashboardRole: 'owner' | 'manager' = userRole === 'owner' ? 'owner' : 'manager';
   const navRole = dashboardRole;
 
+  // Track module loading state for watchdog
+  const [moduleLoading, setModuleLoading] = useState(false);
+
+  // Handle module retry from watchdog
+  const handleModuleRetry = useCallback(() => {
+    refetch();
+    setModuleLoading(true);
+    setTimeout(() => setModuleLoading(false), 500);
+  }, [refetch]);
+
   const renderActiveModule = () => {
     // Check if this module was previously loaded for faster revisit
     const isFirstLoad = !loadedModules.has(activeModule);
@@ -310,11 +320,18 @@ const Dashboard = () => {
 
     return (
       <OfflineErrorBoundary moduleName={activeModule}>
-        <Suspense fallback={isFirstLoad ? <ModuleSkeleton /> : <QuickLoader />}>
-          <div className="module-transition module-enter">
-            {moduleContent}
-          </div>
-        </Suspense>
+        <ModuleWatchdog
+          moduleName={activeModule}
+          isLoading={dataLoading && isFirstLoad}
+          onRetry={handleModuleRetry}
+          timeoutMs={15000}
+        >
+          <Suspense fallback={isFirstLoad ? <ModuleSkeleton /> : <QuickLoader />}>
+            <div className="module-transition module-enter">
+              {moduleContent}
+            </div>
+          </Suspense>
+        </ModuleWatchdog>
       </OfflineErrorBoundary>
     );
   };
