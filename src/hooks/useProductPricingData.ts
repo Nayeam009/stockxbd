@@ -236,14 +236,25 @@ export function useProductPricingData() {
     
     // If changing company_price for LPG products, auto-calculate wholesale and retail
     if (field === 'company_price' && product?.product_type === 'lpg') {
+      // Get current edited values or original values
+      const currentEdits = editedPrices[productId] || {};
+      const currentWholesale = currentEdits.distributor_price ?? product.distributor_price ?? 0;
+      const currentRetail = currentEdits.retail_price ?? product.retail_price ?? 0;
+      
+      // Determine variant from product
       const variant = product.variant === 'Package' ? 'package' : 'refill';
       const calculated = calculateDefaultPrices(value, variant);
+      
+      // Only auto-fill if wholesale/retail are 0 or not yet edited by user
+      const shouldAutoFillWholesale = currentWholesale === 0 || !currentEdits.distributor_price;
+      const shouldAutoFillRetail = currentRetail === 0 || !currentEdits.retail_price;
       
       setEditedPrices(prev => ({
         ...prev,
         [productId]: { 
           ...prev[productId], 
           company_price: value,
+          // Always auto-calculate when company price changes for LPG
           distributor_price: calculated.wholesale,
           retail_price: calculated.retail
         }
@@ -255,7 +266,7 @@ export function useProductPricingData() {
         [productId]: { ...prev[productId], [field]: value }
       }));
     }
-  }, [products]);
+  }, [products, editedPrices]);
 
   // Get current value (edited or original)
   const getValue = useCallback((product: ProductPrice, field: keyof ProductPrice): number => {
