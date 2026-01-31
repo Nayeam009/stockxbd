@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { withTimeout, debounce, TimeoutError } from '@/lib/asyncUtils';
+import { calculateDefaultPrices } from '@/lib/brandConstants';
 
 // Constants
 const FETCH_TIMEOUT_MS = 12000;
@@ -228,13 +229,33 @@ export function useProductPricingData() {
     );
   }, [products]);
 
-  // Price change handler
+  // Price change handler with auto-calculate for LPG cylinders
   const handlePriceChange = useCallback((productId: string, field: keyof ProductPrice, value: number) => {
-    setEditedPrices(prev => ({
-      ...prev,
-      [productId]: { ...prev[productId], [field]: value }
-    }));
-  }, []);
+    // Find the product to check if it's LPG and needs auto-calculation
+    const product = products.find(p => p.id === productId);
+    
+    // If changing company_price for LPG products, auto-calculate wholesale and retail
+    if (field === 'company_price' && product?.product_type === 'lpg') {
+      const variant = product.variant === 'Package' ? 'package' : 'refill';
+      const calculated = calculateDefaultPrices(value, variant);
+      
+      setEditedPrices(prev => ({
+        ...prev,
+        [productId]: { 
+          ...prev[productId], 
+          company_price: value,
+          distributor_price: calculated.wholesale,
+          retail_price: calculated.retail
+        }
+      }));
+    } else {
+      // For other fields or non-LPG products, just update the single field
+      setEditedPrices(prev => ({
+        ...prev,
+        [productId]: { ...prev[productId], [field]: value }
+      }));
+    }
+  }, [products]);
 
   // Get current value (edited or original)
   const getValue = useCallback((product: ProductPrice, field: keyof ProductPrice): number => {
