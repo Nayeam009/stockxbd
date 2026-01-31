@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -107,6 +107,7 @@ export function useProductPricingData() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [editedPrices, setEditedPrices] = useState<Record<string, Partial<ProductPrice>>>({});
   const [isSaving, setIsSaving] = useState(false);
+  const autoFilledMissingRef = useRef<Set<string>>(new Set());
 
   // Products query with timeout
   const { 
@@ -184,6 +185,44 @@ export function useProductPricingData() {
       supabase.removeChannel(channel);
     };
   }, [debouncedRefetch]);
+
+  // Auto-fill missing LPG prices (only when DB values are 0) so owners immediately see defaults
+  // and can still override before saving.
+  useEffect(() => {
+    if (products.length === 0) return;
+
+    setEditedPrices(prev => {
+      let changed = false;
+      const next: Record<string, Partial<ProductPrice>> = { ...prev };
+
+      for (const p of products) {
+        if (p.product_type !== 'lpg') continue;
+
+        const company = p.company_price ?? 0;
+        if (company <= 0) continue;
+
+        const needsWholesale = (p.distributor_price ?? 0) === 0 && next[p.id]?.distributor_price === undefined;
+        const needsRetail = (p.retail_price ?? 0) === 0 && next[p.id]?.retail_price === undefined;
+        if (!needsWholesale && !needsRetail) continue;
+
+        const marker = `${p.id}:${company}:${p.variant ?? ''}`;
+        if (autoFilledMissingRef.current.has(marker)) continue;
+
+        const variant = p.variant === 'Package' ? 'package' : 'refill';
+        const calculated = calculateDefaultPrices(company, variant);
+
+        next[p.id] = {
+          ...next[p.id],
+          ...(needsWholesale ? { distributor_price: calculated.wholesale } : {}),
+          ...(needsRetail ? { retail_price: calculated.retail } : {}),
+        };
+        autoFilledMissingRef.current.add(marker);
+        changed = true;
+      }
+
+      return changed ? next : prev;
+    });
+  }, [products]);
 
   // Filtered products by type
   const lpgProducts = useMemo(() => 
