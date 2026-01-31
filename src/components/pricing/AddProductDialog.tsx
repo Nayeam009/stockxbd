@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,6 +30,12 @@ export const AddProductDialog = ({ lpgBrands, onAddProduct }: AddProductDialogPr
     retail_price: 0,
     package_price: 0,
   });
+
+  const autoCalcFromCompany = useCallback((companyPrice: number, variant: string) => {
+    if (companyPrice <= 0) return null;
+    const cylinderType = variant === 'Package' ? 'package' : 'refill';
+    return calculateDefaultPrices(companyPrice, cylinderType);
+  }, []);
 
   const handleAutoCalculate = () => {
     if (newProduct.company_price <= 0) return;
@@ -192,7 +198,19 @@ export const AddProductDialog = ({ lpgBrands, onAddProduct }: AddProductDialogPr
                   <Label>Variant</Label>
                   <Select
                     value={newProduct.variant}
-                    onValueChange={(value) => setNewProduct(prev => ({ ...prev, variant: value }))}
+                    onValueChange={(value) => {
+                      setNewProduct(prev => {
+                        const next = { ...prev, variant: value };
+                        if (next.product_type === 'lpg') {
+                          const calculated = autoCalcFromCompany(next.company_price, next.variant);
+                          if (calculated) {
+                            next.distributor_price = calculated.wholesale;
+                            next.retail_price = calculated.retail;
+                          }
+                        }
+                        return next;
+                      });
+                    }}
                   >
                     <SelectTrigger className="h-11">
                       <SelectValue />
@@ -250,7 +268,20 @@ export const AddProductDialog = ({ lpgBrands, onAddProduct }: AddProductDialogPr
                 <Input
                   type="number"
                   value={newProduct.company_price || ''}
-                  onChange={(e) => setNewProduct(prev => ({ ...prev, company_price: Number(e.target.value) }))}
+                  onChange={(e) => {
+                    const companyPrice = Number(e.target.value);
+                    setNewProduct(prev => {
+                      const next = { ...prev, company_price: companyPrice };
+                      if (next.product_type === 'lpg') {
+                        const calculated = autoCalcFromCompany(companyPrice, next.variant);
+                        if (calculated) {
+                          next.distributor_price = calculated.wholesale;
+                          next.retail_price = calculated.retail;
+                        }
+                      }
+                      return next;
+                    });
+                  }}
                   placeholder="0"
                   className="h-11 text-center font-medium"
                   min={0}
