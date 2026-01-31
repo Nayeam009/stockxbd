@@ -239,8 +239,8 @@ export const AddProductDialog = ({ lpgBrands, onAddProduct }: AddProductDialogPr
             
             <p className="text-xs text-muted-foreground">
               {newProduct.variant === 'Refill' 
-                ? 'Refill: Company + ৳20 = Wholesale, + ৳30 = Retail'
-                : 'Package: Company + ৳50 = Wholesale, + ৳50 = Retail'
+                ? 'Refill: Company + ৳30 = Wholesale, + ৳20 = Retail'
+                : 'Package: Company + ৳50 = Wholesale, + ৳100 = Retail'
               }
             </p>
 
