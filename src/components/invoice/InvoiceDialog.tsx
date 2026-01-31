@@ -69,7 +69,12 @@ export const InvoiceDialog = ({
     const title = type === 'bill' ? 'Invoice' : 'Gate Pass';
     
     if (ref.current) {
-      const printContent = ref.current.innerHTML;
+      // Use outerHTML so the top-level container (with sizing/padding/fonts) is preserved.
+      // Also strip any embedded <style> tags from the template to avoid print CSS that can hide content.
+      const cloned = ref.current.cloneNode(true) as HTMLElement;
+      cloned.querySelectorAll('style').forEach((s) => s.remove());
+
+      const printContent = cloned.outerHTML;
       const printWindow = window.open("", "", "width=800,height=600");
       if (printWindow) {
         // Use escapeHtml for dynamic title content to prevent XSS
@@ -84,6 +89,9 @@ export const InvoiceDialog = ({
               <style>
                 * { margin: 0; padding: 0; box-sizing: border-box; }
                 body { font-family: 'Hind Siliguri', 'Noto Sans Bengali', Arial, sans-serif; padding: 20px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                @media print {
+                  body { padding: 0; }
+                }
                 .bg-white { background: white; }
                 .text-black { color: black; }
                 .text-gray-600 { color: #666; }
