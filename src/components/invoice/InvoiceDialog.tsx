@@ -79,12 +79,11 @@ export const InvoiceDialog = ({
           <!DOCTYPE html>
           <html>
             <head>
-              <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'none'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com;">
               <title>${safeTitle} - ${safeInvoiceNumber}</title>
               <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&display=swap" rel="stylesheet">
               <style>
                 * { margin: 0; padding: 0; box-sizing: border-box; }
-                body { font-family: 'Hind Siliguri', sans-serif; padding: 20px; }
+                body { font-family: 'Hind Siliguri', 'Noto Sans Bengali', Arial, sans-serif; padding: 20px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
                 .bg-white { background: white; }
                 .text-black { color: black; }
                 .text-gray-600 { color: #666; }
@@ -171,11 +170,34 @@ export const InvoiceDialog = ({
           </html>
         `);
         printWindow.document.close();
-        printWindow.focus();
-        setTimeout(() => {
-          printWindow.print();
-          printWindow.close();
-        }, 250);
+        
+        // Wait for content and fonts to load before printing
+        printWindow.onload = () => {
+          // Wait for fonts to be ready
+          if (printWindow.document.fonts && printWindow.document.fonts.ready) {
+            printWindow.document.fonts.ready.then(() => {
+              printWindow.focus();
+              setTimeout(() => {
+                printWindow.print();
+                printWindow.close();
+              }, 100);
+            }).catch(() => {
+              // Fallback if fonts.ready fails
+              printWindow.focus();
+              setTimeout(() => {
+                printWindow.print();
+                printWindow.close();
+              }, 500);
+            });
+          } else {
+            // Fallback for older browsers
+            printWindow.focus();
+            setTimeout(() => {
+              printWindow.print();
+              printWindow.close();
+            }, 500);
+          }
+        };
       }
     }
   };
