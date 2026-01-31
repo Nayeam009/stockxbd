@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -6,12 +6,16 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
 import { logger } from "@/lib/logger";
 import { InvoiceDialog } from "@/components/invoice/InvoiceDialog";
+import { ModuleLoadErrorCard } from "@/components/shared/ModuleLoadErrorCard";
+import { SoftRefreshBadge } from "@/components/shared/SoftRefreshBadge";
+import { withTimeout, debounce, TimeoutError } from "@/lib/asyncUtils";
 import {
   ShoppingBag, Package, Clock, CheckCircle, Truck, XCircle,
   Search, RefreshCw, Phone, MapPin, Calendar, ExternalLink,
@@ -27,6 +31,9 @@ import {
   DialogTitle as ZoomDialogTitle,
   DialogTrigger as ZoomDialogTrigger,
 } from "@/components/ui/dialog";
+
+const FETCH_TIMEOUT_MS = 12000;
+
 interface CommunityOrder {
   id: string;
   order_number: string;
@@ -51,7 +58,6 @@ interface CommunityOrder {
   delivered_at: string | null;
   created_at: string;
   items?: OrderItem[];
-  // New fields
   payment_trx_id?: string;
   return_cylinder_verified?: boolean;
   verified_at?: string;
@@ -74,7 +80,6 @@ export const MarketplaceOrdersModule = () => {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const [orders, setOrders] = useState<CommunityOrder[]>([]);
-  const [loading, setLoading] = useState(true);
   const [shopId, setShopId] = useState<string | null>(null);
   const [hasShop, setHasShop] = useState<boolean | null>(null);
   const [activeTab, setActiveTab] = useState("all");
@@ -91,33 +96,53 @@ export const MarketplaceOrdersModule = () => {
   const [selectedOrderForVerify, setSelectedOrderForVerify] = useState<CommunityOrder | null>(null);
   const [verifyReturnType, setVerifyReturnType] = useState<'empty' | 'leaked'>('empty');
 
-  // Fetch shop and orders
-  const fetchData = useCallback(async () => {
-    setLoading(true);
+  // Resilient loading state
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [softLoading, setSoftLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  // Fetch shop and orders with timeout and batch queries
+  const fetchData = useCallback(async (isRefresh: boolean = false) => {
+    if (!isRefresh && orders.length === 0) {
+      setInitialLoading(true);
+    } else {
+      setSoftLoading(true);
+    }
+    setLoadError(null);
+
     try {
       // Get current user's shop
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         setHasShop(false);
-        setLoading(false);
+        setInitialLoading(false);
+        setSoftLoading(false);
         return;
       }
 
-      // Get shop owner ID (handles both Owner and Manager)
+      // Get shop owner ID
       const { data: ownerId } = await supabase.rpc("get_owner_id");
 
-      const { data: shopData, error: shopError } = await supabase
+      const shopQuery = supabase
         .from('shop_profiles')
         .select('id, shop_name, phone, address')
         .eq('owner_id', ownerId || user.id)
         .maybeSingle();
+      
+      const shopResult = await withTimeout(
+        shopQuery.then(r => r),
+        FETCH_TIMEOUT_MS,
+        'Shop fetch'
+      );
 
-      if (shopError || !shopData) {
+      if (shopResult.error || !shopResult.data) {
         setHasShop(false);
-        setLoading(false);
+        setInitialLoading(false);
+        setSoftLoading(false);
         return;
       }
 
+      const shopData = shopResult.data;
       setShopId(shopData.id);
       setHasShop(true);
       setShopProfile({
@@ -126,56 +151,92 @@ export const MarketplaceOrdersModule = () => {
         address: shopData.address || ''
       });
 
-      // Fetch orders for this shop
-      const { data: ordersData, error: ordersError } = await supabase
+      // Batch fetch: orders with embedded items (using Supabase relations)
+      const ordersQuery = supabase
         .from('community_orders')
-        .select('*')
+        .select(`
+          *,
+          items:community_order_items(*)
+        `)
         .eq('shop_id', shopData.id)
-        .order('created_at', { ascending: false });
-
-      if (ordersError) throw ordersError;
-
-      // Fetch order items and customer cylinder photos for each order
-      const ordersWithItems = await Promise.all(
-        (ordersData || []).map(async (order) => {
-          const { data: items } = await supabase
-            .from('community_order_items')
-            .select('*')
-            .eq('order_id', order.id);
-
-          // Fetch customer cylinder photo
-          const { data: cylinderProfile } = await supabase
-            .from('customer_cylinder_profiles')
-            .select('cylinder_photo_url')
-            .eq('user_id', order.customer_id)
-            .maybeSingle();
-
-          return {
-            ...order,
-            items: items || [],
-            customer_cylinder_photo: cylinderProfile?.cylinder_photo_url || null
-          } as CommunityOrder;
-        })
+        .order('created_at', { ascending: false })
+        .limit(200);
+      
+      const ordersResult = await withTimeout(
+        ordersQuery.then(r => r),
+        FETCH_TIMEOUT_MS,
+        'Orders fetch'
       );
 
-      setOrders(ordersWithItems);
-    } catch (error) {
-      logger.error('Error fetching marketplace orders:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch orders",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+      if (ordersResult.error) throw ordersResult.error;
+      const ordersData = (ordersResult.data || []) as any[];
 
-  // Real-time subscription
+      // Batch fetch cylinder photos for all unique customers
+      const customerIds = [...new Set(ordersData.map(o => o.customer_id))] as string[];
+      
+      let cylinderPhotos: Record<string, string | null> = {};
+      if (customerIds.length > 0) {
+        try {
+          const photosQuery = supabase
+            .from('customer_cylinder_profiles')
+            .select('user_id, cylinder_photo_url')
+            .in('user_id', customerIds);
+          
+          const photosResult = await withTimeout(
+            photosQuery.then(r => r),
+            5000,
+            'Cylinder photos fetch'
+          );
+
+          if (photosResult.data) {
+            cylinderPhotos = Object.fromEntries(
+              photosResult.data.map((p: any) => [p.user_id, p.cylinder_photo_url])
+            );
+          }
+        } catch {
+          // Photos are non-critical, continue without them
+        }
+      }
+
+      // Merge photos with orders
+      const ordersWithPhotos = ordersData.map(order => ({
+        ...order,
+        customer_cylinder_photo: cylinderPhotos[order.customer_id] || null
+      })) as CommunityOrder[];
+
+
+      setOrders(ordersWithPhotos);
+    } catch (error) {
+      if (error instanceof TimeoutError) {
+        if (orders.length === 0) {
+          setLoadError("Loading took too long. Please retry.");
+        } else {
+          toast({ title: "Refresh timed out", description: "Showing cached data" });
+        }
+      } else {
+        logger.error('Error fetching marketplace orders:', error);
+        if (orders.length === 0) {
+          setLoadError("Failed to fetch orders. Please retry.");
+        }
+      }
+    } finally {
+      setInitialLoading(false);
+      setSoftLoading(false);
+    }
+  }, [orders.length]);
+
+  // Debounced fetch for realtime
+  const debouncedFetch = useMemo(
+    () => debounce(() => fetchData(true), 1000),
+    [fetchData]
+  );
+
+  // Real-time subscription with debouncing
   useEffect(() => {
     fetchData();
+  }, []);
 
-    // Subscribe to new orders
+  useEffect(() => {
     if (shopId) {
       const channel = supabase
         .channel('marketplace-orders')
@@ -189,7 +250,7 @@ export const MarketplaceOrdersModule = () => {
           },
           (payload) => {
             logger.info('Order change detected:', payload);
-            fetchData();
+            debouncedFetch();
 
             if (payload.eventType === 'INSERT') {
               toast({
@@ -205,7 +266,7 @@ export const MarketplaceOrdersModule = () => {
         supabase.removeChannel(channel);
       };
     }
-  }, [fetchData, shopId]);
+  }, [shopId, debouncedFetch]);
 
   // Convert online order to POS transaction
   const convertOnlineOrderToPOS = async (order: CommunityOrder): Promise<string> => {
@@ -552,16 +613,46 @@ export const MarketplaceOrdersModule = () => {
     );
   }
 
-  if (loading) {
+  // Show error state if initial load failed
+  if (loadError && orders.length === 0) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      <ModuleLoadErrorCard
+        title="Failed to Load Orders"
+        message={loadError}
+        onRetry={() => fetchData()}
+        isTimeout={loadError.includes('timeout') || loadError.includes('long')}
+      />
+    );
+  }
+
+  // Show skeleton during initial load only
+  if (initialLoading && orders.length === 0) {
+    return (
+      <div className="space-y-4 animate-pulse">
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-8 w-8 rounded-lg" />
+          <Skeleton className="h-8 w-48" />
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[1, 2, 3, 4].map(i => (
+            <Skeleton key={i} className="h-20 rounded-lg" />
+          ))}
+        </div>
+        <Skeleton className="h-12 w-full rounded-lg" />
+        <div className="space-y-3">
+          {[1, 2, 3].map(i => (
+            <Skeleton key={i} className="h-32 rounded-lg" />
+          ))}
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-4 sm:space-y-6">
+      {/* Soft Refresh Indicator */}
+      <SoftRefreshBadge isRefreshing={softLoading} />
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -572,7 +663,7 @@ export const MarketplaceOrdersModule = () => {
           <p className="text-sm text-muted-foreground">Manage orders from your LPG Community shop</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={fetchData} className="gap-2">
+          <Button variant="outline" size="sm" onClick={() => fetchData(true)} className="gap-2">
             <RefreshCw className="h-4 w-4" />
             Refresh
           </Button>

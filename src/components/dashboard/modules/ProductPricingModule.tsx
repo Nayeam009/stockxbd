@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Plus,
   Save,
@@ -20,12 +21,16 @@ import {
   Building,
   Store,
   Truck,
-  AlertTriangle
+  AlertTriangle,
+  RefreshCw
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { BrandSelect } from "@/components/shared/BrandSelect";
 import { getLpgBrandNames, getStoveBrandNames, getRegulatorBrandNames, getLpgColorByValveSize } from "@/lib/brandConstants";
+import { ModuleLoadErrorCard } from "@/components/shared/ModuleLoadErrorCard";
+import { SoftRefreshBadge } from "@/components/shared/SoftRefreshBadge";
+import { withTimeout, debounce, TimeoutError } from "@/lib/asyncUtils";
 
 interface ProductPrice {
   id: string;
@@ -68,6 +73,9 @@ const WEIGHT_OPTIONS_20MM = [
   { value: "35kg", label: "35 KG", shortLabel: "35" },
 ];
 
+// Fetch timeout constant
+const FETCH_TIMEOUT_MS = 12000;
+
 export const ProductPricingModule = () => {
   const [activeTab, setActiveTab] = useState("lpg");
   const [sizeTab, setSizeTab] = useState<"22mm" | "20mm">("22mm");
@@ -75,7 +83,12 @@ export const ProductPricingModule = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [products, setProducts] = useState<ProductPrice[]>([]);
   const [lpgBrands, setLpgBrands] = useState<LpgBrand[]>([]);
-  const [loading, setLoading] = useState(true);
+  
+  // Resilient loading state
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [softLoading, setSoftLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editedPrices, setEditedPrices] = useState<Record<string, Partial<ProductPrice>>>({});
   const [editingCell, setEditingCell] = useState<{ id: string, field: string } | null>(null);
@@ -99,42 +112,76 @@ export const ProductPricingModule = () => {
 
   const weightOptions = sizeTab === "22mm" ? WEIGHT_OPTIONS_22MM : WEIGHT_OPTIONS_20MM;
 
-  const fetchData = useCallback(async () => {
+  // Core fetch function with timeout
+  const fetchData = useCallback(async (isRefresh: boolean = false) => {
+    // Only show initial loading if no data yet
+    if (!isRefresh && products.length === 0) {
+      setInitialLoading(true);
+    } else {
+      setSoftLoading(true);
+    }
+    setLoadError(null);
+    
     try {
-      setLoading(true);
-      const [productsRes, brandsRes] = await Promise.all([
+      const fetchPromise = Promise.all([
         supabase.from("product_prices").select("*").eq("is_active", true).order("product_name"),
         supabase.from("lpg_brands").select("id, name, color, size, weight").eq("is_active", true),
       ]);
 
+      const [productsRes, brandsRes] = await withTimeout(
+        fetchPromise,
+        FETCH_TIMEOUT_MS,
+        'ProductPricing fetch'
+      );
+
       if (productsRes.data) setProducts(productsRes.data);
       if (brandsRes.data) setLpgBrands(brandsRes.data);
     } catch (error) {
-      toast.error("Failed to load pricing data");
+      if (error instanceof TimeoutError) {
+        // Only show error if we have no data to show
+        if (products.length === 0) {
+          setLoadError("Loading took too long. Please retry.");
+        } else {
+          toast.error("Refresh timed out. Showing cached data.");
+        }
+      } else {
+        if (products.length === 0) {
+          setLoadError("Failed to load pricing data. Please retry.");
+        } else {
+          toast.error("Failed to refresh pricing data");
+        }
+      }
     } finally {
-      setLoading(false);
+      setInitialLoading(false);
+      setSoftLoading(false);
     }
-  }, []);
+  }, [products.length]);
+
+  // Debounced fetch for realtime updates
+  const debouncedFetch = useMemo(
+    () => debounce(() => fetchData(true), 1000),
+    [fetchData]
+  );
 
   useEffect(() => {
     fetchData();
-  }, [fetchData]);
+  }, []);
 
-  // Real-time pricing sync
+  // Real-time pricing sync with debouncing
   useEffect(() => {
     const channels = [
       supabase.channel('pricing-prices-realtime').on('postgres_changes',
         { event: '*', schema: 'public', table: 'product_prices' },
-        () => fetchData()
+        () => debouncedFetch()
       ).subscribe(),
       supabase.channel('pricing-brands-realtime').on('postgres_changes',
         { event: '*', schema: 'public', table: 'lpg_brands' },
-        () => fetchData()
+        () => debouncedFetch()
       ).subscribe(),
     ];
 
     return () => channels.forEach(ch => supabase.removeChannel(ch));
-  }, [fetchData]);
+  }, [debouncedFetch]);
 
   // Normalize brand name for grouping similar names (e.g., "Bashundhara" and "Basundhora")
   const normalizeBrandName = useCallback((name: string): string => {
@@ -755,10 +802,36 @@ export const ProductPricingModule = () => {
     );
   };
 
-  if (loading) {
+  // Show error state if initial load failed
+  if (loadError && products.length === 0) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <ModuleLoadErrorCard
+        title="Failed to Load Pricing"
+        message={loadError}
+        onRetry={() => fetchData()}
+        isTimeout={loadError.includes('timeout') || loadError.includes('long')}
+      />
+    );
+  }
+
+  // Show skeleton during initial load only
+  if (initialLoading && products.length === 0) {
+    return (
+      <div className="space-y-4 animate-pulse">
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-8 w-8 rounded-lg" />
+          <Skeleton className="h-8 w-48" />
+        </div>
+        <div className="flex gap-2">
+          <Skeleton className="h-10 w-24" />
+          <Skeleton className="h-10 w-24" />
+          <Skeleton className="h-10 w-24" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3, 4, 5, 6].map(i => (
+            <Skeleton key={i} className="h-48 rounded-xl" />
+          ))}
+        </div>
       </div>
     );
   }
@@ -771,6 +844,11 @@ export const ProductPricingModule = () => {
 
   return (
     <div className="space-y-4 sm:space-y-6 pb-20 sm:pb-6">
+      {/* Soft Refresh Indicator */}
+      <div className="flex items-center justify-between">
+        <SoftRefreshBadge isRefreshing={softLoading} />
+      </div>
+
       {/* Header - Matching Inventory Module */}
       <div className="flex flex-col gap-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
