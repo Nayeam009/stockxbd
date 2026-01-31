@@ -26,23 +26,13 @@ export const PriceSection = ({
     ? "bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300"
     : "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300";
 
-  // Calculate profit margin
-  const companyPrice = getValue(product, 'company_price');
-  const retailPrice = getValue(product, 'retail_price');
-  const margin = retailPrice - companyPrice;
-
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Badge className={`${badgeClass} text-xs px-3 py-1 font-medium`}>
-            {type === 'Package' ? 'Package (New)' : type}
+            {type}
           </Badge>
-          {margin > 0 && (
-            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
-              +৳{margin} profit
-            </span>
-          )}
         </div>
         <Button
           variant="ghost"

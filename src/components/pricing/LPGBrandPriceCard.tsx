@@ -30,13 +30,6 @@ export const LPGBrandPriceCard = ({
 }: LPGBrandPriceCardProps) => {
   const brandColor = getLpgColorByValveSize(brand.name, valveSize);
 
-  // Calculate total potential profit
-  const refillMargin = refillProduct 
-    ? getValue(refillProduct, 'retail_price') - getValue(refillProduct, 'company_price')
-    : 0;
-  const packageMargin = packageProduct
-    ? getValue(packageProduct, 'retail_price') - getValue(packageProduct, 'company_price')
-    : 0;
 
   // Empty state - no pricing set
   if (!refillProduct && !packageProduct) {
@@ -86,22 +79,6 @@ export const LPGBrandPriceCard = ({
             </Badge>
           </div>
         </div>
-        
-        {/* Profit summary */}
-        {(refillMargin > 0 || packageMargin > 0) && (
-          <div className="flex gap-3 mt-2 text-xs">
-            {refillMargin > 0 && (
-              <span className="text-emerald-600 dark:text-emerald-400">
-                Refill: +৳{refillMargin}
-              </span>
-            )}
-            {packageMargin > 0 && (
-              <span className="text-blue-600 dark:text-blue-400">
-                Package: +৳{packageMargin}
-              </span>
-            )}
-          </div>
-        )}
       </CardHeader>
 
       <CardContent className="space-y-5 px-4 pb-4">

@@ -20,8 +20,7 @@ export const AccessoryPriceCard = ({
   onDelete,
   getValue
 }: AccessoryPriceCardProps) => {
-  // Calculate margin
-  const margin = getValue(product, 'retail_price') - getValue(product, 'company_price');
+  // Keep accessory cards compact; margin is still implicit (Retail - Company)
 
   return (
     <Card className="border-border hover:shadow-md transition-shadow">
@@ -51,11 +50,6 @@ export const AccessoryPriceCard = ({
             <Badge variant="outline" className="text-[10px] sm:text-xs">
               {product.variant}
             </Badge>
-          )}
-          {margin > 0 && (
-            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
-              +৳{margin} profit
-            </span>
           )}
         </div>
       </CardHeader>
