@@ -85,7 +85,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
   
   // Custom product dialogs
   const [showCustomBrandDialog, setShowCustomBrandDialog] = useState(false);
-  const [customBrand, setCustomBrand] = useState({ name: '', price: '' });
+  const [customBrand, setCustomBrand] = useState({ name: '', price: '', color: '#22c55e' });
 
   // Derived state
   const isSaleMode = activeTable === 'sale';
@@ -102,7 +102,8 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
     });
   }, [lpgBrands, mouthSize, weight, productSearch]);
 
-  const brandsForReturn = useMemo(() => lpgBrands.filter(b => b.weight === weight), [lpgBrands, weight]);
+  // Filter return cylinders by both weight AND valve size
+  const brandsForReturn = useMemo(() => lpgBrands.filter(b => b.weight === weight && b.size === mouthSize), [lpgBrands, weight, mouthSize]);
   
   const filteredStoves = useMemo(() => {
     if (!productSearch) return stoves;
@@ -453,6 +454,28 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
             <div className="space-y-3">
               <div><Label>Brand Name *</Label><Input value={customBrand.name} onChange={e => setCustomBrand(p => ({ ...p, name: e.target.value }))} placeholder="Enter brand name" /></div>
               <div><Label>Price ({BANGLADESHI_CURRENCY_SYMBOL})</Label><Input type="number" value={customBrand.price} onChange={e => setCustomBrand(p => ({ ...p, price: e.target.value }))} placeholder="Enter price" /></div>
+              <div>
+                <Label>Brand Color</Label>
+                <div className="flex items-center gap-3 mt-1.5">
+                  <input 
+                    type="color" 
+                    value={customBrand.color} 
+                    onChange={e => setCustomBrand(p => ({ ...p, color: e.target.value }))} 
+                    className="h-10 w-16 rounded-md border border-border cursor-pointer"
+                  />
+                  <div className="flex flex-wrap gap-1.5">
+                    {['#dc2626', '#22c55e', '#2563eb', '#facc15', '#ec4899', '#9333ea', '#ea580c', '#0d9488'].map(c => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setCustomBrand(p => ({ ...p, color: c }))}
+                        className={`h-7 w-7 rounded-full border-2 transition-all ${customBrand.color === c ? 'border-foreground scale-110' : 'border-transparent hover:scale-105'}`}
+                        style={{ backgroundColor: c }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowCustomBrandDialog(false)}>Cancel</Button>
@@ -461,10 +484,19 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                 const { data: { user } } = await supabase.auth.getUser();
                 const { data: ownerId } = await supabase.rpc("get_owner_id");
                 const price = parsePositiveNumber(customBrand.price, 100000) || 0;
-                const { data: newBrand } = await supabase.from('lpg_brands').insert({ name: sanitizeString(customBrand.name), size: mouthSize, weight, color: '#6b7280', package_cylinder: 10, refill_cylinder: 10, created_by: user?.id, owner_id: ownerId }).select().single();
+                const { data: newBrand } = await supabase.from('lpg_brands').insert({ 
+                  name: sanitizeString(customBrand.name), 
+                  size: mouthSize, 
+                  weight, 
+                  color: customBrand.color, 
+                  package_cylinder: 10, 
+                  refill_cylinder: 10, 
+                  created_by: user?.id, 
+                  owner_id: ownerId 
+                }).select().single();
                 if (newBrand) cart.addLPGToCart(newBrand as any, cylinderType, saleType, weight, mouthSize, price);
                 setShowCustomBrandDialog(false);
-                setCustomBrand({ name: '', price: '' });
+                setCustomBrand({ name: '', price: '', color: '#22c55e' });
               }}>Add & Use</Button>
             </DialogFooter>
           </DialogContent>

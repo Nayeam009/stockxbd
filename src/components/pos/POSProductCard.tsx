@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Cylinder, ChefHat, Gauge } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
+import { getLpgColorByValveSize } from "@/lib/brandConstants";
 import type { LPGBrand, Stove, Regulator } from "@/hooks/usePOSData";
 
 // ============= LPG PRODUCT CARD =============
@@ -34,6 +35,11 @@ export const LPGProductCard = ({
   const displayStock = Math.max(0, baseStock - pendingStock);
   const isOutOfStock = displayStock <= 0;
   const previewEmpty = brand.empty_cylinder + pendingReturns;
+  
+  // Get dynamic color based on brand name and valve size
+  const brandColor = valveSize 
+    ? getLpgColorByValveSize(brand.name, valveSize as '22mm' | '20mm')
+    : brand.color;
 
   return (
     <button
@@ -52,7 +58,7 @@ export const LPGProductCard = ({
       {/* Brand Color Strip */}
       <div
         className="absolute top-0 left-0 bottom-0 w-1.5 rounded-l-lg"
-        style={{ backgroundColor: brand.color }}
+        style={{ backgroundColor: brandColor }}
       />
 
       <div className="pl-2">
@@ -60,7 +66,7 @@ export const LPGProductCard = ({
         <div className="flex items-start justify-between gap-1">
           <div
             className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm"
-            style={{ backgroundColor: brand.color }}
+            style={{ backgroundColor: brandColor }}
           >
             <Cylinder className="h-4 w-4 text-white" />
           </div>
