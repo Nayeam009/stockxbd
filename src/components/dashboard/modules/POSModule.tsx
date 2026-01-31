@@ -381,7 +381,22 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
               {(activeTab === 'lpg' || !isSaleMode) && (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
                   {(isSaleMode ? filteredBrands : brandsForReturn).map(brand => (
-                    <LPGProductCard key={brand.id} brand={brand} cylinderType={cylinderType} weight={weight} price={getLPGPrice(brand.id, weight, cylinderType, saleType)} pendingStock={cart.getPendingStock(brand.id, cylinderType)} pendingReturns={cart.getPendingReturns(brand.id)} pendingProblem={cart.getPendingProblem(brand.id)} isSaleMode={isSaleMode} onClick={() => isSaleMode ? cart.addLPGToCart(brand, cylinderType, saleType, weight, mouthSize, getLPGPrice(brand.id, weight, cylinderType, saleType)) : cart.addReturnCylinder(brand, weight)} />
+                    <LPGProductCard 
+                      key={brand.id} 
+                      brand={brand} 
+                      cylinderType={cylinderType} 
+                      weight={weight} 
+                      valveSize={brand.size}
+                      price={getLPGPrice(brand.id, weight, cylinderType, saleType)} 
+                      pendingStock={cart.getPendingStock(brand.id, cylinderType)} 
+                      pendingReturns={cart.getPendingReturns(brand.id)} 
+                      pendingProblem={cart.getPendingProblem(brand.id)} 
+                      isSaleMode={isSaleMode} 
+                      onClick={() => isSaleMode 
+                        ? cart.addLPGToCart(brand, cylinderType, saleType, weight, mouthSize, getLPGPrice(brand.id, weight, cylinderType, saleType)) 
+                        : cart.addReturnCylinder(brand, weight)
+                      } 
+                    />
                   ))}
                   {isSaleMode && <CustomAddCard label="Custom Brand" icon={<Plus className="h-4 w-4 text-muted-foreground" />} onClick={() => setShowCustomBrandDialog(true)} />}
                 </div>

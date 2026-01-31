@@ -9,6 +9,7 @@ interface LPGCardProps {
   brand: LPGBrand;
   cylinderType: 'refill' | 'package';
   weight: string;
+  valveSize?: string;
   price: number;
   pendingStock: number;
   pendingReturns?: number;
@@ -21,6 +22,7 @@ export const LPGProductCard = ({
   brand,
   cylinderType,
   weight,
+  valveSize,
   price,
   pendingStock,
   pendingReturns = 0,
@@ -90,10 +92,17 @@ export const LPGProductCard = ({
           )}
         </div>
 
-        {/* Body: Name + Weight */}
+        {/* Body: Name + Weight + Valve Size */}
         <div className="mt-1.5">
           <p className="font-semibold text-xs truncate">{brand.name}</p>
-          <p className="text-[10px] text-muted-foreground">{weight}</p>
+          <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+            <span>{weight}</span>
+            {valveSize && (
+              <Badge variant="outline" className="h-4 px-1 text-[8px] font-medium">
+                {valveSize}
+              </Badge>
+            )}
+          </div>
         </div>
 
         {/* Footer: Price or Return Info */}
