@@ -40,9 +40,10 @@ export interface SaleEntry {
   transactionNumber: string;
   source: string;
   sourceId: string;
-  isOnlineOrder?: boolean;
-  communityOrderId?: string | null;
-  cogs?: number;
+  isOnlineOrder: boolean;
+  communityOrderId: string | null;
+  cogs: number;
+  saleChannel: 'offline' | 'online';
 }
 
 export interface ExpenseEntry {
@@ -255,7 +256,8 @@ async function fetchSalesData(date: string): Promise<SaleEntry[]> {
           sourceId: txn.id,
           isOnlineOrder,
           communityOrderId,
-          cogs: 0
+          cogs: 0,
+          saleChannel: isOnlineOrder ? 'online' as const : 'offline' as const
         }];
       }
 
@@ -299,7 +301,8 @@ async function fetchSalesData(date: string): Promise<SaleEntry[]> {
           sourceId: txn.id,
           isOnlineOrder,
           communityOrderId,
-          cogs: itemCogs
+          cogs: itemCogs,
+          saleChannel: isOnlineOrder ? 'online' as const : 'offline' as const
         };
       });
     });
@@ -333,7 +336,10 @@ async function fetchSalesData(date: string): Promise<SaleEntry[]> {
         transactionNumber: `PAY-${payment.id.slice(0, 8)}`,
         source: 'Customer Payment',
         sourceId: payment.id,
-        cogs: 0
+        isOnlineOrder: false,
+        communityOrderId: null,
+        cogs: 0,
+        saleChannel: 'offline' as const
       };
     });
 
