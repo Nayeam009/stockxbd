@@ -14,8 +14,18 @@ import {
 import { CommunityOrder } from "@/hooks/useCommunityData";
 import { format } from "date-fns";
 
+interface OrderItem {
+  id?: string;
+  product_name: string;
+  product_type?: string;
+  brand_name?: string;
+  weight?: string;
+  quantity: number;
+  price: number;
+}
+
 interface OrderCardProps {
-  order: CommunityOrder;
+  order: CommunityOrder & { items?: OrderItem[] };
   onViewDetails?: (order: CommunityOrder) => void;
   onUpdateStatus?: (orderId: string, status: CommunityOrder['status']) => void;
   isShopOwner?: boolean;
@@ -161,6 +171,32 @@ export const OrderCard = ({ order, onViewDetails, onUpdateStatus, isShopOwner }:
               <p className="font-medium text-foreground">{order.shop.shop_name}</p>
               <p className="text-sm text-muted-foreground">{order.shop.district}</p>
             </div>
+          </div>
+        )}
+
+        {/* Order Items Summary - NEW */}
+        {order.items && order.items.length > 0 && (
+          <div className="space-y-1.5 py-2 border-t border-border">
+            <p className="text-xs text-muted-foreground font-medium flex items-center gap-1">
+              <Package className="h-3 w-3" />
+              Items ({order.items.length}):
+            </p>
+            {order.items.slice(0, 3).map((item, idx) => (
+              <div key={idx} className="flex items-center justify-between text-sm">
+                <span className="text-foreground truncate max-w-[60%]">
+                  {item.product_name} {item.weight && `(${item.weight})`}
+                  <span className="text-muted-foreground ml-1">×{item.quantity}</span>
+                </span>
+                <span className="text-muted-foreground tabular-nums">
+                  ৳{(item.price * item.quantity).toLocaleString()}
+                </span>
+              </div>
+            ))}
+            {order.items.length > 3 && (
+              <p className="text-xs text-muted-foreground">
+                +{order.items.length - 3} more item{order.items.length - 3 > 1 ? 's' : ''}
+              </p>
+            )}
           </div>
         )}
 

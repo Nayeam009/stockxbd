@@ -122,7 +122,7 @@ export const ShopOrdersTab = ({ shopId }: ShopOrdersTabProps) => {
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
 
-  // Fetch orders
+  // Fetch orders - OPTIMIZED: Batch fetch items (fixes N+1 query problem)
   const fetchData = useCallback(async () => {
     if (!shopId) {
       setLoading(false);
@@ -139,16 +139,34 @@ export const ShopOrdersTab = ({ shopId }: ShopOrdersTabProps) => {
 
       if (ordersError) throw ordersError;
 
-      // Fetch order items for each order
-      const ordersWithItems = await Promise.all(
-        (ordersData || []).map(async (order) => {
-          const { data: items } = await supabase
-            .from('community_order_items')
-            .select('*')
-            .eq('order_id', order.id);
-          return { ...order, items: items || [] } as CommunityOrder;
-        })
-      );
+      if (!ordersData || ordersData.length === 0) {
+        setOrders([]);
+        setLoading(false);
+        return;
+      }
+
+      // BATCH FETCH: Get all order items in a single query (fixes N+1)
+      const orderIds = ordersData.map(o => o.id);
+      const { data: allItems, error: itemsError } = await supabase
+        .from('community_order_items')
+        .select('*')
+        .in('order_id', orderIds);
+
+      if (itemsError) {
+        logger.error('Error fetching order items:', itemsError);
+      }
+
+      // Map items to orders efficiently
+      const itemsMap = new Map<string, OrderItem[]>();
+      allItems?.forEach(item => {
+        const existing = itemsMap.get(item.order_id) || [];
+        itemsMap.set(item.order_id, [...existing, item as OrderItem]);
+      });
+
+      const ordersWithItems = ordersData.map(order => ({
+        ...order,
+        items: itemsMap.get(order.id) || []
+      } as CommunityOrder));
 
       setOrders(ordersWithItems);
     } catch (error) {
@@ -198,9 +216,11 @@ export const ShopOrdersTab = ({ shopId }: ShopOrdersTabProps) => {
     }
   }, [fetchData, shopId]);
 
-  // Update order status
+  // Update order status with inventory sync on delivery
   const updateOrderStatus = async (orderId: string, newStatus: CommunityOrder['status'], reason?: string) => {
     try {
+      const order = orders.find(o => o.id === orderId);
+      
       const updateData: Record<string, any> = { 
         status: newStatus,
         updated_at: new Date().toISOString()
@@ -211,6 +231,11 @@ export const ShopOrdersTab = ({ shopId }: ShopOrdersTabProps) => {
       if (newStatus === 'delivered') {
         updateData.delivered_at = new Date().toISOString();
         updateData.payment_status = 'paid';
+        updateData.return_cylinder_verified = true;
+        updateData.verified_at = new Date().toISOString();
+        
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) updateData.verified_by = user.id;
       }
       if (newStatus === 'rejected' && reason) updateData.rejection_reason = reason;
 
@@ -221,9 +246,53 @@ export const ShopOrdersTab = ({ shopId }: ShopOrdersTabProps) => {
 
       if (error) throw error;
 
+      // INVENTORY SYNC: Update inventory when order is marked as delivered
+      if (newStatus === 'delivered' && order?.items && order.items.length > 0) {
+        // Get shop owner_id for inventory lookup
+        const { data: shopData } = await supabase
+          .from('shop_profiles')
+          .select('owner_id')
+          .eq('id', shopId)
+          .single();
+
+        if (shopData?.owner_id) {
+          for (const item of order.items) {
+            // Only process LPG refill items for inventory sync
+            if (item.product_type === 'lpg_refill' && item.brand_name) {
+              // Find matching LPG brand in inventory
+              const { data: brand } = await supabase
+                .from('lpg_brands')
+                .select('id, refill_cylinder, empty_cylinder')
+                .eq('name', item.brand_name)
+                .eq('owner_id', shopData.owner_id)
+                .maybeSingle();
+
+              if (brand) {
+                // Reduce refill stock, increase empty stock
+                const { error: updateError } = await supabase
+                  .from('lpg_brands')
+                  .update({
+                    refill_cylinder: Math.max(0, brand.refill_cylinder - item.quantity),
+                    empty_cylinder: brand.empty_cylinder + (item.return_cylinder_qty || 0),
+                    updated_at: new Date().toISOString()
+                  })
+                  .eq('id', brand.id);
+
+                if (updateError) {
+                  logger.error('Inventory sync error:', updateError);
+                }
+              }
+            }
+          }
+          logger.info('Inventory synced for order:', orderId);
+        }
+      }
+
       toast({
         title: "Success",
-        description: `Order ${newStatus}`,
+        description: newStatus === 'delivered' 
+          ? "Order delivered & inventory updated!" 
+          : `Order ${newStatus}`,
       });
 
       fetchData();
