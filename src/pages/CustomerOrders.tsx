@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -18,6 +18,8 @@ import { OrderCard } from "@/components/community/OrderCard";
 import { OrderCardSkeletonList } from "@/components/community/OrderCardSkeleton";
 import { useCustomerOrders, useInvalidateCommunity } from "@/hooks/queries/useCommunityQueries";
 import { useCommunityData, CommunityOrder } from "@/hooks/useCommunityData";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
 
 const CustomerOrders = () => {
   const navigate = useNavigate();
@@ -31,6 +33,38 @@ const CustomerOrders = () => {
     isFetching,
     refetch 
   } = useCustomerOrders(currentUser?.id);
+
+  // Real-time subscription for order status updates
+  useEffect(() => {
+    if (!currentUser?.id) return;
+
+    const channel = supabase
+      .channel('customer-orders-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'community_orders',
+          filter: `customer_id=eq.${currentUser.id}`
+        },
+        (payload) => {
+          refetch();
+          const newStatus = (payload.new as any)?.status;
+          if (newStatus) {
+            toast({ 
+              title: "Order Updated!", 
+              description: `Your order status changed to: ${newStatus}` 
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => { 
+      supabase.removeChannel(channel); 
+    };
+  }, [currentUser?.id, refetch]);
 
   // Map to the expected type with proper casting
   const orders = useMemo(() => 

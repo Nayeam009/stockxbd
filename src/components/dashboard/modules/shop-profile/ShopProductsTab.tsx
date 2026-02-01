@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
 import { 
   Package, 
   Save, 
@@ -419,6 +420,46 @@ export const ShopProductsTab = ({ shopId }: ShopProductsTabProps) => {
     total: products.length,
     readyToEnable: products.filter(p => p.stock > 0 && p.retail_price > 0 && !p.is_available).length
   }), [products]);
+
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        {/* Stats skeleton */}
+        <div className="grid grid-cols-3 gap-3">
+          {[1, 2, 3].map(i => (
+            <Skeleton key={i} className="h-20 rounded-xl" />
+          ))}
+        </div>
+        {/* Tabs skeleton */}
+        <div className="flex gap-2">
+          {[1, 2, 3].map(i => (
+            <Skeleton key={i} className="h-10 w-24 rounded-md" />
+          ))}
+        </div>
+        {/* Products grid skeleton */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3, 4, 5, 6].map(i => (
+            <Card key={i} className="border-border">
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <Skeleton className="h-5 w-32" />
+                  <Skeleton className="h-5 w-16 rounded-full" />
+                </div>
+                <div className="flex gap-1 mt-2">
+                  <Skeleton className="h-5 w-12 rounded-full" />
+                  <Skeleton className="h-5 w-12 rounded-full" />
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-11 w-full" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   // ==================== CARD COMPONENTS ====================
 
