@@ -62,6 +62,7 @@ const EXPENSE_CATEGORIES = [
 
 type DateRangeOption = 'today' | 'yesterday' | 'week' | 'month' | 'custom';
 type PaymentFilter = 'all' | 'paid' | 'partial' | 'due';
+type SaleChannelFilter = 'all' | 'online' | 'offline';
 type ExpenseSourceFilter = 'all' | 'pob' | 'salary' | 'vehicle' | 'manual';
 
 // ===== Summary Card Component =====
@@ -230,6 +231,7 @@ export const BusinessDiaryModule = () => {
   
   // Filter states
   const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>('all');
+  const [saleChannelFilter, setSaleChannelFilter] = useState<SaleChannelFilter>('all');
   const [expenseSourceFilter, setExpenseSourceFilter] = useState<ExpenseSourceFilter>('all');
   const [viewMode, setViewMode] = useState<'cash' | 'profit'>('cash');
 
@@ -245,10 +247,11 @@ export const BusinessDiaryModule = () => {
     date: format(new Date(), 'yyyy-MM-dd')
   });
 
-  // Filter sales by payment status and search
+  // Filter sales by payment status, channel, and search
   const filteredSales = useMemo(() => {
     return sales.filter(s => {
       if (paymentFilter !== 'all' && s.paymentStatus !== paymentFilter) return false;
+      if (saleChannelFilter !== 'all' && s.saleChannel !== saleChannelFilter) return false;
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
         return s.productName.toLowerCase().includes(query) ||
@@ -258,7 +261,7 @@ export const BusinessDiaryModule = () => {
       }
       return true;
     });
-  }, [sales, paymentFilter, searchQuery]);
+  }, [sales, paymentFilter, saleChannelFilter, searchQuery]);
 
   // Filter expenses by source and search
   const filteredExpenses = useMemo(() => {
@@ -280,6 +283,10 @@ export const BusinessDiaryModule = () => {
   const paidCount = sales.filter(s => s.paymentStatus === 'paid').length;
   const partialCount = sales.filter(s => s.paymentStatus === 'partial').length;
   const dueCount = sales.filter(s => s.paymentStatus === 'due').length;
+
+  // Sale channel counts
+  const onlineCount = sales.filter(s => s.saleChannel === 'online').length;
+  const offlineCount = sales.filter(s => s.saleChannel === 'offline').length;
 
   // Expense source counts
   const pobCount = expenses.filter(e => e.type === 'pob').length;
@@ -502,8 +509,9 @@ export const BusinessDiaryModule = () => {
             </TabsList>
           </div>
 
-          {/* Payment Status Filter - Sales Tab */}
+          {/* Payment Status Filter + Channel Filter - Sales Tab */}
           <TabsContent value="sales" className="mt-3 space-y-3">
+            {/* Payment Status Filter */}
             <div className="flex gap-1.5 overflow-x-auto pb-1">
               {[
                 { value: 'all' as const, label: 'All', count: sales.length },
@@ -517,12 +525,25 @@ export const BusinessDiaryModule = () => {
                 </Button>
               ))}
             </div>
+            {/* Sale Channel Filter (Online/Offline) */}
+            <div className="flex gap-1.5 overflow-x-auto pb-1">
+              {[
+                { value: 'all' as const, label: 'All Channels', count: sales.length },
+                { value: 'online' as const, label: '🌐 Online', count: onlineCount },
+                { value: 'offline' as const, label: '🏪 Offline', count: offlineCount }
+              ].map(opt => (
+                <Button key={opt.value} variant={saleChannelFilter === opt.value ? 'secondary' : 'ghost'} size="sm"
+                  onClick={() => setSaleChannelFilter(opt.value)} className="h-7 px-2.5 text-[11px] shrink-0">
+                  {opt.label} <Badge variant="outline" className="ml-1 h-4 text-[9px]">{opt.count}</Badge>
+                </Button>
+              ))}
+            </div>
             {filteredSales.length === 0 ? (
-              <Card className="border-dashed border-2 border-emerald-200 dark:border-emerald-800/50 bg-emerald-50/50 dark:bg-emerald-950/20">
+              <Card className="border-dashed border-2 border-muted bg-muted/20">
                 <CardContent className="flex flex-col items-center justify-center py-10">
-                  <Receipt className="h-10 w-10 text-emerald-400 mb-3" />
+                  <Receipt className="h-10 w-10 text-muted-foreground/50 mb-3" />
                   <p className="font-medium">No sales found</p>
-                  <p className="text-xs text-muted-foreground mt-1">No {paymentFilter !== 'all' ? paymentFilter : ''} sales for {format(new Date(selectedDate), 'MMM dd')}</p>
+                  <p className="text-xs text-muted-foreground mt-1">No {paymentFilter !== 'all' ? paymentFilter : ''} {saleChannelFilter !== 'all' ? saleChannelFilter : ''} sales for {format(new Date(selectedDate), 'MMM dd')}</p>
                 </CardContent>
               </Card>
             ) : (
@@ -575,7 +596,7 @@ export const BusinessDiaryModule = () => {
                 </Badge>
               </CardTitle>
               {/* Payment Filter */}
-              <div className="flex gap-1.5 mt-2">
+              <div className="flex gap-1.5 mt-2 flex-wrap">
                 {[
                   { value: 'all' as const, label: 'All', count: sales.length },
                   { value: 'paid' as const, label: 'Paid', count: paidCount },
@@ -584,6 +605,19 @@ export const BusinessDiaryModule = () => {
                 ].map(opt => (
                   <Button key={opt.value} variant={paymentFilter === opt.value ? 'default' : 'ghost'} size="sm"
                     onClick={() => setPaymentFilter(opt.value)} className="h-7 px-2 text-[10px]">
+                    {opt.label} ({opt.count})
+                  </Button>
+                ))}
+              </div>
+              {/* Channel Filter (Online/Offline) */}
+              <div className="flex gap-1 mt-1">
+                {[
+                  { value: 'all' as const, label: 'All', count: sales.length },
+                  { value: 'online' as const, label: '🌐 Online', count: onlineCount },
+                  { value: 'offline' as const, label: '🏪 Offline', count: offlineCount }
+                ].map(opt => (
+                  <Button key={opt.value} variant={saleChannelFilter === opt.value ? 'secondary' : 'ghost'} size="sm"
+                    onClick={() => setSaleChannelFilter(opt.value)} className="h-6 px-1.5 text-[9px]">
                     {opt.label} ({opt.count})
                   </Button>
                 ))}

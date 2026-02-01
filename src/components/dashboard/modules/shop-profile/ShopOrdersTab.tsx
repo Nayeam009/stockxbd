@@ -216,18 +216,119 @@ export const ShopOrdersTab = ({ shopId }: ShopOrdersTabProps) => {
     }
   }, [fetchData, shopId]);
 
+  // Create POS transaction from online order (connects to POS & Business Diary)
+  const createPOSTransactionFromOrder = async (order: CommunityOrder, ownerId: string): Promise<string | null> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+
+    // 1. Find or create customer by phone for Customer module connection
+    let customerId: string | null = null;
+    const { data: existingCustomer } = await supabase
+      .from('customers')
+      .select('id')
+      .eq('phone', order.customer_phone)
+      .maybeSingle();
+
+    if (existingCustomer) {
+      customerId = existingCustomer.id;
+    } else {
+      const { data: newCustomer } = await supabase
+        .from('customers')
+        .insert({
+          name: order.customer_name,
+          phone: order.customer_phone,
+          address: `${order.delivery_address}, ${order.thana || ''}, ${order.district}, ${order.division}`.trim(),
+          owner_id: ownerId,
+          created_by: user.id
+        })
+        .select()
+        .single();
+      customerId = newCustomer?.id || null;
+    }
+
+    // 2. Generate POS transaction number
+    const { data: txnNumber, error: rpcError } = await supabase.rpc('generate_transaction_number');
+    if (rpcError) {
+      logger.error('Failed to generate transaction number:', rpcError);
+      return null;
+    }
+
+    // 3. Create POS transaction linked to community order (for Business Diary)
+    const { data: transaction, error: txnError } = await supabase
+      .from('pos_transactions')
+      .insert({
+        transaction_number: txnNumber,
+        customer_id: customerId,
+        subtotal: order.subtotal,
+        discount: 0,
+        total: order.total_amount,
+        payment_method: order.payment_method === 'cod' ? 'cash' : order.payment_method,
+        payment_status: 'completed',
+        community_order_id: order.id,
+        is_online_order: true,
+        owner_id: ownerId,
+        created_by: user.id
+      } as any)
+      .select()
+      .single();
+
+    if (txnError) {
+      logger.error('Failed to create POS transaction:', txnError);
+      return null;
+    }
+
+    // 4. Create transaction items for Business Diary details
+    for (const item of order.items || []) {
+      const productName = `${item.brand_name || item.product_name} ${item.weight || ''} (${item.product_type === 'lpg_refill' ? 'Refill' : item.product_type === 'lpg_package' ? 'Package' : item.product_type})`;
+      
+      await supabase.from('pos_transaction_items').insert({
+        transaction_id: transaction.id,
+        product_id: item.id, // Using order item id as reference
+        product_name: productName,
+        quantity: item.quantity,
+        unit_price: item.price,
+        total_price: item.price * item.quantity,
+        created_by: user.id
+      });
+    }
+
+    return txnNumber;
+  };
+
   // Update order status with inventory sync on delivery
   const updateOrderStatus = async (orderId: string, newStatus: CommunityOrder['status'], reason?: string) => {
     try {
       const order = orders.find(o => o.id === orderId);
+      if (!order) return;
       
       const updateData: Record<string, any> = { 
         status: newStatus,
         updated_at: new Date().toISOString()
       };
 
-      if (newStatus === 'confirmed') updateData.confirmed_at = new Date().toISOString();
+      // Get shop owner_id for operations
+      const { data: shopData } = await supabase
+        .from('shop_profiles')
+        .select('owner_id')
+        .eq('id', shopId)
+        .single();
+
+      const ownerId = shopData?.owner_id;
+
+      if (newStatus === 'confirmed') {
+        updateData.confirmed_at = new Date().toISOString();
+        
+        // Create POS transaction when confirming order (connects to Business Diary)
+        if (ownerId) {
+          const txnNumber = await createPOSTransactionFromOrder(order, ownerId);
+          if (txnNumber) {
+            logger.info(`POS transaction ${txnNumber} created for online order ${order.order_number}`);
+          }
+        }
+      }
+      
       if (newStatus === 'dispatched') updateData.dispatched_at = new Date().toISOString();
+      
       if (newStatus === 'delivered') {
         updateData.delivered_at = new Date().toISOString();
         updateData.payment_status = 'paid';
@@ -236,7 +337,47 @@ export const ShopOrdersTab = ({ shopId }: ShopOrdersTabProps) => {
         
         const { data: { user } } = await supabase.auth.getUser();
         if (user) updateData.verified_by = user.id;
+
+        // INVENTORY SYNC: Update inventory when delivered
+        if (ownerId && order.items && order.items.length > 0) {
+          for (const item of order.items) {
+            // Process LPG items (both refill and package)
+            if ((item.product_type === 'lpg_refill' || item.product_type === 'lpg_package') && item.brand_name) {
+              const { data: brand } = await supabase
+                .from('lpg_brands')
+                .select('id, refill_cylinder, package_cylinder, empty_cylinder, problem_cylinder, weight')
+                .ilike('name', `%${item.brand_name}%`)
+                .eq('owner_id', ownerId)
+                .eq('weight', item.weight || '12kg')
+                .maybeSingle();
+
+              if (brand) {
+                const isRefill = item.product_type === 'lpg_refill';
+                const stockField = isRefill ? 'refill_cylinder' : 'package_cylinder';
+                const currentStock = isRefill ? brand.refill_cylinder : brand.package_cylinder;
+                
+                const updatePayload: Record<string, any> = {
+                  [stockField]: Math.max(0, currentStock - item.quantity),
+                  updated_at: new Date().toISOString()
+                };
+
+                // Update empty/problem cylinder based on return type
+                if (item.return_cylinder_qty > 0) {
+                  if (item.return_cylinder_type === 'leaked') {
+                    updatePayload.problem_cylinder = (brand.problem_cylinder || 0) + item.return_cylinder_qty;
+                  } else {
+                    updatePayload.empty_cylinder = (brand.empty_cylinder || 0) + item.return_cylinder_qty;
+                  }
+                }
+
+                await supabase.from('lpg_brands').update(updatePayload).eq('id', brand.id);
+              }
+            }
+          }
+          logger.info('Inventory synced for order:', orderId);
+        }
       }
+      
       if (newStatus === 'rejected' && reason) updateData.rejection_reason = reason;
 
       const { error } = await supabase
@@ -246,52 +387,12 @@ export const ShopOrdersTab = ({ shopId }: ShopOrdersTabProps) => {
 
       if (error) throw error;
 
-      // INVENTORY SYNC: Update inventory when order is marked as delivered
-      if (newStatus === 'delivered' && order?.items && order.items.length > 0) {
-        // Get shop owner_id for inventory lookup
-        const { data: shopData } = await supabase
-          .from('shop_profiles')
-          .select('owner_id')
-          .eq('id', shopId)
-          .single();
-
-        if (shopData?.owner_id) {
-          for (const item of order.items) {
-            // Only process LPG refill items for inventory sync
-            if (item.product_type === 'lpg_refill' && item.brand_name) {
-              // Find matching LPG brand in inventory
-              const { data: brand } = await supabase
-                .from('lpg_brands')
-                .select('id, refill_cylinder, empty_cylinder')
-                .eq('name', item.brand_name)
-                .eq('owner_id', shopData.owner_id)
-                .maybeSingle();
-
-              if (brand) {
-                // Reduce refill stock, increase empty stock
-                const { error: updateError } = await supabase
-                  .from('lpg_brands')
-                  .update({
-                    refill_cylinder: Math.max(0, brand.refill_cylinder - item.quantity),
-                    empty_cylinder: brand.empty_cylinder + (item.return_cylinder_qty || 0),
-                    updated_at: new Date().toISOString()
-                  })
-                  .eq('id', brand.id);
-
-                if (updateError) {
-                  logger.error('Inventory sync error:', updateError);
-                }
-              }
-            }
-          }
-          logger.info('Inventory synced for order:', orderId);
-        }
-      }
-
       toast({
         title: "Success",
         description: newStatus === 'delivered' 
           ? "Order delivered & inventory updated!" 
+          : newStatus === 'confirmed'
+          ? "Order confirmed & added to POS!"
           : `Order ${newStatus}`,
       });
 
