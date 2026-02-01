@@ -85,6 +85,9 @@ const ShopProfile = () => {
       shop,
       shop_id: shop.id // Ensure shop_id is always set for checkout
     }));
+    
+    // Save to localStorage IMMEDIATELY before navigation (don't rely on useEffect)
+    localStorage.setItem('lpg-community-cart', JSON.stringify(itemsWithShop));
     setCart(itemsWithShop);
 
     toast({
@@ -111,13 +114,17 @@ const ShopProfile = () => {
 
     // Check if item already in cart
     const existingIndex = cart.findIndex(c => c.id === item.id);
+    let newCart: CartItem[];
     if (existingIndex >= 0) {
-      const newCart = [...cart];
+      newCart = [...cart];
       newCart[existingIndex] = itemWithShop;
-      setCart(newCart);
     } else {
-      setCart([...cart, itemWithShop]);
+      newCart = [...cart, itemWithShop];
     }
+    
+    // Save to localStorage IMMEDIATELY (don't rely on useEffect)
+    localStorage.setItem('lpg-community-cart', JSON.stringify(newCart));
+    setCart(newCart);
 
     toast({
       title: "Added to cart",
