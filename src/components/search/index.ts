@@ -1,0 +1,1 @@
+export { GlobalSearchCard } from './GlobalSearchCard';
