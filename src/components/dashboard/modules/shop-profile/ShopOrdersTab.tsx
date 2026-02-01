@@ -49,14 +49,17 @@ interface CommunityOrder {
 
 interface OrderItem {
   id: string;
+  product_id: string | null;
   product_name: string;
   product_type: string;
   brand_name: string | null;
   weight: string | null;
+  valve_size: string | null;
   quantity: number;
   price: number;
   return_cylinder_qty: number;
   return_cylinder_type: 'empty' | 'leaked' | null;
+  return_cylinder_brand: string | null;
 }
 
 interface ShopOrdersTabProps {
@@ -338,17 +341,32 @@ export const ShopOrdersTab = ({ shopId }: ShopOrdersTabProps) => {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) updateData.verified_by = user.id;
 
-        // INVENTORY SYNC: Update inventory when delivered
+        // INVENTORY SYNC: Update inventory when delivered with EXACT brand matching
         if (ownerId && order.items && order.items.length > 0) {
           for (const item of order.items) {
             // Process LPG items (both refill and package)
             if ((item.product_type === 'lpg_refill' || item.product_type === 'lpg_package') && item.brand_name) {
+              // Get valve_size: from order item first, fallback to shop_products lookup
+              let valveSize = item.valve_size || '22mm';
+              if (!item.valve_size && item.product_id) {
+                const { data: shopProduct } = await supabase
+                  .from('shop_products')
+                  .select('valve_size')
+                  .eq('id', item.product_id)
+                  .maybeSingle();
+                if (shopProduct?.valve_size) {
+                  valveSize = shopProduct.valve_size;
+                }
+              }
+
+              // EXACT brand match with name, weight, AND size filter
               const { data: brand } = await supabase
                 .from('lpg_brands')
                 .select('id, refill_cylinder, package_cylinder, empty_cylinder, problem_cylinder, weight')
-                .ilike('name', `%${item.brand_name}%`)
+                .eq('name', item.brand_name)
                 .eq('owner_id', ownerId)
                 .eq('weight', item.weight || '12kg')
+                .eq('size', valveSize)
                 .maybeSingle();
 
               if (brand) {
@@ -361,7 +379,7 @@ export const ShopOrdersTab = ({ shopId }: ShopOrdersTabProps) => {
                   updated_at: new Date().toISOString()
                 };
 
-                // Update empty/problem cylinder based on return type
+                // Handle return cylinder - same brand
                 if (item.return_cylinder_qty > 0) {
                   if (item.return_cylinder_type === 'leaked') {
                     updatePayload.problem_cylinder = (brand.problem_cylinder || 0) + item.return_cylinder_qty;
@@ -371,6 +389,35 @@ export const ShopOrdersTab = ({ shopId }: ShopOrdersTabProps) => {
                 }
 
                 await supabase.from('lpg_brands').update(updatePayload).eq('id', brand.id);
+                logger.info(`Inventory updated for ${item.brand_name} ${valveSize}: sold ${item.quantity}, returned ${item.return_cylinder_qty}`);
+              } else {
+                logger.warn(`Brand not found for inventory sync: ${item.brand_name} ${item.weight} ${valveSize}`);
+              }
+
+              // Handle different brand return cylinder
+              const returnBrand = item.return_cylinder_brand;
+              if (returnBrand && returnBrand !== item.brand_name && item.return_cylinder_qty > 0) {
+                const { data: returnBrandData } = await supabase
+                  .from('lpg_brands')
+                  .select('id, empty_cylinder, problem_cylinder')
+                  .eq('name', returnBrand)
+                  .eq('owner_id', ownerId)
+                  .eq('weight', item.weight || '12kg')
+                  .eq('size', valveSize)
+                  .maybeSingle();
+                  
+                if (returnBrandData) {
+                  const returnUpdatePayload: Record<string, any> = {
+                    updated_at: new Date().toISOString()
+                  };
+                  if (item.return_cylinder_type === 'leaked') {
+                    returnUpdatePayload.problem_cylinder = (returnBrandData.problem_cylinder || 0) + item.return_cylinder_qty;
+                  } else {
+                    returnUpdatePayload.empty_cylinder = (returnBrandData.empty_cylinder || 0) + item.return_cylinder_qty;
+                  }
+                  await supabase.from('lpg_brands').update(returnUpdatePayload).eq('id', returnBrandData.id);
+                  logger.info(`Return cylinder synced for different brand: ${returnBrand}`);
+                }
               }
             }
           }

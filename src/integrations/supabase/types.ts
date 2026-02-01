@@ -49,6 +49,7 @@ export type Database = {
           return_cylinder_brand: string | null
           return_cylinder_qty: number | null
           return_cylinder_type: string | null
+          valve_size: string | null
           weight: string | null
         }
         Insert: {
@@ -64,6 +65,7 @@ export type Database = {
           return_cylinder_brand?: string | null
           return_cylinder_qty?: number | null
           return_cylinder_type?: string | null
+          valve_size?: string | null
           weight?: string | null
         }
         Update: {
@@ -79,6 +81,7 @@ export type Database = {
           return_cylinder_brand?: string | null
           return_cylinder_qty?: number | null
           return_cylinder_type?: string | null
+          valve_size?: string | null
           weight?: string | null
         }
         Relationships: [

@@ -322,7 +322,7 @@ export const useCommunityData = () => {
 
       if (orderError) throw orderError;
 
-      // Create order items
+      // Create order items with valve_size for accurate inventory matching
       const orderItems = items.map(item => ({
         order_id: orderData.id,
         product_id: item.id,
@@ -330,6 +330,7 @@ export const useCommunityData = () => {
         product_type: item.product_type,
         brand_name: item.brand_name,
         weight: item.weight,
+        valve_size: item.valve_size || '22mm',
         quantity: item.quantity,
         price: item.price,
         return_cylinder_qty: item.return_cylinder_qty || 0,
