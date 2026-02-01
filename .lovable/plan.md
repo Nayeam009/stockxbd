@@ -1,42 +1,47 @@
 
-
-# Rebuild Analysis & Reports Module
+# Rebuild Settings Module
 
 ## Overview
-This plan addresses identified issues in the Analysis & Search Report module to improve performance, optimization, and connectivity with all other modules. The goal is to create a professional, premium module with real-time synchronization and a modular architecture.
+This plan addresses identified issues in the Settings module to improve design, optimization, and connectivity with all other modules. The goal is to create a professional, modular settings interface with real-time synchronization and a cleaner architecture.
 
 ---
 
 ## Current Issues Identified
 
-### 1. **Large Monolithic File**
-- 1571 lines in a single file - difficult to maintain
-- No component separation (analysis, search, reports all mixed)
+### 1. **Large Monolithic Files**
+- `SettingsModule.tsx` is 880 lines - too large
+- `TeamSettingsSection.tsx` is 904 lines - needs splitting
+- Mixed concerns: Profile, Theme, Security, Team, Shop all bundled together
 
 ### 2. **No Real-time Subscriptions**
-- Data fetched only on mount; changes from POS/POB/Customers don't update charts
-- Staff and vehicle data fetched once without live sync
+- Team member changes not reflected in real-time
+- Shop profile updates not synced
+- Pending invites not updated when used by manager
 
-### 3. **Performance Issues**
-- Heavy chart calculations run on every render
-- No loading skeleton for initial load
-- Report generation blocks UI with full-screen overlay
+### 3. **Duplicate Functionality**
+- Shop profile editing exists in both `TeamSettingsSection.tsx` AND `MyShopProfileModule.tsx`
+- Business info duplicated between settings and My Shop module
+- Confusing UX - users don't know where to edit shop details
 
-### 4. **Inconsistent Design**
-- Not using shared `PremiumModuleHeader` and `PremiumStatCard` components
-- Custom KPI cards don't match other modules' premium design
-- Mode toggle UI is inconsistent with other modules
+### 4. **Missing Loading States**
+- No skeleton loading for settings sections
+- Profile data loads with no visual feedback
+- Team members fetch without loading indicator on initial load
 
-### 5. **Missing Features**
-- No date range picker for custom analysis periods
-- No PDF export for reports (only CSV)
-- No comparison views (this month vs last month)
-- Growth indicators missing from KPI cards
+### 5. **Inconsistent Design**
+- Not using shared `PremiumModuleHeader` component
+- Custom profile header differs from other modules' premium headers
+- Section navigation differs from other modules (e.g., MyShopProfileModule uses Tabs)
 
-### 6. **Module Connectivity Gaps**
-- Doesn't listen to inventory changes
-- Doesn't reflect customer payment updates
-- Staff salary payments not reflected in real-time
+### 6. **Performance Issues**
+- Multiple independent useEffect calls fetching data separately
+- No memoization on computed values
+- LocalStorage reads on every render for notification settings
+
+### 7. **Missing Features**
+- No avatar upload functionality in Account section
+- No session management (view active sessions)
+- No export personal data option (GDPR consideration)
 
 ---
 
@@ -44,238 +49,265 @@ This plan addresses identified issues in the Analysis & Search Report module to 
 
 ### New File Structure
 ```text
-src/components/
-  analysis/
-    AnalysisKPIGrid.tsx (NEW)       - Premium KPI cards using PremiumStatCard
-    AnalysisTrendChart.tsx (NEW)    - 7-day trend area chart
-    AnalysisPieCharts.tsx (NEW)     - Payment & expense breakdown charts
-    AnalysisTopItems.tsx (NEW)      - Top products & expenses cards
-    AnalysisTimeSelector.tsx (NEW)  - Time range selector pills
-    AnalysisSkeleton.tsx (NEW)      - Loading skeleton
-    index.ts (NEW)                  - Central exports
-  reports/
-    ReportGenerator.tsx (NEW)       - Report generation logic
-    ReportPreviewDialog.tsx (NEW)   - Report preview & export dialog
-    QuickReportsGrid.tsx (NEW)      - Quick report buttons
-    index.ts (NEW)                  - Central exports
-  search/
-    GlobalSearchCard.tsx (NEW)      - Global search with categories
-    CommandPalette.tsx (NEW)        - Command palette (Cmd+K)
-    SearchResultCard.tsx (NEW)      - Individual search result
-    index.ts (NEW)                  - Central exports
-  dashboard/modules/
-    AnalysisSearchReportModule.tsx  - REFACTORED (~400 lines)
+src/components/settings/
+  SettingsSkeleton.tsx (NEW)          - Loading skeleton
+  ProfileCard.tsx (NEW)               - User profile header card
+  SecuritySection.tsx (NEW)           - Password & danger zone
+  NotificationSection.tsx (RENAMED)   - Rename PushNotificationCard
+  AdvancedSection.tsx (NEW)           - Backup, cache, data management
+  TeamInviteCard.tsx (NEW)            - QR/Link invite generation
+  TeamMembersCard.tsx (NEW)           - Team member list & management
+  index.ts (NEW)                      - Central exports
+  
+  AccountSettingsSection.tsx          - KEEP (minor updates)
+  BackupRestoreCard.tsx              - KEEP (no changes)
+  PrinterSettingsSection.tsx         - KEEP (no changes)
+  TeamSettingsSection.tsx            - REFACTOR (remove shop profile, split into cards)
+  
+  REMOVE:
+  ShopProfileCard.tsx                - REMOVE (duplicates MyShopProfileModule)
+  ShopProductsCard.tsx               - REMOVE (duplicates MyShopProfileModule)
+  ProfileSharingCard.tsx             - REMOVE (unused)
+  
+src/components/dashboard/modules/
+  SettingsModule.tsx                 - REFACTOR (~400 lines)
 ```
 
 ---
 
-## Part 2: Real-time Subscriptions
+## Part 2: Remove Duplicate Shop Profile
 
-### Current Problem
-Data is fetched once on component mount. Changes from:
-- POS sales
-- POB purchases
-- Customer payments
-- Staff salary payments
-- Vehicle costs
+### Problem
+Shop profile editing exists in TWO places:
+1. `Settings > Team & Business > Shop Profile` (TeamSettingsSection.tsx lines 450-577)
+2. `My Shop Profile` module (MyShopProfileModule.tsx)
 
-...are not reflected until page refresh.
+This creates confusion for users and maintenance burden.
 
 ### Solution
-Add Supabase real-time subscriptions:
+- **Remove** shop profile form from Settings/TeamSettingsSection
+- Add a **quick link card** to navigate to My Shop Profile module
+- Keep Team Management (invites, members) in Settings
 
+### Updated TeamSettingsSection Structure
+```typescript
+// BEFORE: Shop Profile + Manager Invite + Team Management (904 lines)
+// AFTER: Manager Invite + Team Management + Link to Shop Profile (~400 lines)
+
+<Card>Quick Link to My Shop Profile</Card>
+<TeamInviteCard />
+<TeamMembersCard />
+```
+
+---
+
+## Part 3: Real-time Subscriptions
+
+### Add Supabase Subscriptions
 ```typescript
 useEffect(() => {
   const channel = supabase
-    .channel('analysis-realtime')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'pos_transactions' }, debouncedRefetch)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'pob_transactions' }, debouncedRefetch)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_expenses' }, debouncedRefetch)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'customer_payments' }, debouncedRefetch)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'staff_payments' }, debouncedRefetch)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicle_costs' }, debouncedRefetch)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'lpg_brands' }, debouncedRefetch)
+    .channel('settings-realtime')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'team_members' }, debouncedRefetch)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'team_invites' }, fetchPendingInvites)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, fetchProfile)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'user_roles' }, fetchUserRole)
     .subscribe();
 
   return () => { supabase.removeChannel(channel); };
-}, [debouncedRefetch]);
+}, [debouncedRefetch, fetchPendingInvites]);
 ```
 
-### Debounce Strategy
-- 800ms debounce on subscription callbacks
-- Prevents UI flicker during rapid updates
+### Tables to Subscribe
+| Table | Trigger | Update |
+|-------|---------|--------|
+| `team_members` | Member joins/leaves | Refresh team list |
+| `team_invites` | Invite used/expired | Refresh pending invites |
+| `profiles` | Profile update | Refresh user display name/avatar |
+| `user_roles` | Role change | Refresh permissions |
 
 ---
 
-## Part 3: Premium Design Updates
+## Part 4: Premium Design Updates
 
-### KPI Grid Improvements
-- Use `PremiumStatCard` component for consistency
-- Add growth badges (vs yesterday/last week/last month)
-- Show profit margin percentage
-- Animated number transitions
+### Profile Header
+Use consistent design with other modules:
+```typescript
+// Current: Custom inline design
+// New: Use Avatar with gradient background + role badge
+<Card className="relative overflow-hidden">
+  <div className="absolute top-0 left-0 right-0 h-24 bg-gradient-to-r from-primary/20 to-primary/5" />
+  <CardContent className="pt-16 pb-6 relative">
+    <Avatar className="h-20 w-20 border-4 border-background shadow-xl absolute -top-10 left-6">
+      {/* Avatar content */}
+    </Avatar>
+    {/* Name, email, role badge */}
+  </CardContent>
+</Card>
+```
 
-### Module Header
-- Use shared `PremiumModuleHeader` component
-- Add real-time sync indicator badge
-- Add refresh button
+### Section Navigation
+Keep current sidebar/section pattern but polish:
+- Add subtle hover animations
+- Add icons to match content
+- Add count badges where applicable (e.g., Team: 3 members)
 
-### Time Selector Enhancement
-- Premium pill-style selector (already exists, polish needed)
-- Add "Custom Range" option with date picker
-- Persist last selected range in localStorage
-
-### Chart Improvements
-- Add gradient fills matching the premium theme
-- Improve tooltip styling
-- Add animation on data change
-- Dark mode color fixes
+### Mobile Improvements
+- Ensure all touch targets are 48px minimum
+- Add swipe-back gesture support for mobile detail views
+- Improve section transitions with fade animations
 
 ---
 
-## Part 4: Enhanced Features
+## Part 5: New Features
 
-### 1. Custom Date Range
+### 1. Avatar Upload
+Add photo upload to Account section:
 ```typescript
-// Add date range state
-const [customRange, setCustomRange] = useState<{from: Date, to: Date} | null>(null);
-
-// Add to time selector
-<Button onClick={() => setShowDatePicker(true)}>
-  <Calendar className="h-4 w-4 mr-2" /> Custom
-</Button>
+<div className="relative group">
+  <Avatar className="h-20 w-20">
+    <AvatarImage src={avatarUrl} />
+    <AvatarFallback>{initials}</AvatarFallback>
+  </Avatar>
+  <label className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 rounded-full cursor-pointer transition-opacity">
+    <Camera className="h-6 w-6 text-white" />
+    <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
+  </label>
+</div>
 ```
 
-### 2. Comparison View
-Show current period vs previous period:
-- Today vs Yesterday
-- This Week vs Last Week
-- This Month vs Last Month
-
-Display as percentage change with trend arrows.
-
-### 3. PDF Export
-Add PDF export using existing `pdfExport.ts` utility:
+### 2. Session Info Card
+Show current session info:
 ```typescript
-import { exportToPDF } from "@/lib/pdfExport";
-
-const handleExportPDF = () => {
-  exportToPDF({
-    title: currentReport.title,
-    headers: currentReport.headers,
-    rows: currentReport.rows,
-    summary: currentReport.summary
-  });
-};
+<Card>
+  <CardHeader>
+    <CardTitle>Current Session</CardTitle>
+  </CardHeader>
+  <CardContent>
+    <div>Logged in as: {userEmail}</div>
+    <div>Last login: {lastLoginDate}</div>
+    <Button variant="outline">Sign Out All Devices</Button>
+  </CardContent>
+</Card>
 ```
 
-### 4. Report Caching
-Cache generated reports to avoid re-fetching:
+### 3. Loading Skeleton
+Create `SettingsSkeleton.tsx`:
 ```typescript
-const reportCache = useRef<Map<string, ReportData>>(new Map());
-
-const generateReport = async (type: string) => {
-  const cacheKey = `${type}-${format(new Date(), 'yyyy-MM-dd')}`;
-  if (reportCache.current.has(cacheKey)) {
-    setCurrentReport(reportCache.current.get(cacheKey)!);
-    return;
-  }
-  // ... generate and cache
-};
+export const SettingsSkeleton = () => (
+  <div className="space-y-4 animate-pulse">
+    <Skeleton className="h-32 w-full rounded-xl" />
+    <div className="space-y-2">
+      {[...Array(5)].map((_, i) => (
+        <Skeleton key={i} className="h-16 w-full rounded-xl" />
+      ))}
+    </div>
+  </div>
+);
 ```
-
----
-
-## Part 5: Module Connectivity Matrix
-
-| Source Module | Target Update in Analysis |
-|---------------|--------------------------|
-| POS Sale | Income KPIs, Trend Chart, Top Products |
-| POB Purchase | Expense KPIs, Expense Breakdown |
-| Customer Payment | Income KPIs (due collection) |
-| Staff Salary | Expense KPIs, Expense Breakdown |
-| Vehicle Cost | Expense KPIs, Expense Breakdown |
-| Inventory Change | Stock Status Report data |
 
 ---
 
 ## Part 6: Performance Optimizations
 
-### 1. Memoized Calculations
-Wrap all analytics computations:
+### 1. Memoized Data Fetching
 ```typescript
-const incomeData = useMemo(() => calculateIncome(sales, timeRange), [sales, timeRange]);
-const expenseData = useMemo(() => calculateExpenses(expenses, timeRange), [expenses, timeRange]);
+const fetchUserData = useCallback(async () => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  
+  // Parallel fetching
+  const [roleData, profileData] = await Promise.all([
+    supabase.from('user_roles').select('role').eq('user_id', user.id).maybeSingle(),
+    supabase.from('profiles').select('*').eq('user_id', user.id).maybeSingle()
+  ]);
+  
+  // Set state once
+  setUserRole(roleData?.data?.role || 'customer');
+  setProfile(profileData?.data);
+}, []);
 ```
 
-### 2. Lazy Loaded Charts
-Load Recharts components only when visible:
+### 2. LocalStorage Lazy Load
 ```typescript
-const TrendChart = lazy(() => import('@/components/analysis/AnalysisTrendChart'));
-
-<Suspense fallback={<ChartSkeleton />}>
-  <TrendChart data={trendData} />
-</Suspense>
+// Load settings once on mount, not on every render
+const [notificationSettings] = useState(() => {
+  const saved = localStorage.getItem("notification-settings");
+  return saved ? JSON.parse(saved) : defaultSettings;
+});
 ```
 
-### 3. Virtualized Search Results
-For large search result sets, use virtualization.
-
-### 4. Loading States
-Add proper skeleton loading:
-```typescript
-if (loading) return <AnalysisSkeleton />;
-```
+### 3. Debounced Real-time Updates
+800ms debounce on subscription callbacks to prevent rapid re-renders.
 
 ---
 
-## Part 7: Implementation Steps
+## Part 7: Module Connectivity
 
-### Step 1: Create Sub-components (6 files)
-- `AnalysisKPIGrid.tsx` - KPI cards with premium design
-- `AnalysisTrendChart.tsx` - Trend area chart
-- `AnalysisPieCharts.tsx` - Payment/expense pie charts
-- `AnalysisTopItems.tsx` - Top products/expenses
-- `AnalysisSkeleton.tsx` - Loading state
-- `QuickReportsGrid.tsx` - Report generation buttons
+### Settings ↔ Other Modules
+| Settings Change | Affected Modules |
+|-----------------|------------------|
+| Profile name change | Dashboard header, Business Diary (created_by names) |
+| Theme change | All modules (via ThemeContext) |
+| Language change | All modules (via LanguageContext) |
+| Printer settings | POS, Invoice generation |
+| Notification settings | All notification triggers |
+| Team member added | Dashboard (role-based access), POS (driver assignment) |
 
-### Step 2: Refactor Main Module
-- Reduce to ~400 lines by using sub-components
+---
+
+## Part 8: Implementation Steps
+
+### Step 1: Create New Sub-components
+- `SettingsSkeleton.tsx` - Loading state
+- `ProfileCard.tsx` - User profile display with avatar upload
+- `SecuritySection.tsx` - Password change + danger zone
+- `TeamInviteCard.tsx` - QR/Link generation only
+- `TeamMembersCard.tsx` - Member list + remove functionality
+
+### Step 2: Refactor TeamSettingsSection
+- Remove shop profile form entirely (lines 450-577)
+- Add navigation card to My Shop Profile
+- Split into TeamInviteCard + TeamMembersCard
 - Add real-time subscriptions
-- Use `PremiumModuleHeader`
-- Add refresh functionality
+- Reduce to ~300 lines
 
-### Step 3: Add Enhanced Features
-- Date range picker integration
-- Comparison view toggle
-- PDF export button
-- Report caching
+### Step 3: Refactor Main SettingsModule
+- Use new sub-components
+- Add real-time sync indicator badge
+- Add proper loading states
+- Reduce to ~350 lines
 
-### Step 4: Optimize Performance
-- Wrap calculations in useMemo
-- Add debounce to real-time callbacks
-- Add skeleton loading states
+### Step 4: Update AccountSettingsSection
+- Add avatar upload functionality
+- Add session info display
+- Improve error handling
+
+### Step 5: Clean Up Unused Files
+- Remove `ShopProfileCard.tsx`
+- Remove `ShopProductsCard.tsx`
+- Remove `ProfileSharingCard.tsx`
+- Update index exports
 
 ---
 
 ## Technical Details
 
-### Database Queries
-No schema changes required. Uses existing:
-- `pos_transactions` (income)
-- `pob_transactions` (expenses)
-- `daily_expenses` (manual expenses)
-- `customer_payments` (due collections)
-- `staff_payments` (salary)
-- `vehicle_costs` (transport)
-- `lpg_brands` (stock levels)
+### Database Tables Used
+- `profiles` - User profile data
+- `user_roles` - User role (owner/manager/customer)
+- `team_members` - Team membership
+- `team_invites` - Pending invitations
+- `shop_profiles` - Shop info (link only, not edit)
 
-### Dependencies
-Already installed:
-- `recharts` for charts
-- `date-fns` for date calculations
-- `cmdk` for command palette
-- `pdf-lib` for PDF export
+### Storage Buckets
+- `avatars` - For avatar/logo uploads
+
+### LocalStorage Keys
+- `app-theme` - Theme preference
+- `app-language` - Language preference
+- `notification-settings` - Notification toggles
+- `printer-settings` - Printer configuration
 
 ---
 
@@ -283,14 +315,12 @@ Already installed:
 
 | Aspect | Before | After |
 |--------|--------|-------|
-| File Size | 1571 lines monolithic | ~400 lines + 8 sub-components |
-| Real-time | None | Full sync with 6 tables |
-| Loading | Basic loader | Professional skeleton |
-| Design | Custom cards | Uses shared PremiumStatCard |
-| Reports | CSV only | CSV + PDF export |
-| Date Range | Fixed periods | Custom range picker |
-| Comparison | None | vs previous period |
-| Performance | No optimization | Memoized + lazy charts |
+| Total Lines | 1784 (880 + 904) | ~750 (350 + 300 + 100 skeleton) |
+| Components | 2 large files | 6 focused components |
+| Real-time | None | Team, invites, profile sync |
+| Duplicate Shop | In Settings + MyShop | MyShop only (link in Settings) |
+| Loading | No skeleton | Professional skeleton |
+| Avatar Upload | Not available | Implemented in Account |
+| Performance | Multiple fetches | Parallel fetching + memoization |
 
-This rebuild ensures the Analysis & Reports module is professional, performant, and fully connected with all other ERP modules through real-time Supabase subscriptions.
-
+This rebuild ensures the Settings module is cleaner, more maintainable, and properly connected with the rest of the ERP system while eliminating duplicate functionality with the My Shop Profile module.
