@@ -27,20 +27,32 @@ import { toast } from "@/hooks/use-toast";
 const CustomerCart = () => {
   const navigate = useNavigate();
   const { currentUser, userRole } = useCommunityData();
-  const [cart, setCart] = useState<CartItem[]>([]);
-
-  // Load cart from localStorage
-  useEffect(() => {
-    const savedCart = localStorage.getItem('lpg-community-cart');
-    if (savedCart) {
-      setCart(JSON.parse(savedCart));
+  
+  // Initialize cart from localStorage directly to prevent race condition
+  const [cart, setCart] = useState<CartItem[]>(() => {
+    try {
+      const savedCart = localStorage.getItem('lpg-community-cart');
+      if (savedCart) {
+        const parsed = JSON.parse(savedCart);
+        console.log('[CustomerCart] Loaded cart from localStorage:', parsed);
+        return Array.isArray(parsed) ? parsed : [];
+      }
+    } catch (e) {
+      console.error('[CustomerCart] Failed to parse cart:', e);
     }
-  }, []);
+    return [];
+  });
+  
+  // Track if initial load is complete to avoid overwriting with empty
+  const [isInitialized, setIsInitialized] = useState(true);
 
-  // Save cart to localStorage
+  // Save cart to localStorage ONLY after user actions (not initial load)
   useEffect(() => {
-    localStorage.setItem('lpg-community-cart', JSON.stringify(cart));
-  }, [cart]);
+    if (isInitialized) {
+      localStorage.setItem('lpg-community-cart', JSON.stringify(cart));
+      console.log('[CustomerCart] Saved cart to localStorage:', cart);
+    }
+  }, [cart, isInitialized]);
 
   const updateQuantity = (index: number, newQuantity: number) => {
     if (newQuantity < 1) return;
