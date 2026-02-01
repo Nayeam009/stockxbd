@@ -696,7 +696,9 @@ export const SettingsModule = () => {
             </Button>
 
             {/* Section Header */}
-            <SectionHeader section={visibleSections.find(s => s.id === activeSection)!} />
+            {visibleSections.find(s => s.id === activeSection) && (
+              <SectionHeader section={visibleSections.find(s => s.id === activeSection)!} />
+            )}
 
             {/* Content */}
             {renderSectionContent()}
@@ -730,7 +732,9 @@ export const SettingsModule = () => {
 
           {/* Content */}
           <div className="min-w-0">
-            <SectionHeader section={visibleSections.find(s => s.id === activeSection)!} />
+            {visibleSections.find(s => s.id === activeSection) && (
+              <SectionHeader section={visibleSections.find(s => s.id === activeSection)!} />
+            )}
             {renderSectionContent()}
           </div>
         </div>
