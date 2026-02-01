@@ -1,223 +1,296 @@
 
-# Rebuild Customer & Utility Expense Modules
+
+# Rebuild Analysis & Reports Module
 
 ## Overview
-This plan addresses issues in both modules to improve design, optimization, and module connectivity. The goal is to create professional, mobile-first interfaces with real-time synchronization across all connected modules.
+This plan addresses identified issues in the Analysis & Search Report module to improve performance, optimization, and connectivity with all other modules. The goal is to create a professional, premium module with real-time synchronization and a modular architecture.
 
 ---
 
-## Part 1: Customer Management Module Rebuild
+## Current Issues Identified
 
-### Current Issues Identified
-1. **Missing Real-time Subscriptions**: No live updates when customer data changes from POS or other modules
-2. **Duplicate Code**: History dialogs appear twice (in main view and due view)
-3. **No Edit Customer Feature**: Cannot modify existing customer details
-4. **Missing Delete Confirmation**: No confirmation dialog for destructive actions
-5. **No Loading States for Sub-actions**: History and payment actions lack loading feedback
-6. **Large Component Size**: 1900+ lines in single file needs splitting
+### 1. **Large Monolithic File**
+- 1571 lines in a single file - difficult to maintain
+- No component separation (analysis, search, reports all mixed)
 
-### Design Improvements
-1. **Unified Component Architecture**:
-   - Split into smaller, focused components
-   - Create `CustomerStatCard.tsx`, `CustomerCard.tsx`, `CustomerHistoryDialog.tsx`, `CustomerSettleDialog.tsx`
+### 2. **No Real-time Subscriptions**
+- Data fetched only on mount; changes from POS/POB/Customers don't update charts
+- Staff and vehicle data fetched once without live sync
 
-2. **Mobile-First Redesign**:
-   - Use shared `PremiumModuleHeader` and `PremiumStatCard` components for consistency
-   - 48px minimum touch targets on all interactive elements
-   - Swipe-to-action on customer cards (settle/history shortcuts)
+### 3. **Performance Issues**
+- Heavy chart calculations run on every render
+- No loading skeleton for initial load
+- Report generation blocks UI with full-screen overlay
 
-3. **Real-time Sync Integration**:
-   ```text
-   +----------------+     +------------------+     +-----------------+
-   |      POS       | --> | customers table  | <-- | Customer Module |
-   | (creates/links |     | (real-time sub)  |     | (view/manage)   |
-   |   customers)   |     +------------------+     +-----------------+
-   +----------------+             |
-                                  v
-                    +---------------------------+
-                    |     Business Diary        |
-                    | (tracks payment history)  |
-                    +---------------------------+
-   ```
+### 4. **Inconsistent Design**
+- Not using shared `PremiumModuleHeader` and `PremiumStatCard` components
+- Custom KPI cards don't match other modules' premium design
+- Mode toggle UI is inconsistent with other modules
 
-### Implementation Steps
+### 5. **Missing Features**
+- No date range picker for custom analysis periods
+- No PDF export for reports (only CSV)
+- No comparison views (this month vs last month)
+- Growth indicators missing from KPI cards
 
-**Step 1: Extract Sub-components**
-- `CustomerStatCard.tsx` - Reusable KPI cards using `PremiumStatCard`
-- `CustomerCard.tsx` - Individual customer display card
-- `CustomerHistoryDialog.tsx` - Purchase & payment history dialog
-- `CustomerSettleDialog.tsx` - Account settlement dialog
-- `CustomerAddDialog.tsx` - Add new customer dialog
+### 6. **Module Connectivity Gaps**
+- Doesn't listen to inventory changes
+- Doesn't reflect customer payment updates
+- Staff salary payments not reflected in real-time
 
-**Step 2: Add Real-time Subscriptions**
+---
+
+## Part 1: Component Architecture
+
+### New File Structure
+```text
+src/components/
+  analysis/
+    AnalysisKPIGrid.tsx (NEW)       - Premium KPI cards using PremiumStatCard
+    AnalysisTrendChart.tsx (NEW)    - 7-day trend area chart
+    AnalysisPieCharts.tsx (NEW)     - Payment & expense breakdown charts
+    AnalysisTopItems.tsx (NEW)      - Top products & expenses cards
+    AnalysisTimeSelector.tsx (NEW)  - Time range selector pills
+    AnalysisSkeleton.tsx (NEW)      - Loading skeleton
+    index.ts (NEW)                  - Central exports
+  reports/
+    ReportGenerator.tsx (NEW)       - Report generation logic
+    ReportPreviewDialog.tsx (NEW)   - Report preview & export dialog
+    QuickReportsGrid.tsx (NEW)      - Quick report buttons
+    index.ts (NEW)                  - Central exports
+  search/
+    GlobalSearchCard.tsx (NEW)      - Global search with categories
+    CommandPalette.tsx (NEW)        - Command palette (Cmd+K)
+    SearchResultCard.tsx (NEW)      - Individual search result
+    index.ts (NEW)                  - Central exports
+  dashboard/modules/
+    AnalysisSearchReportModule.tsx  - REFACTORED (~400 lines)
+```
+
+---
+
+## Part 2: Real-time Subscriptions
+
+### Current Problem
+Data is fetched once on component mount. Changes from:
+- POS sales
+- POB purchases
+- Customer payments
+- Staff salary payments
+- Vehicle costs
+
+...are not reflected until page refresh.
+
+### Solution
+Add Supabase real-time subscriptions:
+
 ```typescript
-// Add to CustomerManagementModule
 useEffect(() => {
   const channel = supabase
-    .channel('customer-realtime')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'customers' }, refetch)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'customer_payments' }, fetchPayments)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'pos_transactions' }, refetch)
+    .channel('analysis-realtime')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'pos_transactions' }, debouncedRefetch)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'pob_transactions' }, debouncedRefetch)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_expenses' }, debouncedRefetch)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'customer_payments' }, debouncedRefetch)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'staff_payments' }, debouncedRefetch)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicle_costs' }, debouncedRefetch)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'lpg_brands' }, debouncedRefetch)
     .subscribe();
 
   return () => { supabase.removeChannel(channel); };
-}, [refetch, fetchPayments]);
+}, [debouncedRefetch]);
 ```
 
-**Step 3: Add Edit Customer Feature**
-- Add "Edit" button on customer cards
-- Create `CustomerEditDialog.tsx` with form validation
-- Update customer in database with proper RLS compliance
-
-**Step 4: Add Delete with Confirmation**
-- Add `AlertDialog` for delete confirmation
-- Show customer's outstanding dues before deletion
-- Prevent deletion if customer has active due
-
-**Step 5: Module Connectivity Fixes**
-- Link customer settlements to `daily_expenses` with proper category
-- Ensure POS transactions correctly update customer due amounts
-- Sync with Business Diary for payment tracking
+### Debounce Strategy
+- 800ms debounce on subscription callbacks
+- Prevents UI flicker during rapid updates
 
 ---
 
-## Part 2: Utility Expense Module Rebuild
+## Part 3: Premium Design Updates
 
-### Current Issues Identified
-1. **Missing owner_id on inserts**: Staff payments and vehicle costs may not have owner_id set
-2. **No Edit Functionality**: Cannot modify existing staff or vehicle records
-3. **Limited History View**: Staff payment history lacks detail and filtering
-4. **No Fuel Efficiency Tracking**: Vehicle costs collect odometer but don't calculate MPG/KPL
-5. **Missing Confirmation Dialogs**: Delete actions lack confirmation
+### KPI Grid Improvements
+- Use `PremiumStatCard` component for consistency
+- Add growth badges (vs yesterday/last week/last month)
+- Show profit margin percentage
+- Animated number transitions
 
-### Design Improvements
+### Module Header
+- Use shared `PremiumModuleHeader` component
+- Add real-time sync indicator badge
+- Add refresh button
 
-1. **Enhanced KPI Dashboard**:
-   - Add trend indicators (vs last month)
-   - Add fuel efficiency metrics for vehicles
-   - Show salary completion percentage
+### Time Selector Enhancement
+- Premium pill-style selector (already exists, polish needed)
+- Add "Custom Range" option with date picker
+- Persist last selected range in localStorage
 
-2. **Improved Staff Management**:
-   - Add staff profile pictures (avatar with initials)
-   - Add advance payment tracking
-   - Add salary slip generation
+### Chart Improvements
+- Add gradient fills matching the premium theme
+- Improve tooltip styling
+- Add animation on data change
+- Dark mode color fixes
 
-3. **Enhanced Vehicle Tracking**:
-   - Fuel efficiency calculations (km/L)
-   - Maintenance reminders
-   - Cost breakdown by vehicle
+---
 
-### Implementation Steps
+## Part 4: Enhanced Features
 
-**Step 1: Fix owner_id Assignment**
+### 1. Custom Date Range
 ```typescript
-// Ensure owner_id is set on all inserts
-const { data: ownerId } = await supabase.rpc("get_owner_id");
+// Add date range state
+const [customRange, setCustomRange] = useState<{from: Date, to: Date} | null>(null);
 
-await supabase.from("staff").insert({
-  ...newStaff,
-  created_by: user.user.id,
-  owner_id: ownerId || user.user.id // Critical fix
-});
+// Add to time selector
+<Button onClick={() => setShowDatePicker(true)}>
+  <Calendar className="h-4 w-4 mr-2" /> Custom
+</Button>
 ```
 
-**Step 2: Add Edit Functionality**
-- Create `StaffEditDialog.tsx` for editing staff details
-- Create `VehicleEditDialog.tsx` for vehicle details
-- Add inline editing for quick salary adjustments
+### 2. Comparison View
+Show current period vs previous period:
+- Today vs Yesterday
+- This Week vs Last Week
+- This Month vs Last Month
 
-**Step 3: Enhance History Dialogs**
-- Add date range filtering to staff payment history
-- Show running balance calculations
-- Add print/export functionality for payment records
+Display as percentage change with trend arrows.
 
-**Step 4: Add Fuel Efficiency Metrics**
+### 3. PDF Export
+Add PDF export using existing `pdfExport.ts` utility:
 ```typescript
-// Calculate fuel efficiency
-const calculateEfficiency = (costs: VehicleCost[]): number => {
-  const fuelCosts = costs.filter(c => c.cost_type === 'Fuel' && c.liters_filled && c.odometer_reading);
-  if (fuelCosts.length < 2) return 0;
+import { exportToPDF } from "@/lib/pdfExport";
 
-  // Sort by odometer to get distance traveled
-  const sorted = fuelCosts.sort((a, b) => (a.odometer_reading || 0) - (b.odometer_reading || 0));
-  const totalKm = (sorted[sorted.length - 1].odometer_reading || 0) - (sorted[0].odometer_reading || 0);
-  const totalLiters = sorted.slice(1).reduce((sum, c) => sum + (c.liters_filled || 0), 0);
-
-  return totalLiters > 0 ? totalKm / totalLiters : 0;
+const handleExportPDF = () => {
+  exportToPDF({
+    title: currentReport.title,
+    headers: currentReport.headers,
+    rows: currentReport.rows,
+    summary: currentReport.summary
+  });
 };
 ```
 
-**Step 5: Add Delete Confirmations**
-- Wrap all delete actions in `AlertDialog`
-- Show impact warning (e.g., "This will remove 5 payment records")
+### 4. Report Caching
+Cache generated reports to avoid re-fetching:
+```typescript
+const reportCache = useRef<Map<string, ReportData>>(new Map());
 
----
-
-## Part 3: Module Connectivity Matrix
-
-| Source Action | Target Updates |
-|---------------|----------------|
-| POS Sale (Due) | customers.total_due++, Business Diary |
-| Customer Settlement | customers.total_due--, daily_expenses, customer_payments |
-| Staff Salary Payment | staff_payments, daily_expenses (auto) |
-| Vehicle Cost Added | vehicle_costs, daily_expenses (auto) |
-| POB Purchase | daily_expenses (already connected) |
-
----
-
-## Part 4: File Structure After Rebuild
-
-```text
-src/components/
-  customer/
-    CustomerStatCard.tsx (NEW)
-    CustomerCard.tsx (NEW)
-    CustomerHistoryDialog.tsx (NEW)
-    CustomerSettleDialog.tsx (NEW)
-    CustomerAddDialog.tsx (NEW)
-    CustomerEditDialog.tsx (NEW)
-  utility/
-    StaffCard.tsx (NEW)
-    StaffPayDialog.tsx (NEW)
-    StaffHistoryDialog.tsx (NEW)
-    StaffEditDialog.tsx (NEW)
-    VehicleCard.tsx (NEW)
-    VehicleCostDialog.tsx (NEW)
-    VehicleEditDialog.tsx (NEW)
-    FuelEfficiencyCard.tsx (NEW)
-  dashboard/modules/
-    CustomerManagementModule.tsx (REFACTORED - reduced to ~400 lines)
-    UtilityExpenseModule.tsx (REFACTORED - reduced to ~400 lines)
+const generateReport = async (type: string) => {
+  const cacheKey = `${type}-${format(new Date(), 'yyyy-MM-dd')}`;
+  if (reportCache.current.has(cacheKey)) {
+    setCurrentReport(reportCache.current.get(cacheKey)!);
+    return;
+  }
+  // ... generate and cache
+};
 ```
+
+---
+
+## Part 5: Module Connectivity Matrix
+
+| Source Module | Target Update in Analysis |
+|---------------|--------------------------|
+| POS Sale | Income KPIs, Trend Chart, Top Products |
+| POB Purchase | Expense KPIs, Expense Breakdown |
+| Customer Payment | Income KPIs (due collection) |
+| Staff Salary | Expense KPIs, Expense Breakdown |
+| Vehicle Cost | Expense KPIs, Expense Breakdown |
+| Inventory Change | Stock Status Report data |
+
+---
+
+## Part 6: Performance Optimizations
+
+### 1. Memoized Calculations
+Wrap all analytics computations:
+```typescript
+const incomeData = useMemo(() => calculateIncome(sales, timeRange), [sales, timeRange]);
+const expenseData = useMemo(() => calculateExpenses(expenses, timeRange), [expenses, timeRange]);
+```
+
+### 2. Lazy Loaded Charts
+Load Recharts components only when visible:
+```typescript
+const TrendChart = lazy(() => import('@/components/analysis/AnalysisTrendChart'));
+
+<Suspense fallback={<ChartSkeleton />}>
+  <TrendChart data={trendData} />
+</Suspense>
+```
+
+### 3. Virtualized Search Results
+For large search result sets, use virtualization.
+
+### 4. Loading States
+Add proper skeleton loading:
+```typescript
+if (loading) return <AnalysisSkeleton />;
+```
+
+---
+
+## Part 7: Implementation Steps
+
+### Step 1: Create Sub-components (6 files)
+- `AnalysisKPIGrid.tsx` - KPI cards with premium design
+- `AnalysisTrendChart.tsx` - Trend area chart
+- `AnalysisPieCharts.tsx` - Payment/expense pie charts
+- `AnalysisTopItems.tsx` - Top products/expenses
+- `AnalysisSkeleton.tsx` - Loading state
+- `QuickReportsGrid.tsx` - Report generation buttons
+
+### Step 2: Refactor Main Module
+- Reduce to ~400 lines by using sub-components
+- Add real-time subscriptions
+- Use `PremiumModuleHeader`
+- Add refresh functionality
+
+### Step 3: Add Enhanced Features
+- Date range picker integration
+- Comparison view toggle
+- PDF export button
+- Report caching
+
+### Step 4: Optimize Performance
+- Wrap calculations in useMemo
+- Add debounce to real-time callbacks
+- Add skeleton loading states
 
 ---
 
 ## Technical Details
 
-### Database Changes
-None required - all tables already exist with proper structure.
+### Database Queries
+No schema changes required. Uses existing:
+- `pos_transactions` (income)
+- `pob_transactions` (expenses)
+- `daily_expenses` (manual expenses)
+- `customer_payments` (due collections)
+- `staff_payments` (salary)
+- `vehicle_costs` (transport)
+- `lpg_brands` (stock levels)
 
-### Performance Optimizations
-1. **Debounced Real-time**: 800ms debounce on subscription callbacks
-2. **Virtualized Lists**: For customers with 100+ records
-3. **Memoized Calculations**: All sum/filter operations wrapped in `useMemo`
-4. **Lazy Loading**: Sub-dialogs lazy loaded to reduce initial bundle
-
-### Mobile Responsiveness
-- All cards use responsive grid: `grid-cols-1 sm:grid-cols-2 lg:grid-cols-4`
-- Touch targets minimum 44px (mostly 48px)
-- Input fields use `input-accessible` class (16px font to prevent iOS zoom)
-- Bottom padding accounts for mobile navigation
+### Dependencies
+Already installed:
+- `recharts` for charts
+- `date-fns` for date calculations
+- `cmdk` for command palette
+- `pdf-lib` for PDF export
 
 ---
 
 ## Summary of Changes
 
-| Module | Before | After |
+| Aspect | Before | After |
 |--------|--------|-------|
-| Customer Management | 1908 lines, no real-time | ~400 lines, full real-time sync |
-| Utility Expense | 881 lines, limited features | ~400 lines, fuel tracking, edit support |
-| Connectivity | Partial sync | Full bi-directional sync |
-| Components | Monolithic | Modular (12 new sub-components) |
+| File Size | 1571 lines monolithic | ~400 lines + 8 sub-components |
+| Real-time | None | Full sync with 6 tables |
+| Loading | Basic loader | Professional skeleton |
+| Design | Custom cards | Uses shared PremiumStatCard |
+| Reports | CSV only | CSV + PDF export |
+| Date Range | Fixed periods | Custom range picker |
+| Comparison | None | vs previous period |
+| Performance | No optimization | Memoized + lazy charts |
 
-This rebuild ensures both modules are professional, optimized, and fully connected with POS, Business Diary, and Inventory modules.
+This rebuild ensures the Analysis & Reports module is professional, performant, and fully connected with all other ERP modules through real-time Supabase subscriptions.
+
