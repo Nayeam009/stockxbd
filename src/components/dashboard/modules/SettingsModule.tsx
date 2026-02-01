@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,8 +23,7 @@ import {
   Eye,
   EyeOff,
   HardDrive,
-  Download,
-  Upload
+  ShieldCheck
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -52,6 +51,7 @@ import { PushNotificationCard } from "@/components/settings/PushNotificationCard
 import { AccountSettingsSection } from "@/components/settings/AccountSettingsSection";
 import { TeamSettingsSection } from "@/components/settings/TeamSettingsSection";
 import { PrinterSettingsSection } from "@/components/settings/PrinterSettingsSection";
+import { SettingsSkeleton } from "@/components/settings/SettingsSkeleton";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -108,11 +108,13 @@ export const SettingsModule = () => {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // User state for role check and account deletion
+  // User state - loaded in parallel
   const [userEmail, setUserEmail] = useState("");
   const [userName, setUserName] = useState("");
-  const [userRole, setUserRole] = useState<string>("owner");
+  const [userRole, setUserRole] = useState<string>("customer");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   // Account deletion state
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -121,57 +123,72 @@ export const SettingsModule = () => {
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
-  // Notification settings
-  const [notifications, setNotifications] = useState({
-    lowStock: true,
-    newOrders: true,
-    payments: true,
-    dailyReports: false
+  // Notification settings - lazy loaded from localStorage
+  const [notifications, setNotifications] = useState(() => {
+    const saved = localStorage.getItem("notification-settings");
+    return saved ? JSON.parse(saved) : {
+      lowStock: true,
+      newOrders: true,
+      payments: true,
+      dailyReports: false
+    };
   });
 
-  // Load user role for security features
-  useEffect(() => {
-    const fetchUserRole = async () => {
+  // Parallel data fetching with timeout protection
+  const fetchUserData = useCallback(async () => {
+    try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setUserEmail(user.email || "");
+      if (!user) {
+        setLoading(false);
+        return;
+      }
 
-        const { data: roleData } = await supabase
+      setUserEmail(user.email || "");
+
+      // Parallel fetching for role, profile, and admin status
+      const [roleResult, profileResult, adminResult] = await Promise.all([
+        supabase
           .from('user_roles')
           .select('role')
           .eq('user_id', user.id)
-          .maybeSingle();
-
-        if (roleData) {
-          setUserRole(roleData.role);
-        }
-
-        // Fetch profile for name and avatar
-        const { data: profileData } = await supabase
+          .maybeSingle(),
+        supabase
           .from('profiles')
           .select('full_name, avatar_url')
           .eq('user_id', user.id)
-          .maybeSingle();
+          .maybeSingle(),
+        supabase
+          .from('admin_users')
+          .select('id')
+          .eq('user_id', user.id)
+          .maybeSingle()
+      ]);
 
-        if (profileData) {
-          setUserName(profileData.full_name || user.email?.split('@')[0] || 'User');
-          setAvatarUrl(profileData.avatar_url);
-        } else {
-          setUserName(user.email?.split('@')[0] || 'User');
-        }
+      // Set role
+      if (roleResult.data) {
+        setUserRole(roleResult.data.role);
       }
-    };
 
-    fetchUserRole();
-  }, []);
+      // Set profile
+      if (profileResult.data) {
+        setUserName(profileResult.data.full_name || user.email?.split('@')[0] || 'User');
+        setAvatarUrl(profileResult.data.avatar_url);
+      } else {
+        setUserName(user.email?.split('@')[0] || 'User');
+      }
 
-  // Load notification settings from localStorage
-  useEffect(() => {
-    const savedNotifications = localStorage.getItem("notification-settings");
-    if (savedNotifications) {
-      setNotifications(JSON.parse(savedNotifications));
+      // Set admin status
+      setIsAdmin(!!adminResult.data);
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+    } finally {
+      setLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    fetchUserData();
+  }, [fetchUserData]);
 
   const handleNotificationChange = (key: keyof typeof notifications, value: boolean) => {
     const updated = { ...notifications, [key]: value };
@@ -211,7 +228,6 @@ export const SettingsModule = () => {
     setChangingPassword(true);
     try {
       const { error } = await supabase.auth.updateUser({ password: newPassword });
-
       if (error) throw error;
 
       toast({ title: language === 'bn' ? 'পাসওয়ার্ড সফলভাবে পরিবর্তন হয়েছে' : "Password changed successfully" });
@@ -315,53 +331,67 @@ export const SettingsModule = () => {
     );
   };
 
-  const sections = [
-    {
-      id: 'account',
-      icon: <UserCircle className="h-5 w-5" />,
-      title: language === 'bn' ? 'অ্যাকাউন্ট' : 'Account',
-      description: language === 'bn' ? 'প্রোফাইল ও থিম' : 'Profile & theme',
-      ownerOnly: false
-    },
-    {
-      id: 'team',
-      icon: <Settings className="h-5 w-5" />,
-      title: language === 'bn' ? 'টিম ও ব্যবসা' : 'Team & Business',
-      description: language === 'bn' ? 'ম্যানেজার ও ব্যবসা' : 'Managers & business',
-      ownerOnly: true
-    },
-    {
-      id: 'notifications',
-      icon: <Bell className="h-5 w-5" />,
-      title: language === 'bn' ? 'বিজ্ঞপ্তি' : 'Notifications',
-      description: language === 'bn' ? 'অ্যালার্ট সেটিংস' : 'Alert preferences',
-      ownerOnly: false
-    },
-    {
-      id: 'security',
-      icon: <Shield className="h-5 w-5" />,
-      title: language === 'bn' ? 'নিরাপত্তা' : 'Security',
-      description: language === 'bn' ? 'পাসওয়ার্ড ও অ্যাকাউন্ট' : 'Password & account',
-      ownerOnly: false
-    },
-    {
-      id: 'advanced',
-      icon: <Zap className="h-5 w-5" />,
-      title: language === 'bn' ? 'উন্নত' : 'Advanced',
-      description: language === 'bn' ? 'ব্যাকআপ ও ডেটা' : 'Backup & data',
-      ownerOnly: false
-    },
-    {
-      id: 'printer',
-      icon: <Settings className="h-5 w-5" />,
-      title: language === 'bn' ? 'প্রিন্টার' : 'Printer',
-      description: language === 'bn' ? 'রসিদ প্রিন্টিং' : 'Receipt printing',
-      ownerOnly: false
-    },
-  ];
+  // Memoized sections based on role
+  const visibleSections = useMemo(() => {
+    const baseSections = [
+      {
+        id: 'account',
+        icon: <UserCircle className="h-5 w-5" />,
+        title: language === 'bn' ? 'অ্যাকাউন্ট' : 'Account',
+        description: language === 'bn' ? 'প্রোফাইল ও থিম' : 'Profile & theme',
+      },
+      {
+        id: 'notifications',
+        icon: <Bell className="h-5 w-5" />,
+        title: language === 'bn' ? 'বিজ্ঞপ্তি' : 'Notifications',
+        description: language === 'bn' ? 'অ্যালার্ট সেটিংস' : 'Alert preferences',
+      },
+      {
+        id: 'security',
+        icon: <Shield className="h-5 w-5" />,
+        title: language === 'bn' ? 'নিরাপত্তা' : 'Security',
+        description: language === 'bn' ? 'পাসওয়ার্ড ও অ্যাকাউন্ট' : 'Password & account',
+      },
+    ];
 
-  // Filter sections based on role
-  const visibleSections = sections.filter(s => !s.ownerOnly || userRole === 'owner');
+    // Admin section - only for admins
+    if (isAdmin) {
+      baseSections.push({
+        id: 'admin',
+        icon: <ShieldCheck className="h-5 w-5" />,
+        title: language === 'bn' ? 'অ্যাডমিন প্যানেল' : 'Admin Panel',
+        description: language === 'bn' ? 'সিস্টেম নিয়ন্ত্রণ' : 'System control',
+      });
+    }
+
+    // Team section - only for owners
+    if (userRole === 'owner') {
+      baseSections.splice(1, 0, {
+        id: 'team',
+        icon: <Settings className="h-5 w-5" />,
+        title: language === 'bn' ? 'টিম ও ব্যবসা' : 'Team & Business',
+        description: language === 'bn' ? 'ম্যানেজার ও ব্যবসা' : 'Managers & business',
+      });
+    }
+
+    // Advanced & Printer - for owner and manager
+    if (userRole === 'owner' || userRole === 'manager') {
+      baseSections.push({
+        id: 'advanced',
+        icon: <Zap className="h-5 w-5" />,
+        title: language === 'bn' ? 'উন্নত' : 'Advanced',
+        description: language === 'bn' ? 'ব্যাকআপ ও ডেটা' : 'Backup & data',
+      });
+      baseSections.push({
+        id: 'printer',
+        icon: <Settings className="h-5 w-5" />,
+        title: language === 'bn' ? 'প্রিন্টার' : 'Printer',
+        description: language === 'bn' ? 'রসিদ প্রিন্টিং' : 'Receipt printing',
+      });
+    }
+
+    return baseSections;
+  }, [userRole, isAdmin, language]);
 
   const renderSectionContent = () => {
     switch (activeSection) {
@@ -377,6 +407,36 @@ export const SettingsModule = () => {
             notifications={notifications}
             onNotificationChange={handleNotificationChange}
           />
+        );
+
+      case 'admin':
+        return (
+          <Card className="border-border/50 shadow-sm bg-card">
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <ShieldCheck className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <CardTitle className="text-lg">
+                    {language === 'bn' ? 'অ্যাডমিন প্যানেল' : 'Admin Panel'}
+                  </CardTitle>
+                  <CardDescription>
+                    {language === 'bn' ? 'সম্পূর্ণ সিস্টেম নিয়ন্ত্রণ করুন' : 'Control the entire system'}
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Button
+                className="w-full h-14"
+                onClick={() => window.location.href = '/dashboard?module=admin'}
+              >
+                <ShieldCheck className="h-5 w-5 mr-2" />
+                {language === 'bn' ? 'অ্যাডমিন প্যানেলে যান' : 'Go to Admin Panel'}
+              </Button>
+            </CardContent>
+          </Card>
         );
 
       case 'security':
@@ -538,8 +598,6 @@ export const SettingsModule = () => {
           </div>
         );
 
-
-
       case 'printer':
         return <PrinterSettingsSection />;
 
@@ -567,8 +625,13 @@ export const SettingsModule = () => {
               {userName}
             </h2>
             <p className="text-sm text-muted-foreground truncate">{userEmail}</p>
-            <div className="mt-2">
+            <div className="mt-2 flex items-center gap-2">
               {getRoleBadge(userRole)}
+              {isAdmin && (
+                <Badge className="bg-red-500/10 text-red-600 border-red-500/20 text-xs">
+                  Admin
+                </Badge>
+              )}
             </div>
           </div>
         </div>
@@ -577,7 +640,7 @@ export const SettingsModule = () => {
   );
 
   // Section Header Component
-  const SectionHeader = ({ section }: { section: typeof sections[0] }) => (
+  const SectionHeader = ({ section }: { section: typeof visibleSections[0] }) => (
     <div className="flex items-center gap-3 mb-6">
       <div className="p-2.5 rounded-xl bg-primary/10">
         {section.icon}
@@ -588,6 +651,11 @@ export const SettingsModule = () => {
       </div>
     </div>
   );
+
+  // Show skeleton while loading
+  if (loading) {
+    return <SettingsSkeleton isMobile={isMobile} />;
+  }
 
   return (
     <div className="min-h-[calc(100vh-200px)]">
@@ -845,9 +913,9 @@ export const SettingsModule = () => {
               <Input
                 id="deleteConfirm"
                 value={deleteConfirmText}
-                onChange={(e) => setDeleteConfirmText(e.target.value.toUpperCase())}
-                className="font-mono h-12 text-base"
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
                 placeholder="DELETE"
+                className="h-12 text-base font-mono"
               />
             </div>
           </div>
@@ -866,11 +934,11 @@ export const SettingsModule = () => {
             <Button
               variant="destructive"
               onClick={handleDeleteAccount}
-              disabled={deletingAccount || deleteConfirmText !== 'DELETE' || !deletePassword}
+              disabled={deletingAccount || !deletePassword || deleteConfirmText !== 'DELETE'}
               className="h-11"
             >
               {deletingAccount && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              {language === 'bn' ? 'স্থায়ীভাবে মুছুন' : 'Permanently Delete'}
+              {language === 'bn' ? 'স্থায়ীভাবে মুছুন' : 'Delete Permanently'}
             </Button>
           </DialogFooter>
         </DialogContent>
