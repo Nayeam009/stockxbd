@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,24 +13,16 @@ import {
   Copy,
   Check,
   Loader2,
-  Shield,
   Trash2,
   RefreshCw,
   Link2,
-  Building2,
-  Save,
   UserMinus,
   Clock,
   XCircle,
   AlertTriangle,
   Store,
-  Camera,
-  Upload,
-  MapPin,
-  Phone,
-  Globe
+  ExternalLink
 } from "lucide-react";
-import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -55,6 +48,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface TeamMember {
   id: string;
@@ -69,20 +63,6 @@ interface TeamMember {
   };
 }
 
-interface ShopProfile {
-  id: string;
-  owner_id: string;
-  shop_name: string;
-  cover_image_url: string | null;
-  is_open: boolean;
-  total_orders: number;
-  rating: number;
-  phone: string | null;
-  address: string | null;
-  division: string;
-  district: string;
-}
-
 interface PendingInvite {
   id: string;
   code: string;
@@ -91,8 +71,81 @@ interface PendingInvite {
   created_at: string;
 }
 
+// Loading skeleton for team section
+const TeamSectionSkeleton = () => (
+  <div className="space-y-6 animate-pulse">
+    {/* Shop Link Card Skeleton */}
+    <Card className="border-border/50">
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-10 w-10 rounded-xl" />
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-28" />
+              <Skeleton className="h-3 w-40" />
+            </div>
+          </div>
+          <Skeleton className="h-10 w-24" />
+        </div>
+      </CardContent>
+    </Card>
+    
+    {/* Manager Invite Skeleton */}
+    <Card className="border-border/50">
+      <CardHeader className="pb-4">
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-10 w-10 rounded-xl" />
+          <div className="space-y-2">
+            <Skeleton className="h-5 w-32" />
+            <Skeleton className="h-3 w-48" />
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-2 gap-3">
+          <Skeleton className="h-14 w-full" />
+          <Skeleton className="h-14 w-full" />
+        </div>
+      </CardContent>
+    </Card>
+    
+    {/* Team Members Skeleton */}
+    <Card className="border-border/50">
+      <CardHeader className="pb-4">
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-10 w-10 rounded-xl" />
+          <div className="space-y-2 flex-1">
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-5 w-36" />
+              <Skeleton className="h-5 w-16 rounded-full" />
+            </div>
+            <Skeleton className="h-3 w-48" />
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          {[...Array(2)].map((_, i) => (
+            <div key={i} className="flex items-center justify-between p-3 rounded-xl border">
+              <div className="flex items-center gap-3">
+                <Skeleton className="h-10 w-10 rounded-full" />
+                <div className="space-y-1.5">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-3 w-32" />
+                </div>
+              </div>
+              <Skeleton className="h-9 w-9 rounded" />
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  </div>
+);
+
 export const TeamSettingsSection = () => {
   const { t, language } = useLanguage();
+  const navigate = useNavigate();
 
   // User state
   const [currentUserId, setCurrentUserId] = useState<string>('');
@@ -113,22 +166,13 @@ export const TeamSettingsSection = () => {
   const [memberToRemove, setMemberToRemove] = useState<TeamMember | null>(null);
   const [inviteToRevoke, setInviteToRevoke] = useState<PendingInvite | null>(null);
 
-  // Business state
-  // Business/Shop state
-  const [shopProfile, setShopProfile] = useState<ShopProfile | null>(null);
-  const [shopName, setShopName] = useState("Stock-X LPG Distribution");
-  const [shopPhone, setShopPhone] = useState("");
-  const [shopAddress, setShopAddress] = useState("");
-  const [shopDivision, setShopDivision] = useState("Dhaka");
-  const [shopDistrict, setShopDistrict] = useState("Dhaka");
-  const [shopIsOpen, setShopIsOpen] = useState(true);
-  const [shopLogo, setShopLogo] = useState<string | null>(null);
-  const [uploadingLogo, setUploadingLogo] = useState(false);
-  const [savingBusiness, setSavingBusiness] = useState(false);
+  // Real-time subscription ref
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
   const isOwner = userRole === 'owner';
 
-  // Check user role
+  // Check user role - runs once
   useEffect(() => {
     const checkUserRole = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -149,73 +193,7 @@ export const TeamSettingsSection = () => {
     checkUserRole();
   }, []);
 
-  // Load business settings
-  // Fetch Shop Profile
-  useEffect(() => {
-    const fetchShopProfile = async () => {
-      if (!currentUserId || !isOwner) return;
-
-      try {
-        const { data, error } = await supabase
-          .from('shop_profiles')
-          .select('*')
-          .eq('owner_id', currentUserId)
-          .maybeSingle();
-
-        if (error) throw error;
-
-        if (data) {
-          setShopProfile(data as ShopProfile);
-          setShopName(data.shop_name);
-          setShopPhone(data.phone || "");
-          setShopAddress(data.address || "");
-          setShopDivision(data.division || "Dhaka");
-          setShopDistrict(data.district || "Dhaka");
-          setShopIsOpen(data.is_open);
-          setShopLogo(data.cover_image_url);
-        }
-      } catch (err) {
-        logger.error("Error fetching shop profile", err);
-      }
-    };
-
-    fetchShopProfile();
-  }, [currentUserId, isOwner]);
-
-  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    try {
-      const file = event.target.files?.[0];
-      if (!file) return;
-
-      setUploadingLogo(true);
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Math.random()}.${fileExt}`;
-      const filePath = `shop-logos/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('avatars') // Using avatars bucket for now
-        .upload(filePath, file);
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(filePath);
-
-      setShopLogo(publicUrl);
-      toast({ title: t("image_uploaded") });
-    } catch (error: any) {
-      toast({
-        title: "Error uploading logo",
-        description: error.message,
-        variant: "destructive"
-      });
-    } finally {
-      setUploadingLogo(false);
-    }
-  };
-
-  // Fetch team data when user is owner
+  // Fetch team members with parallel profile loading
   const fetchTeamMembers = useCallback(async () => {
     if (!currentUserId) return;
 
@@ -231,7 +209,7 @@ export const TeamSettingsSection = () => {
       return;
     }
 
-    // Fetch profiles for team members
+    // Fetch profiles for team members in parallel
     const membersWithProfiles = await Promise.all(
       (data || []).map(async (member) => {
         const { data: profileData } = await supabase
@@ -280,12 +258,41 @@ export const TeamSettingsSection = () => {
     setPendingInvites(managerInvites);
   }, [currentUserId]);
 
+  // Debounced refresh for real-time updates
+  const debouncedRefresh = useCallback((fetchFn: () => void) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(fetchFn, 800);
+  }, []);
+
+  // Initial data fetch + real-time subscriptions
   useEffect(() => {
     if (currentUserId && isOwner) {
       fetchTeamMembers();
       fetchPendingInvites();
+
+      // Set up real-time subscriptions
+      channelRef.current = supabase
+        .channel('team-settings-realtime')
+        .on('postgres_changes', 
+          { event: '*', schema: 'public', table: 'team_members', filter: `owner_id=eq.${currentUserId}` },
+          () => debouncedRefresh(fetchTeamMembers)
+        )
+        .on('postgres_changes',
+          { event: '*', schema: 'public', table: 'team_invites', filter: `created_by=eq.${currentUserId}` },
+          () => debouncedRefresh(fetchPendingInvites)
+        )
+        .subscribe();
     }
-  }, [currentUserId, isOwner, fetchTeamMembers, fetchPendingInvites]);
+
+    return () => {
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+      }
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+    };
+  }, [currentUserId, isOwner, fetchTeamMembers, fetchPendingInvites, debouncedRefresh]);
 
   const generateInviteCode = async () => {
     setGeneratingInvite(true);
@@ -383,39 +390,6 @@ export const TeamSettingsSection = () => {
     }
   };
 
-  const handleSaveBusinessSettings = async () => {
-    setSavingBusiness(true);
-    try {
-      const { error } = await supabase
-        .from('shop_profiles')
-        .upsert({
-          owner_id: currentUserId,
-          shop_name: shopName,
-          phone: shopPhone,
-          address: shopAddress,
-          division: shopDivision,
-          district: shopDistrict,
-          cover_image_url: shopLogo,
-          is_open: shopIsOpen,
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'owner_id' });
-
-      if (error) throw error;
-
-      toast({ title: t("settings_saved"), description: "Shop profile updated successfully on Marketplace." });
-
-      // Refresh local state logic if needed
-      const { data } = await supabase.from('shop_profiles').select('*').eq('owner_id', currentUserId).maybeSingle();
-      if (data) setShopProfile(data as ShopProfile);
-
-    } catch (error: any) {
-      logger.error("Error saving shop profile", error);
-      toast({ title: "Error saving settings", description: error.message, variant: "destructive" });
-    } finally {
-      setSavingBusiness(false);
-    }
-  };
-
   const getInitials = (name: string | null | undefined, email: string) => {
     if (name) {
       return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
@@ -424,11 +398,7 @@ export const TeamSettingsSection = () => {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[200px]">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <TeamSectionSkeleton />;
   }
 
   if (!isOwner) {
@@ -447,132 +417,29 @@ export const TeamSettingsSection = () => {
   return (
     <>
       <div className="space-y-6">
-        {/* Shop Profile Settings */}
-        <Card className="border-border/50 shadow-sm bg-card">
-          <CardHeader className="pb-4">
-            <div className="flex items-center justify-between">
+        {/* Quick Link to My Shop Profile - Replaces duplicate shop form */}
+        <Card className="bg-gradient-to-br from-emerald-500/10 to-green-500/5 border-emerald-500/20 shadow-sm">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 rounded-xl bg-emerald-500/10">
-                  <Store className="h-5 w-5 text-emerald-500" />
+                  <Store className="h-6 w-6 text-emerald-500" />
                 </div>
                 <div>
-                  <CardTitle className="text-lg">
-                    {language === 'bn' ? 'শপ প্রোফাইল' : 'Shop Profile'}
-                  </CardTitle>
-                  <CardDescription>
-                    {language === 'bn' ? 'অনলাইন মার্কেটপ্লেসে আপনার দোকান' : 'Manage your online shop presence'}
-                  </CardDescription>
+                  <p className="font-medium text-foreground">
+                    {language === 'bn' ? 'আমার শপ প্রোফাইল' : 'My Shop Profile'}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {language === 'bn' ? 'আপনার অনলাইন স্টোর পরিচালনা করুন' : 'Manage your online store'}
+                  </p>
                 </div>
               </div>
-              {/* Open/Close Toggle */}
-              <div className="flex items-center gap-2 bg-muted/40 p-2 rounded-lg border">
-                <span className={cn("text-xs font-medium", shopIsOpen ? "text-emerald-600" : "text-muted-foreground")}>
-                  {shopIsOpen ? (language === 'bn' ? 'খোলা' : 'OPEN') : (language === 'bn' ? 'বন্ধ' : 'CLOSED')}
-                </span>
-                <Switch checked={shopIsOpen} onCheckedChange={setShopIsOpen} />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Logo Upload */}
-            <div className="flex flex-col items-center sm:flex-row gap-6">
-              <div className="relative group">
-                <Avatar className="h-24 w-24 border-4 border-muted/30 shadow-sm">
-                  <AvatarImage src={shopLogo || undefined} className="object-cover" />
-                  <AvatarFallback className="bg-muted text-muted-foreground text-2xl">
-                    {getInitials(shopName, "")}
-                  </AvatarFallback>
-                </Avatar>
-                <label
-                  htmlFor="logo-upload"
-                  className="absolute bottom-0 right-0 p-2 rounded-full bg-primary text-primary-foreground shadow-lg cursor-pointer hover:bg-primary/90 transition-colors"
-                >
-                  {uploadingLogo ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
-                  <input
-                    id="logo-upload"
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handleLogoUpload}
-                    disabled={uploadingLogo}
-                  />
-                </label>
-              </div>
-              <div className="flex-1 space-y-1 text-center sm:text-left">
-                <h3 className="font-medium text-foreground">{shopName || "New Shop"}</h3>
-                <p className="text-sm text-muted-foreground">
-                  {language === 'bn'
-                    ? 'আপনার দোকানের লোগো আপলোড করুন। এটি গ্রাহকদের কাছে দৃশ্যমান হবে।'
-                    : 'Upload your shop logo. This will be visible to customers on the marketplace.'}
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="shopName" className="text-sm">{t("business_name")}</Label>
-                <Input
-                  id="shopName"
-                  value={shopName}
-                  onChange={(e) => setShopName(e.target.value)}
-                  className="h-11 text-base"
-                  placeholder="e.g. Stock-X LPG"
-                />
-              </div>
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="shopPhone" className="text-sm flex items-center gap-2">
-                    <Phone className="h-3.5 w-3.5" />
-                    {t("phone_number")}
-                  </Label>
-                  <Input
-                    id="shopPhone"
-                    value={shopPhone}
-                    onChange={(e) => setShopPhone(e.target.value)}
-                    className="h-11 text-base"
-                    placeholder="+880 1..."
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="shopAddress" className="text-sm flex items-center gap-2">
-                    <MapPin className="h-3.5 w-3.5" />
-                    {t("address")}
-                  </Label>
-                  <Input
-                    id="shopAddress"
-                    value={shopAddress}
-                    onChange={(e) => setShopAddress(e.target.value)}
-                    className="h-11 text-base"
-                    placeholder="Full Address"
-                  />
-                </div>
-              </div>
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="shopDivision" className="text-sm">{t("division") || "Division"}</Label>
-                  <Input
-                    id="shopDivision"
-                    value={shopDivision}
-                    onChange={(e) => setShopDivision(e.target.value)}
-                    className="h-11 text-base"
-                    placeholder="Division"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="shopDistrict" className="text-sm">{t("district") || "District"}</Label>
-                  <Input
-                    id="shopDistrict"
-                    value={shopDistrict}
-                    onChange={(e) => setShopDistrict(e.target.value)}
-                    className="h-11 text-base"
-                    placeholder="District"
-                  />
-                </div>
-              </div>
-
-              <Button onClick={handleSaveBusinessSettings} disabled={savingBusiness} className="w-full h-11 text-base">
-                {savingBusiness ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-                {t("save_changes")}
+              <Button 
+                onClick={() => navigate('/dashboard?module=my-shop')}
+                className="gap-2"
+              >
+                {language === 'bn' ? 'খুলুন' : 'Open'}
+                <ExternalLink className="h-4 w-4" />
               </Button>
             </div>
           </CardContent>
@@ -884,8 +751,8 @@ export const TeamSettingsSection = () => {
             </AlertDialogTitle>
             <AlertDialogDescription>
               {language === 'bn'
-                ? 'এই আমন্ত্রণটি বাতিল করা হবে এবং আর ব্যবহার করা যাবে না।'
-                : 'This invite will be revoked and can no longer be used.'}
+                ? 'এই আমন্ত্রণ কোড আর ব্যবহার করা যাবে না।'
+                : 'This invite code will no longer be usable.'}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
