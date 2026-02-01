@@ -284,15 +284,21 @@ export const ShopOrdersTab = ({ shopId }: ShopOrdersTabProps) => {
     for (const item of order.items || []) {
       const productName = `${item.brand_name || item.product_name} ${item.weight || ''} (${item.product_type === 'lpg_refill' ? 'Refill' : item.product_type === 'lpg_package' ? 'Package' : item.product_type})`;
       
-      await supabase.from('pos_transaction_items').insert({
+      // Use product_id from the order item if it references shop_products, otherwise null
+      // This prevents FK constraint errors since community order items don't map to products table
+      const { error: itemError } = await supabase.from('pos_transaction_items').insert({
         transaction_id: transaction.id,
-        product_id: item.id, // Using order item id as reference
+        product_id: null, // Nullable to prevent FK violations for online orders
         product_name: productName,
         quantity: item.quantity,
         unit_price: item.price,
         total_price: item.price * item.quantity,
         created_by: user.id
       });
+      
+      if (itemError) {
+        logger.error('Failed to create POS transaction item:', itemError);
+      }
     }
 
     return txnNumber;
@@ -321,11 +327,22 @@ export const ShopOrdersTab = ({ shopId }: ShopOrdersTabProps) => {
       if (newStatus === 'confirmed') {
         updateData.confirmed_at = new Date().toISOString();
         
-        // Create POS transaction when confirming order (connects to Business Diary)
+        // Check if POS transaction already exists for this order (prevent duplicates)
         if (ownerId) {
-          const txnNumber = await createPOSTransactionFromOrder(order, ownerId);
-          if (txnNumber) {
-            logger.info(`POS transaction ${txnNumber} created for online order ${order.order_number}`);
+          const { data: existingTxn } = await supabase
+            .from('pos_transactions')
+            .select('id, transaction_number')
+            .eq('community_order_id', order.id)
+            .maybeSingle();
+
+          if (!existingTxn) {
+            // Create POS transaction when confirming order (connects to Business Diary)
+            const txnNumber = await createPOSTransactionFromOrder(order, ownerId);
+            if (txnNumber) {
+              logger.info(`POS transaction ${txnNumber} created for online order ${order.order_number}`);
+            }
+          } else {
+            logger.info(`POS transaction ${existingTxn.transaction_number} already exists for order ${order.order_number}`);
           }
         }
       }
@@ -359,7 +376,7 @@ export const ShopOrdersTab = ({ shopId }: ShopOrdersTabProps) => {
                 }
               }
 
-              // EXACT brand match with name, weight, AND size filter
+              // EXACT brand match with name, weight, size, AND is_active filter
               const { data: brand } = await supabase
                 .from('lpg_brands')
                 .select('id, refill_cylinder, package_cylinder, empty_cylinder, problem_cylinder, weight')
@@ -367,6 +384,7 @@ export const ShopOrdersTab = ({ shopId }: ShopOrdersTabProps) => {
                 .eq('owner_id', ownerId)
                 .eq('weight', item.weight || '12kg')
                 .eq('size', valveSize)
+                .eq('is_active', true)
                 .maybeSingle();
 
               if (brand) {
@@ -404,6 +422,7 @@ export const ShopOrdersTab = ({ shopId }: ShopOrdersTabProps) => {
                   .eq('owner_id', ownerId)
                   .eq('weight', item.weight || '12kg')
                   .eq('size', valveSize)
+                  .eq('is_active', true)
                   .maybeSingle();
                   
                 if (returnBrandData) {
