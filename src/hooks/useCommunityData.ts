@@ -81,10 +81,12 @@ export interface CommunityOrderItem {
   product_type: string;
   brand_name: string | null;
   weight: string | null;
+  valve_size: string | null;
   quantity: number;
   price: number;
   return_cylinder_qty: number;
   return_cylinder_type: 'empty' | 'leaked' | null;
+  return_cylinder_brand: string | null;
 }
 
 export interface CartItem extends ShopProduct {
