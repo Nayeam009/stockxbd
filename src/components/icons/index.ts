@@ -1,0 +1,172 @@
+/**
+ * Icon Barrel File - Optimized Lucide React Exports
+ * 
+ * Central export for all icons used in the application.
+ * This enables better tree-shaking and bundle optimization.
+ * 
+ * Import icons from here instead of directly from 'lucide-react':
+ * import { Home, Settings, Package } from '@/components/icons';
+ */
+
+export {
+  // Navigation & Layout
+  Home,
+  Menu,
+  ChevronRight,
+  ChevronLeft,
+  ChevronDown,
+  ChevronUp,
+  ArrowLeft,
+  ArrowRight,
+  ExternalLink,
+  LogOut,
+  
+  // Dashboard Modules
+  LayoutDashboard,
+  Receipt,
+  Wallet,
+  Package,
+  Users,
+  Settings,
+  BarChart3,
+  ShoppingCart,
+  Store,
+  Building2,
+  Truck,
+  Fuel,
+  Banknote,
+  Coins,
+  CreditCard,
+  
+  // POS & Sales
+  ScanLine,
+  Printer,
+  Plus,
+  Minus,
+  Trash2,
+  ShoppingBag,
+  Calculator,
+  
+  // Status & State
+  Clock,
+  CheckCircle,
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
+  AlertTriangle,
+  Info,
+  Loader2,
+  RefreshCw,
+  RotateCcw,
+  
+  // Actions
+  Search,
+  Filter,
+  Edit,
+  Edit2,
+  Save,
+  Download,
+  Upload,
+  Copy,
+  Eye,
+  EyeOff,
+  ZoomIn,
+  ZoomOut,
+  
+  // Communication
+  Phone,
+  Mail,
+  MessageSquare,
+  Bell,
+  BellOff,
+  
+  // Location & Maps
+  MapPin,
+  Navigation,
+  Globe,
+  
+  // Calendar & Time
+  Calendar,
+  CalendarDays,
+  History,
+  Timer,
+  
+  // Users & People
+  User,
+  UserPlus,
+  UserMinus,
+  UserCheck,
+  Users2,
+  UserCircle,
+  
+  // LPG/Cylinder specific
+  Cylinder,
+  Flame,
+  Gauge,
+  Scale,
+  
+  // Data & Charts
+  TrendingUp,
+  TrendingDown,
+  PieChart,
+  LineChart,
+  Activity,
+  
+  // Security
+  Shield,
+  ShieldCheck,
+  ShieldAlert,
+  Lock,
+  Unlock,
+  Key,
+  
+  // Images & Media
+  Image,
+  ImageIcon,
+  Camera,
+  QrCode,
+  
+  // Files & Documents
+  File,
+  FileText,
+  FileDown,
+  Folder,
+  
+  // Misc
+  Star,
+  Heart,
+  ThumbsUp,
+  ThumbsDown,
+  Share,
+  Share2,
+  Link,
+  Hash,
+  Tag,
+  Bookmark,
+  
+  // Shapes
+  Circle,
+  Square,
+  Triangle,
+  Hexagon,
+  
+  // Common UI
+  X,
+  MoreHorizontal,
+  MoreVertical,
+  Grip,
+  GripVertical,
+  Maximize,
+  Minimize,
+  
+  // Social
+  Facebook,
+  Twitter,
+  Instagram,
+  Linkedin,
+  Github,
+  
+} from 'lucide-react';
+
+// Type re-export for convenience
+export type { LucideIcon, LucideProps } from 'lucide-react';
