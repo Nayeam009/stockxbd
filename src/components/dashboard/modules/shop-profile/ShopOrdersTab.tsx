@@ -345,6 +345,37 @@ export const ShopOrdersTab = ({ shopId }: ShopOrdersTabProps) => {
             logger.info(`POS transaction ${existingTxn.transaction_number} already exists for order ${order.order_number}`);
           }
         }
+        
+        // Store order data for POS auto-fill and navigate to POS
+        const pendingOrderData = {
+          orderId: order.id,
+          orderNumber: order.order_number,
+          customer: {
+            name: order.customer_name,
+            phone: order.customer_phone,
+            address: `${order.delivery_address}, ${order.thana || ''}, ${order.district}, ${order.division}`.replace(/, +/g, ', ').trim()
+          },
+          items: order.items?.map(item => ({
+            type: item.product_type === 'lpg_refill' || item.product_type === 'lpg_package' ? 'lpg' : 'other',
+            name: item.brand_name || item.product_name,
+            productType: item.product_type,
+            weight: item.weight || '12kg',
+            valveSize: item.valve_size || '22mm',
+            quantity: item.quantity,
+            price: item.price,
+            returnCylinderQty: item.return_cylinder_qty || 0,
+            returnCylinderType: item.return_cylinder_type || 'empty',
+            returnCylinderBrand: item.return_cylinder_brand
+          })) || [],
+          total: order.total_amount,
+          isOnline: true
+        };
+        localStorage.setItem('pending-online-order', JSON.stringify(pendingOrderData));
+        
+        // Navigate to POS module after a brief delay for toast visibility
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('navigate-module', { detail: 'pos' }));
+        }, 600);
       }
       
       if (newStatus === 'dispatched') updateData.dispatched_at = new Date().toISOString();

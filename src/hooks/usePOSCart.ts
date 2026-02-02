@@ -34,6 +34,8 @@ export function usePOSCart() {
   const [saleItems, setSaleItems] = useState<SaleItem[]>([]);
   const [returnItems, setReturnItems] = useState<ReturnItem[]>([]);
   const [discount, setDiscount] = useState(0);
+  const [isOnlineOrder, setIsOnlineOrder] = useState(false);
+  const [onlineOrderId, setOnlineOrderId] = useState<string | null>(null);
 
   // ===== Calculations =====
   const subtotal = useMemo(() => 
@@ -266,6 +268,8 @@ export function usePOSCart() {
     setSaleItems([]);
     setReturnItems([]);
     setDiscount(0);
+    setIsOnlineOrder(false);
+    setOnlineOrderId(null);
     toast({ title: "Cart cleared" });
   }, []);
 
@@ -273,6 +277,8 @@ export function usePOSCart() {
     setSaleItems([]);
     setReturnItems([]);
     setDiscount(0);
+    setIsOnlineOrder(false);
+    setOnlineOrderId(null);
   }, []);
 
   return {
@@ -280,6 +286,8 @@ export function usePOSCart() {
     saleItems,
     returnItems,
     discount,
+    isOnlineOrder,
+    onlineOrderId,
     // Calculations
     subtotal,
     total,
@@ -311,5 +319,7 @@ export function usePOSCart() {
     resetCart,
     setSaleItems,
     setReturnItems,
+    setIsOnlineOrder,
+    setOnlineOrderId,
   };
 }

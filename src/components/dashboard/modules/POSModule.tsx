@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -22,7 +22,7 @@ import { logger } from "@/lib/logger";
 
 // Import modular components
 import { usePOSData } from "@/hooks/usePOSData";
-import { usePOSCart } from "@/hooks/usePOSCart";
+import { usePOSCart, SaleItem, ReturnItem } from "@/hooks/usePOSCart";
 import { POSSkeleton } from "@/components/pos/POSSkeleton";
 import { POSQuickStats } from "@/components/pos/POSQuickStats";
 import { POSStickyFooter } from "@/components/pos/POSStickyFooter";
@@ -91,6 +91,104 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
   const isSaleMode = activeTable === 'sale';
   const weightOptions = mouthSize === "22mm" ? WEIGHT_OPTIONS_22MM : WEIGHT_OPTIONS_20MM;
   const hasCustomer = customerState.phoneQuery.length >= 11 || customerState.customer !== null;
+
+  // Check for pending online order from My Shop Orders tab
+  useEffect(() => {
+    const pendingOrderStr = localStorage.getItem('pending-online-order');
+    if (!pendingOrderStr || lpgBrands.length === 0) return;
+
+    try {
+      const pendingOrder = JSON.parse(pendingOrderStr);
+
+      // Auto-populate customer
+      setCustomerState({
+        status: 'found',
+        customer: {
+          id: '',
+          name: pendingOrder.customer.name,
+          phone: pendingOrder.customer.phone,
+          address: pendingOrder.customer.address,
+          total_due: 0,
+          cylinders_due: 0,
+          billing_status: 'clear',
+          last_order_date: null
+        },
+        phoneQuery: pendingOrder.customer.phone,
+        newCustomerName: '',
+        newCustomerAddress: ''
+      });
+
+      // Auto-populate cart items
+      const saleItems: SaleItem[] = [];
+      const returnItems: ReturnItem[] = [];
+
+      for (const item of pendingOrder.items) {
+        if (item.type === 'lpg') {
+          // Find matching brand in lpgBrands
+          const brand = lpgBrands.find(b =>
+            b.name === item.name &&
+            b.weight === item.weight &&
+            b.size === item.valveSize
+          );
+
+          if (brand) {
+            const cylinderType = item.productType === 'lpg_refill' ? 'refill' : 'package';
+            saleItems.push({
+              id: `online-${Date.now()}-${Math.random()}`,
+              type: 'lpg',
+              name: brand.name,
+              details: `${item.weight} • ${cylinderType === 'refill' ? 'Refill' : 'Package'} • Online`,
+              price: item.price,
+              quantity: item.quantity,
+              cylinderType,
+              brandId: brand.id,
+              weight: item.weight,
+              mouthSize: item.valveSize,
+              brandColor: brand.color
+            });
+
+            // Add return cylinders if specified
+            if (item.returnCylinderQty > 0) {
+              const returnBrand = lpgBrands.find(b =>
+                b.name === (item.returnCylinderBrand || item.name) &&
+                b.weight === item.weight
+              );
+              if (returnBrand) {
+                returnItems.push({
+                  id: `return-online-${Date.now()}-${Math.random()}`,
+                  brandId: returnBrand.id,
+                  brandName: returnBrand.name,
+                  brandColor: returnBrand.color,
+                  quantity: item.returnCylinderQty,
+                  isLeaked: item.returnCylinderType === 'leaked',
+                  weight: item.weight
+                });
+              }
+            }
+          }
+        }
+      }
+
+      // Set cart items and online order flag
+      cart.setSaleItems(saleItems);
+      cart.setReturnItems(returnItems);
+      cart.setIsOnlineOrder(true);
+      cart.setOnlineOrderId(pendingOrder.orderId);
+
+      // Show toast
+      toast({
+        title: "📦 Online Order Loaded",
+        description: `Order #${pendingOrder.orderNumber} ready for checkout`
+      });
+
+      // Clear localStorage to prevent re-loading
+      localStorage.removeItem('pending-online-order');
+
+    } catch (error) {
+      logger.error('Failed to load pending online order', error);
+      localStorage.removeItem('pending-online-order');
+    }
+  }, [lpgBrands]); // Depend on lpgBrands to ensure data is loaded first
 
   // Filtered products
   const filteredBrands = useMemo(() => {
