@@ -6,6 +6,9 @@
  * 
  * Import icons from here instead of directly from 'lucide-react':
  * import { Home, Settings, Package } from '@/components/icons';
+ * 
+ * Note: Only icons actively used in the codebase are exported here.
+ * Add new icons as needed to keep bundle size optimal.
  */
 
 export {
@@ -20,6 +23,8 @@ export {
   ArrowRight,
   ExternalLink,
   LogOut,
+  PanelLeft,
+  PanelRight,
   
   // Dashboard Modules
   LayoutDashboard,
@@ -37,6 +42,7 @@ export {
   Banknote,
   Coins,
   CreditCard,
+  DollarSign,
   
   // POS & Sales
   ScanLine,
@@ -72,6 +78,10 @@ export {
   EyeOff,
   ZoomIn,
   ZoomOut,
+  MoreHorizontal,
+  MoreVertical,
+  Check,
+  X,
   
   // Communication
   Phone,
@@ -104,6 +114,8 @@ export {
   Flame,
   Gauge,
   Scale,
+  ChefHat,
+  Wrench,
   
   // Data & Charts
   TrendingUp,
@@ -151,15 +163,14 @@ export {
   Hexagon,
   
   // Common UI
-  X,
-  MoreHorizontal,
-  MoreVertical,
   Grip,
   GripVertical,
   Maximize,
   Minimize,
+  WifiOff,
+  Wifi,
   
-  // Social
+  // Social (if needed)
   Facebook,
   Twitter,
   Instagram,
