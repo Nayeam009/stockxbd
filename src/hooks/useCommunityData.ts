@@ -5,13 +5,13 @@ import { getStoredSessionSnapshot } from "@/lib/authUtils";
 
 export interface Shop {
   id: string;
-  owner_id?: string; // Hidden from public view for security
+  owner_id?: string;
   shop_name: string;
   description: string | null;
   logo_url: string | null;
   cover_image_url: string | null;
-  phone?: string; // Now optional - only visible to authenticated users on shop detail page
-  whatsapp?: string | null; // Now optional - only visible to authenticated users
+  phone?: string;
+  whatsapp?: string | null;
   address: string;
   division: string;
   district: string;
@@ -25,7 +25,6 @@ export interface Shop {
   total_reviews: number;
   total_orders: number;
   created_at: string;
-  // Payment details - only visible to authenticated users placing orders
   bkash_number?: string | null;
   nagad_number?: string | null;
   rocket_number?: string | null;
@@ -94,7 +93,7 @@ export interface CartItem extends ShopProduct {
   return_cylinder_qty: number;
   return_cylinder_type: 'empty' | 'leaked' | null;
   shop?: Shop;
-  shop_id: string; // Make shop_id required in CartItem for reliability
+  shop_id: string;
 }
 
 export const useCommunityData = () => {
@@ -108,7 +107,6 @@ export const useCommunityData = () => {
   const fetchShops = useCallback(async () => {
     setLoading(true);
     try {
-      // Use the public view that excludes sensitive data (phone, whatsapp, payment numbers)
       const { data, error } = await supabase
         .from('shop_profiles_public')
         .select('*')
@@ -116,7 +114,6 @@ export const useCommunityData = () => {
         .order('rating', { ascending: false });
 
       if (error) throw error;
-      // Map public view data - contact info is intentionally excluded for security
       const publicShops = (data || []).map(shop => ({
         id: shop.id,
         shop_name: shop.shop_name,
@@ -136,7 +133,6 @@ export const useCommunityData = () => {
         total_orders: shop.total_orders || 0,
         delivery_fee: Number(shop.delivery_fee || 50),
         created_at: shop.created_at || new Date().toISOString()
-        // Note: phone, whatsapp, payment numbers intentionally excluded from public listing
       })) as Shop[];
       setShops(publicShops);
     } catch (error) {
@@ -152,7 +148,6 @@ export const useCommunityData = () => {
       const { data: { user } } = await supabase.auth.getUser();
       
       if (user) {
-        // Authenticated users can see contact info from main table (RLS controlled)
         const { data, error } = await supabase
           .from('shop_profiles')
           .select('*')
@@ -162,7 +157,6 @@ export const useCommunityData = () => {
         if (error) throw error;
         return data as Shop;
       } else {
-        // Unauthenticated users get public view only (no contact info)
         const { data, error } = await supabase
           .from('shop_profiles_public')
           .select('*')
@@ -203,34 +197,67 @@ export const useCommunityData = () => {
     }
   }, []);
 
-  // Fetch customer orders
+  // OPTIMIZED: Fetch customer orders with batch shop fetching (fixes N+1 query)
   const fetchCustomerOrders = useCallback(async (): Promise<CommunityOrder[]> => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return [];
 
-      const { data, error } = await supabase
+      const { data: orders, error } = await supabase
         .from('community_orders')
         .select('*')
         .eq('customer_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
+      if (!orders || orders.length === 0) return [];
+
+      // BATCH FETCH: Get all unique shop IDs and fetch shops in one query
+      const shopIds = [...new Set(orders.map(o => o.shop_id))];
       
-      // Fetch shop details for each order
-      const ordersWithShops = await Promise.all(
-        (data || []).map(async (order) => {
-          const shop = await fetchShopById(order.shop_id);
-          return { ...order, shop } as CommunityOrder;
-        })
-      );
+      // Use the public view for shop details (safe for customers)
+      const { data: shopsData } = await supabase
+        .from('shop_profiles_public')
+        .select('*')
+        .in('id', shopIds);
+
+      // Create a map for O(1) lookup
+      const shopMap = new Map<string, Shop>();
+      shopsData?.forEach(shop => {
+        shopMap.set(shop.id, {
+          id: shop.id,
+          shop_name: shop.shop_name,
+          description: shop.description,
+          address: shop.address,
+          division: shop.division,
+          district: shop.district,
+          thana: shop.thana,
+          latitude: shop.latitude,
+          longitude: shop.longitude,
+          logo_url: shop.logo_url,
+          cover_image_url: shop.cover_image_url,
+          is_open: shop.is_open,
+          is_verified: shop.is_verified,
+          rating: Number(shop.rating || 0),
+          total_reviews: shop.total_reviews || 0,
+          total_orders: shop.total_orders || 0,
+          delivery_fee: Number(shop.delivery_fee || 50),
+          created_at: shop.created_at || new Date().toISOString()
+        } as Shop);
+      });
+
+      // Map orders with their shops
+      const ordersWithShops = orders.map(order => ({
+        ...order,
+        shop: shopMap.get(order.shop_id) || null
+      })) as CommunityOrder[];
 
       return ordersWithShops;
     } catch (error) {
       logger.error('Error fetching customer orders:', error);
       return [];
     }
-  }, [fetchShopById]);
+  }, []);
 
   // Fetch shop orders (for owner)
   const fetchShopOrders = useCallback(async (): Promise<CommunityOrder[]> => {
@@ -238,7 +265,6 @@ export const useCommunityData = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return [];
 
-      // First get user's shop
       const { data: shopData, error: shopError } = await supabase
         .from('shop_profiles')
         .select('id')
@@ -281,22 +307,16 @@ export const useCommunityData = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return { success: false, error: 'Not authenticated' };
 
-      // Detect if this is a self-order (owner ordering from their own shop)
       const isSelfOrder = userShop?.id === shopId;
-      
-      // Detect customer type (wholesale for owners, retail for regular customers)
       const customerType = userRole === 'owner' ? 'wholesale' : 'retail';
 
-      // Calculate totals
       const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-      const deliveryFee = isSelfOrder ? 0 : 50; // No delivery fee for self-orders
+      const deliveryFee = isSelfOrder ? 0 : 50;
       const totalAmount = subtotal + deliveryFee;
 
-      // Determine payment status based on method
       const paymentMethod = customerInfo.paymentMethod || 'cod';
       const paymentStatus = paymentMethod !== 'cod' && customerInfo.paymentTrxId ? 'paid' : 'pending';
 
-      // Create order with customer_type and is_self_order
       const { data: orderData, error: orderError } = await supabase
         .from('community_orders')
         .insert([{
@@ -324,7 +344,6 @@ export const useCommunityData = () => {
 
       if (orderError) throw orderError;
 
-      // Create order items with valve_size for accurate inventory matching
       const orderItems = items.map(item => ({
         order_id: orderData.id,
         product_id: item.id,
@@ -388,16 +407,13 @@ export const useCommunityData = () => {
     
     const fetchUser = async () => {
       try {
-        // Quick localStorage check first (key detected dynamically)
         const snapshot = getStoredSessionSnapshot();
         let userId: string | null = snapshot?.userId || null;
         let userEmail: string = snapshot?.email || '';
         
-        // If we have stored data, use it immediately
         if (userId) {
           setCurrentUser({ id: userId, email: userEmail });
           
-          // Fetch role and shop in parallel (non-blocking)
           const [roleResult, shopResult] = await Promise.all([
             supabase
               .from('user_roles')
@@ -415,7 +431,6 @@ export const useCommunityData = () => {
           
           if (roleResult.data) {
             setUserRole(roleResult.data.role);
-            // Cache role in sessionStorage for fast access
             sessionStorage.setItem(`user-role-${userId}`, roleResult.data.role);
           }
           
@@ -423,7 +438,6 @@ export const useCommunityData = () => {
             setUserShop(shopResult.data as Shop);
           }
         } else {
-          // Fallback to getUser if no localStorage data
           const { data: { user } } = await supabase.auth.getUser();
           if (!mounted) return;
           
@@ -447,7 +461,6 @@ export const useCommunityData = () => {
             
             if (roleResult.data) {
               setUserRole(roleResult.data.role);
-              // Cache role in sessionStorage for fast access
               sessionStorage.setItem(`user-role-${user.id}`, roleResult.data.role);
             }
             

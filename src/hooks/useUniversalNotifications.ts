@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { logger } from "@/lib/logger";
 
@@ -6,6 +6,7 @@ export type NotificationType =
   | "low_stock"
   | "out_of_stock"
   | "new_order"
+  | "online_order"
   | "order_completed"
   | "order_cancelled"
   | "payment_received"
@@ -41,6 +42,44 @@ export interface UniversalNotification {
   roles: UserRole[];
 }
 
+// Notification cache configuration
+const NOTIFICATION_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const NOTIFICATION_CACHE_KEY = 'notification-cache';
+
+interface NotificationCache {
+  data: UniversalNotification[];
+  timestamp: number;
+}
+
+// Get cached notifications from sessionStorage
+const getCachedNotifications = (): UniversalNotification[] | null => {
+  try {
+    const cached = sessionStorage.getItem(NOTIFICATION_CACHE_KEY);
+    if (cached) {
+      const { data, timestamp }: NotificationCache = JSON.parse(cached);
+      if (Date.now() - timestamp < NOTIFICATION_CACHE_TTL) {
+        return data.map(n => ({ ...n, createdAt: new Date(n.createdAt) }));
+      }
+    }
+  } catch {
+    // Ignore cache errors
+  }
+  return null;
+};
+
+// Set notification cache
+const setCachedNotifications = (notifications: UniversalNotification[]) => {
+  try {
+    const cache: NotificationCache = {
+      data: notifications,
+      timestamp: Date.now()
+    };
+    sessionStorage.setItem(NOTIFICATION_CACHE_KEY, JSON.stringify(cache));
+  } catch {
+    // Ignore cache errors
+  }
+};
+
 // Helper to send browser push notification
 const sendBrowserNotification = (title: string, body: string, tag: string) => {
   const isEnabled = localStorage.getItem("push-notifications-enabled") === "true";
@@ -64,15 +103,17 @@ const sendBrowserNotification = (title: string, body: string, tag: string) => {
 export const useUniversalNotifications = (userRole: UserRole = 'manager') => {
   const [notifications, setNotifications] = useState<UniversalNotification[]>([]);
   const [loading, setLoading] = useState(true);
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  const lastFetchRef = useRef<number>(0);
 
   // Check low stock for LPG, Stoves, Regulators
   const checkInventoryAlerts = useCallback(async (): Promise<UniversalNotification[]> => {
     const alerts: UniversalNotification[] = [];
 
     const [lpgResult, stoveResult, regulatorResult] = await Promise.all([
-      supabase.from("lpg_brands").select("*").eq("is_active", true),
-      supabase.from("stoves").select("*").eq("is_active", true),
-      supabase.from("regulators").select("*").eq("is_active", true)
+      supabase.from("lpg_brands").select("id, name, size, package_cylinder, refill_cylinder, empty_cylinder, problem_cylinder").eq("is_active", true),
+      supabase.from("stoves").select("id, brand, burners, quantity").eq("is_active", true),
+      supabase.from("regulators").select("id, brand, type, quantity").eq("is_active", true)
     ]);
 
     // LPG Cylinders
@@ -215,20 +256,28 @@ export const useUniversalNotifications = (userRole: UserRole = 'manager') => {
     return alerts;
   }, []);
 
-  // Check pending orders
+  // Check pending orders (both regular and community orders)
   const checkOrderAlerts = useCallback(async (): Promise<UniversalNotification[]> => {
     const alerts: UniversalNotification[] = [];
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
 
-    const { data: orders } = await supabase
-      .from("orders")
-      .select("*")
-      .in("status", ["pending", "processing"])
-      .order("created_at", { ascending: false })
-      .limit(10);
+    // Fetch both regular orders and community orders in parallel
+    const [ordersResult, communityOrdersResult] = await Promise.all([
+      supabase
+        .from("orders")
+        .select("id, order_number, customer_name, total_amount, created_at, status")
+        .in("status", ["pending", "processing"])
+        .order("created_at", { ascending: false })
+        .limit(10),
+      supabase
+        .from("community_orders")
+        .select("id, order_number, customer_name, total_amount, created_at, status, shop_id")
+        .in("status", ["pending", "confirmed", "dispatched"])
+        .order("created_at", { ascending: false })
+        .limit(15)
+    ]);
 
-    orders?.forEach((order) => {
+    // Regular orders
+    ordersResult.data?.forEach((order) => {
       const orderDate = new Date(order.created_at);
       const hoursSinceOrder = (Date.now() - orderDate.getTime()) / (1000 * 60 * 60);
 
@@ -263,6 +312,43 @@ export const useUniversalNotifications = (userRole: UserRole = 'manager') => {
       }
     });
 
+    // Community/Online orders (marketplace)
+    communityOrdersResult.data?.forEach((order) => {
+      const orderDate = new Date(order.created_at);
+      const hoursSinceOrder = (Date.now() - orderDate.getTime()) / (1000 * 60 * 60);
+
+      if (order.status === "pending") {
+        const priority = hoursSinceOrder > 1 ? "high" : "medium";
+        alerts.push({
+          id: `online_order_${order.id}`,
+          type: "online_order",
+          priority,
+          title: hoursSinceOrder > 1 ? "⏰ Online Order Waiting!" : "🌐 New Online Order",
+          message: `#${order.order_number} from ${order.customer_name} - ৳${order.total_amount}`,
+          read: false,
+          createdAt: orderDate,
+          module: "marketplace-orders",
+          action: { label: "View Online Orders", moduleId: "marketplace-orders" },
+          data: { orderId: order.id, orderNumber: order.order_number, shopId: order.shop_id },
+          roles: ['owner', 'manager'],
+        });
+      } else if (order.status === "dispatched") {
+        alerts.push({
+          id: `dispatched_order_${order.id}`,
+          type: "info",
+          priority: "low",
+          title: "🚚 Order In Transit",
+          message: `#${order.order_number} dispatched to ${order.customer_name}`,
+          read: false,
+          createdAt: orderDate,
+          module: "marketplace-orders",
+          action: { label: "Track Order", moduleId: "marketplace-orders" },
+          data: { orderId: order.id, orderNumber: order.order_number },
+          roles: ['owner', 'manager'],
+        });
+      }
+    });
+
     return alerts;
   }, []);
 
@@ -272,7 +358,7 @@ export const useUniversalNotifications = (userRole: UserRole = 'manager') => {
 
     const { data: customers } = await supabase
       .from("customers")
-      .select("*")
+      .select("id, name, total_due, cylinders_due, credit_limit")
       .or("total_due.gt.0,cylinders_due.gt.0")
       .order("total_due", { ascending: false })
       .limit(10);
@@ -356,13 +442,14 @@ export const useUniversalNotifications = (userRole: UserRole = 'manager') => {
     return alerts;
   }, []);
 
-  // Check pending exchanges
+  // Check pending cylinder exchange requests (FIXED: use cylinder_exchange_requests table)
   const checkExchangeAlerts = useCallback(async (): Promise<UniversalNotification[]> => {
     const alerts: UniversalNotification[] = [];
 
+    // Query the correct table: cylinder_exchange_requests
     const { data: exchanges } = await supabase
-      .from("cylinder_exchanges")
-      .select("*")
+      .from("cylinder_exchange_requests")
+      .select("id, brand_name, weight, quantity, status, created_at, requester_shop_id, target_shop_id")
       .eq("status", "pending")
       .order("created_at", { ascending: false })
       .limit(5);
@@ -372,13 +459,13 @@ export const useUniversalNotifications = (userRole: UserRole = 'manager') => {
         id: `exchange_pending_${exchange.id}`,
         type: "exchange_pending",
         priority: "medium",
-        title: "🔄 Pending Exchange",
-        message: `${exchange.quantity}x ${exchange.from_brand} → ${exchange.to_brand}`,
+        title: "🔄 Pending Exchange Request",
+        message: `${exchange.quantity}x ${exchange.brand_name} (${exchange.weight})`,
         read: false,
         createdAt: new Date(exchange.created_at),
         module: "exchange",
         action: { label: "View Exchanges", moduleId: "exchange" },
-        data: { exchangeId: exchange.id },
+        data: { exchangeId: exchange.id, brandName: exchange.brand_name, quantity: exchange.quantity },
         roles: ['owner', 'manager'],
       });
     });
@@ -399,9 +486,6 @@ export const useUniversalNotifications = (userRole: UserRole = 'manager') => {
 
     if (transactions && transactions.length > 0) {
       const totalSales = transactions.reduce((sum, t) => sum + Number(t.total), 0);
-      const cashSales = transactions
-        .filter(t => t.payment_method === 'cash')
-        .reduce((sum, t) => sum + Number(t.total), 0);
 
       // Good sales day alert (celebratory)
       if (totalSales > 50000) {
@@ -424,8 +508,25 @@ export const useUniversalNotifications = (userRole: UserRole = 'manager') => {
     return alerts;
   }, []);
 
-  // Load all notifications
-  const loadNotifications = useCallback(async () => {
+  // Load all notifications with caching
+  const loadNotifications = useCallback(async (forceRefresh = false) => {
+    // Prevent rapid reloads
+    const now = Date.now();
+    if (!forceRefresh && now - lastFetchRef.current < 5000) {
+      return;
+    }
+    lastFetchRef.current = now;
+
+    // Try to use cache first (unless force refresh)
+    if (!forceRefresh) {
+      const cached = getCachedNotifications();
+      if (cached && cached.length > 0) {
+        setNotifications(cached);
+        setLoading(false);
+        return;
+      }
+    }
+
     setLoading(true);
     try {
       const [inventoryAlerts, orderAlerts, customerAlerts, exchangeAlerts, salesAlerts] = await Promise.all([
@@ -460,6 +561,7 @@ export const useUniversalNotifications = (userRole: UserRole = 'manager') => {
       }));
 
       setNotifications(notificationsWithReadStatus);
+      setCachedNotifications(notificationsWithReadStatus);
 
       // Send browser push for critical unread
       const notifSettings = JSON.parse(localStorage.getItem("notification-settings") || "{}");
@@ -504,6 +606,7 @@ export const useUniversalNotifications = (userRole: UserRole = 'manager') => {
   const clearNotifications = useCallback(() => {
     setNotifications([]);
     localStorage.setItem("universalReadNotifications", JSON.stringify([]));
+    sessionStorage.removeItem(NOTIFICATION_CACHE_KEY);
   }, []);
 
   const unreadCount = useMemo(() => {
@@ -518,13 +621,21 @@ export const useUniversalNotifications = (userRole: UserRole = 'manager') => {
     return roleFilteredNotifications.filter((n) => !n.read && (n.priority === 'critical' || n.priority === 'high')).length;
   }, [roleFilteredNotifications]);
 
-  // Setup realtime subscriptions
+  // Debounced refresh for real-time updates
+  const debouncedRefresh = useCallback((delay: number = 2000) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      loadNotifications(true);
+    }, delay);
+  }, [loadNotifications]);
+
+  // Setup CONSOLIDATED real-time subscriptions (reduced from 4 to 2 channels)
   useEffect(() => {
     loadNotifications();
 
-    // Subscribe to orders
-    const ordersChannel = supabase
-      .channel("universal-notifications-orders")
+    // PRIMARY CHANNEL: Critical alerts (orders, payments, community orders)
+    const primaryChannel = supabase
+      .channel("notifications-primary-consolidated")
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "orders" },
@@ -543,35 +654,54 @@ export const useUniversalNotifications = (userRole: UserRole = 'manager') => {
             data: { orderId: order.id, orderNumber: order.order_number },
             roles: ['owner', 'manager'],
           };
-          setNotifications((prev) => [newNotification, ...prev]);
-
+          setNotifications((prev) => [newNotification, ...prev].slice(0, 50));
+          
           const notifSettings = JSON.parse(localStorage.getItem("notification-settings") || "{}");
           if (notifSettings.newOrders !== false) {
-            sendBrowserNotification(
-              "🛒 New Order",
-              `#${order.order_number} - ${order.customer_name}`,
-              `order-${order.id}`
-            );
+            sendBrowserNotification("🛒 New Order", `#${order.order_number} - ${order.customer_name}`, `order-${order.id}`);
           }
         }
       )
-      .subscribe();
-
-    // Subscribe to payments
-    const paymentsChannel = supabase
-      .channel("universal-notifications-payments")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "community_orders" },
+        (payload) => {
+          const order = payload.new as any;
+          const newNotification: UniversalNotification = {
+            id: `online_order_${order.id}`,
+            type: "online_order",
+            priority: "high",
+            title: "🌐 New Online Order!",
+            message: `#${order.order_number} from ${order.customer_name} - ৳${order.total_amount}`,
+            read: false,
+            createdAt: new Date(),
+            module: "marketplace-orders",
+            action: { label: "View Online Orders", moduleId: "marketplace-orders" },
+            data: { orderId: order.id, orderNumber: order.order_number, shopId: order.shop_id },
+            roles: ['owner', 'manager'],
+          };
+          setNotifications((prev) => [newNotification, ...prev].slice(0, 50));
+          
+          const notifSettings = JSON.parse(localStorage.getItem("notification-settings") || "{}");
+          if (notifSettings.newOrders !== false) {
+            sendBrowserNotification("🌐 Online Order", `#${order.order_number} - ${order.customer_name}`, `online-order-${order.id}`);
+          }
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "community_orders" },
+        () => {
+          // Debounced refresh for order status changes
+          debouncedRefresh(1000);
+        }
+      )
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "customer_payments" },
         async (payload) => {
           const payment = payload.new as any;
-
-          const { data: customer } = await supabase
-            .from("customers")
-            .select("name")
-            .eq("id", payment.customer_id)
-            .single();
-
+          const { data: customer } = await supabase.from("customers").select("name").eq("id", payment.customer_id).single();
           const customerName = customer?.name || "Customer";
 
           const newNotification: UniversalNotification = {
@@ -587,29 +717,19 @@ export const useUniversalNotifications = (userRole: UserRole = 'manager') => {
             data: { paymentId: payment.id, amount: payment.amount },
             roles: ['owner', 'manager'],
           };
-          setNotifications((prev) => [newNotification, ...prev]);
+          setNotifications((prev) => [newNotification, ...prev].slice(0, 50));
 
           const notifSettings = JSON.parse(localStorage.getItem("notification-settings") || "{}");
           if (notifSettings.payments !== false) {
-            sendBrowserNotification(
-              "💰 Payment Received",
-              `${customerName} paid ৳${payment.amount}`,
-              `payment-${payment.id}`
-            );
+            sendBrowserNotification("💰 Payment Received", `${customerName} paid ৳${payment.amount}`, `payment-${payment.id}`);
           }
         }
       )
-      .subscribe();
-
-    // Subscribe to POS transactions
-    const posChannel = supabase
-      .channel("universal-notifications-pos")
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "pos_transactions" },
         (payload) => {
           const transaction = payload.new as any;
-
           const newNotification: UniversalNotification = {
             id: `pos_${transaction.id}`,
             type: "info",
@@ -623,41 +743,51 @@ export const useUniversalNotifications = (userRole: UserRole = 'manager') => {
             data: { transactionId: transaction.id },
             roles: ['owner', 'manager'],
           };
-          setNotifications((prev) => [newNotification, ...prev].slice(0, 50)); // Keep max 50
+          setNotifications((prev) => [newNotification, ...prev].slice(0, 50));
         }
       )
       .subscribe();
 
-    // Subscribe to stock changes (for critical alerts)
-    const stockChannel = supabase
-      .channel("universal-notifications-stock")
+    // SECONDARY CHANNEL: Inventory alerts (debounced - less critical)
+    const inventoryChannel = supabase
+      .channel("notifications-inventory-consolidated")
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "lpg_brands" },
-        async () => {
-          // Refresh inventory alerts when stock changes
-          const alerts = await checkInventoryAlerts();
-          const criticalAlerts = alerts.filter(a => a.priority === 'critical');
-
-          if (criticalAlerts.length > 0) {
-            setNotifications(prev => {
-              const existingIds = prev.map(n => n.id);
-              const newAlerts = criticalAlerts.filter(a => !existingIds.includes(a.id));
-              return [...newAlerts, ...prev].slice(0, 50);
-            });
-          }
+        () => {
+          // 5-second debounce for stock updates (lower priority)
+          debouncedRefresh(5000);
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "stoves" },
+        () => {
+          debouncedRefresh(5000);
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "regulators" },
+        () => {
+          debouncedRefresh(5000);
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "cylinder_exchange_requests" },
+        () => {
+          debouncedRefresh(2000);
         }
       )
       .subscribe();
 
-    // Real-time only - no polling interval needed
     return () => {
-      supabase.removeChannel(ordersChannel);
-      supabase.removeChannel(paymentsChannel);
-      supabase.removeChannel(posChannel);
-      supabase.removeChannel(stockChannel);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      supabase.removeChannel(primaryChannel);
+      supabase.removeChannel(inventoryChannel);
     };
-  }, [loadNotifications, checkInventoryAlerts]);
+  }, [loadNotifications, debouncedRefresh]);
 
   // Navigate to module handler
   const navigateToModule = useCallback((moduleId: string) => {
@@ -673,7 +803,7 @@ export const useUniversalNotifications = (userRole: UserRole = 'manager') => {
     markAsRead,
     markAllAsRead,
     clearNotifications,
-    refresh: loadNotifications,
+    refresh: () => loadNotifications(true),
     navigateToModule,
   };
 };
