@@ -53,7 +53,9 @@ export const useUserRole = (): UserRoleData => {
   // Get initial session once (stable reference)
   const initialSession = useMemo(() => getStoredSession(), []);
   
-  // Initialize with cached data for instant UI
+  // Initialize with cached data for instant UI - no loading if we have cached role
+  const hasCachedRole = Boolean(initialSession?.role);
+  
   const [userRole, setUserRole] = useState<UserRole>(
     (initialSession?.role as UserRole) || 'customer'
   );
@@ -63,7 +65,8 @@ export const useUserRole = (): UserRoleData => {
   const [userId, setUserId] = useState<string | null>(
     initialSession?.userId || null
   );
-  const [loading, setLoading] = useState(!initialSession);
+  // If we have cached role, mark as NOT loading immediately
+  const [loading, setLoading] = useState(!hasCachedRole && !initialSession);
   const [error, setError] = useState<string | null>(null);
   
   const mountedRef = useRef(true);
@@ -84,9 +87,9 @@ export const useUserRole = (): UserRoleData => {
     try {
       setError(null);
       
-      // Fetch role and profile in parallel with timeout
+      // Fast parallel fetch with shorter timeout (3s instead of 5s)
       const timeoutPromise = new Promise<null>((resolve) => 
-        setTimeout(() => resolve(null), 5000)
+        setTimeout(() => resolve(null), 3000)
       );
       
       const fetchPromise = Promise.all([
@@ -120,7 +123,8 @@ export const useUserRole = (): UserRoleData => {
       }
     } catch (err) {
       console.warn('[useUserRole] Error fetching user data:', err);
-      if (mountedRef.current) {
+      // Don't set error if we have cached data - silent background refresh
+      if (mountedRef.current && !hasCachedRole) {
         setError('Failed to load user data');
       }
     } finally {
@@ -128,7 +132,7 @@ export const useUserRole = (): UserRoleData => {
         setLoading(false);
       }
     }
-  }, [userId, userName]);
+  }, [userId, userName, hasCachedRole]);
 
   useEffect(() => {
     mountedRef.current = true;

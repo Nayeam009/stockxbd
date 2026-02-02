@@ -328,43 +328,43 @@ export const DashboardOverview = ({
       )}
 
 
-      {/* Quick Actions Grid */}
-      <Card className="border border-border/40 shadow-md bg-card overflow-hidden">
-        <CardHeader className="p-3 sm:p-4 pb-2 bg-gradient-to-r from-primary/5 to-transparent border-b border-border/40">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-gradient-to-br from-primary to-primary-light flex items-center justify-center shadow-md">
-              <Settings className="h-5 w-5 sm:h-6 sm:w-6 text-primary-foreground" />
+      {/* Quick Actions Grid - Compact */}
+      <Card className="border border-border/40 shadow-sm bg-card overflow-hidden">
+        <CardHeader className="p-2 sm:p-3 pb-1 bg-gradient-to-r from-primary/5 to-transparent border-b border-border/40">
+          <div className="flex items-center gap-2">
+            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-primary-light flex items-center justify-center shadow-sm">
+              <Settings className="h-4 w-4 text-primary-foreground" />
             </div>
             <div>
-              <CardTitle className="text-base sm:text-lg font-bold">Quick Actions</CardTitle>
-              <CardDescription className="text-xs sm:text-sm">Access key features instantly</CardDescription>
+              <CardTitle className="text-sm font-bold">Quick Actions</CardTitle>
+              <CardDescription className="text-[10px]">Access key features instantly</CardDescription>
             </div>
           </div>
         </CardHeader>
 
-        <CardContent className="p-3 sm:p-4 space-y-4 sm:space-y-5">
+        <CardContent className="p-2 sm:p-3 space-y-2 sm:space-y-3">
           {/* Sales Group */}
           <div>
-            <h4 className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider flex items-center gap-2">
-              <Receipt className="h-3 w-3" />
+            <h4 className="text-[10px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-wider flex items-center gap-1.5">
+              <Receipt className="h-2.5 w-2.5" />
               Sales
             </h4>
-            <div className="grid grid-cols-3 gap-2 sm:gap-3" role="group" aria-label="Sales quick actions">
+            <div className="grid grid-cols-4 sm:grid-cols-5 gap-1.5 sm:gap-2" role="group" aria-label="Sales quick actions">
               {salesActions.map((action) => {
                 const Icon = action.icon;
                 return (
                   <button
                     key={action.module}
                     onClick={() => handleQuickAction(action.module)}
-                    className="group/action relative flex flex-col items-center justify-center p-3 sm:p-4 rounded-xl border border-border/40 bg-card hover:bg-primary/5 hover:border-primary/30 transition-all duration-200 hover:shadow-md focus-visible:ring-2 focus-visible:ring-primary touch-target"
+                    className="group/action relative flex flex-col items-center justify-center p-2 sm:p-2.5 rounded-lg border border-border/40 bg-card hover:bg-primary/5 hover:border-primary/30 transition-all duration-200 hover:shadow-sm focus-visible:ring-2 focus-visible:ring-primary"
                     aria-label={action.description || action.title}
                   >
-                    <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center mb-2 group-hover/action:from-primary group-hover/action:to-primary-light transition-all duration-200">
-                      <Icon className="h-5 w-5 sm:h-6 sm:w-6 text-primary group-hover/action:text-primary-foreground transition-colors" />
+                    <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center mb-1 group-hover/action:from-primary group-hover/action:to-primary-light transition-all duration-200">
+                      <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary group-hover/action:text-primary-foreground transition-colors" />
                     </div>
-                    <span className="text-xs sm:text-sm font-medium text-foreground text-center">{action.title}</span>
+                    <span className="text-[10px] sm:text-xs font-medium text-foreground text-center leading-tight">{action.title}</span>
                     {action.hotkey && (
-                      <span className="absolute top-1 right-1 text-[9px] sm:text-[10px] text-muted-foreground bg-muted/50 px-1 rounded hidden sm:inline">
+                      <span className="absolute top-0.5 right-0.5 text-[8px] text-muted-foreground bg-muted/50 px-0.5 rounded hidden sm:inline">
                         {action.hotkey}
                       </span>
                     )}
@@ -376,23 +376,23 @@ export const DashboardOverview = ({
 
           {/* Marketplace Group */}
           <div>
-            <h4 className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider flex items-center gap-2">
-              <Store className="h-3 w-3" />
+            <h4 className="text-[10px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-wider flex items-center gap-1.5">
+              <Store className="h-2.5 w-2.5" />
               Marketplace
             </h4>
-            <div className="grid grid-cols-3 gap-2 sm:gap-3" role="group" aria-label="Marketplace quick actions">
+            <div className="grid grid-cols-4 sm:grid-cols-5 gap-1.5 sm:gap-2" role="group" aria-label="Marketplace quick actions">
               {marketplaceActions.map((action) => {
                 const Icon = action.icon;
                 return (
                   <button
                     key={action.module}
                     onClick={() => handleQuickAction(action.module)}
-                    className="group/action flex flex-col items-center justify-center p-3 sm:p-4 rounded-xl border border-border/40 bg-card hover:bg-primary/5 hover:border-primary/30 transition-all duration-200 hover:shadow-md focus-visible:ring-2 focus-visible:ring-primary touch-target"
+                    className="group/action flex flex-col items-center justify-center p-2 sm:p-2.5 rounded-lg border border-border/40 bg-card hover:bg-primary/5 hover:border-primary/30 transition-all duration-200 hover:shadow-sm focus-visible:ring-2 focus-visible:ring-primary"
                   >
-                    <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center mb-2 group-hover/action:from-primary group-hover/action:to-primary-light transition-all duration-200">
-                      <Icon className="h-5 w-5 sm:h-6 sm:w-6 text-primary group-hover/action:text-primary-foreground transition-colors" />
+                    <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center mb-1 group-hover/action:from-primary group-hover/action:to-primary-light transition-all duration-200">
+                      <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary group-hover/action:text-primary-foreground transition-colors" />
                     </div>
-                    <span className="text-xs sm:text-sm font-medium text-foreground text-center">{action.title}</span>
+                    <span className="text-[10px] sm:text-xs font-medium text-foreground text-center leading-tight">{action.title}</span>
                   </button>
                 );
               })}
@@ -401,25 +401,25 @@ export const DashboardOverview = ({
 
           {/* Inventory Group */}
           <div>
-            <h4 className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider flex items-center gap-2">
-              <Package className="h-3 w-3" />
+            <h4 className="text-[10px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-wider flex items-center gap-1.5">
+              <Package className="h-2.5 w-2.5" />
               Inventory
             </h4>
-            <div className="grid grid-cols-3 gap-2 sm:gap-3" role="group" aria-label="Inventory quick actions">
+            <div className="grid grid-cols-4 sm:grid-cols-5 gap-1.5 sm:gap-2" role="group" aria-label="Inventory quick actions">
               {inventoryActions.map((action) => {
                 const Icon = action.icon;
                 return (
                   <button
                     key={action.module}
                     onClick={() => handleQuickAction(action.module)}
-                    className="group/action relative flex flex-col items-center justify-center p-3 sm:p-4 rounded-xl border border-border/40 bg-card hover:bg-primary/5 hover:border-primary/30 transition-all duration-200 hover:shadow-md focus-visible:ring-2 focus-visible:ring-primary touch-target"
+                    className="group/action relative flex flex-col items-center justify-center p-2 sm:p-2.5 rounded-lg border border-border/40 bg-card hover:bg-primary/5 hover:border-primary/30 transition-all duration-200 hover:shadow-sm focus-visible:ring-2 focus-visible:ring-primary"
                   >
-                    <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center mb-2 group-hover/action:from-primary group-hover/action:to-primary-light transition-all duration-200">
-                      <Icon className="h-5 w-5 sm:h-6 sm:w-6 text-primary group-hover/action:text-primary-foreground transition-colors" />
+                    <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center mb-1 group-hover/action:from-primary group-hover/action:to-primary-light transition-all duration-200">
+                      <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary group-hover/action:text-primary-foreground transition-colors" />
                     </div>
-                    <span className="text-xs sm:text-sm font-medium text-foreground text-center">{action.title}</span>
+                    <span className="text-[10px] sm:text-xs font-medium text-foreground text-center leading-tight">{action.title}</span>
                     {action.hotkey && (
-                      <span className="absolute top-1 right-1 text-[9px] sm:text-[10px] text-muted-foreground bg-muted/50 px-1 rounded hidden sm:inline">
+                      <span className="absolute top-0.5 right-0.5 text-[8px] text-muted-foreground bg-muted/50 px-0.5 rounded hidden sm:inline">
                         {action.hotkey}
                       </span>
                     )}
@@ -432,11 +432,11 @@ export const DashboardOverview = ({
           {/* Admin Group - Owner/Manager only */}
           {isOwnerOrManager && (
             <div>
-              <h4 className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider flex items-center gap-2">
-                <Settings className="h-3 w-3" />
+              <h4 className="text-[10px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-wider flex items-center gap-1.5">
+                <Settings className="h-2.5 w-2.5" />
                 Administration
               </h4>
-              <div className="grid grid-cols-3 gap-2 sm:gap-3" role="group" aria-label="Admin quick actions">
+              <div className="grid grid-cols-4 sm:grid-cols-5 gap-1.5 sm:gap-2" role="group" aria-label="Admin quick actions">
                 {adminActions
                   .filter(action => !action.ownerOnly || isOwner)
                   .map((action) => {
@@ -445,12 +445,12 @@ export const DashboardOverview = ({
                       <button
                         key={action.module}
                         onClick={() => handleQuickAction(action.module)}
-                        className="group/action flex flex-col items-center justify-center p-3 sm:p-4 rounded-xl border border-border/40 bg-card hover:bg-primary/5 hover:border-primary/30 transition-all duration-200 hover:shadow-md focus-visible:ring-2 focus-visible:ring-primary touch-target"
+                        className="group/action flex flex-col items-center justify-center p-2 sm:p-2.5 rounded-lg border border-border/40 bg-card hover:bg-primary/5 hover:border-primary/30 transition-all duration-200 hover:shadow-sm focus-visible:ring-2 focus-visible:ring-primary"
                       >
-                        <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center mb-2 group-hover/action:from-primary group-hover/action:to-primary-light transition-all duration-200">
-                          <Icon className="h-5 w-5 sm:h-6 sm:w-6 text-primary group-hover/action:text-primary-foreground transition-colors" />
+                        <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center mb-1 group-hover/action:from-primary group-hover/action:to-primary-light transition-all duration-200">
+                          <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary group-hover/action:text-primary-foreground transition-colors" />
                         </div>
-                        <span className="text-xs sm:text-sm font-medium text-foreground text-center">{action.title}</span>
+                        <span className="text-[10px] sm:text-xs font-medium text-foreground text-center leading-tight">{action.title}</span>
                       </button>
                     );
                   })}
