@@ -10,6 +10,7 @@ import { ModuleWatchdog } from "@/components/dashboard/ModuleWatchdog";
 import { OfflineIndicator } from "@/components/shared/OfflineIndicator";
 import { OfflineErrorBoundary } from "@/components/shared/OfflineErrorBoundary";
 import { useDashboardData } from "@/hooks/useDashboardData";
+import { useDashboardRealtime, usePrefetchDashboardData } from "@/hooks/useDashboardQueries";
 import { getNextModule } from "@/hooks/useSwipeNavigation";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -117,7 +118,11 @@ const Dashboard = () => {
 
   const isMobile = useIsMobile();
 
-  // Mark initial load complete for animation control
+  // Use optimized real-time subscriptions with tiered debounce
+  useDashboardRealtime(activeModule);
+  
+  // Prefetch commonly accessed modules in background
+  usePrefetchDashboardData();
   useEffect(() => {
     const timer = setTimeout(() => setHasInitiallyLoaded(true), 100);
     return () => clearTimeout(timer);

@@ -426,8 +426,9 @@ export const useDashboardData = () => {
     }
   }, []);
 
-  // Debounce ref for real-time updates - reduced to 1s for faster sync
+  // Debounce ref for real-time updates - tiered for different data types
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  const DEBOUNCE_MS = 2000; // Increased from 1s to 2s for better batching
 
   // Store fetchData in a ref to use in subscription callbacks
   const fetchDataRef = useRef(fetchData);
@@ -439,7 +440,7 @@ export const useDashboardData = () => {
     }
     debounceRef.current = setTimeout(() => {
       fetchDataRef.current(true);
-    }, 1000); // Reduced from 2s to 1s for faster updates
+    }, DEBOUNCE_MS);
   }, []); // Empty deps - uses ref internally
 
   // Setup real-time subscriptions - runs only once

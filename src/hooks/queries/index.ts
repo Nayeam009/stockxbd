@@ -15,3 +15,14 @@ export {
   type ExpenseEntry,
   type CustomerDebtSummary,
 } from './useBusinessDiaryQueries';
+
+// Dashboard optimized queries
+export {
+  useOverviewStats,
+  useInventoryData,
+  useRecentTransactions,
+  useCustomersWithDues,
+  useDashboardRealtime,
+  usePrefetchDashboardData,
+  dashboardKeys,
+} from '../useDashboardQueries';
