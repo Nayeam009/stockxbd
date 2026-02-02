@@ -1,62 +1,33 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useCallback } from "react";
+/**
+ * POS Data Hook - Uses Shared Query System
+ * 
+ * Optimized to share cache with other modules for instant switching.
+ * Real-time updates handled by unified subscription in useSharedQueries.
+ */
+
+import { useQuery } from "@tanstack/react-query";
+import { useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useNetwork } from "@/contexts/NetworkContext";
+import { 
+  sharedKeys, 
+  useSharedLPGBrands, 
+  useSharedStoves, 
+  useSharedRegulators, 
+  useSharedCustomers, 
+  useSharedProductPrices,
+  type SharedLPGBrand,
+  type SharedStove,
+  type SharedRegulator,
+  type SharedCustomer,
+  type SharedProductPrice,
+} from "@/hooks/useSharedQueries";
 
 // ============= INTERFACES =============
-export interface LPGBrand {
-  id: string;
-  name: string;
-  size: string;
-  weight: string;
-  refill_cylinder: number;
-  package_cylinder: number;
-  empty_cylinder: number;
-  problem_cylinder: number;
-  color: string;
-}
-
-export interface Stove {
-  id: string;
-  brand: string;
-  model: string;
-  burners: number;
-  price: number;
-  quantity: number;
-}
-
-export interface Regulator {
-  id: string;
-  brand: string;
-  type: string;
-  quantity: number;
-  price?: number;
-}
-
-export interface ProductPrice {
-  id: string;
-  product_type: string;
-  brand_id: string | null;
-  product_name: string;
-  size: string | null;
-  variant: string | null;
-  company_price: number;
-  distributor_price: number;
-  retail_price: number;
-  package_price: number;
-}
-
-export interface Customer {
-  id: string;
-  name: string;
-  phone: string | null;
-  address: string | null;
-  total_due: number;
-  cylinders_due: number;
-  billing_status: string;
-  last_order_date: string | null;
-  credit_limit?: number;
-}
+export interface LPGBrand extends SharedLPGBrand {}
+export interface Stove extends SharedStove {}
+export interface Regulator extends SharedRegulator {}
+export interface Customer extends SharedCustomer {}
+export interface ProductPrice extends SharedProductPrice {}
 
 export interface TodayStats {
   totalSales: number;
@@ -66,83 +37,16 @@ export interface TodayStats {
 
 // ============= MAIN HOOK =============
 export function usePOSData() {
-  const queryClient = useQueryClient();
-  const { isOnline } = useNetwork();
+  // Use shared queries - these are cached across all modules
+  const { data: lpgBrands = [], isLoading: lpgLoading } = useSharedLPGBrands();
+  const { data: stoves = [], isLoading: stovesLoading } = useSharedStoves();
+  const { data: regulators = [], isLoading: regulatorsLoading } = useSharedRegulators();
+  const { data: customers = [], isLoading: customersLoading } = useSharedCustomers();
+  const { data: productPrices = [], isLoading: pricesLoading } = useSharedProductPrices();
 
-  // ===== LPG Brands Query =====
-  const { data: lpgBrands = [], isLoading: lpgLoading } = useQuery({
-    queryKey: ['pos-lpg-brands'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('lpg_brands')
-        .select('*')
-        .eq('is_active', true);
-      if (error) throw error;
-      return data as LPGBrand[];
-    },
-    staleTime: 30_000,
-    gcTime: 5 * 60_000,
-  });
-
-  // ===== Stoves Query =====
-  const { data: stoves = [], isLoading: stovesLoading } = useQuery({
-    queryKey: ['pos-stoves'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('stoves')
-        .select('*')
-        .eq('is_active', true);
-      if (error) throw error;
-      return data as Stove[];
-    },
-    staleTime: 30_000,
-  });
-
-  // ===== Regulators Query =====
-  const { data: regulators = [], isLoading: regulatorsLoading } = useQuery({
-    queryKey: ['pos-regulators'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('regulators')
-        .select('*')
-        .eq('is_active', true);
-      if (error) throw error;
-      return data as Regulator[];
-    },
-    staleTime: 30_000,
-  });
-
-  // ===== Customers Query =====
-  const { data: customers = [], isLoading: customersLoading } = useQuery({
-    queryKey: ['pos-customers'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('customers')
-        .select('*')
-        .order('name');
-      if (error) throw error;
-      return data as Customer[];
-    },
-    staleTime: 30_000,
-  });
-
-  // ===== Product Prices Query =====
-  const { data: productPrices = [], isLoading: pricesLoading } = useQuery({
-    queryKey: ['pos-prices'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('product_prices')
-        .select('*')
-        .eq('is_active', true);
-      if (error) throw error;
-      return data as ProductPrice[];
-    },
-    staleTime: 30_000,
-  });
-
-  // ===== Today's Stats Query =====
+  // ===== Today's Stats Query (POS-specific) =====
   const { data: todayStats } = useQuery({
-    queryKey: ['pos-today-stats'],
+    queryKey: [...sharedKeys.todayStats(), 'pos'],
     queryFn: async () => {
       const today = new Date().toISOString().split('T')[0];
       
@@ -172,31 +76,6 @@ export function usePOSData() {
     staleTime: 60_000,
     refetchInterval: 30_000,
   });
-
-  // ===== Real-time Subscriptions =====
-  useEffect(() => {
-    if (!isOnline) return;
-
-    const channel = supabase
-      .channel('pos-realtime-v4')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'lpg_brands' }, 
-        () => queryClient.invalidateQueries({ queryKey: ['pos-lpg-brands'] }))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'stoves' }, 
-        () => queryClient.invalidateQueries({ queryKey: ['pos-stoves'] }))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'regulators' }, 
-        () => queryClient.invalidateQueries({ queryKey: ['pos-regulators'] }))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'customers' }, 
-        () => queryClient.invalidateQueries({ queryKey: ['pos-customers'] }))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'product_prices' }, 
-        () => queryClient.invalidateQueries({ queryKey: ['pos-prices'] }))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pos_transactions' }, 
-        () => queryClient.invalidateQueries({ queryKey: ['pos-today-stats'] }))
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [isOnline, queryClient]);
 
   // ===== Price Helper Functions =====
   const getLPGPrice = useCallback((brandId: string, weightVal: string, cylType: 'refill' | 'package', saleTp: 'retail' | 'wholesale') => {
@@ -239,20 +118,15 @@ export function usePOSData() {
     return priceEntry?.retail_price || 0;
   }, [productPrices]);
 
-  // ===== Refresh Function =====
+  // Refresh is now handled by shared queries - no-op here
   const refreshAllData = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ['pos-lpg-brands'] });
-    queryClient.invalidateQueries({ queryKey: ['pos-stoves'] });
-    queryClient.invalidateQueries({ queryKey: ['pos-regulators'] });
-    queryClient.invalidateQueries({ queryKey: ['pos-customers'] });
-    queryClient.invalidateQueries({ queryKey: ['pos-prices'] });
-    queryClient.invalidateQueries({ queryKey: ['pos-today-stats'] });
-  }, [queryClient]);
+    // Data refresh is handled by unified real-time subscription
+  }, []);
 
   const isLoading = lpgLoading || stovesLoading || regulatorsLoading || customersLoading || pricesLoading;
 
   return {
-    // Data
+    // Data (from shared cache)
     lpgBrands,
     stoves,
     regulators,

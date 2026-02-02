@@ -1,43 +1,29 @@
+/**
+ * Inventory Data Hook - Uses Shared Query System
+ * 
+ * Optimized to share cache with POS and other modules.
+ * Real-time updates handled by unified subscription.
+ */
+
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useNetwork } from "@/contexts/NetworkContext";
 import { logger } from "@/lib/logger";
+import { 
+  sharedKeys,
+  useSharedLPGBrands,
+  useSharedStoves,
+  useSharedRegulators,
+  type SharedLPGBrand,
+  type SharedStove,
+  type SharedRegulator,
+} from "@/hooks/useSharedQueries";
 
-// Interfaces
-export interface LPGBrand {
-  id: string;
-  name: string;
-  color: string;
-  size: string;
-  weight: string;
-  package_cylinder: number;
-  refill_cylinder: number;
-  empty_cylinder: number;
-  problem_cylinder: number;
-  in_transit_cylinder: number;
-  is_active: boolean;
-}
-
-export interface Stove {
-  id: string;
-  brand: string;
-  model: string;
-  burners: number;
-  quantity: number;
-  price: number;
-  is_damaged: boolean | null;
-  warranty_months: number | null;
-}
-
-export interface Regulator {
-  id: string;
-  brand: string;
-  type: string;
-  quantity: number;
-  price: number | null;
-  is_defective: boolean | null;
-}
+// Re-export types for compatibility
+export type LPGBrand = SharedLPGBrand;
+export type Stove = SharedStove;
+export type Regulator = SharedRegulator;
 
 export interface InventoryTotals {
   total_full: number;
@@ -77,69 +63,17 @@ export const WEIGHT_OPTIONS_20MM = [
 export function useInventoryData(sizeTab: "22mm" | "20mm" = "22mm", selectedWeight: string = "12kg") {
   const queryClient = useQueryClient();
   const { isOnline } = useNetwork();
-  const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Fetch LPG Brands
-  const { 
-    data: lpgBrands = [], 
-    isLoading: lpgLoading,
-    refetch: refetchLpg
-  } = useQuery({
-    queryKey: ['inventory-lpg-brands', sizeTab, selectedWeight],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("lpg_brands")
-        .select("*")
-        .eq("is_active", true)
-        .eq("size", sizeTab)
-        .eq("weight", selectedWeight)
-        .order("name");
-      
-      if (error) throw error;
-      return (data || []) as LPGBrand[];
-    },
-    staleTime: 30_000
-  });
+  // Use SHARED queries for global data
+  const { data: allLpgBrands = [], isLoading: lpgLoading, refetch: refetchLpg } = useSharedLPGBrands();
+  const { data: stoves = [], isLoading: stovesLoading, refetch: refetchStoves } = useSharedStoves();
+  const { data: regulators = [], isLoading: regulatorsLoading, refetch: refetchRegulators } = useSharedRegulators();
 
-  // Fetch Stoves
-  const { 
-    data: stoves = [], 
-    isLoading: stovesLoading,
-    refetch: refetchStoves
-  } = useQuery({
-    queryKey: ['inventory-stoves'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("stoves")
-        .select("*")
-        .eq("is_active", true)
-        .order("brand");
-      
-      if (error) throw error;
-      return (data || []) as Stove[];
-    },
-    staleTime: 30_000
-  });
-
-  // Fetch Regulators
-  const { 
-    data: regulators = [], 
-    isLoading: regulatorsLoading,
-    refetch: refetchRegulators
-  } = useQuery({
-    queryKey: ['inventory-regulators'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("regulators")
-        .select("*")
-        .eq("is_active", true)
-        .order("brand");
-      
-      if (error) throw error;
-      return (data || []) as Regulator[];
-    },
-    staleTime: 30_000
-  });
+  // Filter LPG brands by size and weight (client-side filter on cached data)
+  const lpgBrands = useMemo(() => 
+    allLpgBrands.filter(b => b.size === sizeTab && b.weight === selectedWeight),
+    [allLpgBrands, sizeTab, selectedWeight]
+  );
 
   // Fetch Inventory Totals using RPC
   const { data: totals } = useQuery({
@@ -147,7 +81,6 @@ export function useInventoryData(sizeTab: "22mm" | "20mm" = "22mm", selectedWeig
     queryFn: async () => {
       const { data, error } = await supabase.rpc('get_inventory_totals');
       if (error) throw error;
-      // RPC returns an array with single row for aggregations
       const result = Array.isArray(data) && data.length > 0 ? data[0] : data;
       return result as InventoryTotals | null;
     },
@@ -203,35 +136,6 @@ export function useInventoryData(sizeTab: "22mm" | "20mm" = "22mm", selectedWeig
     refetchInterval: 30_000
   });
 
-  // Real-time subscriptions
-  useEffect(() => {
-    if (!isOnline) return;
-
-    const debouncedInvalidate = () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ['inventory-lpg-brands'] });
-        queryClient.invalidateQueries({ queryKey: ['inventory-stoves'] });
-        queryClient.invalidateQueries({ queryKey: ['inventory-regulators'] });
-        queryClient.invalidateQueries({ queryKey: ['inventory-totals'] });
-        queryClient.invalidateQueries({ queryKey: ['inventory-today-stats'] });
-      }, 1000);
-    };
-
-    const channel = supabase
-      .channel('inventory-realtime-v4')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'lpg_brands' }, debouncedInvalidate)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'stoves' }, debouncedInvalidate)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'regulators' }, debouncedInvalidate)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pob_transactions' }, debouncedInvalidate)
-      .subscribe();
-
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      supabase.removeChannel(channel);
-    };
-  }, [isOnline, queryClient]);
-
   // Computed LPG Totals
   const lpgTotals = useMemo(() => 
     lpgBrands.reduce((acc, b) => ({
@@ -261,11 +165,10 @@ export function useInventoryData(sizeTab: "22mm" | "20mm" = "22mm", selectedWeig
 
   // Update operations with optimistic updates
   const updateLpgBrand = useCallback(async (id: string, field: string, value: number) => {
-    // Get previous data for rollback
-    const previousData = queryClient.getQueryData<LPGBrand[]>(['inventory-lpg-brands', sizeTab, selectedWeight]);
+    const previousData = queryClient.getQueryData<LPGBrand[]>(sharedKeys.lpgBrands());
     
-    // Optimistic update - immediately update the UI
-    queryClient.setQueryData<LPGBrand[]>(['inventory-lpg-brands', sizeTab, selectedWeight], (old) => {
+    // Optimistic update
+    queryClient.setQueryData<LPGBrand[]>(sharedKeys.lpgBrands(), (old) => {
       if (!old) return old;
       return old.map(brand => 
         brand.id === id ? { ...brand, [field]: value } : brand
@@ -279,22 +182,19 @@ export function useInventoryData(sizeTab: "22mm" | "20mm" = "22mm", selectedWeig
         .eq("id", id);
       
       if (error) throw error;
-      // Silently revalidate in background
       queryClient.invalidateQueries({ queryKey: ['inventory-totals'] });
       return true;
     } catch (error: any) {
-      // Rollback on error
-      queryClient.setQueryData(['inventory-lpg-brands', sizeTab, selectedWeight], previousData);
+      queryClient.setQueryData(sharedKeys.lpgBrands(), previousData);
       logger.error('Failed to update LPG brand', error, { component: 'useInventoryData' });
       throw error;
     }
-  }, [queryClient, sizeTab, selectedWeight]);
+  }, [queryClient]);
 
   const updateStove = useCallback(async (id: string, value: number) => {
-    // Optimistic update
-    const previousData = queryClient.getQueryData<Stove[]>(['inventory-stoves']);
+    const previousData = queryClient.getQueryData<Stove[]>(sharedKeys.stoves());
     
-    queryClient.setQueryData<Stove[]>(['inventory-stoves'], (old) => {
+    queryClient.setQueryData<Stove[]>(sharedKeys.stoves(), (old) => {
       if (!old) return old;
       return old.map(stove => 
         stove.id === id ? { ...stove, quantity: value } : stove
@@ -310,18 +210,16 @@ export function useInventoryData(sizeTab: "22mm" | "20mm" = "22mm", selectedWeig
       if (error) throw error;
       return true;
     } catch (error: any) {
-      // Rollback on error
-      queryClient.setQueryData(['inventory-stoves'], previousData);
+      queryClient.setQueryData(sharedKeys.stoves(), previousData);
       logger.error('Failed to update stove', error, { component: 'useInventoryData' });
       throw error;
     }
   }, [queryClient]);
 
   const updateRegulator = useCallback(async (id: string, value: number) => {
-    // Optimistic update
-    const previousData = queryClient.getQueryData<Regulator[]>(['inventory-regulators']);
+    const previousData = queryClient.getQueryData<Regulator[]>(sharedKeys.regulators());
     
-    queryClient.setQueryData<Regulator[]>(['inventory-regulators'], (old) => {
+    queryClient.setQueryData<Regulator[]>(sharedKeys.regulators(), (old) => {
       if (!old) return old;
       return old.map(reg => 
         reg.id === id ? { ...reg, quantity: value } : reg
@@ -337,8 +235,7 @@ export function useInventoryData(sizeTab: "22mm" | "20mm" = "22mm", selectedWeig
       if (error) throw error;
       return true;
     } catch (error: any) {
-      // Rollback on error
-      queryClient.setQueryData(['inventory-regulators'], previousData);
+      queryClient.setQueryData(sharedKeys.regulators(), previousData);
       logger.error('Failed to update regulator', error, { component: 'useInventoryData' });
       throw error;
     }
@@ -353,7 +250,7 @@ export function useInventoryData(sizeTab: "22mm" | "20mm" = "22mm", selectedWeig
         .eq("id", id);
       
       if (error) throw error;
-      queryClient.invalidateQueries({ queryKey: ['inventory-lpg-brands'] });
+      queryClient.invalidateQueries({ queryKey: sharedKeys.lpgBrands() });
       return true;
     } catch (error: any) {
       logger.error('Failed to delete LPG brand', error, { component: 'useInventoryData' });
@@ -369,7 +266,7 @@ export function useInventoryData(sizeTab: "22mm" | "20mm" = "22mm", selectedWeig
         .eq("id", id);
       
       if (error) throw error;
-      queryClient.invalidateQueries({ queryKey: ['inventory-stoves'] });
+      queryClient.invalidateQueries({ queryKey: sharedKeys.stoves() });
       return true;
     } catch (error: any) {
       logger.error('Failed to delete stove', error, { component: 'useInventoryData' });
@@ -385,7 +282,7 @@ export function useInventoryData(sizeTab: "22mm" | "20mm" = "22mm", selectedWeig
         .eq("id", id);
       
       if (error) throw error;
-      queryClient.invalidateQueries({ queryKey: ['inventory-regulators'] });
+      queryClient.invalidateQueries({ queryKey: sharedKeys.regulators() });
       return true;
     } catch (error: any) {
       logger.error('Failed to delete regulator', error, { component: 'useInventoryData' });
