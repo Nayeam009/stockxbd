@@ -522,12 +522,28 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
               )}
               {activeTab === 'stove' && isSaleMode && (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
-                  {filteredStoves.map(stove => <StoveProductCard key={stove.id} stove={stove} price={getStovePrice(stove.brand, stove.model) || stove.price} onClick={() => cart.addStoveToCart(stove, getStovePrice(stove.brand, stove.model) || stove.price)} />)}
+                  {filteredStoves.map(stove => (
+                    <StoveProductCard 
+                      key={stove.id} 
+                      stove={stove} 
+                      price={getStovePrice(stove.brand, stove.model) || stove.price} 
+                      pendingStock={cart.getPendingStoveStock(stove.id)}
+                      onClick={() => cart.addStoveToCart(stove, getStovePrice(stove.brand, stove.model) || stove.price)} 
+                    />
+                  ))}
                 </div>
               )}
               {activeTab === 'regulator' && isSaleMode && (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
-                  {filteredRegulators.map(reg => <RegulatorProductCard key={reg.id} regulator={reg} price={getRegulatorPrice(reg.brand, reg.type) || reg.price || 0} onClick={() => cart.addRegulatorToCart(reg, getRegulatorPrice(reg.brand, reg.type) || reg.price || 0)} />)}
+                  {filteredRegulators.map(reg => (
+                    <RegulatorProductCard 
+                      key={reg.id} 
+                      regulator={reg} 
+                      price={getRegulatorPrice(reg.brand, reg.type) || reg.price || 0} 
+                      pendingStock={cart.getPendingRegulatorStock(reg.id)}
+                      onClick={() => cart.addRegulatorToCart(reg, getRegulatorPrice(reg.brand, reg.type) || reg.price || 0)} 
+                    />
+                  ))}
                 </div>
               )}
             </ScrollArea>

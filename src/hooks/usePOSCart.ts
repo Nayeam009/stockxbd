@@ -263,6 +263,20 @@ export function usePOSCart() {
       .reduce((sum, r) => sum + r.quantity, 0);
   }, [returnItems]);
 
+  // Get pending stock for a stove by ID
+  const getPendingStoveStock = useCallback((stoveId: string) => {
+    return saleItems
+      .filter(i => i.type === 'stove' && i.stoveId === stoveId)
+      .reduce((sum, i) => sum + i.quantity, 0);
+  }, [saleItems]);
+
+  // Get pending stock for a regulator by ID
+  const getPendingRegulatorStock = useCallback((regulatorId: string) => {
+    return saleItems
+      .filter(i => i.type === 'regulator' && i.regulatorId === regulatorId)
+      .reduce((sum, i) => sum + i.quantity, 0);
+  }, [saleItems]);
+
   // ===== Clear Cart =====
   const clearCart = useCallback(() => {
     setSaleItems([]);
@@ -313,6 +327,8 @@ export function usePOSCart() {
     getPendingStock,
     getPendingReturns,
     getPendingProblem,
+    getPendingStoveStock,
+    getPendingRegulatorStock,
     // Cart Management
     setDiscount,
     clearCart,

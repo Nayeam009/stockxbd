@@ -133,11 +133,13 @@ export const LPGProductCard = ({
 interface StoveCardProps {
   stove: Stove;
   price: number;
+  pendingStock?: number;
   onClick: () => void;
 }
 
-export const StoveProductCard = ({ stove, price, onClick }: StoveCardProps) => {
-  const isOutOfStock = stove.quantity <= 0;
+export const StoveProductCard = ({ stove, price, pendingStock = 0, onClick }: StoveCardProps) => {
+  const displayStock = Math.max(0, stove.quantity - pendingStock);
+  const isOutOfStock = displayStock <= 0;
 
   return (
     <button
@@ -160,10 +162,17 @@ export const StoveProductCard = ({ stove, price, onClick }: StoveCardProps) => {
             <ChefHat className="h-4 w-4 text-white" />
           </div>
           <Badge
-            variant={stove.quantity > 3 ? "secondary" : stove.quantity > 0 ? "outline" : "destructive"}
-            className="text-[9px] px-1.5 h-5"
+            variant={displayStock > 3 ? "secondary" : displayStock > 0 ? "outline" : "destructive"}
+            className="text-[9px] px-1.5 h-5 font-semibold"
           >
-            {stove.quantity > 0 ? stove.quantity : 'Out'}
+            {displayStock > 0 ? (
+              <span className="flex items-center gap-0.5">
+                {displayStock}
+                {pendingStock > 0 && (
+                  <span className="text-amber-600 dark:text-amber-400">(-{pendingStock})</span>
+                )}
+              </span>
+            ) : 'Out'}
           </Badge>
         </div>
 
@@ -189,11 +198,13 @@ export const StoveProductCard = ({ stove, price, onClick }: StoveCardProps) => {
 interface RegulatorCardProps {
   regulator: Regulator;
   price: number;
+  pendingStock?: number;
   onClick: () => void;
 }
 
-export const RegulatorProductCard = ({ regulator, price, onClick }: RegulatorCardProps) => {
-  const isOutOfStock = regulator.quantity <= 0;
+export const RegulatorProductCard = ({ regulator, price, pendingStock = 0, onClick }: RegulatorCardProps) => {
+  const displayStock = Math.max(0, regulator.quantity - pendingStock);
+  const isOutOfStock = displayStock <= 0;
 
   return (
     <button
@@ -216,10 +227,17 @@ export const RegulatorProductCard = ({ regulator, price, onClick }: RegulatorCar
             <Gauge className="h-4 w-4 text-white" />
           </div>
           <Badge
-            variant={regulator.quantity > 3 ? "secondary" : regulator.quantity > 0 ? "outline" : "destructive"}
-            className="text-[9px] px-1.5 h-5"
+            variant={displayStock > 3 ? "secondary" : displayStock > 0 ? "outline" : "destructive"}
+            className="text-[9px] px-1.5 h-5 font-semibold"
           >
-            {regulator.quantity > 0 ? regulator.quantity : 'Out'}
+            {displayStock > 0 ? (
+              <span className="flex items-center gap-0.5">
+                {displayStock}
+                {pendingStock > 0 && (
+                  <span className="text-amber-600 dark:text-amber-400">(-{pendingStock})</span>
+                )}
+              </span>
+            ) : 'Out'}
           </Badge>
         </div>
 
