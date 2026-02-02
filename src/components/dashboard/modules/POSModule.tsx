@@ -112,10 +112,12 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
           name: pendingOrder.customer.name,
           phone: pendingOrder.customer.phone,
           address: pendingOrder.customer.address,
+          email: null,
           total_due: 0,
           cylinders_due: 0,
           billing_status: 'clear',
-          last_order_date: null
+          last_order_date: null,
+          created_at: new Date().toISOString()
         },
         phoneQuery: pendingOrder.customer.phone,
         newCustomerName: '',

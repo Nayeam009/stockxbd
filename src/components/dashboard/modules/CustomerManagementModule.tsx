@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,6 +46,8 @@ import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
 import { sanitizeString, customerSchema } from "@/lib/validationSchemas";
 import { logger } from "@/lib/logger";
 import { InvoiceDialog } from "@/components/invoice/InvoiceDialog";
+import { useSharedCustomers, sharedKeys } from "@/hooks/useSharedQueries";
+import { useModuleEvent } from "@/lib/moduleEvents";
 
 interface Customer {
   id: string;
@@ -106,13 +109,29 @@ interface MemoSearchResult {
 
 export const CustomerManagementModule = () => {
   const { t } = useLanguage();
+  const queryClient = useQueryClient();
+  
+  // ===== USE SHARED QUERY FOR CUSTOMERS (Instant sync with POS) =====
+  const { data: sharedCustomers = [], isLoading: customersLoading } = useSharedCustomers();
+  
+  // Map shared customers to local Customer interface
+  const customers: Customer[] = sharedCustomers.map(c => ({
+    id: c.id,
+    name: c.name,
+    email: c.email,
+    phone: c.phone,
+    address: c.address,
+    total_due: c.total_due || 0,
+    cylinders_due: c.cylinders_due || 0,
+    billing_status: c.billing_status || 'clear',
+    last_order_date: c.last_order_date,
+    created_at: c.created_at
+  }));
+  
   const [viewMode, setViewMode] = useState<ViewMode>('main');
-  const [customers, setCustomers] = useState<Customer[]>([]);
   const [payments, setPayments] = useState<CustomerPayment[]>([]);
   const [salesHistory, setSalesHistory] = useState<POSTransaction[]>([]);
-  const [initialLoading, setInitialLoading] = useState(true);
   const [softLoading, setSoftLoading] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [settleDialogOpen, setSettleDialogOpen] = useState(false);
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
@@ -140,41 +159,22 @@ export const CustomerManagementModule = () => {
   const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
 
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // ===== LISTEN FOR CROSS-MODULE EVENTS (POS sales trigger instant refresh) =====
+  useModuleEvent('sale-completed', () => {
+    // Immediately invalidate customers cache when POS sale completes
+    queryClient.invalidateQueries({ queryKey: sharedKeys.customers(), refetchType: 'active' });
+  });
+  
+  useModuleEvent('customer-updated', () => {
+    // Refresh when customer is updated anywhere in the app
+    queryClient.invalidateQueries({ queryKey: sharedKeys.customers(), refetchType: 'active' });
+  });
 
-  const fetchCustomers = useCallback(async (isSoftRefresh = false) => {
-    if (!isSoftRefresh && customers.length === 0) {
-      setInitialLoading(true);
-    } else {
-      setSoftLoading(true);
-    }
-    setLoadError(null);
-
-    try {
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Request timeout')), 10000)
-      );
-
-      const fetchPromise = supabase
-        .from('customers')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as any;
-
-      if (error) {
-        throw error;
-      }
-      setCustomers(data || []);
-    } catch (error: any) {
-      logger.error('Error fetching customers', error, { component: 'CustomerManagement' });
-      if (customers.length === 0) {
-        setLoadError(error.message || 'Failed to load customers');
-      }
-    } finally {
-      setInitialLoading(false);
-      setSoftLoading(false);
-    }
-  }, [customers.length]);
+  // Legacy fetch for manual refresh (now mostly unused, shared query handles it)
+  const fetchCustomers = useCallback(async () => {
+    queryClient.invalidateQueries({ queryKey: sharedKeys.customers(), refetchType: 'active' });
+  }, [queryClient]);
 
   const fetchPayments = async () => {
     const { data, error } = await supabase
