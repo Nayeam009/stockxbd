@@ -188,22 +188,27 @@ const CustomerProfile = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
+      // Save profile WITH address fields to DB
       const { error } = await supabase
         .from('profiles')
         .upsert({
           user_id: user.id,
           full_name: fullName,
           phone: phone,
+          default_division: division,
+          default_district: district,
+          default_thana: thana,
+          street_address: address,
           updated_at: new Date().toISOString()
         }, { onConflict: 'user_id' });
 
       if (error) throw error;
 
-      // Save to customer data hook (for auto-fill)
+      // Also update customer data hook state (for local auto-fill)
       saveCustomerData({
         profile: { name: fullName, phone, email },
         defaultAddress: { division, district, thana, streetAddress: address }
-      }, false);
+      }, false); // false = don't sync again, we just did
 
       toast({ title: "Profile updated successfully!" });
     } catch (error: any) {
