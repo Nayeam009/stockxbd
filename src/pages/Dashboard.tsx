@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, TouchEvent, Suspense, lazy, useTransition } from "react";
 import { useLocation, useNavigate, Navigate } from "react-router-dom";
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/dashboard/AppSidebar";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { GlobalCommandPalette } from "@/components/dashboard/GlobalCommandPalette";
@@ -9,14 +9,14 @@ import { ModuleSkeleton, QuickLoader } from "@/components/dashboard/ModuleSkelet
 import { ModuleWatchdog } from "@/components/dashboard/ModuleWatchdog";
 import { OfflineIndicator } from "@/components/shared/OfflineIndicator";
 import { OfflineErrorBoundary } from "@/components/shared/OfflineErrorBoundary";
-import { useDashboardData } from "@/hooks/useDashboardData";
-import { useDashboardRealtime, usePrefetchDashboardData, usePrefetchNextModule } from "@/hooks/useDashboardQueries";
+import { useSharedOverviewStats, useUnifiedRealtime, usePrefetchSharedData } from "@/hooks/useSharedQueries";
+import { useModuleEventSync } from "@/lib/moduleEvents";
 import { getNextModule } from "@/hooks/useSwipeNavigation";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useNetwork } from "@/contexts/NetworkContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, WifiOff } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 // Lazy load heavy modules for faster initial render
 const DashboardOverview = lazy(() => import("@/components/dashboard/modules/DashboardOverview").then(m => ({ default: m.DashboardOverview })));
@@ -118,14 +118,17 @@ const Dashboard = () => {
 
   const isMobile = useIsMobile();
 
-  // Use optimized real-time subscriptions with tiered debounce
-  useDashboardRealtime(activeModule);
+  // Use UNIFIED real-time subscription (single channel for all data)
+  useUnifiedRealtime();
   
-  // Prefetch commonly accessed modules in background
-  usePrefetchDashboardData();
+  // Prefetch shared data in background for instant module switching
+  usePrefetchSharedData();
   
-  // Prefetch likely-next modules based on current navigation
-  usePrefetchNextModule(activeModule);
+  // Enable cross-module event synchronization
+  useModuleEventSync();
+  
+  // Get lightweight overview stats (uses shared cache)
+  const { data: overviewStats, isLoading: statsLoading, refetch: refetchStats } = useSharedOverviewStats();
 
   useEffect(() => {
     const timer = setTimeout(() => setHasInitiallyLoaded(true), 100);
@@ -180,36 +183,50 @@ const Dashboard = () => {
     };
   }, [handleModuleChange]);
 
-  const {
-    salesData,
-    stockData,
-    cylinderStock,
-    drivers,
-    customers,
-    orders,
-    vehicles,
-    staff,
-    analytics,
-    loading: dataLoading,
-    softLoading,
-    refetch,
-    setSalesData,
-    setStockData,
-    setDrivers,
-    setCustomers,
-    setOrders,
-  } = useDashboardData();
+  // Build analytics from overview stats
+  const analytics = {
+    todayRevenue: overviewStats?.todayRevenue || 0,
+    todayCashRevenue: overviewStats?.todayRevenue || 0,
+    todayDueRevenue: 0,
+    todayExpenses: overviewStats?.todayExpenses || 0,
+    monthlyRevenue: 0,
+    lastMonthRevenue: 0,
+    monthlyGrowthPercent: 0,
+    lowStockItems: [],
+    totalFullCylinders: overviewStats?.inventory?.total_full || 0,
+    totalEmptyCylinders: overviewStats?.inventory?.total_empty || 0,
+    cylinderStockHealth: 'good' as const,
+    activeOrders: overviewStats?.orders?.total_active || 0,
+    pendingOrders: overviewStats?.orders?.pending_count || 0,
+    dispatchedOrders: overviewStats?.orders?.dispatched_count || 0,
+    totalCustomers: 0,
+    activeCustomers: 0,
+    lostCustomers: 0,
+    activeDrivers: 0,
+  };
 
-  // Handle module retry from watchdog - MUST be before any conditionals
+  // Cylinder stock from overview
+  const cylinderStock = [{
+    id: 'overview',
+    brand: 'All',
+    size: '22mm',
+    weight: '12kg',
+    fullCylinders: overviewStats?.inventory?.total_full || 0,
+    emptyCylinders: overviewStats?.inventory?.total_empty || 0,
+    problemCylinders: overviewStats?.inventory?.total_problem || 0,
+    packageCylinders: overviewStats?.inventory?.total_package || 0,
+  }];
+
+  // Handle module retry from watchdog
   const handleModuleRetry = useCallback(() => {
-    refetch();
+    refetchStats();
     setModuleLoading(true);
     setTimeout(() => setModuleLoading(false), 500);
-  }, [refetch, setModuleLoading]);
+  }, [refetchStats]);
+
   // Auth is already verified by ProtectedRoute
   
   // Brief loading state only if auth is still initializing AND no userId yet
-  // This should be very rare since ProtectedRoute already verified auth
   if (authLoading && !userId) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -263,11 +280,11 @@ const Dashboard = () => {
           return (
             <DashboardOverview
               analytics={analytics}
-              drivers={drivers}
+              drivers={[]}
               cylinderStock={cylinderStock}
               userRole={dashboardRole}
               setActiveModule={handleModuleChange}
-              onRefresh={refetch}
+              onRefresh={refetchStats}
             />
           );
         case "pos":
@@ -304,10 +321,10 @@ const Dashboard = () => {
         case "analysis-search":
           return (
             <AnalysisSearchReportModule
-              salesData={salesData}
-              customers={customers}
-              stockData={stockData}
-              drivers={drivers}
+              salesData={[]}
+              customers={[]}
+              stockData={[]}
+              drivers={[]}
               userRole={dashboardRole}
             />
           );
@@ -315,11 +332,11 @@ const Dashboard = () => {
           return (
             <DashboardOverview
               analytics={analytics}
-              drivers={drivers}
+              drivers={[]}
               cylinderStock={cylinderStock}
               userRole={dashboardRole}
               setActiveModule={handleModuleChange}
-              onRefresh={refetch}
+              onRefresh={refetchStats}
             />
           );
       }
@@ -329,7 +346,7 @@ const Dashboard = () => {
       <OfflineErrorBoundary moduleName={activeModule}>
         <ModuleWatchdog
           moduleName={activeModule}
-          isLoading={dataLoading && isFirstLoad}
+          isLoading={statsLoading && isFirstLoad}
           onRetry={handleModuleRetry}
           timeoutMs={15000}
         >
@@ -345,15 +362,8 @@ const Dashboard = () => {
 
   return (
     <SidebarProvider defaultOpen={false}>
-      {/* Soft loading indicator - shows during background refresh */}
-      {softLoading && (
-        <div className="fixed top-0 left-0 right-0 h-0.5 bg-primary/20 z-[100]">
-          <div className="h-full bg-primary animate-[loading_1s_ease-in-out_infinite] w-1/3" />
-        </div>
-      )}
-
       {/* Transition pending indicator - shows during module switch */}
-      {isPending && !softLoading && (
+      {isPending && (
         <div className="fixed top-0 left-0 right-0 h-1 bg-primary/20 z-[100]">
           <div className="h-full w-1/3 bg-primary rounded-r-full animate-pulse transition-loading" />
         </div>

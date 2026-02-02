@@ -2,7 +2,7 @@
  * Query Hooks - Central Export
  * 
  * Import from here for all data fetching needs:
- * import { useBusinessSales, useBusinessExpenses } from '@/hooks/queries';
+ * import { useBusinessSales, useSharedLPGBrands } from '@/hooks/queries';
  */
 
 // Business Diary queries
@@ -16,7 +16,27 @@ export {
   type CustomerDebtSummary,
 } from './useBusinessDiaryQueries';
 
-// Dashboard optimized queries
+// Shared queries (unified cache system)
+export {
+  sharedKeys,
+  useSharedLPGBrands,
+  useSharedStoves,
+  useSharedRegulators,
+  useSharedCustomers,
+  useSharedProductPrices,
+  useSharedOverviewStats,
+  useUnifiedRealtime,
+  usePrefetchSharedData,
+  useLPGPriceHelper,
+  type SharedLPGBrand,
+  type SharedStove,
+  type SharedRegulator,
+  type SharedCustomer,
+  type SharedProductPrice,
+  type OverviewStats,
+} from '../useSharedQueries';
+
+// Legacy dashboard queries (for backward compatibility)
 export {
   useOverviewStats,
   useInventoryData,
