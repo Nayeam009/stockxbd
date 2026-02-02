@@ -2031,6 +2031,15 @@ export type Database = {
           last_month: number
         }[]
       }
+      get_notification_counts: {
+        Args: { p_owner_id: string }
+        Returns: {
+          exchange_requests_count: number
+          low_stock_count: number
+          overdue_payments_count: number
+          pending_orders_count: number
+        }[]
+      }
       get_owner_id: { Args: never; Returns: string }
       get_today_expenses_total: { Args: never; Returns: number }
       get_today_sales_total: { Args: never; Returns: number }
@@ -2062,7 +2071,19 @@ export type Database = {
         Args: { _member_id: string; _owner_id: string }
         Returns: boolean
       }
+      search_all_entities: {
+        Args: { p_owner_id: string; p_query: string }
+        Returns: {
+          entity_id: string
+          entity_type: string
+          metadata: Json
+          subtitle: string
+          title: string
+        }[]
+      }
       seed_demo_data: { Args: { _owner_id: string }; Returns: undefined }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
       update_team_member_role: {
         Args: {
           _member_id: string

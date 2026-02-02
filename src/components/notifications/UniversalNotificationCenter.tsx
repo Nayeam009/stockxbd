@@ -149,6 +149,7 @@ export const UniversalNotificationCenter = ({ userRole }: UniversalNotificationC
       low_stock: { en: "Low Stock", bn: "কম স্টক" },
       out_of_stock: { en: "Out of Stock", bn: "স্টক শেষ" },
       new_order: { en: "New Order", bn: "নতুন অর্ডার" },
+      online_order: { en: "Online Order", bn: "অনলাইন অর্ডার" },
       order_completed: { en: "Completed", bn: "সম্পন্ন" },
       order_cancelled: { en: "Cancelled", bn: "বাতিল" },
       payment_received: { en: "Payment", bn: "পেমেন্ট" },
