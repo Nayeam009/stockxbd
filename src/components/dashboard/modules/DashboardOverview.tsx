@@ -139,27 +139,25 @@ export const DashboardOverview = ({
     return cards;
   };
 
-  // Quick Actions
-  const salesActions = [
-    { title: "POS", icon: Receipt, module: "pos", hotkey: "F1", description: "Point of Sale" },
-    { title: "Business Diary", icon: BarChart3, module: "business-diary", hotkey: "F2" },
-  ];
-
-  const marketplaceActions = [
-    { title: "LPG Marketplace", icon: Store, module: "community" },
-    { title: "Customers", icon: Users, module: "customers" },
-  ];
-
-  const inventoryActions = [
-    { title: "Inventory", icon: Package, module: "inventory", hotkey: "F3" },
-    { title: "Product Pricing", icon: Banknote, module: "product-pricing" },
-  ];
-
-  const adminActions = [
-    { title: "Utility Expense", icon: Wallet, module: "utility-expense" },
-    { title: "Analytics", icon: BarChart3, module: "analysis-search" },
-    { title: "Settings", icon: Settings, module: "settings", ownerOnly: true },
-  ];
+  // Quick Actions - All in one flat array for better layout
+  const allQuickActions = useMemo(() => {
+    const actions = [
+      { title: "POS", icon: Receipt, module: "pos", hotkey: "F1" },
+      { title: "Diary", icon: BarChart3, module: "business-diary", hotkey: "F2" },
+      { title: "Inventory", icon: Package, module: "inventory", hotkey: "F3" },
+      { title: "Pricing", icon: Banknote, module: "product-pricing" },
+      { title: "Customers", icon: Users, module: "customers" },
+      { title: "Marketplace", icon: Store, module: "community" },
+      { title: "Utility", icon: Wallet, module: "utility-expense" },
+      { title: "Analytics", icon: BarChart3, module: "analysis-search" },
+    ];
+    
+    if (isOwner) {
+      actions.push({ title: "Settings", icon: Settings, module: "settings" });
+    }
+    
+    return actions;
+  }, [isOwner]);
 
   const handleQuickAction = (module: string) => {
     if (setActiveModule) {
@@ -328,135 +326,39 @@ export const DashboardOverview = ({
       )}
 
 
-      {/* Quick Actions Grid - Compact */}
-      <Card className="border border-border/40 shadow-sm bg-card overflow-hidden">
-        <CardHeader className="p-2 sm:p-3 pb-1 bg-gradient-to-r from-primary/5 to-transparent border-b border-border/40">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-primary-light flex items-center justify-center shadow-sm">
-              <Settings className="h-4 w-4 text-primary-foreground" />
-            </div>
-            <div>
-              <CardTitle className="text-sm font-bold">Quick Actions</CardTitle>
-              <CardDescription className="text-[10px]">Access key features instantly</CardDescription>
-            </div>
+      {/* Quick Actions - Compact Single Grid */}
+      <Card className="border border-border/40 shadow-sm bg-card">
+        <CardHeader className="p-2.5 sm:p-3 pb-2 flex-row items-center gap-2 space-y-0">
+          <div className="h-7 w-7 rounded-md bg-gradient-to-br from-primary to-primary-light flex items-center justify-center">
+            <Settings className="h-3.5 w-3.5 text-primary-foreground" />
           </div>
+          <CardTitle className="text-sm font-semibold">Quick Actions</CardTitle>
         </CardHeader>
 
-        <CardContent className="p-2 sm:p-3 space-y-2 sm:space-y-3">
-          {/* Sales Group */}
-          <div>
-            <h4 className="text-[10px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-wider flex items-center gap-1.5">
-              <Receipt className="h-2.5 w-2.5" />
-              Sales
-            </h4>
-            <div className="grid grid-cols-4 sm:grid-cols-5 gap-1.5 sm:gap-2" role="group" aria-label="Sales quick actions">
-              {salesActions.map((action) => {
-                const Icon = action.icon;
-                return (
-                  <button
-                    key={action.module}
-                    onClick={() => handleQuickAction(action.module)}
-                    className="group/action relative flex flex-col items-center justify-center p-2 sm:p-2.5 rounded-lg border border-border/40 bg-card hover:bg-primary/5 hover:border-primary/30 transition-all duration-200 hover:shadow-sm focus-visible:ring-2 focus-visible:ring-primary"
-                    aria-label={action.description || action.title}
-                  >
-                    <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center mb-1 group-hover/action:from-primary group-hover/action:to-primary-light transition-all duration-200">
-                      <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary group-hover/action:text-primary-foreground transition-colors" />
-                    </div>
-                    <span className="text-[10px] sm:text-xs font-medium text-foreground text-center leading-tight">{action.title}</span>
-                    {action.hotkey && (
-                      <span className="absolute top-0.5 right-0.5 text-[8px] text-muted-foreground bg-muted/50 px-0.5 rounded hidden sm:inline">
-                        {action.hotkey}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
+        <CardContent className="p-2.5 sm:p-3 pt-0">
+          <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-2" role="group" aria-label="Quick actions">
+            {allQuickActions.map((action) => {
+              const Icon = action.icon;
+              return (
+                <button
+                  key={action.module}
+                  onClick={() => handleQuickAction(action.module)}
+                  className="group/action relative flex flex-col items-center justify-center p-2 sm:p-2.5 rounded-lg border border-border/40 bg-muted/30 hover:bg-primary/10 hover:border-primary/40 transition-all duration-200 focus-visible:ring-2 focus-visible:ring-primary min-h-[60px]"
+                  aria-label={action.title}
+                >
+                  <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary/15 to-primary/5 flex items-center justify-center mb-1 group-hover/action:from-primary group-hover/action:to-primary-light transition-all duration-200">
+                    <Icon className="h-4 w-4 text-primary group-hover/action:text-primary-foreground transition-colors" />
+                  </div>
+                  <span className="text-[10px] sm:text-xs font-medium text-foreground text-center leading-tight">{action.title}</span>
+                  {action.hotkey && (
+                    <span className="absolute top-0.5 right-0.5 text-[8px] text-muted-foreground/70 bg-muted/60 px-1 rounded hidden lg:inline">
+                      {action.hotkey}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
-
-          {/* Marketplace Group */}
-          <div>
-            <h4 className="text-[10px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-wider flex items-center gap-1.5">
-              <Store className="h-2.5 w-2.5" />
-              Marketplace
-            </h4>
-            <div className="grid grid-cols-4 sm:grid-cols-5 gap-1.5 sm:gap-2" role="group" aria-label="Marketplace quick actions">
-              {marketplaceActions.map((action) => {
-                const Icon = action.icon;
-                return (
-                  <button
-                    key={action.module}
-                    onClick={() => handleQuickAction(action.module)}
-                    className="group/action flex flex-col items-center justify-center p-2 sm:p-2.5 rounded-lg border border-border/40 bg-card hover:bg-primary/5 hover:border-primary/30 transition-all duration-200 hover:shadow-sm focus-visible:ring-2 focus-visible:ring-primary"
-                  >
-                    <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center mb-1 group-hover/action:from-primary group-hover/action:to-primary-light transition-all duration-200">
-                      <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary group-hover/action:text-primary-foreground transition-colors" />
-                    </div>
-                    <span className="text-[10px] sm:text-xs font-medium text-foreground text-center leading-tight">{action.title}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Inventory Group */}
-          <div>
-            <h4 className="text-[10px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-wider flex items-center gap-1.5">
-              <Package className="h-2.5 w-2.5" />
-              Inventory
-            </h4>
-            <div className="grid grid-cols-4 sm:grid-cols-5 gap-1.5 sm:gap-2" role="group" aria-label="Inventory quick actions">
-              {inventoryActions.map((action) => {
-                const Icon = action.icon;
-                return (
-                  <button
-                    key={action.module}
-                    onClick={() => handleQuickAction(action.module)}
-                    className="group/action relative flex flex-col items-center justify-center p-2 sm:p-2.5 rounded-lg border border-border/40 bg-card hover:bg-primary/5 hover:border-primary/30 transition-all duration-200 hover:shadow-sm focus-visible:ring-2 focus-visible:ring-primary"
-                  >
-                    <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center mb-1 group-hover/action:from-primary group-hover/action:to-primary-light transition-all duration-200">
-                      <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary group-hover/action:text-primary-foreground transition-colors" />
-                    </div>
-                    <span className="text-[10px] sm:text-xs font-medium text-foreground text-center leading-tight">{action.title}</span>
-                    {action.hotkey && (
-                      <span className="absolute top-0.5 right-0.5 text-[8px] text-muted-foreground bg-muted/50 px-0.5 rounded hidden sm:inline">
-                        {action.hotkey}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Admin Group - Owner/Manager only */}
-          {isOwnerOrManager && (
-            <div>
-              <h4 className="text-[10px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-wider flex items-center gap-1.5">
-                <Settings className="h-2.5 w-2.5" />
-                Administration
-              </h4>
-              <div className="grid grid-cols-4 sm:grid-cols-5 gap-1.5 sm:gap-2" role="group" aria-label="Admin quick actions">
-                {adminActions
-                  .filter(action => !action.ownerOnly || isOwner)
-                  .map((action) => {
-                    const Icon = action.icon;
-                    return (
-                      <button
-                        key={action.module}
-                        onClick={() => handleQuickAction(action.module)}
-                        className="group/action flex flex-col items-center justify-center p-2 sm:p-2.5 rounded-lg border border-border/40 bg-card hover:bg-primary/5 hover:border-primary/30 transition-all duration-200 hover:shadow-sm focus-visible:ring-2 focus-visible:ring-primary"
-                      >
-                        <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center mb-1 group-hover/action:from-primary group-hover/action:to-primary-light transition-all duration-200">
-                          <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary group-hover/action:text-primary-foreground transition-colors" />
-                        </div>
-                        <span className="text-[10px] sm:text-xs font-medium text-foreground text-center leading-tight">{action.title}</span>
-                      </button>
-                    );
-                  })}
-              </div>
-            </div>
-          )}
         </CardContent>
       </Card>
     </div>
