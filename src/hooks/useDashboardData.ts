@@ -443,28 +443,16 @@ export const useDashboardData = () => {
     }, DEBOUNCE_MS);
   }, []); // Empty deps - uses ref internally
 
-  // Setup real-time subscriptions - runs only once
+  // Initial data fetch only - real-time is handled by unified subscription in useSharedQueries
   useEffect(() => {
     fetchDataRef.current();
-
-    const channel = supabase
-      .channel('dashboard-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, debouncedRefetch)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pos_transactions' }, debouncedRefetch)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'lpg_brands' }, debouncedRefetch)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'customers' }, debouncedRefetch)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_expenses' }, debouncedRefetch)
-      .subscribe();
-
-    channelRef.current = channel;
-
+    
     return () => {
       if (debounceRef.current) {
         clearTimeout(debounceRef.current);
       }
-      supabase.removeChannel(channel);
     };
-  }, [debouncedRefetch]); // debouncedRefetch is stable now
+  }, []);
 
   // Analytics calculations
   const analytics = useMemo((): DashboardAnalytics => {
