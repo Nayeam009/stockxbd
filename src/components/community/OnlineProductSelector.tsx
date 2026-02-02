@@ -54,6 +54,7 @@ export const OnlineProductSelector = ({
   const [activeTable, setActiveTable] = useState<'sale' | 'return'>('sale');
   const [selectedWeight, setSelectedWeight] = useState<string>('all');
   const [selectedType, setSelectedType] = useState<string>('all');
+  const [selectedValveSize, setSelectedValveSize] = useState<string>('all');
 
   // Group products by type
   const lpgProducts = useMemo(() => 
@@ -77,17 +78,24 @@ export const OnlineProductSelector = ({
     return Array.from(weights);
   }, [lpgProducts]);
 
+  // Get unique valve sizes for filter
+  const availableValveSizes = useMemo(() => {
+    const sizes = new Set(lpgProducts.map(p => p.valve_size).filter(Boolean));
+    return Array.from(sizes) as string[];
+  }, [lpgProducts]);
+
   // Filter products
   const filteredLpgProducts = useMemo(() => {
     return lpgProducts.filter(p => {
       if (selectedWeight !== 'all' && p.weight !== selectedWeight) return false;
+      if (selectedValveSize !== 'all' && p.valve_size !== selectedValveSize) return false;
       if (selectedType !== 'all') {
         if (selectedType === 'refill' && p.product_type !== 'lpg_refill') return false;
         if (selectedType === 'package' && p.product_type !== 'lpg_package') return false;
       }
       return true;
     });
-  }, [lpgProducts, selectedWeight, selectedType]);
+  }, [lpgProducts, selectedWeight, selectedValveSize, selectedType]);
 
   // Calculate totals
   const totalRefillQty = saleItems
@@ -712,6 +720,45 @@ export const OnlineProductSelector = ({
                     </Button>
                   ))}
                 </div>
+
+                {/* Valve Size Filter */}
+                {availableValveSizes.length > 1 && (
+                  <>
+                    <div className="h-9 w-px bg-border hidden sm:block" />
+                    <div className="flex gap-1 flex-wrap">
+                      <Button
+                        variant={selectedValveSize === 'all' ? 'secondary' : 'ghost'}
+                        size="sm"
+                        className="h-9"
+                        onClick={() => setSelectedValveSize('all')}
+                      >
+                        All Sizes
+                      </Button>
+                      <Button
+                        variant={selectedValveSize === '22mm' ? 'secondary' : 'ghost'}
+                        size="sm"
+                        className={cn(
+                          "h-9",
+                          selectedValveSize === '22mm' && "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300"
+                        )}
+                        onClick={() => setSelectedValveSize('22mm')}
+                      >
+                        22mm
+                      </Button>
+                      <Button
+                        variant={selectedValveSize === '20mm' ? 'secondary' : 'ghost'}
+                        size="sm"
+                        className={cn(
+                          "h-9",
+                          selectedValveSize === '20mm' && "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300"
+                        )}
+                        onClick={() => setSelectedValveSize('20mm')}
+                      >
+                        20mm
+                      </Button>
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Product Grid */}
@@ -751,9 +798,23 @@ export const OnlineProductSelector = ({
                         <div className="mt-2">
                           <div className="font-semibold text-sm truncate">{product.brand_name}</div>
                           <div className="text-xs text-muted-foreground">{product.weight}</div>
-                          <Badge variant="outline" className="text-[10px] mt-1">
-                            {product.product_type === 'lpg_refill' ? 'Refill' : 'Package'}
-                          </Badge>
+                          <div className="flex gap-1 mt-1 flex-wrap">
+                            <Badge variant="outline" className="text-[10px]">
+                              {product.product_type === 'lpg_refill' ? 'Refill' : 'Package'}
+                            </Badge>
+                            {product.valve_size && (
+                              <Badge 
+                                className={cn(
+                                  "text-[10px]",
+                                  product.valve_size === '22mm' 
+                                    ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" 
+                                    : "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+                                )}
+                              >
+                                {product.valve_size}
+                              </Badge>
+                            )}
+                          </div>
                         </div>
                         <div className="mt-2 font-bold text-primary">
                           ৳{product.price.toLocaleString()}
