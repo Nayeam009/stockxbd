@@ -2,8 +2,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { lazy, Suspense, useEffect, memo } from "react";
-import Auth from "./pages/Auth";
-import Dashboard from "./pages/Dashboard";
 import NotFound from "./pages/NotFound";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -12,6 +10,10 @@ import { NetworkProvider } from "./contexts/NetworkContext";
 import { Loader2 } from "lucide-react";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { supabase } from "./integrations/supabase/client";
+
+// Lazy load heavy pages for faster initial bundle
+const Auth = lazy(() => import("./pages/Auth"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
 import { clearSensitiveStorage } from "./lib/securityUtils";
 
 // Lazy load pages for better performance (code splitting)
@@ -27,15 +29,15 @@ const CustomerProfile = lazy(() => import("./pages/CustomerProfile"));
 const Toaster = lazy(() => import("@/components/ui/toaster").then(m => ({ default: m.Toaster })));
 const Sonner = lazy(() => import("@/components/ui/sonner").then(m => ({ default: m.Toaster })));
 
-// Optimized QueryClient for fast, reliable connections
+// Optimized QueryClient for fast, reliable connections with better caching
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: 2, // Retry failed requests twice
       retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000), // Exponential backoff: 1s, 2s, 4s (max 5s)
-      staleTime: 1000 * 30, // Data stays fresh for 30 seconds
-      gcTime: 1000 * 60 * 5, // Keep unused data for 5 minutes
-      refetchOnWindowFocus: true, // Refetch when user returns to tab
+      staleTime: 1000 * 60, // Data stays fresh for 60 seconds (was 30s)
+      gcTime: 1000 * 60 * 10, // Keep unused data for 10 minutes (was 5)
+      refetchOnWindowFocus: false, // Disable to reduce network calls (data syncs via realtime)
       refetchOnReconnect: true, // Refetch when connection restored
     },
   },

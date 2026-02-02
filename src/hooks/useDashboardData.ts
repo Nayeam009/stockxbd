@@ -159,9 +159,10 @@ export const useDashboardData = () => {
 
       const today = new Date().toISOString().split('T')[0];
       const now = new Date();
-      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-      // Parallel fetch all data
+      // OPTIMIZED: Parallel fetch with reduced limits and date filters
       const [
         transactionsResult,
         customerDataResult,
@@ -171,6 +172,7 @@ export const useDashboardData = () => {
         userRolesResult,
         expensesResult
       ] = await Promise.all([
+        // Only fetch last 7 days of transactions (reduced from 500 unlimited)
         supabase
           .from('pos_transactions')
           .select(`
@@ -187,9 +189,12 @@ export const useDashboardData = () => {
               total_price
             )
           `)
+          .gte('created_at', sevenDaysAgo)
           .order('created_at', { ascending: false })
-          .limit(500),
-        supabase.from('customers').select('*').order('name'),
+          .limit(100),
+        // Only fetch customers with name/phone/due for overview (reduced columns)
+        supabase.from('customers').select('id, name, phone, address, total_due').order('name').limit(200),
+        // Only fetch recent orders (last 7 days)
         supabase
           .from('orders')
           .select(`
@@ -213,10 +218,11 @@ export const useDashboardData = () => {
               price
             )
           `)
+          .gte('created_at', sevenDaysAgo)
           .order('created_at', { ascending: false })
-          .limit(500),
+          .limit(100),
         supabase.from('lpg_brands').select('*').eq('is_active', true),
-        supabase.from('stoves').select('*').eq('is_active', true),
+        supabase.from('stoves').select('id, brand, model, quantity, price, updated_at').eq('is_active', true),
         supabase.from('user_roles').select('user_id, role').eq('role', 'manager'),
         supabase.from('daily_expenses').select('amount').eq('expense_date', today)
       ]);
