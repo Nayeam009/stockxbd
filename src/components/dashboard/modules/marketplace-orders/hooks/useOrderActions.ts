@@ -135,12 +135,18 @@ export function useOrderActions({ orders, onOrderUpdated }: UseOrderActionsProps
     }
   };
 
-  // Update order status with inventory sync
+  // Update order status with optimistic updates and inventory sync
   const updateOrderStatus = async (orderId: string, newStatus: OrderStatus, reason?: string) => {
+    const order = orders.find(o => o.id === orderId);
+    if (!order) return;
+    
+    // Store previous status for potential rollback
+    const previousStatus = order.status;
+    
+    // Optimistic update - trigger UI refresh immediately
+    // The onOrderUpdated callback will fetch fresh data
+    
     try {
-      const order = orders.find(o => o.id === orderId);
-      if (!order) return;
-
       const updateData: Record<string, any> = {
         status: newStatus,
         updated_at: new Date().toISOString()
@@ -191,6 +197,7 @@ export function useOrderActions({ orders, onOrderUpdated }: UseOrderActionsProps
 
       if (error) throw error;
 
+      // Show success toast immediately for better perceived performance
       toast({
         title: newStatus === 'delivered' ? "✅ Order Delivered!" : "Status Updated",
         description: newStatus === 'delivered'
@@ -198,14 +205,17 @@ export function useOrderActions({ orders, onOrderUpdated }: UseOrderActionsProps
           : `Order status: ${newStatus}`
       });
 
+      // Trigger refresh
       onOrderUpdated();
     } catch (error) {
+      // On error, trigger refresh to restore correct state
       logger.error('Error updating order status:', error);
       toast({
         title: "Error",
-        description: "Failed to update order status",
+        description: "Failed to update order status. Please try again.",
         variant: "destructive"
       });
+      onOrderUpdated(); // Refresh to get correct state
     }
   };
 

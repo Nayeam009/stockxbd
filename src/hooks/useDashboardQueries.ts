@@ -224,26 +224,82 @@ export function useDashboardRealtime(activeModule: string) {
   }, [invalidateWithDebounce]);
 }
 
-// Prefetch commonly accessed modules
+// Prefetch commonly accessed modules with smart loading
 export function usePrefetchDashboardData() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
     // Prefetch inventory and customers in background after initial load
     const prefetchTimer = setTimeout(() => {
+      // Prefetch inventory data (most commonly accessed after overview)
       queryClient.prefetchQuery({
         queryKey: dashboardKeys.inventory(),
         queryFn: fetchInventoryData,
         staleTime: 60 * 1000,
       });
       
+      // Prefetch customers data
       queryClient.prefetchQuery({
         queryKey: dashboardKeys.customers(),
         queryFn: fetchCustomersWithDues,
         staleTime: 60 * 1000,
       });
+      
+      // Prefetch overview stats for quick revisits
+      queryClient.prefetchQuery({
+        queryKey: dashboardKeys.overview(),
+        queryFn: fetchOverviewStats,
+        staleTime: 30 * 1000,
+      });
     }, 2000); // Delay 2s after initial render
 
     return () => clearTimeout(prefetchTimer);
   }, [queryClient]);
+}
+
+// Smart module-specific prefetching based on navigation patterns
+export function usePrefetchNextModule(currentModule: string) {
+  const queryClient = useQueryClient();
+  
+  useEffect(() => {
+    // Predict likely next modules based on current module
+    const prefetchMap: Record<string, string[]> = {
+      'overview': ['pos', 'inventory'],
+      'pos': ['customers', 'business-diary'],
+      'inventory': ['pos', 'product-pricing'],
+      'customers': ['pos', 'business-diary'],
+      'business-diary': ['analysis-search', 'customers'],
+    };
+    
+    const modulesToPrefetch = prefetchMap[currentModule] || [];
+    
+    // Prefetch after a short delay to not block current render
+    const timer = setTimeout(() => {
+      modulesToPrefetch.forEach(module => {
+        if (module === 'pos' || module === 'business-diary') {
+          queryClient.prefetchQuery({
+            queryKey: dashboardKeys.transactions(),
+            queryFn: fetchRecentTransactions,
+            staleTime: 30 * 1000,
+          });
+        }
+        if (module === 'customers') {
+          queryClient.prefetchQuery({
+            queryKey: dashboardKeys.customers(),
+            queryFn: fetchCustomersWithDues,
+            staleTime: 60 * 1000,
+          });
+        }
+        if (module === 'inventory' || module === 'product-pricing') {
+          queryClient.prefetchQuery({
+            queryKey: dashboardKeys.inventory(),
+            queryFn: fetchInventoryData,
+            staleTime: 60 * 1000,
+          });
+        }
+      });
+    }, 500);
+    
+    return () => clearTimeout(timer);
+  }, [currentModule, queryClient]);
 }

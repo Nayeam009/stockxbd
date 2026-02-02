@@ -259,8 +259,19 @@ export function useInventoryData(sizeTab: "22mm" | "20mm" = "22mm", selectedWeig
     size20mm: regulators.filter(r => r.type === "20mm").reduce((sum, r) => sum + r.quantity, 0),
   }), [regulators]);
 
-  // Update operations
+  // Update operations with optimistic updates
   const updateLpgBrand = useCallback(async (id: string, field: string, value: number) => {
+    // Get previous data for rollback
+    const previousData = queryClient.getQueryData<LPGBrand[]>(['inventory-lpg-brands', sizeTab, selectedWeight]);
+    
+    // Optimistic update - immediately update the UI
+    queryClient.setQueryData<LPGBrand[]>(['inventory-lpg-brands', sizeTab, selectedWeight], (old) => {
+      if (!old) return old;
+      return old.map(brand => 
+        brand.id === id ? { ...brand, [field]: value } : brand
+      );
+    });
+
     try {
       const { error } = await supabase
         .from("lpg_brands")
@@ -268,15 +279,28 @@ export function useInventoryData(sizeTab: "22mm" | "20mm" = "22mm", selectedWeig
         .eq("id", id);
       
       if (error) throw error;
-      queryClient.invalidateQueries({ queryKey: ['inventory-lpg-brands'] });
+      // Silently revalidate in background
+      queryClient.invalidateQueries({ queryKey: ['inventory-totals'] });
       return true;
     } catch (error: any) {
+      // Rollback on error
+      queryClient.setQueryData(['inventory-lpg-brands', sizeTab, selectedWeight], previousData);
       logger.error('Failed to update LPG brand', error, { component: 'useInventoryData' });
       throw error;
     }
-  }, [queryClient]);
+  }, [queryClient, sizeTab, selectedWeight]);
 
   const updateStove = useCallback(async (id: string, value: number) => {
+    // Optimistic update
+    const previousData = queryClient.getQueryData<Stove[]>(['inventory-stoves']);
+    
+    queryClient.setQueryData<Stove[]>(['inventory-stoves'], (old) => {
+      if (!old) return old;
+      return old.map(stove => 
+        stove.id === id ? { ...stove, quantity: value } : stove
+      );
+    });
+
     try {
       const { error } = await supabase
         .from("stoves")
@@ -284,15 +308,26 @@ export function useInventoryData(sizeTab: "22mm" | "20mm" = "22mm", selectedWeig
         .eq("id", id);
       
       if (error) throw error;
-      queryClient.invalidateQueries({ queryKey: ['inventory-stoves'] });
       return true;
     } catch (error: any) {
+      // Rollback on error
+      queryClient.setQueryData(['inventory-stoves'], previousData);
       logger.error('Failed to update stove', error, { component: 'useInventoryData' });
       throw error;
     }
   }, [queryClient]);
 
   const updateRegulator = useCallback(async (id: string, value: number) => {
+    // Optimistic update
+    const previousData = queryClient.getQueryData<Regulator[]>(['inventory-regulators']);
+    
+    queryClient.setQueryData<Regulator[]>(['inventory-regulators'], (old) => {
+      if (!old) return old;
+      return old.map(reg => 
+        reg.id === id ? { ...reg, quantity: value } : reg
+      );
+    });
+
     try {
       const { error } = await supabase
         .from("regulators")
@@ -300,9 +335,10 @@ export function useInventoryData(sizeTab: "22mm" | "20mm" = "22mm", selectedWeig
         .eq("id", id);
       
       if (error) throw error;
-      queryClient.invalidateQueries({ queryKey: ['inventory-regulators'] });
       return true;
     } catch (error: any) {
+      // Rollback on error
+      queryClient.setQueryData(['inventory-regulators'], previousData);
       logger.error('Failed to update regulator', error, { component: 'useInventoryData' });
       throw error;
     }
