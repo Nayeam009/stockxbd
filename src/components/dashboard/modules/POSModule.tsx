@@ -298,6 +298,26 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
         await supabase.from('lpg_brands').update({ [field]: Math.max(0, current - item.quantity) }).eq('id', brand.id);
       }
 
+      // Update inventory for Stoves
+      for (const item of cart.saleItems.filter(i => i.type === 'stove' && i.stoveId)) {
+        const stove = stoves.find(s => s.id === item.stoveId);
+        if (!stove) continue;
+        await supabase.from('stoves').update({ 
+          quantity: Math.max(0, (stove.quantity || 0) - item.quantity),
+          updated_at: new Date().toISOString()
+        }).eq('id', stove.id);
+      }
+
+      // Update inventory for Regulators
+      for (const item of cart.saleItems.filter(i => i.type === 'regulator' && i.regulatorId)) {
+        const regulator = regulators.find(r => r.id === item.regulatorId);
+        if (!regulator) continue;
+        await supabase.from('regulators').update({ 
+          quantity: Math.max(0, (regulator.quantity || 0) - item.quantity),
+          updated_at: new Date().toISOString()
+        }).eq('id', regulator.id);
+      }
+
       // Update return cylinders
       for (const returnItem of cart.returnItems) {
         const brand = lpgBrands.find(b => b.id === returnItem.brandId);
@@ -363,7 +383,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
     } finally {
       setProcessing(false);
     }
-  }, [cart, paymentAmount, customerState, lpgBrands, customers, hasCustomer]);
+  }, [cart, paymentAmount, customerState, lpgBrands, stoves, regulators, customers, hasCustomer]);
 
   // Loading state
   if (isLoading) return <POSSkeleton />;
