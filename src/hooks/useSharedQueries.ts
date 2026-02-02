@@ -63,6 +63,7 @@ export interface SharedRegulator {
 export interface SharedCustomer {
   id: string;
   name: string;
+  email: string | null;
   phone: string | null;
   address: string | null;
   total_due: number;
@@ -70,6 +71,7 @@ export interface SharedCustomer {
   billing_status: string;
   last_order_date: string | null;
   credit_limit?: number;
+  created_at: string;
 }
 
 export interface SharedProductPrice {
@@ -152,7 +154,7 @@ async function fetchCustomers(): Promise<SharedCustomer[]> {
   const { data, error } = await supabase
     .from('customers')
     .select('*')
-    .order('name')
+    .order('created_at', { ascending: false })
     .limit(500);
   
   if (error) throw error;
