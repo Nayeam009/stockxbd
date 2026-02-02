@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +24,8 @@ import { logger } from "@/lib/logger";
 // Import modular components
 import { usePOSData } from "@/hooks/usePOSData";
 import { usePOSCart, SaleItem, ReturnItem } from "@/hooks/usePOSCart";
+import { sharedKeys } from "@/hooks/useSharedQueries";
+import { notifySaleCompleted } from "@/lib/moduleEvents";
 import { POSSkeleton } from "@/components/pos/POSSkeleton";
 import { POSQuickStats } from "@/components/pos/POSQuickStats";
 import { POSStickyFooter } from "@/components/pos/POSStickyFooter";
@@ -47,6 +50,7 @@ interface POSModuleProps {
 export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModuleProps) => {
   const { t } = useLanguage();
   const isMobile = useIsMobile();
+  const queryClient = useQueryClient();
 
   // Data hook
   const { lpgBrands, stoves, regulators, customers, todayStats, isLoading, getLPGPrice, getStovePrice, getRegulatorPrice } = usePOSData();
@@ -370,6 +374,19 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
       setShowPaymentDrawer(false);
       setShowPrintTypeDialog(true);
 
+      // INSTANT CACHE INVALIDATION - Don't wait for realtime subscription
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: sharedKeys.lpgBrands(), refetchType: 'active' }),
+        queryClient.invalidateQueries({ queryKey: sharedKeys.stoves(), refetchType: 'active' }),
+        queryClient.invalidateQueries({ queryKey: sharedKeys.regulators(), refetchType: 'active' }),
+        queryClient.invalidateQueries({ queryKey: sharedKeys.customers(), refetchType: 'active' }),
+        queryClient.invalidateQueries({ queryKey: sharedKeys.overview(), refetchType: 'active' }),
+        queryClient.invalidateQueries({ queryKey: sharedKeys.todayStats(), refetchType: 'active' }),
+      ]);
+
+      // Notify other modules (Business Diary, Dashboard Overview, etc.)
+      notifySaleCompleted(transactionNumber, cart.total, customerId || undefined);
+
       // Reset
       cart.resetCart();
       setPaymentAmount("");
@@ -383,7 +400,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
     } finally {
       setProcessing(false);
     }
-  }, [cart, paymentAmount, customerState, lpgBrands, stoves, regulators, customers, hasCustomer]);
+  }, [cart, paymentAmount, customerState, lpgBrands, stoves, regulators, customers, hasCustomer, queryClient]);
 
   // Loading state
   if (isLoading) return <POSSkeleton />;
