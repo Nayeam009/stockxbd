@@ -38,6 +38,7 @@ export const DashboardOverview = ({
   const activeOrders = {
     total_active: analytics.activeOrders || 0,
     pending_count: analytics.pendingOrders || 0,
+    confirmed_count: analytics.confirmedOrders || 0,
     dispatched_count: analytics.dispatchedOrders || 0,
   };
 
@@ -128,12 +129,12 @@ export const DashboardOverview = ({
       id: 'active-orders',
       title: "Active Orders",
       value: formatNumber(activeOrders.total_active),
-      subtitle: `${formatNumber(activeOrders.pending_count)} pending, ${formatNumber(activeOrders.dispatched_count)} dispatched`,
+      subtitle: `${formatNumber(activeOrders.pending_count)} pending, ${formatNumber(activeOrders.confirmed_count)} confirmed, ${formatNumber(activeOrders.dispatched_count)} dispatched`,
       change: (activeOrders.total_active || 0) > 0 ? "On the road" : "All clear",
       changeType: (activeOrders.total_active || 0) > 0 ? "warning" as const : "positive" as const,
       icon: ClipboardList,
       clickable: true,
-      onClick: () => setActiveModule?.('orders')
+      onClick: () => setActiveModule?.('marketplace-orders')
     });
 
     return cards;

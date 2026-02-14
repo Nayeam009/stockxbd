@@ -119,6 +119,7 @@ export interface DashboardAnalytics {
   cylinderStockHealth: 'critical' | 'warning' | 'good';
   activeOrders: number;
   pendingOrders: number;
+  confirmedOrders: number;
   dispatchedOrders: number;
   totalCustomers: number;
   activeCustomers: number;
@@ -496,6 +497,7 @@ export const useDashboardData = () => {
     const lostCustomers = customers.filter(c => !c.isActive && c.totalOrders > 0).length;
 
     const pendingOrders = orders.filter(o => o.status === 'pending').length;
+    const confirmedOrders = orders.filter(o => o.status === 'confirmed').length;
     const dispatchedOrders = orders.filter(o => o.status === 'dispatched').length;
 
     return {
@@ -512,6 +514,7 @@ export const useDashboardData = () => {
       cylinderStockHealth,
       activeOrders: orders.filter(order => ['pending', 'confirmed', 'dispatched'].includes(order.status)).length,
       pendingOrders: pendingOrders || 0,
+      confirmedOrders: confirmedOrders || 0,
       dispatchedOrders: dispatchedOrders || 0,
       totalCustomers: customers.length || 0,
       activeCustomers: activeCustomers || 0,

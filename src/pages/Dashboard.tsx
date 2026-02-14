@@ -198,6 +198,7 @@ const Dashboard = () => {
     cylinderStockHealth: 'good' as const,
     activeOrders: overviewStats?.orders?.total_active || 0,
     pendingOrders: overviewStats?.orders?.pending_count || 0,
+    confirmedOrders: overviewStats?.orders?.confirmed_count || 0,
     dispatchedOrders: overviewStats?.orders?.dispatched_count || 0,
     totalCustomers: 0,
     activeCustomers: 0,

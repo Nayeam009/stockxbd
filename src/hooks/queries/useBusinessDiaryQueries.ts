@@ -179,8 +179,8 @@ async function fetchSalesData(date: string): Promise<SaleEntry[]> {
           )
         `)
         .eq('is_voided', false)
-        .gte('created_at', format(new Date(date), "yyyy-MM-dd'T'00:00:00"))
-        .lte('created_at', format(new Date(date), "yyyy-MM-dd'T'23:59:59.999"))
+        .gte('created_at', `${date}T00:00:00+06:00`)
+        .lte('created_at', `${date}T23:59:59.999+06:00`)
         .order('created_at', { ascending: false }),
       supabase
         .from('customer_payments')
@@ -378,8 +378,8 @@ async function fetchExpensesData(date: string): Promise<ExpenseEntry[]> {
           )
         `)
         .eq('is_voided', false)
-        .gte('created_at', format(new Date(date), "yyyy-MM-dd'T'00:00:00"))
-        .lte('created_at', format(new Date(date), "yyyy-MM-dd'T'23:59:59.999"))
+        .gte('created_at', `${date}T00:00:00+06:00`)
+        .lte('created_at', `${date}T23:59:59.999+06:00`)
         .order('created_at', { ascending: false }),
       supabase
         .from('daily_expenses')

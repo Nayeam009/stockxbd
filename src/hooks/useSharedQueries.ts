@@ -99,6 +99,7 @@ export interface OverviewStats {
   };
   orders: {
     pending_count: number;
+    confirmed_count: number;
     dispatched_count: number;
     total_active: number;
   };
@@ -191,6 +192,7 @@ async function fetchOverviewStats(): Promise<OverviewStats> {
     },
     orders: ordersResult.data?.[0] || {
       pending_count: 0,
+      confirmed_count: 0,
       dispatched_count: 0,
       total_active: 0,
     },
