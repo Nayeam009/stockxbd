@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Badge } from "@/components/ui/badge";
 import {
   Command,
@@ -156,7 +157,10 @@ export const GlobalCommandPalette = ({ userRole, setActiveModule }: GlobalComman
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="p-0 gap-0 max-w-[95vw] md:max-w-2xl overflow-hidden">
+      <DialogContent className="p-0 gap-0 max-w-[95vw] md:max-w-2xl overflow-hidden" aria-describedby={undefined}>
+        <VisuallyHidden>
+          <DialogTitle>Command Palette</DialogTitle>
+        </VisuallyHidden>
         <Command className="rounded-lg border-0" shouldFilter={true}>
           <CommandInput
             placeholder="Search pages, actions, reports..."
