@@ -2000,6 +2000,7 @@ export type Database = {
       get_active_orders_count: {
         Args: never
         Returns: {
+          confirmed_count: number
           dispatched_count: number
           pending_count: number
           total_active: number
