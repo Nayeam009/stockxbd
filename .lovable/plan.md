@@ -1,157 +1,65 @@
 
-# Plan: Dashboard Performance Optimization & Unified App Experience
 
-## ✅ IMPLEMENTATION COMPLETE
+# Shop Owner Dashboard - Issues and Improvements Found
 
-All phases have been successfully implemented. Here's a summary of what was done:
+## Issues Identified
 
----
+### 1. BUG: "Active Orders" Card Navigation Broken
+- **Location**: `src/components/dashboard/modules/DashboardOverview.tsx` line 136
+- **Problem**: The "Active Orders" KPI card navigates to `setActiveModule('orders')` but the Dashboard's switch-case only handles `'marketplace-orders'`, not `'orders'`. Clicking this card shows the default overview instead of the marketplace orders module.
+- **Fix**: Change `'orders'` to `'marketplace-orders'`
 
-## Summary of Changes
+### 2. BUG: Dashboard Shows "2 dispatched" but Orders are Actually "confirmed"
+- **Location**: `src/hooks/useSharedQueries.ts` line 179 (`get_active_orders_count` RPC)
+- **Problem**: The dashboard overview displays "0 pending, 2 dispatched" but the actual data shows 2 orders with status `confirmed`. The RPC function `get_active_orders_count` is likely grouping `confirmed` orders as `dispatched`.
+- **Fix**: Audit and fix the `get_active_orders_count` RPC to correctly distinguish between `pending`, `confirmed`, and `dispatched` statuses. Update the dashboard display to show all three categories.
 
-### Phase 1: Unified Query System ✅
-**Files Created:**
-- `src/hooks/useSharedQueries.ts` - Centralized query system with shared cache
-- `src/lib/moduleEvents.ts` - Cross-module event bus
+### 3. BUG: 2 Stale Confirmed Orders from Feb 2
+- **Problem**: Orders `LPG-20260202-940198` and `LPG-20260202-6ec809` have been in "confirmed" status for 12 days without being dispatched or resolved. These inflate the "Active Orders" count.
+- **Improvement**: Add a visual indicator (warning badge) for orders older than 24 hours that haven't progressed. This helps shop owners notice stuck orders.
 
-**Key Features:**
-- Shared query keys: `['shared', 'lpg-brands']`, `['shared', 'stoves']`, etc.
-- Aggressive stale times: LPG/Stoves (2min), Customers (3min), Prices (5min)
-- Single `stock-x-unified` real-time channel for all data updates
-- Tiered debounce: Critical (500ms), Normal (1500ms), Low (3000ms)
+### 4. IMPROVEMENT: Business Diary Date Timezone Safety
+- **Location**: `src/hooks/queries/useBusinessDiaryQueries.ts` lines 182-183
+- **Problem**: The date filtering uses `format(new Date(date), "yyyy-MM-dd'T'00:00:00")` without timezone offset. For Bangladesh (UTC+6), a sale made at 11:30 PM local time on Feb 14 is stored as Feb 15 05:30 AM UTC, which would be missed by the "Today" filter.
+- **Fix**: Use timezone-aware boundaries by appending the UTC offset or using ISO date with proper start/end of day in local time.
 
-### Phase 2: Dashboard Optimization ✅
-**File Modified:** `src/pages/Dashboard.tsx`
+### 5. IMPROVEMENT: Package Prices Not Set for Some Brands
+- **Observation**: INDEX brand shows Package prices as 0/0/0. While this is a data entry issue, the UI could show a warning badge when prices are missing to remind the owner.
 
-- Removed duplicate `useDashboardRealtime` call
-- Replaced `useDashboardData` heavy fetch with `useSharedOverviewStats`
-- Added `usePrefetchSharedData()` for background data loading
-- Added `useModuleEventSync()` for cross-module communication
-- Lazy loading all modules with code splitting
+## Implementation Steps
 
-### Phase 3: Module Hooks Migration ✅
-**Files Modified:**
-- `src/hooks/usePOSData.ts` - Now uses `useSharedLPGBrands`, `useSharedStoves`, etc.
-- `src/hooks/useInventoryData.ts` - Now uses shared queries with client-side filtering
-
-### Phase 4: Remove Duplicate Realtime ✅
-**File Modified:** `src/hooks/useDashboardData.ts`
-
-- Removed duplicate `dashboard-realtime` channel
-- Now only does initial data fetch; real-time handled by unified system
-
-### Phase 5: Cross-Module Events ✅
-**Features Implemented:**
-- `dispatchModuleEvent()` - Emit events from any module
-- `useModuleEvent()` - Subscribe to events in React components
-- `useModuleEventSync()` - Auto-invalidates queries on events
-- Convenience functions: `notifySaleCompleted()`, `notifyPurchaseCompleted()`, etc.
-
----
-
-## Architecture Achieved
-
-```text
-┌─────────────────────────────────────────────────────────────────────┐
-│                    UNIFIED DATA LAYER                                │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                      │
-│  ┌─────────────────────┐    ┌─────────────────────┐                 │
-│  │  sharedKeys         │───▶│  React Query Cache  │                 │
-│  │  (single source)    │    │  (all modules share)│                 │
-│  └─────────────────────┘    └─────────────────────┘                 │
-│           │                          ▲                               │
-│           ▼                          │                               │
-│  ┌─────────────────────────────────────────────────┐                │
-│  │        stock-x-unified Channel                   │                │
-│  │        (SINGLE real-time subscription)           │                │
-│  └─────────────────────────────────────────────────┘                │
-│                                                                      │
-└─────────────────────────────────────────────────────────────────────┘
-                              │
-       ┌──────────────────────┼──────────────────────┐
-       │                      │                      │
-       ▼                      ▼                      ▼
-┌─────────────┐       ┌─────────────┐       ┌─────────────┐
-│  POS Module │       │  Inventory  │       │  Business   │
-│  (instant)  │       │  (instant)  │       │   Diary     │
-└─────────────┘       └─────────────┘       └─────────────┘
+### Step 1: Fix Active Orders Navigation
+In `DashboardOverview.tsx`, change line 136:
+```
+onClick: () => setActiveModule?.('orders')
+```
+to:
+```
+onClick: () => setActiveModule?.('marketplace-orders')
 ```
 
----
+### Step 2: Fix Order Status Counting
+Check the `get_active_orders_count` database function and update it to correctly categorize:
+- `pending` -> pending_count
+- `confirmed` -> confirmed_count (new field)
+- `dispatched` -> dispatched_count
 
-## Performance Improvements Achieved
+Update the OverviewStats interface and dashboard display to show confirmed orders separately.
 
-| Metric | Before | After |
-|--------|--------|-------|
-| Real-time Channels | 2 | 1 |
-| Duplicate Queries | Many | 0 |
-| Module Switch Time | 500-800ms | 50-150ms (cached) |
-| Initial Dashboard Load | 2-3s | 800ms-1.2s |
-| Cache Hit Rate | Low | High |
-
----
-
-## Files Summary
-
-### Created
-| File | Purpose |
-|------|---------|
-| `src/hooks/useSharedQueries.ts` | Unified query system with shared cache |
-| `src/lib/moduleEvents.ts` | Cross-module event bus |
-
-### Modified
-| File | Changes |
-|------|---------|
-| `src/pages/Dashboard.tsx` | Uses unified realtime, prefetching, event sync |
-| `src/hooks/useDashboardData.ts` | Removed duplicate realtime channel |
-| `src/hooks/usePOSData.ts` | Uses shared query keys |
-| `src/hooks/useInventoryData.ts` | Uses shared query keys |
-| `src/components/dashboard/ModuleSkeleton.tsx` | Optimized QuickLoader |
-| `src/hooks/queries/index.ts` | Exports shared hooks |
-
----
-
-## Usage Examples
-
-### Accessing Shared Data
-```typescript
-import { useSharedLPGBrands, useSharedCustomers } from '@/hooks/useSharedQueries';
-
-function MyComponent() {
-  const { data: brands } = useSharedLPGBrands();
-  const { data: customers } = useSharedCustomers();
-  // Data comes from shared cache - instant if already loaded
-}
+### Step 3: Update Dashboard Display
+Update the Active Orders subtitle to show all three states:
+```
+"X pending, Y confirmed, Z dispatched"
 ```
 
-### Emitting Cross-Module Events
-```typescript
-import { notifySaleCompleted } from '@/lib/moduleEvents';
+### Step 4: Timezone-Safe Date Filtering (Business Diary)
+Update the sales and expenses fetch functions to use proper timezone-aware date boundaries to prevent edge-case misses for late-night transactions.
 
-// After completing a sale in POS
-notifySaleCompleted(transactionId, total, customerId);
-// This automatically invalidates Overview, Customers, and Inventory caches
-```
+### Technical Details
 
-### Listening to Events
-```typescript
-import { useModuleEvent } from '@/lib/moduleEvents';
+**Files to modify:**
+- `src/components/dashboard/modules/DashboardOverview.tsx` - Fix navigation target
+- `src/hooks/useSharedQueries.ts` - Update OverviewStats interface
+- Database migration - Fix `get_active_orders_count` RPC function
+- `src/hooks/queries/useBusinessDiaryQueries.ts` - Timezone-safe date filtering
 
-function BusinessDiary() {
-  useModuleEvent('sale-completed', (payload) => {
-    console.log('Sale completed:', payload.total);
-    // Refresh diary data
-  });
-}
-```
-
----
-
-## Status: ✅ COMPLETE
-
-The Stock-X dashboard now operates as a unified, responsive application where:
-- All modules share data instantly via React Query cache
-- A single real-time channel handles all database updates
-- Cross-module events enable instant synchronization
-- Module switching is near-instantaneous for cached data
