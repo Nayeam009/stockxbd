@@ -265,85 +265,44 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
         if (newCust) customerId = newCust.id;
       }
 
-      // Create transaction
-      const { data: transaction, error: txnError } = await supabase.from('pos_transactions').insert({
-        transaction_number: transactionNumber,
-        customer_id: customerId,
-        subtotal: cart.subtotal,
-        discount: cart.discount,
-        total: cart.total,
-        payment_method: 'cash' as const,
-        payment_status: finalPaymentStatus,
-        notes: finalPaymentStatus === 'partial' ? `Paid: ৳${paidAmount}, Due: ৳${remainingDue}` : null,
-        created_by: user.id,
-        owner_id: ownerId || user.id
-      }).select().single();
+      // Build items JSONB for the RPC
+      const rpcItems = cart.saleItems.map(item => ({
+        product_id: item.brandId || item.stoveId || item.regulatorId || null,
+        product_name: `${item.name} - ${item.details}`,
+        quantity: item.quantity,
+        unit_price: item.price,
+        total_price: item.price * item.quantity,
+        item_type: item.type,
+        brand_id: item.brandId || null,
+        cylinder_type: item.cylinderType || null,
+        stove_id: item.stoveId || null,
+        regulator_id: item.regulatorId || null,
+      }));
 
-      if (txnError) throw txnError;
+      const rpcReturnItems = cart.returnItems.map(r => ({
+        brand_id: r.brandId,
+        quantity: r.quantity,
+        is_leaked: r.isLeaked,
+      }));
 
-      // Insert items
-      if (transaction) {
-        const items = cart.saleItems.map(item => ({
-          transaction_id: transaction.id,
-          product_id: item.brandId || item.stoveId || item.regulatorId || null,
-          product_name: `${item.name} - ${item.details}`,
-          quantity: item.quantity,
-          unit_price: item.price,
-          total_price: item.price * item.quantity,
-          created_by: user.id
-        }));
-        await supabase.from('pos_transaction_items').insert(items);
-      }
+      // Single atomic RPC call — transaction + items + inventory + customer dues
+      const { data: txnId, error: rpcError } = await supabase.rpc('complete_pos_sale', {
+        p_transaction_number: transactionNumber,
+        p_customer_id: customerId,
+        p_subtotal: cart.subtotal,
+        p_discount: cart.discount,
+        p_total: cart.total,
+        p_payment_method: 'cash',
+        p_payment_status: finalPaymentStatus,
+        p_notes: finalPaymentStatus === 'partial' ? `Paid: ৳${paidAmount}, Due: ৳${remainingDue}` : null,
+        p_is_online_order: cart.isOnlineOrder,
+        p_community_order_id: cart.onlineOrderId,
+        p_items: rpcItems,
+        p_return_items: rpcReturnItems,
+        p_remaining_due: remainingDue,
+      });
 
-      // Update inventory for LPG
-      for (const item of cart.saleItems.filter(i => i.type === 'lpg' && i.brandId)) {
-        const brand = lpgBrands.find(b => b.id === item.brandId);
-        if (!brand) continue;
-        const field = item.cylinderType === 'refill' ? 'refill_cylinder' : 'package_cylinder';
-        const current = item.cylinderType === 'refill' ? brand.refill_cylinder : brand.package_cylinder;
-        await supabase.from('lpg_brands').update({ [field]: Math.max(0, current - item.quantity) }).eq('id', brand.id);
-      }
-
-      // Update inventory for Stoves
-      for (const item of cart.saleItems.filter(i => i.type === 'stove' && i.stoveId)) {
-        const stove = stoves.find(s => s.id === item.stoveId);
-        if (!stove) continue;
-        await supabase.from('stoves').update({ 
-          quantity: Math.max(0, (stove.quantity || 0) - item.quantity),
-          updated_at: new Date().toISOString()
-        }).eq('id', stove.id);
-      }
-
-      // Update inventory for Regulators
-      for (const item of cart.saleItems.filter(i => i.type === 'regulator' && i.regulatorId)) {
-        const regulator = regulators.find(r => r.id === item.regulatorId);
-        if (!regulator) continue;
-        await supabase.from('regulators').update({ 
-          quantity: Math.max(0, (regulator.quantity || 0) - item.quantity),
-          updated_at: new Date().toISOString()
-        }).eq('id', regulator.id);
-      }
-
-      // Update return cylinders
-      for (const returnItem of cart.returnItems) {
-        const brand = lpgBrands.find(b => b.id === returnItem.brandId);
-        if (!brand) continue;
-        const field = returnItem.isLeaked ? 'problem_cylinder' : 'empty_cylinder';
-        const current = returnItem.isLeaked ? brand.problem_cylinder : brand.empty_cylinder;
-        await supabase.from('lpg_brands').update({ [field]: current + returnItem.quantity }).eq('id', returnItem.brandId);
-      }
-
-      // Update customer dues
-      if ((finalPaymentStatus === 'due' || finalPaymentStatus === 'partial') && customerId) {
-        const customer = customers.find(c => c.id === customerId);
-        if (customer) {
-          await supabase.from('customers').update({
-            total_due: (customer.total_due || 0) + remainingDue,
-            billing_status: remainingDue > 0 ? 'pending' : 'clear',
-            last_order_date: new Date().toISOString()
-          }).eq('id', customerId);
-        }
-      }
+      if (rpcError) throw rpcError;
 
       // Prepare invoice data
       setLastTransaction({
