@@ -200,29 +200,31 @@ export const BusinessDiaryModule = () => {
   const [customDate, setCustomDate] = useState<Date>(new Date());
   const [calendarOpen, setCalendarOpen] = useState(false);
   
-  // Compute selected date based on option
-  const selectedDate = useMemo(() => {
+  // Compute selected date range based on option
+  const { selectedDate, selectedEndDate } = useMemo(() => {
     const today = new Date();
     switch (dateRangeOption) {
-      case 'today': return format(today, 'yyyy-MM-dd');
-      case 'yesterday': return format(subDays(today, 1), 'yyyy-MM-dd');
-      case 'custom': return format(customDate, 'yyyy-MM-dd');
-      default: return format(today, 'yyyy-MM-dd');
+      case 'today': return { selectedDate: format(today, 'yyyy-MM-dd'), selectedEndDate: format(today, 'yyyy-MM-dd') };
+      case 'yesterday': return { selectedDate: format(subDays(today, 1), 'yyyy-MM-dd'), selectedEndDate: format(subDays(today, 1), 'yyyy-MM-dd') };
+      case 'week': return { selectedDate: format(startOfWeek(today, { weekStartsOn: 6 }), 'yyyy-MM-dd'), selectedEndDate: format(endOfWeek(today, { weekStartsOn: 6 }), 'yyyy-MM-dd') };
+      case 'month': return { selectedDate: format(startOfMonth(today), 'yyyy-MM-dd'), selectedEndDate: format(endOfMonth(today), 'yyyy-MM-dd') };
+      case 'custom': return { selectedDate: format(customDate, 'yyyy-MM-dd'), selectedEndDate: format(customDate, 'yyyy-MM-dd') };
+      default: return { selectedDate: format(today, 'yyyy-MM-dd'), selectedEndDate: format(today, 'yyyy-MM-dd') };
     }
   }, [dateRangeOption, customDate]);
 
   // TanStack Query hooks
-  const { data: sales = [], isLoading: salesLoading } = useBusinessSales(selectedDate);
-  const { data: expenses = [], isLoading: expensesLoading } = useBusinessExpenses(selectedDate);
+  const { data: sales = [], isLoading: salesLoading } = useBusinessSales(selectedDate, selectedEndDate);
+  const { data: expenses = [], isLoading: expensesLoading } = useBusinessExpenses(selectedDate, selectedEndDate);
   const loading = salesLoading || expensesLoading;
 
   // Real-time subscriptions
-  useBusinessDiaryRealtime(selectedDate);
+  useBusinessDiaryRealtime(selectedDate, selectedEndDate);
 
   const queryClient = useQueryClient();
   const refetch = () => {
-    queryClient.invalidateQueries({ queryKey: ['business-diary-sales', selectedDate] });
-    queryClient.invalidateQueries({ queryKey: ['business-diary-expenses', selectedDate] });
+    queryClient.invalidateQueries({ queryKey: ['business-diary-sales', selectedDate, selectedEndDate] });
+    queryClient.invalidateQueries({ queryKey: ['business-diary-expenses', selectedDate, selectedEndDate] });
   };
 
   const isMobile = useIsMobile();
@@ -386,13 +388,16 @@ export const BusinessDiaryModule = () => {
 
             {/* Date Range Selector */}
             <div className="flex bg-muted/50 rounded-md p-0.5 border border-border/50">
-              {(['today', 'yesterday'] as const).map(opt => (
+              {(['today', 'yesterday', 'week', 'month'] as const).map(opt => {
+                const labels: Record<string, string> = { today: 'Today', yesterday: 'Yesterday', week: 'Week', month: 'Month' };
+                return (
                 <Button key={opt} variant="ghost" size="sm"
                   onClick={() => { setDateRangeOption(opt); setCalendarOpen(false); }}
                   className={cn("h-7 px-2 text-[10px] font-medium rounded capitalize", dateRangeOption === opt ? "bg-background shadow text-primary" : "text-muted-foreground")}>
-                  {opt}
+                  {labels[opt]}
                 </Button>
-              ))}
+                );
+              })}
               <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
                 <PopoverTrigger asChild>
                   <Button variant="ghost" size="sm"

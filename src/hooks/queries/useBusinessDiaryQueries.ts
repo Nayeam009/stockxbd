@@ -149,7 +149,7 @@ const getPaymentAmounts = (paymentStatus: string, total: number, notes: string |
 };
 
 // ===== Fetch Functions =====
-async function fetchSalesData(date: string): Promise<SaleEntry[]> {
+async function fetchSalesData(startDate: string, endDate: string): Promise<SaleEntry[]> {
   try {
     const [userRolesResult, posResult, paymentsResult, customersResult, pricesResult] = await Promise.all([
       supabase.from('user_roles').select('user_id, role'),
@@ -179,8 +179,8 @@ async function fetchSalesData(date: string): Promise<SaleEntry[]> {
           )
         `)
         .eq('is_voided', false)
-        .gte('created_at', `${date}T00:00:00+06:00`)
-        .lte('created_at', `${date}T23:59:59.999+06:00`)
+        .gte('created_at', `${startDate}T00:00:00+06:00`)
+        .lte('created_at', `${endDate}T23:59:59.999+06:00`)
         .order('created_at', { ascending: false }),
       supabase
         .from('customer_payments')
@@ -198,7 +198,8 @@ async function fetchSalesData(date: string): Promise<SaleEntry[]> {
             phone
           )
         `)
-        .eq('payment_date', date)
+        .gte('payment_date', startDate)
+        .lte('payment_date', endDate)
         .order('created_at', { ascending: false }),
       supabase.from('customers').select('id, name, phone'),
       supabase.from('product_prices').select('product_name, company_price, is_active')
@@ -218,7 +219,7 @@ async function fetchSalesData(date: string): Promise<SaleEntry[]> {
 
     // Process POS transactions
     const posEntries: SaleEntry[] = (posResult.data || []).flatMap(txn => {
-      if (format(new Date(txn.created_at), 'yyyy-MM-dd') !== date) return [];
+      // Date filtering is handled by the query, no need for client-side filter
 
       const customer = txn.customer_id ? customerMap.get(txn.customer_id) : null;
       const items = txn.pos_transaction_items || [];
@@ -352,7 +353,7 @@ async function fetchSalesData(date: string): Promise<SaleEntry[]> {
   }
 }
 
-async function fetchExpensesData(date: string): Promise<ExpenseEntry[]> {
+async function fetchExpensesData(startDate: string, endDate: string): Promise<ExpenseEntry[]> {
   try {
     // Parallel fetch ALL expense sources including staff_payments and vehicle_costs
     const [userRolesResult, pobResult, manualExpensesResult, staffPaymentsResult, vehicleCostsResult] = await Promise.all([
@@ -378,13 +379,14 @@ async function fetchExpensesData(date: string): Promise<ExpenseEntry[]> {
           )
         `)
         .eq('is_voided', false)
-        .gte('created_at', `${date}T00:00:00+06:00`)
-        .lte('created_at', `${date}T23:59:59.999+06:00`)
+        .gte('created_at', `${startDate}T00:00:00+06:00`)
+        .lte('created_at', `${endDate}T23:59:59.999+06:00`)
         .order('created_at', { ascending: false }),
       supabase
         .from('daily_expenses')
         .select('*')
-        .eq('expense_date', date)
+        .gte('expense_date', startDate)
+        .lte('expense_date', endDate)
         .order('created_at', { ascending: false }),
       supabase
         .from('staff_payments')
@@ -401,7 +403,8 @@ async function fetchExpensesData(date: string): Promise<ExpenseEntry[]> {
             role
           )
         `)
-        .eq('payment_date', date)
+        .gte('payment_date', startDate)
+        .lte('payment_date', endDate)
         .order('created_at', { ascending: false }),
       supabase
         .from('vehicle_costs')
@@ -419,7 +422,8 @@ async function fetchExpensesData(date: string): Promise<ExpenseEntry[]> {
             name
           )
         `)
-        .eq('cost_date', date)
+        .gte('cost_date', startDate)
+        .lte('cost_date', endDate)
         .order('created_at', { ascending: false })
     ]);
 
@@ -427,7 +431,7 @@ async function fetchExpensesData(date: string): Promise<ExpenseEntry[]> {
 
     // Process POB transactions
     const pobEntries: ExpenseEntry[] = (pobResult.data || []).flatMap(txn => {
-      if (format(new Date(txn.created_at), 'yyyy-MM-dd') !== date) return [];
+      // Date filtering is handled by the query
 
       const items = txn.pob_transaction_items || [];
       const mainItem = items[0];
@@ -570,19 +574,23 @@ async function fetchExpensesData(date: string): Promise<ExpenseEntry[]> {
 }
 
 // ===== Query Hooks =====
-export const useBusinessSales = (date: string) => {
+export const useBusinessSales = (date: string, endDate?: string) => {
+  const start = date;
+  const end = endDate || date;
   return useQuery({
-    queryKey: ['business-diary-sales', date],
-    queryFn: () => fetchSalesData(date),
+    queryKey: ['business-diary-sales', start, end],
+    queryFn: () => fetchSalesData(start, end),
     staleTime: 1000 * 30,
     gcTime: 1000 * 60 * 5,
   });
 };
 
-export const useBusinessExpenses = (date: string) => {
+export const useBusinessExpenses = (date: string, endDate?: string) => {
+  const start = date;
+  const end = endDate || date;
   return useQuery({
-    queryKey: ['business-diary-expenses', date],
-    queryFn: () => fetchExpensesData(date),
+    queryKey: ['business-diary-expenses', start, end],
+    queryFn: () => fetchExpensesData(start, end),
     staleTime: 1000 * 30,
     gcTime: 1000 * 60 * 5,
   });
@@ -608,18 +616,19 @@ export const useCustomerDebtSummary = (sales: SaleEntry[]): CustomerDebtSummary 
 };
 
 // ===== Real-time Subscription Hook with Complete Table Coverage =====
-export const useBusinessDiaryRealtime = (date: string) => {
+export const useBusinessDiaryRealtime = (startDate: string, endDate?: string) => {
   const queryClient = useQueryClient();
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
   const isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
+  const end = endDate || startDate;
 
   const debouncedInvalidate = useCallback(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      queryClient.invalidateQueries({ queryKey: ['business-diary-sales', date] });
-      queryClient.invalidateQueries({ queryKey: ['business-diary-expenses', date] });
+      queryClient.invalidateQueries({ queryKey: ['business-diary-sales', startDate, end] });
+      queryClient.invalidateQueries({ queryKey: ['business-diary-expenses', startDate, end] });
     }, 1000);
-  }, [queryClient, date]);
+  }, [queryClient, startDate, end]);
 
   useEffect(() => {
     if (!isOnline) return;

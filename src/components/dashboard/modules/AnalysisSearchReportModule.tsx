@@ -19,7 +19,6 @@ import {
   Plus, UserPlus, PackagePlus, Banknote, CreditCard, ChefHat, Wrench, Flame
 } from "lucide-react";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
-import { SalesData, Customer, StockItem, Driver } from "@/hooks/useDashboardData";
 import { useBusinessDiaryData } from "@/hooks/useBusinessDiaryData";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -41,10 +40,6 @@ import { QuickReportsGrid, ReportPreviewDialog } from "@/components/reports";
 import { GlobalSearchCard } from "@/components/search";
 
 interface AnalysisSearchReportModuleProps {
-  salesData: SalesData[];
-  customers: Customer[];
-  stockData: StockItem[];
-  drivers: Driver[];
   userRole: string;
 }
 
@@ -80,7 +75,7 @@ type ViewMode = 'analysis' | 'search';
 const CHART_COLORS = ['#22c55e', '#3b82f6', '#f97316', '#8b5cf6', '#ec4899', '#06b6d4', '#eab308'];
 
 export const AnalysisSearchReportModule = ({ 
-  salesData, customers, stockData, drivers, userRole 
+  userRole 
 }: AnalysisSearchReportModuleProps) => {
   const { t } = useLanguage();
   const isMobile = useIsMobile();
@@ -205,7 +200,7 @@ export const AnalysisSearchReportModule = ({
     { id: 'product-pricing', title: 'Product Pricing', description: 'Set product prices', icon: Tag, category: 'page' as const, roles: ['owner', 'manager'], keywords: ['price', 'pricing'] },
     { id: 'customers', title: 'Customer Management', description: 'Manage customers & dues', icon: Users, category: 'page' as const, roles: ['owner', 'manager'], keywords: ['customer', 'due'] },
     { id: 'utility-expense', title: 'Utility Expense', description: 'Staff salary & vehicle costs', icon: Wallet, category: 'page' as const, roles: ['owner', 'manager'], keywords: ['staff', 'salary', 'vehicle'] },
-    { id: 'orders', title: 'Online Delivery', description: 'Manage delivery orders', icon: Truck, category: 'page' as const, roles: ['owner', 'manager', 'driver'], keywords: ['order', 'delivery'] },
+    { id: 'marketplace-orders', title: 'Online Delivery', description: 'Manage delivery orders', icon: Truck, category: 'page' as const, roles: ['owner', 'manager', 'driver'], keywords: ['order', 'delivery'] },
     { id: 'settings', title: 'Settings', description: 'System configuration', icon: Settings, category: 'page' as const, roles: ['owner', 'manager'], keywords: ['settings', 'config'] },
     { id: 'action-new-sale', title: 'Create New Sale', description: 'Start a new POS transaction', icon: Plus, category: 'action' as const, roles: ['owner', 'manager', 'driver'], keywords: ['new', 'sale'] },
     { id: 'action-add-customer', title: 'Add New Customer', description: 'Register a new customer', icon: UserPlus, category: 'action' as const, roles: ['owner', 'manager'], keywords: ['add', 'customer'] },
@@ -213,54 +208,6 @@ export const AnalysisSearchReportModule = ({
     { id: 'report-stock-status', title: 'Stock Status Report', description: 'Current inventory', icon: Package, category: 'report' as const, roles: ['owner', 'manager'], keywords: ['report', 'stock'] },
     { id: 'report-financial', title: 'Financial Summary', description: 'Income vs expenses', icon: DollarSign, category: 'report' as const, roles: ['owner'], keywords: ['report', 'financial'] },
   ] as NavigationItem[]).filter(item => item.roles.includes(userRole)), [userRole]);
-
-  // ==================== SEARCH ====================
-  const searchResults = useMemo((): SearchResult[] => {
-    if (!searchQuery.trim()) return [];
-    const query = searchQuery.toLowerCase();
-    const results: SearchResult[] = [];
-
-    // Navigation search
-    navigationItems.forEach(item => {
-      if (item.title.toLowerCase().includes(query) || item.keywords.some(k => k.includes(query))) {
-        results.push({
-          type: item.category === 'action' ? 'action' : item.category === 'report' ? 'navigation' : 'navigation',
-          id: item.id, title: item.title, subtitle: item.description,
-          meta: item.category === 'action' ? 'Action' : item.category === 'report' ? 'Report' : 'Page',
-          icon: item.icon, action: () => handleAction(item.id)
-        });
-      }
-    });
-
-    // Customer search
-    if (searchCategory === "all" || searchCategory === "customers") {
-      customers.forEach(c => {
-        if (c.name.toLowerCase().includes(query) || c.phone.includes(query)) {
-          results.push({
-            type: 'customer', id: c.id, title: c.name, subtitle: c.phone,
-            meta: `${BANGLADESHI_CURRENCY_SYMBOL}${c.outstanding} due`,
-            icon: Users, action: () => navigateToModule('customers')
-          });
-        }
-      });
-    }
-
-    // Stock search
-    if (searchCategory === "all" || searchCategory === "stock") {
-      stockData.forEach(item => {
-        if (item.name.toLowerCase().includes(query)) {
-          results.push({
-            type: 'stock', id: item.id, title: item.name,
-            subtitle: `${item.currentStock} units @ ${BANGLADESHI_CURRENCY_SYMBOL}${item.price}`,
-            meta: item.type, icon: item.type === 'cylinder' ? Flame : ChefHat,
-            action: () => navigateToModule('inventory')
-          });
-        }
-      });
-    }
-
-    return results.slice(0, 15);
-  }, [searchQuery, searchCategory, navigationItems, customers, stockData]);
 
   // ==================== ACTIONS ====================
   const navigateToModule = useCallback((moduleId: string) => {
@@ -279,6 +226,99 @@ export const AnalysisSearchReportModule = ({
       navigateToModule(actionId);
     }
   }, [navigateToModule]);
+
+  // ==================== SERVER-SIDE SEARCH (RPC) ====================
+  const [serverSearchResults, setServerSearchResults] = useState<SearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Server-side search using RPC
+  useEffect(() => {
+    if (!searchQuery.trim() || searchQuery.length < 2) {
+      setServerSearchResults([]);
+      return;
+    }
+
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        // Get owner_id for the search
+        const { data: ownerIdResult } = await supabase.rpc('get_owner_id');
+        if (!ownerIdResult) return;
+
+        const { data: results, error } = await supabase.rpc('search_all_entities', {
+          p_query: searchQuery,
+          p_owner_id: ownerIdResult
+        });
+
+        if (error) throw error;
+
+        const iconMap: Record<string, any> = {
+          customer: Users,
+          sale: Receipt,
+          staff: Users,
+          vehicle: Truck,
+          order: Truck,
+          stock: Flame
+        };
+
+        const moduleMap: Record<string, string> = {
+          customer: 'customers',
+          sale: 'business-diary',
+          staff: 'utility-expense',
+          vehicle: 'utility-expense',
+          order: 'marketplace-orders',
+          stock: 'inventory'
+        };
+
+        const mapped: SearchResult[] = (results || []).map((r: any) => ({
+          type: r.entity_type,
+          id: r.entity_id,
+          title: r.title,
+          subtitle: r.subtitle,
+          meta: r.entity_type.charAt(0).toUpperCase() + r.entity_type.slice(1),
+          icon: iconMap[r.entity_type] || Package,
+          data: r.metadata,
+          action: () => navigateToModule(moduleMap[r.entity_type] || 'overview')
+        }));
+
+        setServerSearchResults(mapped);
+      } catch (error) {
+        console.error('[Analysis] Search error:', error);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 400);
+
+    return () => {
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    };
+  }, [searchQuery, navigateToModule]);
+
+  const searchResults = useMemo((): SearchResult[] => {
+    if (!searchQuery.trim()) return [];
+    const query = searchQuery.toLowerCase();
+    const results: SearchResult[] = [];
+
+    // Navigation search (always local)
+    navigationItems.forEach(item => {
+      if (item.title.toLowerCase().includes(query) || item.keywords.some(k => k.includes(query))) {
+        results.push({
+          type: item.category === 'action' ? 'action' : item.category === 'report' ? 'navigation' : 'navigation',
+          id: item.id, title: item.title, subtitle: item.description,
+          meta: item.category === 'action' ? 'Action' : item.category === 'report' ? 'Report' : 'Page',
+          icon: item.icon, action: () => handleAction(item.id)
+        });
+      }
+    });
+
+    // Merge server-side results
+    return [...results, ...serverSearchResults].slice(0, 20);
+  }, [searchQuery, navigationItems, serverSearchResults]);
 
   // ==================== REPORTS ====================
   const generateReport = useCallback(async (type: string) => {
