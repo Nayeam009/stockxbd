@@ -1,118 +1,112 @@
 
+# Phase 1 (Post-Fixes): Health Check and Gap Analysis
 
-# Phase 3: Gap Analysis -- What Already Exists vs. What Needs Fixing
+## Status of Previous Fixes
 
-## Assessment Summary
-
-After a thorough audit, **most of the requested features already exist** in the codebase. The Phase 3 request describes capabilities that were built in previous iterations. Here is the exact status of each directive:
-
----
-
-## 1. Bottom Navigation Bar -- ALREADY EXISTS (Minor Fix Needed)
-
-**Status:** Fully implemented in `src/components/dashboard/MobileBottomNav.tsx`
-- Sticky bottom nav with 4 primary icons (Home, Business Diary, POS, My Shop) + a "More" sheet for secondary modules (Inventory, Pricing, Customers, Utility, Analysis, Settings)
-- Hidden on desktop (`md:hidden`), safe-area padding, active indicators, touch targets
-- Rendered in `Dashboard.tsx` for mobile only
-
-**Gap Found:** The nav icons don't match the requested set (Dashboard, POS, Inventory, Diary, Menu). Current set prioritizes "My Shop" over "Inventory" in the primary bar.
-
-**Fix:** Swap "My Shop" for "Inventory" in the primary nav (since POS users access inventory far more frequently than My Shop), and move "My Shop" to the "More" sheet. This is a 1-line config change.
+All changes from Phases 1-4 are confirmed integrated:
+- Dead code removed (OnlineDeliveryModule, VehicleCostModule, ExchangeModule)
+- Atomic POS sale via `complete_pos_sale` RPC -- working
+- Business Diary date filters (30-day lookback) applied to staff_payments and vehicle_costs
+- `customer_payments` RLS tightened with owner scoping via customers join
+- Mobile bottom nav reordered (Inventory promoted)
+- POS product cards wrapped in `React.memo` with `min-w-[140px]`
+- Business Diary mobile FAB added
+- Analysis module uses server-side `search_all_entities` RPC
 
 ---
 
-## 2. POS Module -- ALREADY EXISTS (2 Mobile Polish Fixes)
+## REMAINING ISSUES FOUND
 
-**Status:** Fully built in `src/components/dashboard/modules/POSModule.tsx` (619 lines) with modular architecture:
-- Product grid with LPG/Stove/Regulator cards (brand-colored, one-tap add)
-- Cart summary fixed at bottom via `POSStickyFooter`
-- Mobile table toggle (Sale/Return)
-- Filter bar with Retail/Wholesale, Refill/Package, valve size, weight
-- Payment drawer, customer lookup, barcode scanner, invoice printing
-- Data fetched via TanStack Query (`usePOSData` hook)
-- Cart logic in `usePOSCart` hook
+### CRITICAL (Bugs / Data Integrity)
 
-**Gap 1 -- Product cards lack `React.memo`:** The `LPGProductCard`, `StoveProductCard`, and `RegulatorProductCard` components in `POSProductCard.tsx` are plain function exports -- not wrapped in `React.memo`. When scrolling a list of 20+ brands, every filter change or cart update re-renders ALL cards unnecessarily.
+**1. Analysis module still creates a duplicate realtime channel**
+- File: `AnalysisSearchReportModule.tsx` lines 130-145
+- Creates its own `analysis-realtime` channel subscribing to 7 tables, duplicating the unified `dashboard-master` channel in `useSharedQueries.ts`
+- Fix: Remove the local channel; rely on unified realtime + TanStack Query cache invalidation that already covers these tables
 
-**Fix:** Wrap all 3 card components in `React.memo` with shallow prop comparison.
+**2. Utility Expense module still creates a duplicate realtime channel**
+- File: `UtilityExpenseModule.tsx` lines 192-203
+- Creates `utility-expense-realtime` channel subscribing to 5 tables
+- Fix: Same approach -- remove local channel, use shared cache invalidation
 
-**Gap 2 -- Product grid enforces no min-width on 320px screens:** The grid uses `grid-cols-2` but cards can compress below readable size on 320px devices.
+**3. `fetchPayments` in CustomerManagement is still unbounded**
+- File: `CustomerManagementModule.tsx` lines 179-191
+- Fetches ALL `customer_payments` with no date filter or limit
+- For shops with high volume, this will hit the 1000-row default Supabase limit silently, causing missing payment records
+- Fix: Add `.limit(500)` and a 90-day lookback filter
 
-**Fix:** Add `min-w-[140px]` to the product card button elements and ensure the grid container allows horizontal overflow on very narrow screens.
-
----
-
-## 3. Business Diary -- ALREADY EXISTS (1 UX Enhancement)
-
-**Status:** Fully built in `BusinessDiaryModule.tsx` (697 lines):
-- Cash Flow and Profit view modes via toggle
-- 6-card KPI summary grid (Total Sales, Expenses, Net Flow, Paid, Partial, Due)
-- Date range selector with Today, Yesterday, Week, Month, Custom calendar
-- Add Expense dialog with category picker
-- Filterable sales/expenses lists with search
-- Sale details dialog
-- TanStack Query with `useBusinessSales` and `useBusinessExpenses` hooks
-
-**Gap -- No Floating Action Button (FAB) for mobile expense logging:** The "Add Expense" button is inside the header toolbar, which can be hard to reach on tall mobile screens. A FAB pinned to the bottom-right would make quick expense logging more accessible.
-
-**Fix:** Add a floating `+` button positioned `fixed bottom-24 right-4` (above the bottom nav) on mobile only, which opens the same Add Expense dialog.
+**4. CustomerManagementModule is 1,908 lines in a single file**
+- Not a bug, but a maintainability and performance concern
+- Every state change in any sub-feature (search, settle, history, memo recall) triggers re-renders across the entire 1,908-line component
+- Fix: Extract into sub-components (CustomerList, CustomerSettleDialog, CustomerHistoryPanel, MemoRecallSearch) -- deferred to a dedicated refactor phase
 
 ---
 
-## 4. Skeleton Loading States -- ALREADY EXISTS (Complete)
+### PERFORMANCE
 
-**Status:** Every module already has dedicated skeleton components:
-- `POSSkeleton` -- matches POS header, stats, tables, product grid layout
-- `POSProductGridSkeleton` -- matches individual product card structure
-- `BusinessDiarySkeleton` -- matches diary header, summary grid, entry cards
-- `InventorySkeleton` -- matches inventory tabs, stats, product cards
-- `ModuleSkeleton` / `QuickLoader` -- generic fallbacks for lazy-loaded modules
-- `ShopCardSkeleton`, `OrderCardSkeleton`, `ProfileSkeleton` -- community pages
+**5. Business Diary summary cards lack `tabular-nums` on currency values**
+- File: `BusinessDiaryModule.tsx` (SummaryCard component)
+- Currency values without `tabular-nums` cause layout shifts as digits change width (e.g., "1" vs "8")
+- Fix: Add `tabular-nums` class to the value text elements in the summary cards
 
-No spinning loaders are used in any of these modules. All use shadcn `Skeleton` components.
-
-**Gap:** None. This is fully implemented.
+**6. POS product grid container has no overflow safety on 320px**
+- File: `POSModule.tsx` line ~500 (product grid)
+- While individual cards now have `min-w-[140px]`, the grid container uses `grid-cols-2 sm:grid-cols-3` without `overflow-x-auto`. On 320px screens, two 140px cards + gap = 288px which fits, but if padding pushes it, cards can clip
+- Fix: Add `overflow-x-auto` as a safety net on the grid wrapper
 
 ---
 
-## 5. TanStack Query Caching -- ALREADY EXISTS (Complete)
+### MOBILE RESPONSIVENESS
 
-**Status:** All data fetching uses TanStack React Query:
-- `useSharedQueries.ts` provides shared cached hooks (`useSharedLPGBrands`, `useSharedStoves`, etc.) with `staleTime: 30_000` (30s)
-- `usePOSData` wraps shared queries for the POS module
-- `useBusinessDiaryQueries.ts` provides `useBusinessSales` and `useBusinessExpenses` with date-scoped queries
-- Optimistic cache invalidation after sales (`queryClient.invalidateQueries`)
-- Real-time subscriptions via unified `dashboard-master` channel for live updates
+**7. POS Sticky Footer z-index conflict with Business Diary FAB**
+- Both use `z-40`. If a user navigates between modules quickly, both can briefly coexist in the DOM (due to React transitions). No visual conflict since they're on different modules, but aligning z-indices to a consistent scale improves robustness
+- Status: Low priority, no action needed
 
-**Gap:** None. This is fully implemented.
+**8. Business Diary summary grid overflows on 320px screens**
+- The 3-column grid of summary cards uses `grid-cols-3` which gives ~96px per card at 320px after padding. Currency values above 99,999 overflow
+- Fix: Add `text-ellipsis overflow-hidden` to the value containers and ensure `tabular-nums` is applied
 
 ---
 
-## Implementation Plan (Only the Actual Gaps)
+### GAP ANALYSIS (Missing Features)
+
+**9. No remaining dead/empty modules**
+- All dashboard switch cases map to live, functional components
+- All navigation items (sidebar + bottom nav + "More" menu) point to valid modules
+- The `ExchangeModule`, `OnlineDeliveryModule`, and `VehicleCostModule` dead code was successfully removed in Phase 1
+
+**10. Analysis module report generators use raw Supabase queries without owner scoping**
+- File: `AnalysisSearchReportModule.tsx` lines 355-400
+- `generateDailySalesReport()`, `generateStockReport()`, etc. query tables directly without adding `owner_id` filters
+- RLS handles this at the database level, so this is not a security issue, but the queries could return unexpected results if RLS policies change
+- Fix: Low priority -- RLS is the correct enforcement layer here
+
+---
+
+## IMPLEMENTATION PLAN (Priority Order)
 
 | # | Fix | File | Effort |
 |---|-----|------|--------|
-| 1 | Swap "My Shop" for "Inventory" in primary bottom nav | `MobileBottomNav.tsx` | Trivial |
-| 2 | Wrap `LPGProductCard`, `StoveProductCard`, `RegulatorProductCard` in `React.memo` | `POSProductCard.tsx` | Trivial |
-| 3 | Add `min-w-[140px]` to POS product card buttons for 320px screens | `POSProductCard.tsx` | Trivial |
-| 4 | Add mobile FAB for quick expense logging in Business Diary | `BusinessDiaryModule.tsx` | Low |
+| 1 | Remove duplicate `analysis-realtime` channel, rely on unified realtime | `AnalysisSearchReportModule.tsx` | Low |
+| 2 | Remove duplicate `utility-expense-realtime` channel, rely on unified realtime | `UtilityExpenseModule.tsx` | Low |
+| 3 | Add `.limit(500)` and 90-day lookback to `fetchPayments` | `CustomerManagementModule.tsx` | Trivial |
+| 4 | Add `tabular-nums` and overflow handling to Business Diary summary cards | `BusinessDiaryModule.tsx` | Trivial |
+| 5 | Add `overflow-x-auto` safety to POS product grid wrapper | `POSModule.tsx` | Trivial |
 
-### Technical Details
+### Technical Notes
 
-**Item 1 -- Bottom Nav Reorder:**
-Move the `my-shop` entry from `navItems` array (line 28-33) to `moreItems` array, and move `inventory` from `moreItems` to `navItems`. This gives POS users instant access to stock levels without opening the "More" menu.
+**Items 1-2 (Realtime consolidation):**
+The unified `dashboard-master` channel in `useSharedQueries.ts` already subscribes to `pos_transactions`, `lpg_brands`, `customers`, `community_orders`, and `daily_expenses`. It invalidates TanStack Query caches with debounced tiers. The Analysis and Utility modules should simply use `useEffect` listeners on cache invalidation (which they already do via `useBusinessDiaryData`) instead of maintaining separate WebSocket channels. This reduces active WebSocket connections from 3+ to 1 per dashboard session.
 
-**Item 2 -- React.memo on Product Cards:**
+**Item 3 (fetchPayments):**
 ```typescript
-export const LPGProductCard = React.memo(({ brand, ... }: LPGCardProps) => {
-  // existing implementation unchanged
-});
+const { data } = await supabase
+  .from('customer_payments')
+  .select('*')
+  .gte('payment_date', subDays(new Date(), 90).toISOString())
+  .order('payment_date', { ascending: false })
+  .limit(500);
 ```
-Apply the same pattern to `StoveProductCard` and `RegulatorProductCard`. This prevents re-renders when sibling cards change (e.g., adding one brand to cart should not re-render all other brand cards).
 
-**Item 3 -- Min-width on 320px:**
-Add `min-w-[140px]` to the button element in each card component. This ensures text remains readable on the smallest supported screen width (320px / 2 columns = 160px per card, minus 8px gap).
-
-**Item 4 -- Business Diary FAB:**
-Add a floating action button visible only on mobile (`md:hidden`), positioned above the bottom nav bar. Clicking it opens the existing `addDialogOpen` state. This provides a thumb-friendly way to log expenses without scrolling to the header.
-
+**Item 4 (tabular-nums):**
+Add `tabular-nums` CSS class to the currency value elements in `SummaryCard` to prevent layout shifts when numbers change.
