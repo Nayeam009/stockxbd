@@ -177,10 +177,15 @@ export const CustomerManagementModule = () => {
   }, [queryClient]);
 
   const fetchPayments = async () => {
+    const ninetyDaysAgo = new Date();
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+    
     const { data, error } = await supabase
       .from('customer_payments')
       .select('*')
-      .order('payment_date', { ascending: false });
+      .gte('payment_date', ninetyDaysAgo.toISOString())
+      .order('payment_date', { ascending: false })
+      .limit(500);
 
     if (error) {
       logger.error('Error fetching payments', error, { component: 'CustomerManagement' });

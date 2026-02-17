@@ -476,7 +476,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
           <CardContent className="p-3">
             <ScrollArea className="h-[280px] sm:h-[320px]">
               {(activeTab === 'lpg' || !isSaleMode) && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 overflow-x-auto">
                   {(isSaleMode ? filteredBrands : brandsForReturn).map(brand => (
                     <LPGProductCard 
                       key={brand.id} 
@@ -499,7 +499,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                 </div>
               )}
               {activeTab === 'stove' && isSaleMode && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 overflow-x-auto">
                   {filteredStoves.map(stove => (
                     <StoveProductCard 
                       key={stove.id} 
@@ -512,7 +512,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
                 </div>
               )}
               {activeTab === 'regulator' && isSaleMode && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 overflow-x-auto">
                   {filteredRegulators.map(reg => (
                     <RegulatorProductCard 
                       key={reg.id} 
