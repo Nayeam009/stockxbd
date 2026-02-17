@@ -432,7 +432,7 @@ export const useBusinessDiaryData = (): UseBusinessDiaryDataReturn => {
 
       if (pobError) throw pobError;
 
-      // Fetch staff payments
+      // Fetch staff payments (last 30 days only)
       const { data: staffPayments, error: staffError } = await supabase
         .from('staff_payments')
         .select(`
@@ -448,12 +448,13 @@ export const useBusinessDiaryData = (): UseBusinessDiaryDataReturn => {
             role
           )
         `)
+        .gte('created_at', `${thirtyDaysAgo}T00:00:00+06:00`)
         .order('created_at', { ascending: false })
         .limit(200);
 
       if (staffError) throw staffError;
 
-      // Fetch vehicle costs
+      // Fetch vehicle costs (last 30 days only)
       const { data: vehicleCosts, error: vehicleError } = await supabase
         .from('vehicle_costs')
         .select(`
@@ -472,6 +473,7 @@ export const useBusinessDiaryData = (): UseBusinessDiaryDataReturn => {
             license_plate
           )
         `)
+        .gte('created_at', `${thirtyDaysAgo}T00:00:00+06:00`)
         .order('created_at', { ascending: false })
         .limit(200);
 
