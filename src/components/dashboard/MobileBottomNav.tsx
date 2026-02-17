@@ -27,17 +27,17 @@ const navItems = [{
   icon: Receipt,
   roles: ['owner', 'manager']
 }, {
-  id: 'my-shop',
-  labelKey: 'my_shop',
-  icon: Store,
+  id: 'inventory',
+  labelKey: 'inventory',
+  icon: Package,
   roles: ['owner', 'manager']
 }];
 
 // More menu items - secondary access (owner and manager only)
 const moreItems = [{
-  id: 'inventory',
-  labelKey: 'inventory',
-  icon: Package,
+  id: 'my-shop',
+  labelKey: 'my_shop',
+  icon: Store,
   roles: ['owner', 'manager']
 }, {
   id: 'product-pricing',

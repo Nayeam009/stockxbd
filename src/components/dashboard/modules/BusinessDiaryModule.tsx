@@ -692,6 +692,16 @@ export const BusinessDiaryModule = () => {
 
       {/* Sale Details Dialog */}
       <SaleDetailsDialog sale={selectedSale} open={!!selectedSale} onClose={() => setSelectedSale(null)} />
+
+      {/* Mobile FAB for quick expense logging */}
+      <Button
+        size="icon"
+        className="fixed bottom-24 right-4 z-40 md:hidden rounded-full w-14 h-14 shadow-lg bg-primary hover:bg-primary/90"
+        onClick={() => setAddDialogOpen(true)}
+        aria-label="Add expense"
+      >
+        <Plus className="h-6 w-6" />
+      </Button>
     </div>
   );
 };
