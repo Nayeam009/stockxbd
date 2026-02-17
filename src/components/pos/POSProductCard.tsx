@@ -1,3 +1,4 @@
+import React from "react";
 import { Badge } from "@/components/ui/badge";
 import { Cylinder, ChefHat, Gauge } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -19,7 +20,7 @@ interface LPGCardProps {
   onClick: () => void;
 }
 
-export const LPGProductCard = ({
+export const LPGProductCard = React.memo(({
   brand,
   cylinderType,
   weight,
@@ -48,7 +49,7 @@ export const LPGProductCard = ({
       className={cn(
         "relative p-2.5 rounded-lg text-left transition-all",
         "hover:shadow-md active:scale-[0.98]",
-        "min-h-[88px]", // Touch-friendly
+        "min-h-[88px] min-w-[140px]", // Touch-friendly + 320px safe
         isSaleMode && isOutOfStock && "opacity-50 cursor-not-allowed",
         isSaleMode
           ? "border border-transparent hover:border-emerald-500/50 bg-card"
@@ -127,7 +128,8 @@ export const LPGProductCard = ({
       </div>
     </button>
   );
-};
+});
+LPGProductCard.displayName = 'LPGProductCard';
 
 // ============= STOVE PRODUCT CARD =============
 interface StoveCardProps {
@@ -137,7 +139,7 @@ interface StoveCardProps {
   onClick: () => void;
 }
 
-export const StoveProductCard = ({ stove, price, pendingStock = 0, onClick }: StoveCardProps) => {
+export const StoveProductCard = React.memo(({ stove, price, pendingStock = 0, onClick }: StoveCardProps) => {
   const displayStock = Math.max(0, stove.quantity - pendingStock);
   const isOutOfStock = displayStock <= 0;
 
@@ -148,7 +150,7 @@ export const StoveProductCard = ({ stove, price, pendingStock = 0, onClick }: St
       className={cn(
         "relative p-2.5 rounded-lg text-left transition-all",
         "hover:shadow-md active:scale-[0.98]",
-        "min-h-[88px]",
+        "min-h-[88px] min-w-[140px]",
         isOutOfStock && "opacity-50 cursor-not-allowed",
         "border border-transparent hover:border-primary/50 bg-card"
       )}
@@ -192,7 +194,8 @@ export const StoveProductCard = ({ stove, price, pendingStock = 0, onClick }: St
       </div>
     </button>
   );
-};
+});
+StoveProductCard.displayName = 'StoveProductCard';
 
 // ============= REGULATOR PRODUCT CARD =============
 interface RegulatorCardProps {
@@ -202,7 +205,7 @@ interface RegulatorCardProps {
   onClick: () => void;
 }
 
-export const RegulatorProductCard = ({ regulator, price, pendingStock = 0, onClick }: RegulatorCardProps) => {
+export const RegulatorProductCard = React.memo(({ regulator, price, pendingStock = 0, onClick }: RegulatorCardProps) => {
   const displayStock = Math.max(0, regulator.quantity - pendingStock);
   const isOutOfStock = displayStock <= 0;
 
@@ -213,7 +216,7 @@ export const RegulatorProductCard = ({ regulator, price, pendingStock = 0, onCli
       className={cn(
         "relative p-2.5 rounded-lg text-left transition-all",
         "hover:shadow-md active:scale-[0.98]",
-        "min-h-[88px]",
+        "min-h-[88px] min-w-[140px]",
         isOutOfStock && "opacity-50 cursor-not-allowed",
         "border border-transparent hover:border-primary/50 bg-card"
       )}
@@ -252,7 +255,8 @@ export const RegulatorProductCard = ({ regulator, price, pendingStock = 0, onCli
       </div>
     </button>
   );
-};
+});
+RegulatorProductCard.displayName = 'RegulatorProductCard';
 
 // ============= CUSTOM ADD CARD =============
 interface CustomAddCardProps {
