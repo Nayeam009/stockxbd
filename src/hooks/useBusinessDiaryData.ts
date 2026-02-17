@@ -120,6 +120,9 @@ export const useBusinessDiaryData = (): UseBusinessDiaryDataReturn => {
 
       const roleMap = new Map<string, string>(userRoles?.map(r => [r.user_id, r.role]) || []);
 
+      // Default: fetch last 30 days only to avoid pulling entire history
+      const thirtyDaysAgo = format(subDays(new Date(), 30), 'yyyy-MM-dd');
+
       // Fetch POS transactions with items and created_by
       const { data: posTransactions, error: posError } = await supabase
         .from('pos_transactions')
@@ -145,6 +148,7 @@ export const useBusinessDiaryData = (): UseBusinessDiaryDataReturn => {
           )
         `)
         .eq('is_voided', false)
+        .gte('created_at', `${thirtyDaysAgo}T00:00:00+06:00`)
         .order('created_at', { ascending: false })
         .limit(500);
 
@@ -397,6 +401,9 @@ export const useBusinessDiaryData = (): UseBusinessDiaryDataReturn => {
         return role.charAt(0).toUpperCase() + role.slice(1);
       };
 
+      // Default: fetch last 30 days only
+      const thirtyDaysAgo = format(subDays(new Date(), 30), 'yyyy-MM-dd');
+
       // Fetch POB transactions
       const { data: pobTransactions, error: pobError } = await supabase
         .from('pob_transactions')
@@ -419,6 +426,7 @@ export const useBusinessDiaryData = (): UseBusinessDiaryDataReturn => {
           )
         `)
         .eq('is_voided', false)
+        .gte('created_at', `${thirtyDaysAgo}T00:00:00+06:00`)
         .order('created_at', { ascending: false })
         .limit(300);
 

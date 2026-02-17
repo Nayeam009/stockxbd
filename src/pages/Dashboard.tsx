@@ -322,10 +322,6 @@ const Dashboard = () => {
         case "analysis-search":
           return (
             <AnalysisSearchReportModule
-              salesData={[]}
-              customers={[]}
-              stockData={[]}
-              drivers={[]}
               userRole={dashboardRole}
             />
           );
