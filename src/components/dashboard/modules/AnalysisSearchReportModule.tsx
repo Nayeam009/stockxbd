@@ -127,20 +127,11 @@ export const AnalysisSearchReportModule = ({
       }, 800);
     };
 
-    const channel = supabase
-      .channel('analysis-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pos_transactions' }, debouncedRefetch)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pob_transactions' }, debouncedRefetch)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_expenses' }, debouncedRefetch)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'customer_payments' }, debouncedRefetch)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'staff_payments' }, debouncedRefetch)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicle_costs' }, debouncedRefetch)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'lpg_brands' }, debouncedRefetch)
-      .subscribe();
+    // Rely on unified realtime channel in useSharedQueries.ts
+    // TanStack Query cache invalidation will trigger refetch automatically
 
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
-      supabase.removeChannel(channel);
     };
   }, [refetch]);
 

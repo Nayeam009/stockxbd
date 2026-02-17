@@ -188,19 +188,8 @@ export const UtilityExpenseModule = () => {
     return () => { mountedRef.current = false; };
   }, [fetchAllData]);
 
-  // Real-time subscriptions
-  useEffect(() => {
-    const channel = supabase
-      .channel('utility-expense-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'staff' }, fetchStaffData)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'staff_payments' }, fetchStaffData)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicles' }, fetchVehicleData)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicle_costs' }, fetchVehicleData)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_expenses' }, fetchAllData)
-      .subscribe();
-    
-    return () => { supabase.removeChannel(channel); };
-  }, [fetchStaffData, fetchVehicleData, fetchAllData]);
+  // Rely on unified realtime channel in useSharedQueries.ts
+  // No duplicate channel needed here
 
   // ==================== Staff Actions ====================
   const handleAddStaff = async () => {
