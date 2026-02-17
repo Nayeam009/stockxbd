@@ -1,140 +1,103 @@
 
-# Phase 1: Health Check and Gap Analysis
 
-## Complete Audit Results
+# Phase 2: Database and Core Logic Refinement -- Audit Results
 
----
+## What Already Exists (No New Tables Needed)
 
-### SECTION A: CRITICAL BUGS (Must Fix)
+The requested tables map directly to existing infrastructure:
 
-**1. ExchangeModule references non-existent table `cylinder_exchanges`**
-- Location: `src/components/dashboard/modules/ExchangeModule.tsx` line 88
-- The module queries `cylinder_exchanges` table, but this table is separate from `cylinder_exchange_requests` (the inter-shop exchange system). However, the ExchangeModule is **never mounted** in `Dashboard.tsx` -- there is no case in the `renderActiveModule()` switch statement that renders it, and it does not appear in either `AppSidebar.tsx` or `MobileBottomNav.tsx`. It is effectively dead code.
+### 1. "lpg_inventory" Already Exists as `lpg_brands` + `product_prices`
 
-**2. OnlineDeliveryModule is dead code**
-- Location: `src/components/dashboard/modules/OnlineDeliveryModule.tsx` (758 lines)
-- Never imported or rendered in `Dashboard.tsx`. It was superseded by `MarketplaceOrdersModule` but never removed. This is 758 lines of dead weight in the bundle (though lazy-loaded, it still adds maintenance burden).
+| Requested Column | Existing Implementation |
+|---|---|
+| `brand` | `lpg_brands.name` (text) |
+| `cylinder_size` | `lpg_brands.weight` (e.g., "12kg", "35kg") + `lpg_brands.size` (valve: "22mm"/"20mm") |
+| `stock_status` (Full/Empty) | Split into 4 granular columns: `package_cylinder`, `refill_cylinder`, `empty_cylinder`, `problem_cylinder` |
+| `quantity` | Sum of the above columns per status |
+| `buy_price` / `sell_price` | Stored in `product_prices` table with `company_price`, `distributor_price`, `retail_price`, `package_price` per variant (Refill/Package) |
 
-**3. VehicleCostModule is dead code (duplicated)**
-- Location: `src/components/dashboard/modules/VehicleCostModule.tsx` (612 lines)
-- Dashboard maps `vehicle-cost` to `UtilityExpenseModule` (line 319), which already contains the full Vehicle Cost tab. `VehicleCostModule.tsx` is a standalone duplicate that is never rendered.
+Additionally, an `inventory_summary` materialized view exists with a `sync_inventory_summary` trigger that auto-updates aggregated counts.
 
-**4. Analysis module receives empty data arrays**
-- Location: `src/pages/Dashboard.tsx` lines 324-329
-- The `AnalysisSearchReportModule` is passed `salesData={[]}`, `customers={[]}`, `stockData={[]}`, `drivers={[]}`. While the module internally fetches its own data via `useBusinessDiaryData()`, the `customers` and `stockData` props feed the **search results** (lines 236-261 in AnalysisSearchReportModule). This means searching for customers or stock in the Analysis module returns zero results despite data existing in the database.
+### 2. "daily_transactions" Already Exists Across Multiple Tables
 
-**5. Analysis module navigation item uses wrong module ID**
-- Location: `src/components/dashboard/modules/AnalysisSearchReportModule.tsx` line 208
-- The "Online Delivery" navigation item uses `id: 'orders'` which does not match any Dashboard case. Should be `'marketplace-orders'`.
+| Requested Column | Existing Implementation |
+|---|---|
+| `transaction_type` (Income) | `pos_transactions` (sales) + `customer_payments` (due collections) |
+| `transaction_type` (Expense) | `pob_transactions` (purchases) + `daily_expenses` (manual) + `staff_payments` + `vehicle_costs` |
+| `category` | `daily_expenses.category` (Utility, Salary, etc.) + auto-categorized from source table |
+| `amount` | Each table has its own `total` / `amount` column |
+| `payment_method` | `pos_transactions.payment_method` (enum: cash, bkash, nagad, rocket, due, partial) |
+| `date` | `created_at` on all tables, `expense_date` on `daily_expenses` |
 
----
+The `useBusinessDiaryData` hook already aggregates all 5 source tables into unified `SaleEntry[]` and `ExpenseEntry[]` arrays with analytics (daily/weekly/monthly/yearly profit calculations).
 
-### SECTION B: DATA INTEGRITY ISSUES
+### 3. RLS Policies Already Enforce Multi-Tenant Isolation
 
-**6. Business Diary fetches ALL transactions without owner scoping**
-- Location: `src/hooks/useBusinessDiaryData.ts` lines 124-148
-- `fetchSalesData()` queries `pos_transactions` without filtering by `owner_id`. RLS handles this at the database level, but the query fetches up to 500 records without a date filter, pulling historical data unnecessarily. The date-specific `useBusinessDiaryQueries.ts` hook (used by the Business Diary module itself) is correctly scoped, but the Analysis module uses the unscoped `useBusinessDiaryData` hook.
-
-**7. Customer Management `fetchPayments` has no owner scope**
-- Location: `src/components/dashboard/modules/CustomerManagementModule.tsx` lines 179-191
-- `fetchPayments()` fetches ALL customer_payments without any filter. RLS protects it, but this will hit the 1000-row default limit for shops with high transaction volume.
-
-**8. POS sale creates inventory updates without transactions**
-- Location: `src/components/dashboard/modules/POSModule.tsx` lines 298-334
-- Each inventory update (refill, package, stove, regulator, return cylinders) is a separate `await supabase.from().update()` call. If any update fails mid-sequence, the transaction is already recorded but inventory is partially updated. There is no rollback mechanism.
+All tables use a consistent pattern:
+- `owner_id = get_owner_id()` for SELECT (team members see only their shop's data)
+- `is_admin(auth.uid())` for INSERT/UPDATE (only owners and managers can modify)
+- `has_role(auth.uid(), 'owner')` for DELETE (only owners can delete)
+- `is_super_admin(auth.uid())` for admin-level access
 
 ---
 
-### SECTION C: MOBILE RESPONSIVENESS ISSUES
+## Actual Gaps Found (What Needs Fixing)
 
-**9. POS product grid lacks min-width on 320px screens**
-- Location: `src/components/pos/POSProductCard.tsx`
-- Product cards use `p-2.5 rounded-lg` but the parent grid in POSModule (line 590+) doesn't enforce a minimum card width. On 320px screens with 2-column grid, cards can compress below readable size.
+### Gap 1: POS Inventory Updates Are Not Atomic
+**Problem:** When a sale completes in `POSModule.tsx`, inventory is updated via 3-5 separate `supabase.update()` calls. If one fails mid-sequence, the transaction is recorded but inventory is partially updated.
 
-**10. POS Sticky Footer overlaps bottom nav on short screens**
-- Location: `src/components/pos/POSStickyFooter.tsx` line 24
-- Uses `bottom-[calc(64px+env(safe-area-inset-bottom))]` which is correct, but when the keyboard opens on mobile (customer phone input), the footer can overlap the input fields.
+**Fix:** Create a single Postgres RPC function `complete_pos_sale` that wraps all updates in a database transaction.
 
-**11. Business Diary SummaryCards text truncation on 320px**
-- Location: `src/components/dashboard/modules/BusinessDiaryModule.tsx` lines 91-109
-- The 3-column grid of summary cards uses `text-[9px]` labels, but currency values (`text-sm sm:text-lg`) can still overflow on 320px width, especially for values above 99,999.
+### Gap 2: `customer_payments` Has No `owner_id` Scoping
+**Problem:** The `customer_payments` table has no `owner_id` column. RLS relies on `is_admin(auth.uid())` which allows any admin to see all payments across all shops. The `fetchPayments` function in CustomerManagement also has no team filter.
 
-**12. Exchange Module uses desktop Table layout**
-- Location: `src/components/dashboard/modules/ExchangeModule.tsx` lines 386-437
-- Uses HTML `<Table>` without any mobile card fallback. Columns would compress illegibly on small screens. However, since the module is dead code, this is moot unless it is revived.
+**Fix:** The table relies on the `customers` foreign key for implicit scoping (each customer belongs to an owner). However, the RLS policy should be tightened to check that the payment's customer belongs to the caller's team.
 
----
+### Gap 3: `staff_payments` and `vehicle_costs` Fetches in Business Diary Are Unbounded
+**Problem:** `useBusinessDiaryData` applies a 30-day filter to `pos_transactions` and `pob_transactions` but NOT to `staff_payments` (line 436) or `vehicle_costs` (line 457). These fetch ALL records with only a `.limit(200)`.
 
-### SECTION D: PERFORMANCE ISSUES
+**Fix:** Apply the same `thirtyDaysAgo` date filter to these queries.
 
-**13. useBusinessDiaryData fetches unbounded data on mount**
-- Location: `src/hooks/useBusinessDiaryData.ts` lines 124-149, 401-423
-- Fetches up to 500 POS transactions + 300 POB transactions + 200 staff payments + 200 vehicle costs + unlimited manual expenses on EVERY mount. No date range filter. This causes a noticeable delay when the Analysis module loads.
+### Gap 4: Duplicate RLS Policies on `customer_payments`
+**Problem:** The `customer_payments` table has duplicate INSERT, SELECT, UPDATE, and DELETE policies (e.g., "Admins can insert customer payments" AND "Admins can insert customer_payments"). This is redundant and confusing.
 
-**14. UtilityExpenseModule creates its own realtime channel**
-- Location: `src/components/dashboard/modules/UtilityExpenseModule.tsx` lines 192-203
-- Subscribes to `staff`, `staff_payments`, `vehicles`, `vehicle_costs`, and `daily_expenses` tables in its own channel, separate from the unified `dashboard-master` channel. This creates duplicate subscriptions.
-
-**15. Analysis module creates its own realtime channel**
-- Location: `src/components/dashboard/modules/AnalysisSearchReportModule.tsx` lines 125-150
-- Another separate channel (`analysis-realtime`) subscribing to 7 tables, duplicating the unified channel.
-
-**16. CustomerManagementModule is 1908 lines in a single file**
-- Location: `src/components/dashboard/modules/CustomerManagementModule.tsx`
-- Contains all CRUD logic, memo recall search, invoice printing, and 4 different view modes in one monolithic component. This hurts code splitting and increases re-render scope.
+**Fix:** Clean up duplicate policies, keeping only the simpler `is_admin()` versions.
 
 ---
 
-### SECTION E: GAP ANALYSIS (Missing/Incomplete Features)
+## Implementation Plan
 
-**17. ExchangeModule has no navigation entry**
-- Not accessible from sidebar, bottom nav, or quick actions. Dead module.
+### Step 1: Create Atomic POS Sale RPC
+Create a database function `complete_pos_sale` that:
+- Inserts the `pos_transactions` record
+- Inserts all `pos_transaction_items`
+- Updates `lpg_brands` inventory (decrement refill/package, increment empty)
+- Updates `stoves` / `regulators` quantities
+- Updates `customers.total_due` if payment is due/partial
+- Inserts into `daily_expenses` if needed
+- All within a single transaction (automatic rollback on failure)
 
-**18. OnlineDeliveryModule superseded but not removed**
-- 758 lines of unused code. The `MarketplaceOrdersModule` replaced it entirely.
+### Step 2: Fix Unbounded Fetches in Business Diary
+Add `thirtyDaysAgo` date filter to `staff_payments` and `vehicle_costs` queries in `useBusinessDiaryData.ts`.
 
-**19. VehicleCostModule superseded but not removed**
-- 612 lines of unused code. The `UtilityExpenseModule` contains this functionality.
+### Step 3: Clean Up Duplicate RLS on `customer_payments`
+Drop the 4 duplicate policies and keep the cleaner versions.
 
-**20. No "week" or "month" date range in Business Diary**
-- The `dateRangeOption` type includes `'week' | 'month'` but only `'today'`, `'yesterday'`, and `'custom'` buttons are rendered in the UI (lines 389-395). Week/month ranges exist in the type but have no UI controls.
+### Step 4: Tighten `customer_payments` RLS
+Update SELECT/INSERT policies to verify the payment's `customer_id` belongs to the caller's team via `customers.owner_id = get_owner_id()`.
 
 ---
 
-## IMPLEMENTATION PLAN (Priority Order)
+## Technical Details
 
-### Priority 1: Fix Critical Bugs (Immediate)
+### Files to Modify
+- **New migration**: Atomic POS RPC function + RLS cleanup
+- `src/hooks/useBusinessDiaryData.ts`: Add date filters to staff/vehicle queries
+- `src/components/dashboard/modules/POSModule.tsx`: Call RPC instead of individual updates
 
-| # | Fix | Files | Effort |
-|---|-----|-------|--------|
-| 1 | Fix Analysis module search -- pass real customer/stock data or use shared queries internally | `Dashboard.tsx`, `AnalysisSearchReportModule.tsx` | Medium |
-| 2 | Fix Analysis nav item `'orders'` to `'marketplace-orders'` | `AnalysisSearchReportModule.tsx` | Trivial |
-| 3 | Delete dead code: `OnlineDeliveryModule.tsx`, `VehicleCostModule.tsx`, `ExchangeModule.tsx` | 3 files deleted | Trivial |
+### No New Tables Required
+The existing schema (`lpg_brands` + `product_prices` + `inventory_summary` + `pos_transactions` + `pob_transactions` + `daily_expenses` + `staff_payments` + `vehicle_costs`) already provides full coverage for both Inventory and Business Diary requirements. Creating duplicate tables would fragment the data and break existing module integrations.
 
-### Priority 2: Data Integrity Hardening
+### TypeScript Types
+The `src/integrations/supabase/types.ts` file is auto-generated from the database schema. No manual updates are needed -- it will regenerate automatically after the migration runs.
 
-| # | Fix | Files | Effort |
-|---|-----|-------|--------|
-| 4 | Add date-range filter to `useBusinessDiaryData` (default: last 30 days) | `useBusinessDiaryData.ts` | Medium |
-| 5 | Add `.limit(500)` and owner-scoping to `fetchPayments` in Customer module | `CustomerManagementModule.tsx` | Low |
-| 6 | Wrap POS inventory updates in a single RPC function for atomicity | New migration + `POSModule.tsx` | High |
-
-### Priority 3: Performance Optimization
-
-| # | Fix | Files | Effort |
-|---|-----|-------|--------|
-| 7 | Remove duplicate realtime channels in Utility/Analysis, use unified channel | `UtilityExpenseModule.tsx`, `AnalysisSearchReportModule.tsx` | Medium |
-| 8 | Add Business Diary "This Week" and "This Month" date range buttons | `BusinessDiaryModule.tsx` | Low |
-
-### Priority 4: Mobile Polish
-
-| # | Fix | Files | Effort |
-|---|-----|-------|--------|
-| 9 | Enforce `min-w-[140px]` on POS product cards for 320px screens | `POSModule.tsx` | Trivial |
-| 10 | Add `tabular-nums` and `max-w` overflow handling to Business Diary summary cards | `BusinessDiaryModule.tsx` | Trivial |
-
-### Technical Notes
-
-- **Dead code removal** (items 17-19) will reduce the codebase by ~1,800 lines and simplify the import graph
-- **Atomic POS updates** (item 6) is the highest-effort fix but the most impactful for data integrity -- it requires a new Postgres function that handles sale + inventory + customer update in a single transaction
-- **Realtime channel consolidation** (item 7) will reduce WebSocket connections from 4+ to 1 per dashboard session
