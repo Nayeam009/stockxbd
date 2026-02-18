@@ -50,6 +50,7 @@ interface POSCustomerLookupProps {
 
 export const POSCustomerLookup = ({
   customers,
+  saleType,
   discount,
   onDiscountChange,
   userRole,
@@ -170,6 +171,13 @@ export const POSCustomerLookup = ({
                 Old Customer
               </Badge>
             )}
+            {status === 'found' && customer && (customer as any).customer_type && (
+              <Badge className={(customer as any).customer_type === 'wholesale'
+                ? 'bg-purple-100 text-purple-700 border border-purple-300 dark:bg-purple-900/30 dark:text-purple-400'
+                : 'bg-sky-100 text-sky-700 border border-sky-300 dark:bg-sky-900/30 dark:text-sky-400'}>
+                {(customer as any).customer_type === 'wholesale' ? '🟣 Wholesale' : '🔵 Retail'}
+              </Badge>
+            )}
             {status === 'new' && (
               <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
                 <Sparkles className="h-3 w-3 mr-1" />
@@ -197,6 +205,15 @@ export const POSCustomerLookup = ({
               Browse
             </Button>
           </div>
+
+          {/* Cross-type warning */}
+          {status === 'found' && customer &&
+           saleType === 'retail' && (customer as any).customer_type === 'wholesale' && (
+            <div className="flex items-center gap-2 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-xs text-amber-700 dark:text-amber-400">
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+              <span>Wholesale account — this sale is set to Retail pricing.</span>
+            </div>
+          )}
 
           {/* Customer Details Form */}
           <div className="grid grid-cols-1 gap-3">
@@ -344,7 +361,14 @@ export const POSCustomerLookup = ({
                           </span>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm truncate">{cust.name}</p>
+                          <div className="flex items-center gap-1.5">
+                            <p className="font-medium text-sm truncate">{cust.name}</p>
+                            <Badge className={(cust as any).customer_type === 'wholesale'
+                              ? 'text-[9px] px-1.5 py-0 bg-purple-100 text-purple-700 border border-purple-300 dark:bg-purple-900/30 dark:text-purple-400'
+                              : 'text-[9px] px-1.5 py-0 bg-sky-100 text-sky-700 border border-sky-300 dark:bg-sky-900/30 dark:text-sky-400'}>
+                              {(cust as any).customer_type === 'wholesale' ? 'WS' : 'RT'}
+                            </Badge>
+                          </div>
                           <p className="text-xs text-muted-foreground truncate">
                             {cust.phone || 'No phone'} • {cust.address || 'No address'}
                           </p>

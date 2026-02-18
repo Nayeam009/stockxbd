@@ -1198,7 +1198,7 @@ export const CustomerManagementModule = () => {
           <EmptyStateCard
             icon={<Users className="h-8 w-8" />}
             title={`No ${isWholesale ? 'wholesale' : 'retail'} customers yet`}
-            description={`Add your first ${isWholesale ? 'wholesale account' : 'retail customer'} to get started`}
+            subtitle={`Add your first ${isWholesale ? 'wholesale account' : 'retail customer'} to get started`}
           />
         ) : (
           <div className="space-y-2">
@@ -1306,7 +1306,7 @@ export const CustomerManagementModule = () => {
     );
   }
 
-
+  if (viewMode === 'due') {
     return (
       <div className="space-y-4 sm:space-y-6 pb-4">
         {/* Premium Header */}
