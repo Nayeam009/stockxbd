@@ -1124,7 +1124,7 @@ export const CustomerManagementModule = () => {
         {/* Premium Summary Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
           {/* Due Accounts */}
-          <Card className="relative overflow-hidden border-0 shadow-lg">
+          <Card className="relative overflow-hidden border border-border/20 shadow-sm">
             <div className="absolute inset-0 bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-transparent" />
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-rose-500 to-rose-400" />
             <CardContent className="relative p-4 sm:p-5">
@@ -1142,7 +1142,7 @@ export const CustomerManagementModule = () => {
           </Card>
 
           {/* Total Amount Due */}
-          <Card className="relative overflow-hidden border-0 shadow-lg">
+          <Card className="relative overflow-hidden border border-border/20 shadow-sm">
             <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent" />
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 to-amber-400" />
             <CardContent className="relative p-4 sm:p-5">
@@ -1162,7 +1162,7 @@ export const CustomerManagementModule = () => {
           </Card>
 
           {/* Total Cylinders Due */}
-          <Card className="relative overflow-hidden border-0 shadow-lg">
+          <Card className="relative overflow-hidden border border-border/20 shadow-sm">
             <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 via-purple-500/5 to-transparent" />
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 to-purple-400" />
             <CardContent className="relative p-4 sm:p-5">
@@ -1192,7 +1192,7 @@ export const CustomerManagementModule = () => {
         </div>
 
         {/* Customer List - Mobile Cards / Desktop Table */}
-        <Card className="relative overflow-hidden border-0 shadow-lg">
+        <Card className="relative overflow-hidden border border-border/20 shadow-sm">
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-rose-500 to-rose-400" />
           <CardHeader className="pb-3">
             <div className="flex items-center gap-2">
@@ -1353,12 +1353,14 @@ export const CustomerManagementModule = () => {
                   ))}
                   {filteredDueCustomers.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-12">
-                        <div className="h-16 w-16 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-4">
-                          <UserCheck className="h-8 w-8 text-muted-foreground" />
-                        </div>
-                        <p className="text-muted-foreground font-medium">No due customers found</p>
-                        <p className="text-xs text-muted-foreground mt-1">All accounts are settled!</p>
+                      <TableCell colSpan={5} className="py-0 border-0">
+                        <EmptyStateCard
+                          icon={<UserCheck className="h-10 w-10" />}
+                          title={searchQuery ? "No results found" : "No outstanding dues"}
+                          subtitle={searchQuery ? `No customers match "${searchQuery}"` : "All customers are fully paid up"}
+                          colorScheme="emerald"
+                          className="border-0 bg-transparent"
+                        />
                       </TableCell>
                     </TableRow>
                   )}
@@ -1618,9 +1620,9 @@ export const CustomerManagementModule = () => {
         />
       </div>
 
-      {/* Customer List - Mobile Cards / Desktop Table */}
-      <Card className="relative overflow-hidden border-0 shadow-lg">
-        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-emerald-400" />
+        {/* Customer List - Mobile Cards / Desktop Table */}
+        <Card className="relative overflow-hidden border border-border/20 shadow-sm">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-emerald-400" />
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
@@ -1637,6 +1639,14 @@ export const CustomerManagementModule = () => {
         <CardContent className="pt-0">
           {/* Mobile Card View */}
           <div className="sm:hidden space-y-3">
+            {filteredPaidCustomers.length === 0 && (
+              <EmptyStateCard
+                icon={<Users className="h-10 w-10" />}
+                title={searchQuery ? "No results found" : "No fully paid customers yet"}
+                subtitle={searchQuery ? `No customers match "${searchQuery}"` : "Complete a sale with full payment to see customers here"}
+                colorScheme="muted"
+              />
+            )}
             {filteredPaidCustomers.map((customer, index) => (
               <Card
                 key={customer.id}
@@ -1677,20 +1687,11 @@ export const CustomerManagementModule = () => {
                 </CardContent>
               </Card>
             ))}
-            {filteredPaidCustomers.length === 0 && (
-              <div className="text-center py-12">
-                <div className="h-16 w-16 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-4">
-                  <Users className="h-8 w-8 text-muted-foreground" />
-                </div>
-                <p className="text-muted-foreground font-medium">No paid customers found</p>
-                <p className="text-xs text-muted-foreground mt-1">Try adjusting your search</p>
-              </div>
-            )}
           </div>
 
           {/* Desktop Table View */}
-          <div className="hidden sm:block">
-            <Table>
+          <div className="hidden sm:block overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
+            <Table className="min-w-[600px]">
               <TableHeader>
                 <TableRow className="border-border hover:bg-transparent">
                   <TableHead className="text-muted-foreground font-semibold">Customer ID</TableHead>
@@ -1749,12 +1750,14 @@ export const CustomerManagementModule = () => {
                 ))}
                 {filteredPaidCustomers.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-12">
-                      <div className="h-16 w-16 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-4">
-                        <Users className="h-8 w-8 text-muted-foreground" />
-                      </div>
-                      <p className="text-muted-foreground font-medium">No paid customers found</p>
-                      <p className="text-xs text-muted-foreground mt-1">Try adjusting your search</p>
+                    <TableCell colSpan={6} className="py-0 border-0">
+                      <EmptyStateCard
+                        icon={<Users className="h-10 w-10" />}
+                        title={searchQuery ? "No results found" : "No fully paid customers yet"}
+                        subtitle={searchQuery ? `No customers match "${searchQuery}"` : "Complete a sale with full payment to see customers here"}
+                        colorScheme="muted"
+                        className="border-0 bg-transparent"
+                      />
                     </TableCell>
                   </TableRow>
                 )}
