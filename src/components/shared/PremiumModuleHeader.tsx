@@ -4,7 +4,7 @@ import { RefreshCcw, ArrowLeft } from "lucide-react";
 
 interface PremiumModuleHeaderProps {
   title: string;
-  subtitle: string;
+  subtitle: ReactNode;
   icon: ReactNode;
   gradientFrom?: string;
   gradientTo?: string;

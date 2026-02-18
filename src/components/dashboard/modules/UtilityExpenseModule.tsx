@@ -321,7 +321,16 @@ export const UtilityExpenseModule = () => {
     if (!user.user) return;
 
     const vehicle = vehicles.find(v => v.id === newCost.vehicle_id);
-    const costData = {
+    const costData: {
+      vehicle_id: string;
+      cost_type: string;
+      description: string | null;
+      amount: number;
+      cost_date: string;
+      created_by: string;
+      liters_filled?: number | null;
+      odometer_reading?: number | null;
+    } = {
       vehicle_id: newCost.vehicle_id,
       cost_type: newCost.cost_type,
       description: newCost.description || null,
