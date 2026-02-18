@@ -26,6 +26,7 @@ import { usePOSData } from "@/hooks/usePOSData";
 import { usePOSCart, SaleItem, ReturnItem } from "@/hooks/usePOSCart";
 import { sharedKeys } from "@/hooks/useSharedQueries";
 import { notifySaleCompleted } from "@/lib/moduleEvents";
+import { PremiumModuleHeader } from "@/components/shared/PremiumModuleHeader";
 import { POSSkeleton } from "@/components/pos/POSSkeleton";
 import { POSQuickStats } from "@/components/pos/POSQuickStats";
 import { POSStickyFooter } from "@/components/pos/POSStickyFooter";
@@ -383,16 +384,12 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
       <div className="space-y-3 pb-24 lg:pb-4">
         {/* Header */}
         <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg shrink-0">
-              <ShoppingCart className="h-5 w-5 text-primary-foreground" />
-            </div>
-            <div>
-              <h1 className="text-lg sm:text-xl font-bold text-foreground tracking-tight">{t('pos')}</h1>
-              <p className="text-[10px] sm:text-xs text-muted-foreground">Point of Sale — Fast Checkout <span className="hidden sm:inline text-primary/70">• Enter to Pay</span></p>
-            </div>
-          </div>
-          <div className="flex items-center gap-1.5">
+          <PremiumModuleHeader
+            title={t('pos')}
+            subtitle={<span>Point of Sale — Fast Checkout <span className="hidden sm:inline text-primary/70">• Enter to Pay</span></span>}
+            icon={<ShoppingCart className="h-5 w-5 text-primary-foreground" />}
+          />
+          <div className="flex items-center gap-1.5 -mt-2">
             <Button onClick={() => setShowBarcodeScanner(true)} variant="outline" size="sm" className="h-9 w-9 p-0">
               <ScanLine className="h-4 w-4" />
             </Button>

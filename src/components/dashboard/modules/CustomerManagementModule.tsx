@@ -1044,7 +1044,7 @@ export const CustomerManagementModule = () => {
 
               <TabsContent value="payments" className="flex-1 overflow-auto mt-4">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 z-10 bg-card">
                     <TableRow className="border-border">
                       <TableHead className="text-muted-foreground font-semibold">Date</TableHead>
                       <TableHead className="text-muted-foreground font-semibold text-right">Amount</TableHead>
