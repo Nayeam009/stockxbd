@@ -402,6 +402,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           credit_limit: number | null
+          customer_type: string
           cylinders_due: number | null
           email: string | null
           id: string
@@ -419,6 +420,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           credit_limit?: number | null
+          customer_type?: string
           cylinders_due?: number | null
           email?: string | null
           id?: string
@@ -436,6 +438,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           credit_limit?: number | null
+          customer_type?: string
           cylinders_due?: number | null
           email?: string | null
           id?: string

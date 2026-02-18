@@ -39,6 +39,7 @@ interface CustomerState {
 
 interface POSCustomerLookupProps {
   customers: Customer[];
+  saleType: 'retail' | 'wholesale';
   discount: number;
   onDiscountChange: (value: number) => void;
   userRole: 'owner' | 'manager';

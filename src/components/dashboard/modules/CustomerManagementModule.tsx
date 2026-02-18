@@ -36,7 +36,8 @@ import {
   Printer,
   FileText,
   Phone,
-  X
+  X,
+  Building2
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -51,6 +52,8 @@ import { useModuleEvent } from "@/lib/moduleEvents";
 import { PremiumModuleHeader } from "@/components/shared/PremiumModuleHeader";
 import { EmptyStateCard } from "@/components/shared/EmptyStateCard";
 
+type ViewMode = 'main' | 'due' | 'paid' | 'memo-search' | 'retail' | 'wholesale';
+
 interface Customer {
   id: string;
   name: string;
@@ -62,6 +65,8 @@ interface Customer {
   billing_status: string;
   last_order_date: string | null;
   created_at: string;
+  customer_type: 'retail' | 'wholesale';
+  credit_limit?: number;
 }
 
 interface SalesRecord {
@@ -81,7 +86,6 @@ interface CustomerPayment {
   notes: string | null;
 }
 
-type ViewMode = 'main' | 'due' | 'paid' | 'memo-search';
 
 interface POSTransaction {
   id: string;
@@ -127,7 +131,9 @@ export const CustomerManagementModule = () => {
     cylinders_due: c.cylinders_due || 0,
     billing_status: c.billing_status || 'clear',
     last_order_date: c.last_order_date,
-    created_at: c.created_at
+    created_at: c.created_at,
+    customer_type: c.customer_type || 'retail',
+    credit_limit: c.credit_limit,
   }));
   
   const [viewMode, setViewMode] = useState<ViewMode>('main');
@@ -143,6 +149,7 @@ export const CustomerManagementModule = () => {
   const [paymentAmount, setPaymentAmount] = useState("");
   const [cylindersToCollect, setCylindersToCollect] = useState("");
   const [historyTab, setHistoryTab] = useState<'payments' | 'sales'>('sales');
+  const [newCustomerType, setNewCustomerType] = useState<'retail' | 'wholesale'>('retail');
   const [newCustomer, setNewCustomer] = useState({
     name: "",
     email: "",
@@ -255,7 +262,7 @@ export const CustomerManagementModule = () => {
 
       if (customersByPhone) {
         customersByPhone.forEach(c => {
-          results.push({ type: 'customer', customer: c });
+          results.push({ type: 'customer', customer: { ...c, customer_type: ((c as any).customer_type || 'retail') as 'retail' | 'wholesale' } as Customer });
         });
       }
 
@@ -270,7 +277,7 @@ export const CustomerManagementModule = () => {
         customersByName.forEach(c => {
           // Avoid duplicates
           if (!results.find(r => r.type === 'customer' && r.customer?.id === c.id)) {
-            results.push({ type: 'customer', customer: c });
+            results.push({ type: 'customer', customer: { ...c, customer_type: ((c as any).customer_type || 'retail') as 'retail' | 'wholesale' } as Customer });
           }
         });
       }
@@ -489,10 +496,11 @@ export const CustomerManagementModule = () => {
         total_due: totalDue,
         cylinders_due: cylindersDue,
         credit_limit: creditLimit,
+        customer_type: newCustomerType,
         billing_status: totalDue > 0 || cylindersDue > 0 ? 'pending' : 'clear',
         created_by: user?.id,
-        owner_id: ownerId || user?.id // Ensure owner_id is set
-      });
+        owner_id: ownerId || user?.id
+      } as any);
 
     if (error) {
       logger.error('Error adding customer', error, { component: 'CustomerManagement' });
@@ -502,6 +510,7 @@ export const CustomerManagementModule = () => {
 
     toast({ title: "Customer added successfully" });
     setAddCustomerDialogOpen(false);
+    setNewCustomerType('retail');
     setNewCustomer({ name: "", email: "", phone: "", address: "", total_due: "", cylinders_due: "", credit_limit: "10000" });
     fetchCustomers();
   };
@@ -859,13 +868,76 @@ export const CustomerManagementModule = () => {
           </Card>
         </div>
 
-        {/* Add Customer Dialog */}
+        {/* Customer Segments */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-5">
+          {/* Retail Customers Card */}
+          <Card className="relative overflow-hidden border border-border/20 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer group" onClick={() => setViewMode('retail')}>
+            <div className="absolute inset-0 bg-gradient-to-br from-sky-500/5 via-card to-card group-hover:from-sky-500/10 transition-colors" />
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-sky-500 to-sky-400" />
+            <CardContent className="relative p-4 sm:p-6">
+              <div className="flex items-start gap-4 mb-4">
+                <div className="p-3 rounded-xl bg-sky-500/20 group-hover:scale-110 transition-transform shrink-0">
+                  <ShoppingCart className="h-6 w-6 text-sky-500" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-base sm:text-lg font-bold text-foreground">Retail Customers</h3>
+                  <p className="text-xs text-muted-foreground">Speed & Volume · Walk-in & delivery</p>
+                  <p className="text-2xl font-bold text-sky-600 dark:text-sky-400 tabular-nums mt-1">
+                    {customers.filter(c => c.customer_type === 'retail').length}
+                  </p>
+                </div>
+              </div>
+              <Button className="w-full bg-sky-500 hover:bg-sky-600 text-white h-10 text-sm font-medium touch-manipulation">
+                Manage Retail <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Wholesale Accounts Card */}
+          <Card className="relative overflow-hidden border border-border/20 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer group" onClick={() => setViewMode('wholesale')}>
+            <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 via-card to-card group-hover:from-purple-500/10 transition-colors" />
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-600 to-purple-400" />
+            <CardContent className="relative p-4 sm:p-6">
+              <div className="flex items-start gap-4 mb-4">
+                <div className="p-3 rounded-xl bg-purple-500/20 group-hover:scale-110 transition-transform shrink-0">
+                  <Building2 className="h-6 w-6 text-purple-600" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-base sm:text-lg font-bold text-foreground">Wholesale Accounts</h3>
+                  <p className="text-xs text-muted-foreground">Credit & Ledger · Account management</p>
+                  <p className="text-2xl font-bold text-purple-600 dark:text-purple-400 tabular-nums mt-1">
+                    {customers.filter(c => c.customer_type === 'wholesale').length}
+                  </p>
+                </div>
+              </div>
+              <Button className="w-full bg-purple-600 hover:bg-purple-700 text-white h-10 text-sm font-medium touch-manipulation">
+                Manage Wholesale <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+
+
         <Dialog open={addCustomerDialogOpen} onOpenChange={setAddCustomerDialogOpen}>
           <DialogContent className="bg-card border-border max-w-md">
             <DialogHeader>
               <DialogTitle>Add New Customer</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 py-4">
+              {/* Customer Type Toggle */}
+              <div>
+                <label className="text-sm font-medium text-foreground">Customer Type</label>
+                <div className="grid grid-cols-2 gap-2 p-1 bg-muted rounded-lg mt-1">
+                  <button type="button" onClick={() => { setNewCustomerType('retail'); setNewCustomer(p => ({...p, credit_limit: '10000'})); }}
+                    className={`flex items-center justify-center gap-2 h-10 rounded-md text-sm font-semibold transition-all ${newCustomerType === 'retail' ? 'bg-sky-500 text-white shadow-md' : 'text-muted-foreground'}`}>
+                    <ShoppingCart className="h-4 w-4" /> Retail
+                  </button>
+                  <button type="button" onClick={() => { setNewCustomerType('wholesale'); setNewCustomer(p => ({...p, credit_limit: '50000'})); }}
+                    className={`flex items-center justify-center gap-2 h-10 rounded-md text-sm font-semibold transition-all ${newCustomerType === 'wholesale' ? 'bg-purple-600 text-white shadow-md' : 'text-muted-foreground'}`}>
+                    <Building2 className="h-4 w-4" /> Wholesale
+                  </button>
+                </div>
+              </div>
               <div>
                 <label className="text-sm font-medium text-foreground">Customer Name *</label>
                 <Input
@@ -1090,8 +1162,151 @@ export const CustomerManagementModule = () => {
     );
   }
 
-  // Due Customers View
-  if (viewMode === 'due') {
+  // Retail Customers View
+  if (viewMode === 'retail' || viewMode === 'wholesale') {
+    const segmentCustomers = customers.filter(c => c.customer_type === (viewMode === 'retail' ? 'retail' : 'wholesale'));
+    const isWholesale = viewMode === 'wholesale';
+    const filtered = segmentCustomers.filter(c =>
+      c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      c.phone?.includes(searchQuery)
+    );
+
+    return (
+      <div className="space-y-4 pb-4">
+        <PremiumModuleHeader
+          title={isWholesale ? 'Wholesale Accounts' : 'Retail Customers'}
+          subtitle={isWholesale ? 'Credit & ledger management' : 'Speed & volume · Walk-in customers'}
+          icon={isWholesale ? <Building2 className="h-6 w-6 text-primary-foreground" /> : <ShoppingCart className="h-6 w-6 text-primary-foreground" />}
+          actions={
+            <Button variant="outline" size="sm" className="h-10" onClick={() => setViewMode('main')}>
+              ← Back
+            </Button>
+          }
+        />
+
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder={`Search ${isWholesale ? 'wholesale' : 'retail'} customers...`}
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="pl-10 h-11"
+          />
+        </div>
+
+        {filtered.length === 0 ? (
+          <EmptyStateCard
+            icon={<Users className="h-8 w-8" />}
+            title={`No ${isWholesale ? 'wholesale' : 'retail'} customers yet`}
+            description={`Add your first ${isWholesale ? 'wholesale account' : 'retail customer'} to get started`}
+          />
+        ) : (
+          <div className="space-y-2">
+            {filtered.map(c => (
+              <Card key={c.id} className="border-border/40 shadow-sm">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${isWholesale ? 'bg-purple-500/20' : 'bg-sky-500/20'}`}>
+                      <span className={`text-sm font-bold ${isWholesale ? 'text-purple-600' : 'text-sky-600'}`}>
+                        {c.name.charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-foreground truncate">{c.name}</p>
+                        <Badge className={`text-[10px] ${isWholesale ? 'bg-purple-500/20 text-purple-600 border-purple-500/30' : 'bg-sky-500/20 text-sky-600 border-sky-500/30'}`}>
+                          {isWholesale ? 'Wholesale' : 'Retail'}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{c.phone || 'No phone'}</p>
+                      {isWholesale && c.credit_limit && (
+                        <div className="mt-1">
+                          <div className="flex justify-between text-xs mb-0.5">
+                            <span className="text-muted-foreground">Credit used</span>
+                            <span className="tabular-nums">{BANGLADESHI_CURRENCY_SYMBOL}{(c.total_due || 0).toLocaleString()} / {BANGLADESHI_CURRENCY_SYMBOL}{c.credit_limit.toLocaleString()}</span>
+                          </div>
+                          <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                            <div
+                              className="h-full rounded-full bg-purple-500 transition-all"
+                              style={{ width: `${Math.min(100, ((c.total_due || 0) / c.credit_limit) * 100)}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-1 shrink-0">
+                      {c.total_due > 0 && (
+                        <Badge variant="destructive" className="text-[10px]">Due: {BANGLADESHI_CURRENCY_SYMBOL}{c.total_due.toLocaleString()}</Badge>
+                      )}
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => { setSelectedCustomer(c); fetchCustomerSalesHistory(c.id); fetchPayments(); setHistoryDialogOpen(true); }}>
+                          <History className="h-3.5 w-3.5" />
+                        </Button>
+                        {c.total_due > 0 && (
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-emerald-600" onClick={() => { setSelectedCustomer(c); fetchPayments(); setSettleDialogOpen(true); }}>
+                            <Banknote className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        {/* Reuse existing dialogs */}
+        <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
+          <DialogContent className="bg-card border-border max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+            <DialogHeader className="shrink-0">
+              <DialogTitle>Customer History — {selectedCustomer?.name}</DialogTitle>
+            </DialogHeader>
+            <Tabs defaultValue="sales" className="flex-1 overflow-hidden flex flex-col">
+              <TabsList className="grid w-full grid-cols-2 shrink-0">
+                <TabsTrigger value="sales"><ShoppingCart className="h-4 w-4 mr-2" />Purchase History</TabsTrigger>
+                <TabsTrigger value="payments"><Banknote className="h-4 w-4 mr-2" />Payments</TabsTrigger>
+              </TabsList>
+              <TabsContent value="sales" className="flex-1 overflow-auto mt-4">
+                {salesHistory.length === 0 ? <div className="text-center py-8 text-muted-foreground">No purchases found</div> : salesHistory.map(tx => (
+                  <Card key={tx.id} className="border-border/50 shadow-sm mb-2 cursor-pointer" onClick={() => handleViewTransaction(tx)}>
+                    <CardContent className="p-3 flex items-center justify-between gap-3">
+                      <div><p className="font-mono text-sm font-semibold">{tx.transaction_number}</p><p className="text-xs text-muted-foreground">{format(new Date(tx.created_at), 'MMM dd, yyyy')}</p></div>
+                      <p className="font-bold tabular-nums">{BANGLADESHI_CURRENCY_SYMBOL}{tx.total.toLocaleString()}</p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </TabsContent>
+              <TabsContent value="payments" className="flex-1 overflow-auto mt-4">
+                {selectedCustomer && getCustomerPayments(selectedCustomer.id).length === 0 ? <div className="text-center py-8 text-muted-foreground">No payments found</div> : selectedCustomer && getCustomerPayments(selectedCustomer.id).map(p => (
+                  <Card key={p.id} className="border-border/50 shadow-sm mb-2">
+                    <CardContent className="p-3 flex items-center justify-between">
+                      <p className="text-sm">{format(new Date(p.payment_date), 'MMM dd, yyyy')}</p>
+                      <p className="font-bold text-emerald-600 tabular-nums">{BANGLADESHI_CURRENCY_SYMBOL}{Number(p.amount).toLocaleString()}</p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </TabsContent>
+            </Tabs>
+          </DialogContent>
+        </Dialog>
+        <Dialog open={settleDialogOpen} onOpenChange={setSettleDialogOpen}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader><DialogTitle>Settle Account — {selectedCustomer?.name}</DialogTitle></DialogHeader>
+            <div className="space-y-3 py-2">
+              <div><label className="text-sm font-medium">Payment Amount ({BANGLADESHI_CURRENCY_SYMBOL})</label>
+                <Input type="number" value={paymentAmount} onChange={e => setPaymentAmount(e.target.value)} className="mt-1 h-11" placeholder="0" /></div>
+              <div><label className="text-sm font-medium">Cylinders to Collect</label>
+                <Input type="number" value={cylindersToCollect} onChange={e => setCylindersToCollect(e.target.value)} className="mt-1 h-11" placeholder="0" /></div>
+            </div>
+            <DialogFooter><Button variant="outline" onClick={() => setSettleDialogOpen(false)}>Cancel</Button><Button onClick={handleSettleAccount}>Save Settlement</Button></DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
+
+
     return (
       <div className="space-y-4 sm:space-y-6 pb-4">
         {/* Premium Header */}
