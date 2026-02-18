@@ -1,162 +1,218 @@
 
-# Cross-Module Connectivity Audit: Repair Plan
+# "Shop Owner Day" Workflow Simulation: Broken Links Report
 
 ## Executive Summary
 
-After tracing all 10 modules through their data sources, hooks, RPC calls, and event wires, the system is **substantially solid**. The atomic `complete_pos_sale` RPC, unified React Query cache, and the `moduleEvents` bus form a strong backbone. However, there are **7 real gaps** across 4 categories that need to be fixed for commercial-grade reliability.
+After tracing the full code path for each of the 5 simulated workflow steps, the system is **largely functional** but has **4 real broken links** and **3 UX friction points**. The core POS→Inventory→Diary data flow works. The gaps are concentrated in missing integration points between Settings, Inventory→Pricing discovery, the payment method routing in POS, and a low-stock alert gap on the Dashboard.
 
 ---
 
-## Audit Results by Integration Point
+## PHASE 1: Morning Setup
 
-### Integration Point 1: POS ↔ Inventory & Pricing
+### Step 1: Settings → "Change Currency to USD / Tax Rate 5%"
 
-**Findings:**
+**CRITICAL BREAK: Currency and Tax Rate settings do not exist.**
 
-- **Inventory decrement: WORKING.** The `complete_pos_sale` RPC correctly decrements `lpg_brands.refill_cylinder` or `package_cylinder` and increments `empty_cylinder` or `problem_cylinder` for returns. Uses `GREATEST(0, ...)` to prevent negative stock.
-- **Real-time price fetching: WORKING.** `usePOSData` pulls from `useSharedProductPrices` which reads from `product_prices` table. `getLPGPrice()` correctly branches on `refill`/`package` and `wholesale`/`retail`.
-- **Out-of-stock blocking: PARTIAL GAP (Gap #1).** `usePOSCart.addLPGToCart()` checks `stock = cylinderType === 'refill' ? brand.refill_cylinder : brand.package_cylinder` and blocks adding more than available. However, this check uses the **React Query cache snapshot**, not a live database check. If two staff members are selling simultaneously on different devices, the cache on Device A may be stale by the time they both click Checkout. The RPC itself uses `GREATEST(0, ...)` which silently succeeds even when stock is zero — it does not throw an error to the client when an oversell occurs. The client receives a success response even if the real stock was already 0.
+- The Settings module (`SettingsModule.tsx`) contains: Account (Profile, Theme, Language), Notifications, Security, Team & Business, and Advanced/Printer.
+- There is **no "Currency" setting** anywhere. The app hardcodes `৳` (Taka) via `BANGLADESHI_CURRENCY_SYMBOL` in `src/lib/bangladeshConstants.ts` (line 3). This constant is imported in 15+ components — POS, Dashboard, Diary, Analytics — and cannot be changed through any UI.
+- There is **no "Tax Rate" setting** anywhere. The POS cart (`usePOSCart.ts`) calculates `total = subtotal - discount` with no tax multiplication step. There is no `taxRate` field in `shop_profiles` or anywhere in the database schema.
 
-**Gap #1 — Silent Oversell on Concurrent Sales**
-- The `complete_pos_sale` RPC should raise an exception if the computed result of `refill_cylinder - quantity` would go below zero for any item, instead of silently using `GREATEST(0, ...)`.
-- Fix: Add a pre-check inside the RPC before the UPDATE. If `refill_cylinder < qty`, raise `EXCEPTION 'Insufficient stock for %', brand_name`.
+**Finding: Settings → Currency/Tax is fully missing logic. The simulation request cannot be completed.**
 
----
-
-### Integration Point 2: Analytics ↔ Data Sources
-
-**Findings:**
-
-- **Business Diary data source: WORKING.** `useBusinessDiaryQueries.ts` aggregates directly from `pos_transactions`, `pob_transactions`, `daily_expenses`, `staff_payments`, `vehicle_costs`, and `customer_payments`. No mock data.
-- **Analytics module data: PARTIAL GAP (Gap #2).** `AnalysisSearchReportModule` uses `useBusinessDiaryData` (the **legacy hook** in `src/hooks/useBusinessDiaryData.ts`) instead of the newer `useBusinessDiaryQueries`. The legacy hook has its own independent `useEffect` polling loop and a separate Supabase real-time subscription channel — duplicating what the unified `useUnifiedRealtime` already does. This creates two channels subscribing to the same tables, which can cause double-refresh storms and slightly out-of-sync data between the Diary and Analytics views.
-- **Date filtering: WORKING.** Both `useBusinessSales` and `useBusinessExpenses` pass `startDate`/`endDate` directly to the Supabase query. The weekly boundary starts on Saturday (correct for Bangladesh context per architecture notes).
-- **Dashboard KPI: PARTIAL GAP (Gap #3).** `Dashboard.tsx` builds its `analytics` object from `useSharedOverviewStats`, which reads from `inventory_summary` (a separate summary table synced by trigger). However, `analytics.monthlyRevenue`, `lastMonthRevenue`, and `monthlyGrowthPercent` are all hardcoded to `0` — the `get_monthly_revenue_stats` RPC exists in the database but is never called in the dashboard component.
-
-**Gap #2 — Duplicate Real-time Subscription in Analytics**
-- `AnalysisSearchReportModule` imports `useBusinessDiaryData` (legacy), which opens its own Supabase channel.
-- Fix: Migrate the Analytics module to use `useBusinessSales` + `useBusinessExpenses` from `useBusinessDiaryQueries` (the TanStack Query version). The unified realtime channel in `useUnifiedRealtime` will handle refreshes automatically, removing the duplicate subscription.
-
-**Gap #3 — Monthly Growth KPIs Missing on Dashboard**
-- `monthlyRevenue`, `lastMonthRevenue`, and `monthlyGrowthPercent` are always `0` in the dashboard analytics object.
-- Fix: Call `supabase.rpc('get_monthly_revenue_stats')` inside `useSharedOverviewStats` (or as a separate query) and populate these fields.
+**Gap #A — No Currency/Tax Infrastructure**
+- No `tax_rate` column on `shop_profiles`
+- No `currency` column on `shop_profiles`
+- No context or global state that would propagate either value to POS/Pricing
+- This is a **Missing Logic** gap, not a broken link — the feature simply doesn't exist yet.
 
 ---
 
-### Integration Point 3: Financial Integrity (Diary ↔ Expenses ↔ Shop)
+### Step 2: Inventory → Add "Premium Widget" → See it in Product Pricing immediately
 
-**Findings:**
+**PARTIAL BREAK: The sync works but with a critical product name mismatch.**
 
-- **Utility Expenses → Daily Expenses: WORKING.** When a staff salary payment is saved in `UtilityExpenseModule`, a second `supabase.from("daily_expenses").insert(...)` call runs immediately after, auto-categorized as `"Staff"`. Same for vehicle costs, categorized as `"Transport"`. Both appear in the Business Diary expenses panel.
-- **POB → Daily Expenses: WORKING.** The `InventoryPOBDrawer` similarly inserts a row into `daily_expenses` on every purchase completion, which feeds the diary.
-- **Shop Configuration → POS Invoice: PARTIAL GAP (Gap #4).** The `InvoiceTemplate` component has hardcoded fallback values: `businessName = "Stock-X LPG"`, `businessPhone = "+880 1234-567890"`, `businessAddress = "Dhaka, Bangladesh"`. The `MyShopProfileModule` saves real values to the `shop_profiles` table, but the POS module never fetches these and passes them to the invoice. Every printed memo shows generic placeholder data.
-- **Utility Expenses → Shared Cache Invalidation: GAP (Gap #5).** When `UtilityExpenseModule` inserts into `daily_expenses`, it does NOT call `queryClient.invalidateQueries` for the `sharedKeys.overview()` cache. The unified realtime channel does listen to `daily_expenses` changes, but only with a 1500ms debounce. More critically, the Utility module fetches its own data with `fetchStaffData()` and `fetchVehicleData()` in plain `useState` + `useEffect` — not TanStack Query — so the data is **not shared** with the diary's cache. After a staff payment, the Utility module correctly updates its own local state via refetch, but the Business Diary must wait for the realtime event.
+- When a new LPG brand is added via the POB drawer (`InventoryPOBDrawer`), `syncLpgBrandToPricing()` is called from `useInventoryPricingSync.ts`.
+- `syncLpgBrandToPricing` creates a `product_prices` entry with the name format: `"${brandName} LP Gas ${weight} Cylinder (${size}) ${variant}"` (line 102).
+- The `ProductPricingModule` uses `getGroupedBrands()` from `useProductPricingData` which groups by `lpg_brands.name` via a `normalizeBrandName` function.
+- The **mismatch**: `lpg_brands.name = "Premium Widget"` but `product_prices.product_name = "Premium Widget LP Gas 12kg Cylinder (22mm) Refill"`. These don't match unless the code explicitly uses `brand_id` as the join key.
+- Checking the code: `getProductsForBrandGroup` filters by `brand_id` (line in useProductPricingData summary), so the join IS on `brand_id` not on name — **this part works correctly**.
+- **BUT**: The `product_prices` entry is created with `company_price: 0`, `retail_price: 0` — these are $0 placeholders. The owner must then manually navigate to Pricing and fill in the prices. There is no toast or visual indicator in the Inventory module pointing the user to do this.
+- **UX Fail**: No notification to the owner that "A new pricing entry has been created for Premium Widget. Set its prices in Product Pricing."
 
-**Gap #4 — POS Invoice Shows Placeholder Shop Name**
-- Fix: Create a small `useShopProfile` hook (or reuse the existing query in `MyShopProfileModule`) that fetches `shop_profiles` for the current owner. Pass `shopProfile.shop_name`, `shopProfile.phone`, and `shopProfile.address` as props to `InvoiceTemplate` inside `POSModule`.
-
-**Gap #5 — Utility Expense Module Not Using Shared Query Cache**
-- The module uses direct `useState` fetching instead of TanStack Query, so its data is isolated.
-- Fix: Migrate `UtilityExpenseModule`'s `fetchStaffData` and `fetchVehicleData` into `useQuery` hooks with appropriate query keys (e.g., `['staff', ownerId]`, `['vehicles', ownerId]`). After insert/update/delete actions, call `queryClient.invalidateQueries` on those keys.
-
----
-
-### Integration Point 4: Customer Data Flow
-
-**Findings:**
-
-- **POS → Customers (instant sync): WORKING.** After `complete_pos_sale`, `POSModule` calls `queryClient.invalidateQueries({ queryKey: sharedKeys.customers() })`. The `CustomerManagementModule` uses `useSharedCustomers()` from the same cache, so new customers and updated dues appear immediately.
-- **Transaction history from Customer profile: WORKING.** `CustomerManagementModule.fetchCustomerSalesHistory()` queries `pos_transactions` joined with `pos_transaction_items` filtered by `customer_id`. The `CustomerHistoryDialog` renders both the purchases tab and payments tab correctly.
-- **Customer data in Business Diary: PARTIAL GAP (Gap #6).** `fetchSalesData` in `useBusinessDiaryQueries` fetches a separate `customers` query to build a `customerMap`. This means the diary does a redundant fetch of all customers every time the date range changes, independent of the shared `useSharedCustomers` cache.
-- **Memo Recall (Customer module): WORKING.** Uses `search_all_entities` RPC to search by phone/memo number. Results display transaction details with reprint capability.
-
-**Gap #6 — Business Diary Fetches Customers Redundantly**
-- Fix: Refactor `fetchSalesData` to use the existing `useSharedCustomers` cache data by passing the customer map as a parameter from the hook level, removing the inline `supabase.from('customers').select(...)` inside the fetch function.
+**Gap #B — No Cross-Module Guidance After Inventory Add**
+- After POB checkout, the success toast says "Purchase completed" but doesn't guide the user to set a price in Pricing.
+- The Pricing module *will* show the item (correctly via `brand_id`), but only after the user manually navigates there.
 
 ---
 
-### Navigation Flow Audit
+## PHASE 2: The Trading Day
 
-**Findings:**
+### Step 3: POS → Search "Premium Widget" + 5% Tax Calculation
 
-- **Dashboard → Modules: WORKING.** The `DashboardOverview` KPI cards call `setActiveModule?.(moduleId)` on click. Quick Action buttons call `handleQuickAction(module)`.
-- **Analytics → Inventory (click-through): GAP (Gap #7).** The `AnalysisSearchReportModule`'s top item lists (top selling products, top expense categories) render text-only cards. There is no click handler to navigate to the relevant module. For example, clicking "Bashundhara 12kg" in the top products list should navigate to `inventory`. Currently it does nothing.
-- **Module event bus: WORKING.** `window.dispatchEvent(new CustomEvent('navigate-module', { detail: moduleId }))` is handled in `Dashboard.tsx`'s `useEffect` which calls `handleModuleChange`.
-- **Search → Module navigation: WORKING.** The global search in Analytics uses the `search_all_entities` RPC and the results display a "Go to" button that calls `navigateToModule`.
+**BREAK: POS has no tax calculation. Tax = 0 always.**
 
-**Gap #7 — Analytics Top-Items Cards Are Not Clickable**
-- Fix: Add `onClick` handlers to the top-selling product rows in `AnalysisTopItems` component and top expense category rows, dispatching `navigate-module` events (e.g., `inventory` for products, `utility-expense` for staff costs).
+- `usePOSCart.ts` lines 41-49: `total = Math.max(0, subtotal - discount)`. No `* (1 + taxRate/100)` multiplier.
+- Since `tax_rate` doesn't exist in the database or context, the POS will never apply tax.
+- The `InvoiceTemplate` likely also shows no tax line item (not a separate break, just a consequence of the same missing logic).
 
----
+**Finding: 5% tax simulation = FAIL. The total will always show pre-tax amount.**
 
-## Complete Repair Plan (Prioritized)
+**POS Search — WORKS:**
+- `filteredBrands` in `POSModule.tsx` lines 211-217 filters by `mouthSize`, `weight`, and `productSearch` (case-insensitive name match).
+- Custom items ("Premium Widget" is not an LPG brand) would appear as custom add — the user would need to use the "+ Custom Item" button, not the LPG brand grid. There is no generic "product" search in POS that spans all non-LPG inventory types.
 
-### Priority 1 — Data Integrity (Business-Critical)
-
-**Fix #1: Prevent Silent Oversell in `complete_pos_sale` RPC**
-- File: New database migration
-- Action: Add a stock availability check inside the RPC loop. Before `UPDATE lpg_brands SET refill_cylinder = GREATEST(0, ...)`, check `IF v_brand.refill_cylinder < qty THEN RAISE EXCEPTION ...`. Return a descriptive error that the POS can catch and display as a toast.
-
-### Priority 2 — Financial Accuracy
-
-**Fix #3: Wire Monthly Revenue Stats to Dashboard**
-- Files: `src/hooks/useSharedQueries.ts`, `src/pages/Dashboard.tsx`
-- Action: Add a `useQuery` call for `get_monthly_revenue_stats` RPC inside `useSharedOverviewStats` or as a separate hook. Map the result into the `analytics` object in `Dashboard.tsx`.
-
-**Fix #4: Pull Shop Name/Phone into POS Invoice**
-- Files: `src/components/dashboard/modules/POSModule.tsx`
-- Action: Add a `useQuery` for `shop_profiles` at the top of `POSModule`. Pass `shopProfile?.shop_name`, `shopProfile?.phone`, and `shopProfile?.address` as `businessName`, `businessPhone`, and `businessAddress` props to `InvoiceTemplate` inside `InvoiceDialog`.
-
-### Priority 3 — Performance & Cache Coherence
-
-**Fix #2: Remove Duplicate Realtime Channel in Analytics**
-- Files: `src/components/dashboard/modules/AnalysisSearchReportModule.tsx`
-- Action: Replace `import { useBusinessDiaryData }` with `import { useBusinessSales, useBusinessExpenses, useBusinessDiaryRealtime }` from `@/hooks/queries`. Recompute the analytics aggregations from the TanStack Query hooks. Remove the standalone `useEffect` subscription loop.
-
-**Fix #5: Migrate Utility Expense to TanStack Query**
-- File: `src/components/dashboard/modules/UtilityExpenseModule.tsx`
-- Action: Wrap `fetchStaffData` and `fetchVehicleData` in `useQuery` hooks. After each mutation (add/pay/delete), call `queryClient.invalidateQueries` on the appropriate keys and `sharedKeys.overview()`. This also gives the module access to the loading/error states that TanStack Query provides.
-
-**Fix #6: Eliminate Redundant Customer Fetch in Business Diary**
-- File: `src/hooks/queries/useBusinessDiaryQueries.ts`
-- Action: Remove the inline `supabase.from('customers').select(...)` from `fetchSalesData`. Instead, accept a pre-built customer map as a parameter into the function, populated by the caller from `useSharedCustomers`.
-
-### Priority 4 — UX & Navigation
-
-**Fix #7: Make Analytics Top-Items Navigable**
-- File: `src/components/analysis/AnalysisTopItems.tsx`
-- Action: Add `onClick` prop support. Each top product row dispatches `navigate-module` → `inventory`. Each top expense category dispatches to `utility-expense` or `business-diary`. Add a subtle `cursor-pointer` style and a `ChevronRight` icon to each row.
+**Gap #C — POS Custom Item UX is Hidden**
+- Non-LPG items (generic products like "Premium Widget") require clicking the small "+" custom add card, which has no search. A non-technical owner may not find it.
 
 ---
 
-## Summary Table
+### Step 4: Checkout → Inventory decrements → Business Diary appears
 
-| # | Gap | Severity | Module(s) Affected | Type |
-|---|-----|----------|-------------------|------|
-| 1 | Silent oversell on concurrent sales | Critical | POS, Inventory | Database RPC |
-| 2 | Duplicate realtime channel in Analytics | Medium | Analytics | State/Cache |
-| 3 | Monthly revenue KPIs always show 0 | Medium | Dashboard | Missing RPC call |
-| 4 | POS invoice shows hardcoded shop name | Medium | POS, My Shop | Data wiring |
-| 5 | Utility Expense not in shared cache | Low | Utility, Diary | State migration |
-| 6 | Business Diary fetches customers redundantly | Low | Diary, Customers | Performance |
-| 7 | Analytics top-items not clickable | Low | Analytics | Navigation |
+**WORKS — With one nuance.**
+
+- POS checkout calls `complete_pos_sale` RPC atomically. Confirmed: LPG `refill_cylinder` decrements by quantity sold.
+- After sale, `queryClient.invalidateQueries` fires for `sharedKeys.lpgBrands()` with `refetchType: 'active'` — inventory updates **immediately** in the same session.
+- `notifySaleCompleted` fires the cross-module event bus, which triggers Business Diary query invalidation via `useModuleEventSync`.
+- Business Diary (`useBusinessSales`) re-fetches, and the new transaction appears.
+
+**One nuance — Payment Method hardcoded to 'cash':**
+- `POSModule.tsx` line 305: `p_payment_method: 'cash'` is hardcoded. The `POSPaymentDrawer` shows "bKash", "Nagad" options in the UI but the value passed to the RPC is always `'cash'`. 
+
+This is **Gap #D — CRITICAL:** If the customer pays via bKash, it's recorded as cash in `pos_transactions.payment_method`. The Business Diary's "Cash vs Digital" breakdown will be wrong. Revenue will appear to always be cash.
 
 ---
 
-## What Is Already Correct (No Action Needed)
+## PHASE 3: End of Day
 
-- POS inventory decrement via atomic RPC with rollback
-- Real-time price fetching from `product_prices` in POS
-- Client-side stock guard in `usePOSCart`
-- New customers from POS appear instantly in Customer module
-- Customer transaction history (purchases + payments) viewable from profile
-- Utility expenses auto-sync to `daily_expenses`
-- POB purchases auto-sync to `daily_expenses`
-- Business Diary reads from live tables (no mock data)
-- All modules use skeleton loaders (no blank screens)
-- RLS policies enforce owner-scoped data isolation for all 9 core tables
-- Unified realtime channel (single Supabase channel, tiered debounce)
-- Cross-module event bus wired: POS → Customer, Diary, Dashboard
+### Step 5: Utility Expense → Electricity Bill → Net Profit in Analytics
 
-Once approved, these 7 fixes will be implemented in two batches:
-- **Batch A (Database + Critical):** Fix #1 (RPC stock check)
-- **Batch B (Frontend):** Fixes #2–7 (cache wiring, invoice, navigation)
+**WORKS — but with a 1.5-second delay.**
+
+- `UtilityExpenseModule.handleAddVehicleCost` (or equivalent for utility bills) inserts into `daily_expenses`.
+- Immediately after, `queryClient.invalidateQueries({ queryKey: sharedKeys.overview() })` is called (line 245, confirmed in code).
+- The unified realtime channel in `useUnifiedRealtime` also listens to `daily_expenses` with a `normal` (1500ms) debounce.
+- `AnalysisSearchReportModule` uses `useBusinessExpenses` from TanStack Query, which is invalidated by the `moduleEvents` bus via `useModuleEventSync`.
+
+**Finding: Analytics Net Profit WILL update, but with up to ~1.5 seconds delay. Not a broken link — acceptable UX.**
+
+**One gap**: The Utility module uses direct `fetchStaffData()`/`fetchVehicleData()` in `useState` + `useEffect` — not TanStack Query. So after paying an electricity bill via the vehicle cost dialog, the Utility module itself refreshes via `fetchAllData()` (local refetch), but the `sharedKeys.overview()` invalidation is only done for staff salary (line 245). Vehicle costs insert into `daily_expenses` but the `sharedKeys.overview()` invalidation call is **missing** for vehicle cost saves. The Dashboard "Today's Expenses" KPI card may not update until the realtime subscription fires.
+
+**Gap #E — Vehicle Cost Does Not Invalidate Overview Cache Immediately**
+
+---
+
+### Step 6: Dashboard → "Total Sales" and "Low Stock" alerts
+
+**Total Sales — WORKS:**
+- `overviewStats.todayRevenue` comes from `get_today_sales_total()` RPC → `SUM(total) FROM pos_transactions WHERE DATE(created_at) = CURRENT_DATE`.
+- After POS sale, `sharedKeys.overview()` is invalidated → refetches RPC → Dashboard KPI updates.
+
+**Low Stock Alerts — PARTIAL BREAK:**
+- `DashboardOverview.tsx` line 176: Shows a banner only when `analytics.cylinderStockHealth === 'critical'`.
+- `cylinderStockHealth` is set in `Dashboard.tsx` lines 187-200: It's always `'good' as const` — it's a hardcoded value! The Dashboard builds the `analytics` object from `overviewStats` but line 198 shows: `cylinderStockHealth: 'good' as const`.
+- There is no logic that checks if any brand's `refill_cylinder < threshold` and sets this to `'critical'`.
+
+**Gap #F — CRITICAL: Low Stock Alert Logic Is Hardcoded to 'good'. It Never Fires.**
+
+The critical stock banner is dead code. No matter how low the stock goes, it never shows.
+
+---
+
+## BROKEN LINKS REPORT (Prioritized)
+
+### Critical Breaks (Data Integrity)
+
+| # | Break | Location | Impact |
+|---|-------|----------|--------|
+| D | Payment method always saved as 'cash' in DB, regardless of bKash/Nagad selection | `POSModule.tsx` line 305 | Cash vs digital revenue reporting is permanently incorrect |
+| F | Low stock alert never fires — `cylinderStockHealth` hardcoded to `'good'` | `Dashboard.tsx` line 198 | Owner never gets warned about empty shelves |
+
+### UX Fails (No Reload Required, but Confusing)
+
+| # | UX Fail | Location | Impact |
+|---|---------|----------|--------|
+| B | No guidance after adding inventory to set price | POB Drawer success handler | Owner doesn't know to go to Pricing to set prices for new brand |
+| C | Non-LPG items invisible in POS search | `POSModule.tsx` filteredBrands logic | Generic items require hidden custom add path |
+| E | Vehicle costs don't immediately refresh Dashboard KPI | `UtilityExpenseModule.tsx` vehicle cost save handler | 1.5s delay before Dashboard "Total Expenses" updates |
+
+### Missing Logic (Feature Does Not Exist)
+
+| # | Missing Feature | Impact |
+|---|-----------------|--------|
+| A | No Currency or Tax Rate settings | POS always uses ৳ and 0% tax; simulation requirement cannot be fulfilled |
+
+---
+
+## 3-Step Fix Plan
+
+### Step 1 (Critical — Fix Payment Method Routing in POS)
+
+**File: `src/components/dashboard/modules/POSModule.tsx`**
+
+The `POSPaymentDrawer` already has payment method selection in its UI (it shows bKash/Nagad buttons), but the actual selected value is never wired back to the RPC call. The fix:
+- Add a `paymentMethod` state (`useState<'cash' | 'bkash' | 'nagad' | 'rocket'>('cash')`) to `POSModule`.
+- Pass it as a prop to `POSPaymentDrawer` with an `onPaymentMethodChange` callback.
+- Replace the hardcoded `p_payment_method: 'cash'` on line 305 with the state variable.
+
+This is a **2-file change** (`POSModule.tsx` + `POSPaymentDrawer.tsx`) with zero database changes needed. The `payment_method` enum already includes `bkash`, `nagad`, `rocket` in the schema.
+
+---
+
+### Step 2 (Critical — Fix Low Stock Alert Logic)
+
+**File: `src/pages/Dashboard.tsx`**
+
+The `analytics` object is built from `overviewStats` (lines 187-203). The fix:
+- Use `overviewStats.inventory.total_refill` and `overviewStats.inventory.total_package` to compute a real stock health status.
+- Replace the hardcoded `cylinderStockHealth: 'good' as const` with actual logic:
+  ```js
+  cylinderStockHealth: (() => {
+    const total_full = overviewStats?.inventory?.total_full || 0;
+    const total_empty = overviewStats?.inventory?.total_empty || 0;
+    if (total_full === 0) return 'critical';
+    if (total_empty > total_full) return 'critical';
+    if (total_full < 10) return 'warning';
+    return 'good';
+  })()
+  ```
+- This is a **1-file, 5-line change** that activates the already-built alert banner UI in `DashboardOverview`.
+
+---
+
+### Step 3 (UX — Fix Vehicle Cost Cache Invalidation + Add Cross-Module Guidance)
+
+**Part A — File: `src/components/dashboard/modules/UtilityExpenseModule.tsx`**
+
+Add `queryClient.invalidateQueries({ queryKey: sharedKeys.overview() })` to the vehicle cost save handler (same as already done for staff salary on line 245). This ensures Dashboard "Today's Expenses" updates instantly after a fuel fill.
+
+**Part B — File: `src/inventory/InventoryPOBDrawer.tsx` (or POB checkout success handler)**
+
+After a successful POB purchase that creates new inventory, show a toast with a navigation action:
+```tsx
+toast({
+  title: "Stock Added",
+  description: "Set selling prices in Product Pricing",
+  action: <ToastAction onClick={() => navigateToModule('product-pricing')}>Set Prices →</ToastAction>
+})
+```
+
+This uses the existing `navigate-module` event bus to guide the owner to complete the workflow without manual navigation.
+
+---
+
+## Summary: What Works vs. What Needs Fixing
+
+| Workflow Step | Status | Notes |
+|---|---|---|
+| Settings → Currency/Tax | MISSING | Feature does not exist in codebase |
+| Inventory → Pricing sync | WORKS | $0 placeholder, but entry is created correctly |
+| POS search | WORKS | LPG brands only; custom items need separate path |
+| POS + 5% Tax calc | MISSING | No tax infrastructure exists |
+| POS Checkout → Inventory | WORKS | Atomic RPC, instant cache invalidation |
+| POS → Business Diary | WORKS | Via moduleEvents bus |
+| **POS Payment Method** | **BROKEN** | **Always saves as 'cash' in DB** |
+| Utility Expense → Diary | WORKS | 1.5s delay, acceptable |
+| Vehicle Cost → Dashboard | UX FAIL | Missing `invalidateQueries` call |
+| **Low Stock Alert** | **BROKEN** | **Hardcoded 'good', never fires** |
+| Monthly Revenue KPIs | WORKS | Wired in previous fix batch |
+| POS Invoice → Shop Name | WORKS | Wired in previous fix batch |
