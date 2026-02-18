@@ -37,7 +37,8 @@ import {
   FileText,
   Phone,
   X,
-  Building2
+  Building2,
+  BookOpen
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -411,6 +412,19 @@ export const CustomerManagementModule = () => {
     const amount = parseFloat(paymentAmount) || 0;
     const cylinders = parseInt(cylindersToCollect) || 0;
 
+    // OPTIMISTIC UPDATE — fires instantly before server responds
+    const newTotalDue = Math.max(0, selectedCustomer.total_due - amount);
+    const newCylindersDue = Math.max(0, selectedCustomer.cylinders_due - cylinders);
+    const newStatus = newTotalDue === 0 && newCylindersDue === 0 ? 'clear' : 'pending';
+
+    queryClient.setQueryData(sharedKeys.customers(), (old: Customer[] | undefined) => {
+      if (!old) return old;
+      return old.map(c => {
+        if (c.id !== selectedCustomer.id) return c;
+        return { ...c, total_due: newTotalDue, cylinders_due: newCylindersDue, billing_status: newStatus };
+      });
+    });
+
     const { data: { user } } = await supabase.auth.getUser();
 
     // Record the payment with today's date
@@ -421,21 +435,18 @@ export const CustomerManagementModule = () => {
         amount: amount,
         cylinders_collected: cylinders,
         created_by: user?.id,
-        payment_date: new Date().toISOString().split('T')[0] // Today's date for Business Diary filtering
+        payment_date: new Date().toISOString().split('T')[0]
       });
 
     if (paymentError) {
+      // Rollback on error — refetch true server state
+      queryClient.invalidateQueries({ queryKey: sharedKeys.customers() });
       logger.error('Error recording payment', paymentError, { component: 'CustomerManagement' });
       toast({ title: "Error recording payment", description: paymentError.message, variant: "destructive" });
       return;
     }
 
     // Update customer record
-    const newTotalDue = Math.max(0, selectedCustomer.total_due - amount);
-    const newCylindersDue = Math.max(0, selectedCustomer.cylinders_due - cylinders);
-    const newStatus = newTotalDue === 0 && newCylindersDue === 0 ? 'clear' :
-      newTotalDue > 0 ? 'pending' : 'pending';
-
     const { error: updateError } = await supabase
       .from('customers')
       .update({
@@ -446,6 +457,8 @@ export const CustomerManagementModule = () => {
       .eq('id', selectedCustomer.id);
 
     if (updateError) {
+      // Rollback on error
+      queryClient.invalidateQueries({ queryKey: sharedKeys.customers() });
       logger.error('Error updating customer dues', updateError, { component: 'CustomerManagement' });
       toast({ title: "Error updating customer", description: updateError.message, variant: "destructive" });
       return;
@@ -456,7 +469,6 @@ export const CustomerManagementModule = () => {
     setPaymentAmount("");
     setCylindersToCollect("");
     setSelectedCustomer(null);
-    fetchCustomers();
     fetchPayments();
   };
 
@@ -1242,6 +1254,20 @@ export const CustomerManagementModule = () => {
                         <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => { setSelectedCustomer(c); fetchCustomerSalesHistory(c.id); fetchPayments(); setHistoryDialogOpen(true); }}>
                           <History className="h-3.5 w-3.5" />
                         </Button>
+                        {isWholesale && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 text-purple-600 hover:text-purple-700 hover:bg-purple-500/10"
+                            title="View Ledger"
+                            onClick={() => {
+                              sessionStorage.setItem('pending-diary-filter', c.name);
+                              window.dispatchEvent(new CustomEvent('navigate-module', { detail: 'business-diary' }));
+                            }}
+                          >
+                            <BookOpen className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                         {c.total_due > 0 && (
                           <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-emerald-600" onClick={() => { setSelectedCustomer(c); fetchPayments(); setSettleDialogOpen(true); }}>
                             <Banknote className="h-3.5 w-3.5" />
