@@ -80,7 +80,7 @@ const EditableStockCell = ({
       <div
         onClick={() => setIsEditing(true)}
         className={cn(
-          "px-2 sm:px-3 py-2 rounded-md cursor-pointer transition-all text-center font-medium text-sm sm:text-base hover:opacity-80",
+          "px-2 sm:px-3 py-2 rounded-md cursor-pointer transition-all text-center font-medium text-sm sm:text-base hover:opacity-80 tabular-nums",
           bgColor
         )}
       >
@@ -95,7 +95,7 @@ export const LPGBrandCard = ({ brand, selectedWeight, onUpdate, onDelete }: LPGB
   const brandColor = getLpgColorByValveSize(brand.name, brand.size as "22mm" | "20mm");
   
   return (
-    <Card className="border-border hover:shadow-md transition-shadow">
+    <Card className="border-border/40 shadow-sm hover:shadow-md transition-shadow">
       <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-4 pt-3 sm:pt-4">
         <div className="flex items-center justify-between gap-2">
           <CardTitle className="flex items-center gap-2 text-sm sm:text-base">

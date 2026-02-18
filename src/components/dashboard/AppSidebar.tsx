@@ -53,6 +53,24 @@ export const AppSidebar = ({
     { id: 'settings', titleKey: 'settings', icon: Settings, roles: ['owner', 'manager'] },
   ];
 
+  const prefetchModule = (moduleId: string) => {
+    const moduleMap: Record<string, () => Promise<unknown>> = {
+      'overview':          () => import("@/components/dashboard/modules/DashboardOverview"),
+      'pos':               () => import("@/components/dashboard/modules/POSModule"),
+      'inventory':         () => import("@/components/dashboard/modules/InventoryModule"),
+      'product-pricing':   () => import("@/components/dashboard/modules/ProductPricingModule"),
+      'customers':         () => import("@/components/dashboard/modules/CustomerManagementModule"),
+      'business-diary':    () => import("@/components/dashboard/modules/BusinessDiaryModule"),
+      'utility-expense':   () => import("@/components/dashboard/modules/UtilityExpenseModule"),
+      'analysis-search':   () => import("@/components/dashboard/modules/AnalysisSearchReportModule"),
+      'settings':          () => import("@/components/dashboard/modules/SettingsModule"),
+      'drivers':           () => import("@/components/dashboard/modules/DriversModule"),
+      'my-shop':           () => import("@/components/dashboard/modules/MyShopProfileModule"),
+      'marketplace-orders':() => import("@/components/dashboard/modules/MarketplaceOrdersModule"),
+    };
+    moduleMap[moduleId]?.();
+  };
+
   const handleModuleChange = (moduleId: string) => {
     setActiveModule(moduleId);
     if (isMobile) setOpenMobile(false);
@@ -83,7 +101,7 @@ export const AppSidebar = ({
     const isActive = activeModule === item.id;
     const displayTitle = t(item.titleKey) + (item.titleSuffix || '');
     const isAdminItem = item.isAdmin;
-    const button = <SidebarMenuButton onClick={() => handleModuleChange(item.id)} isActive={isActive} className={`relative group transition-all duration-200 h-9 ${isCollapsed ? 'justify-center px-0' : 'px-2'} ${isActive ? 'bg-primary/10 text-primary' : isAdminItem ? 'hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 bg-amber-500/10' : 'hover:bg-muted text-muted-foreground hover:text-foreground'}`}>
+    const button = <SidebarMenuButton onClick={() => handleModuleChange(item.id)} onMouseEnter={() => prefetchModule(item.id)} isActive={isActive} className={`relative group transition-all duration-200 h-9 ${isCollapsed ? 'justify-center px-0' : 'px-2'} ${isActive ? 'bg-primary/10 text-primary' : isAdminItem ? 'hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 bg-amber-500/10' : 'hover:bg-muted text-muted-foreground hover:text-foreground'}`}>
       <div className={`flex items-center justify-center h-7 w-7 rounded-md shrink-0 transition-all duration-200 ${isActive ? 'bg-primary/15' : isAdminItem ? 'bg-amber-500/20' : 'bg-transparent group-hover:bg-primary/10'}`}>
         <Icon className={`h-4 w-4 transition-colors ${isActive ? 'text-primary' : isAdminItem ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground group-hover:text-primary'}`} />
       </div>
