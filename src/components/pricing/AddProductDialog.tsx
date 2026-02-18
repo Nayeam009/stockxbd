@@ -262,11 +262,12 @@ export const AddProductDialog = ({ lpgBrands, onAddProduct }: AddProductDialogPr
               }
             </p>
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs">Company</Label>
                 <Input
                   type="number"
+                  inputMode="numeric"
                   value={newProduct.company_price || ''}
                   onChange={(e) => {
                     const companyPrice = Number(e.target.value);
@@ -291,6 +292,7 @@ export const AddProductDialog = ({ lpgBrands, onAddProduct }: AddProductDialogPr
                 <Label className="text-xs">Wholesale</Label>
                 <Input
                   type="number"
+                  inputMode="numeric"
                   value={newProduct.distributor_price || ''}
                   onChange={(e) => setNewProduct(prev => ({ ...prev, distributor_price: Number(e.target.value) }))}
                   placeholder="0"
@@ -302,6 +304,7 @@ export const AddProductDialog = ({ lpgBrands, onAddProduct }: AddProductDialogPr
                 <Label className="text-xs">Retail</Label>
                 <Input
                   type="number"
+                  inputMode="numeric"
                   value={newProduct.retail_price || ''}
                   onChange={(e) => setNewProduct(prev => ({ ...prev, retail_price: Number(e.target.value) }))}
                   placeholder="0"
@@ -310,6 +313,22 @@ export const AddProductDialog = ({ lpgBrands, onAddProduct }: AddProductDialogPr
                 />
               </div>
             </div>
+
+            {/* Package Price (only for Package variant) */}
+            {newProduct.variant === 'Package' && (
+              <div className="space-y-1.5">
+                <Label className="text-xs">Package Price (Full cylinder + deposit)</Label>
+                <Input
+                  type="number"
+                  inputMode="numeric"
+                  value={newProduct.package_price || ''}
+                  onChange={(e) => setNewProduct(prev => ({ ...prev, package_price: Number(e.target.value) }))}
+                  placeholder="0"
+                  className="h-11 font-medium"
+                  min={0}
+                />
+              </div>
+            )}
 
             {/* Package Price (only for Package variant) */}
             {newProduct.variant === 'Package' && (

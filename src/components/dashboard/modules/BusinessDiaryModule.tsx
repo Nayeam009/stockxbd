@@ -448,7 +448,7 @@ export const BusinessDiaryModule = () => {
                   </div>
                   <div className="space-y-2">
                     <Label>Amount ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
-                    <Input type="number" value={newExpense.amount} onChange={(e) => setNewExpense({ ...newExpense, amount: e.target.value })}
+                    <Input type="number" inputMode="numeric" value={newExpense.amount} onChange={(e) => setNewExpense({ ...newExpense, amount: e.target.value })}
                       placeholder="0" className="h-11 text-lg font-semibold" />
                   </div>
                   <div className="space-y-2">
@@ -504,7 +504,7 @@ export const BusinessDiaryModule = () => {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           <Input placeholder="Search product, customer, transaction..." value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 h-10 text-sm bg-card/50 border-border/50 rounded-lg" />
+            className="pl-9 h-11 text-sm bg-card/50 border-border/50 rounded-lg" />
         </div>
       </div>
 

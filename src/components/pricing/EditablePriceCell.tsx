@@ -91,6 +91,7 @@ export const EditablePriceCell = ({
           <Input
             ref={inputRef}
             type="number"
+            inputMode="numeric"
             value={localValue}
             onChange={(e) => {
               const nextValue = Number(e.target.value);

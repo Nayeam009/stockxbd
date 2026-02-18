@@ -55,7 +55,7 @@ export const AccessoryPriceCard = ({
       </CardHeader>
       
       <CardContent className="px-4 pb-4">
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <EditablePriceCell
             productId={product.id}
             field="company_price"

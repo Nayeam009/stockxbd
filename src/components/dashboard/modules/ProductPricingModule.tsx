@@ -201,7 +201,7 @@ export const ProductPricingModule = () => {
 
             {/* Weight Selector */}
             <Select value={selectedWeight} onValueChange={setSelectedWeight}>
-              <SelectTrigger className="w-32 h-10">
+              <SelectTrigger className="w-32 h-11">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -218,7 +218,7 @@ export const ProductPricingModule = () => {
                 placeholder="Search brands..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 h-10"
+                className="pl-9 h-11"
               />
             </div>
 
@@ -228,7 +228,7 @@ export const ProductPricingModule = () => {
               size="icon"
               onClick={() => refetch()}
               disabled={softLoading}
-              className="h-10 w-10"
+              className="h-11 w-11"
             >
               <RefreshCw className={`h-4 w-4 ${softLoading ? 'animate-spin' : ''}`} />
             </Button>
