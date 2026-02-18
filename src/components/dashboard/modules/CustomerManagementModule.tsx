@@ -158,6 +158,7 @@ export const CustomerManagementModule = () => {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [paymentAmount, setPaymentAmount] = useState("");
   const [cylindersToCollect, setCylindersToCollect] = useState("");
+  const [paymentNotes, setPaymentNotes] = useState("");
   const [historyTab, setHistoryTab] = useState<'payments' | 'sales'>('sales');
   const [subViewMemoResults, setSubViewMemoResults] = useState<MemoSearchResult[]>([]);
   const [subViewMemoLoading, setSubViewMemoLoading] = useState(false);
@@ -455,7 +456,8 @@ export const CustomerManagementModule = () => {
         amount: amount,
         cylinders_collected: cylinders,
         created_by: user?.id,
-        payment_date: new Date().toISOString().split('T')[0]
+        payment_date: new Date().toISOString().split('T')[0],
+        notes: paymentNotes || null
       });
 
     if (paymentError) {
@@ -488,6 +490,7 @@ export const CustomerManagementModule = () => {
     setSettleDialogOpen(false);
     setPaymentAmount("");
     setCylindersToCollect("");
+    setPaymentNotes("");
     setSelectedCustomer(null);
     fetchPayments();
   };
@@ -1405,6 +1408,15 @@ export const CustomerManagementModule = () => {
                     </div>
                   </div>
                 </div>
+                {customerTab === 'due' && c.total_due > 0 && (
+                  <Button
+                    className="w-full h-11 mt-3 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold touch-manipulation"
+                    onClick={(e) => { e.stopPropagation(); setSelectedCustomer(c); fetchPayments(); setSettleDialogOpen(true); }}
+                  >
+                    <Banknote className="h-4 w-4 mr-2" />
+                    Settle {BANGLADESHI_CURRENCY_SYMBOL}{c.total_due.toLocaleString()}
+                  </Button>
+                )}
               </CardContent>
             </Card>
           );
@@ -1683,6 +1695,8 @@ export const CustomerManagementModule = () => {
                 <Input type="number" inputMode="numeric" value={paymentAmount} onChange={e => setPaymentAmount(e.target.value)} className="mt-1 h-12 text-base font-semibold" placeholder="0" /></div>
               <div><label className="text-sm font-medium">Cylinders to Collect</label>
                 <Input type="number" inputMode="numeric" value={cylindersToCollect} onChange={e => setCylindersToCollect(e.target.value)} className="mt-1 h-12 text-base" placeholder="0" /></div>
+              <div><label className="text-sm font-medium">Note (optional)</label>
+                <Input value={paymentNotes} onChange={e => setPaymentNotes(e.target.value)} className="mt-1 h-12 text-base" placeholder="e.g. Cylinder + cash collection" /></div>
             </div>
             <MobileFormActions
               onCancel={() => setSettleDialogOpen(false)}
