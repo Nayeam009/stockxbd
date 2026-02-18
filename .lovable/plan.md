@@ -1,174 +1,161 @@
 
-# StockX BD — QA Vulnerability Report
+# Driver Management — Full Implementation Plan
 
-## Scope of Audit
-7 files read in full, 3 database queries executed, 2 RPC bodies inspected. The findings below are verified against actual code, not theoretical.
+## Audit Summary: What's Already Done
 
----
+After reading every file in full:
 
-## Section 1: POS "Unhappy Path" Simulation
+| Requirement | Status |
+|---|---|
+| `tax_rate` + `currency_symbol` in `shop_profiles` | Done — columns exist |
+| Settings "Financial Preferences" form | Done — `case 'business'` fully implemented |
+| POS reads tax/currency dynamically | Done — `shopSettings` query at line 70-77 |
+| `POSPaymentDrawer` uses prop not hardcoded `৳` | Done — `currencySymbol = '৳'` prop default |
+| `POSStickyFooter` uses prop not hardcoded `৳` | Done — same |
+| POS `processing` state blocks double-clicks | Done — `disabled={disabled || processing}` |
+| `navigator.onLine` offline check | Done — lines 268-275 in `handleCompleteSale` |
+| Stock race condition friendly toast | Done — `Insufficient stock for` parser |
+| `expense-added` event from salary/bonus | Done — lines 240, 277 |
 
-### Finding 1.1 — Network Failure on "Pay" Press
-**Severity: Medium | Status: Partially Handled**
-
-**What the code does:**
-In `POSModule.tsx`, the `handleCompleteSale` function starts with `setProcessing(true)` and the `finally` block always calls `setProcessing(false)`. The Proceed button receives `disabled={disabled || processing}` from `POSStickyFooter.tsx`. The payment confirm buttons also check `disabled={processing}`.
-
-**The gap — No retry mechanism:**
-When the network cuts mid-call, the `supabase.rpc('complete_pos_sale', ...)` will throw a network error. The `catch` block fires, showing a toast with the error message (e.g., "Failed to fetch"). `setProcessing(false)` is called in `finally`. This is correct basic error handling.
-
-**However, there is no retry mechanism.** The cart data is preserved (no `resetCart()` is called on error), so the user CAN press pay again manually. But:
-1. The toast just says "Error" and the raw error message — on mobile a "network error" toast is confusing to non-technical staff.
-2. The `generate_transaction_number` RPC has already run before the main RPC call (line 274). If the transaction number was generated but the main RPC failed, the next retry will generate a new number. The old number is orphaned but harmless.
-3. There is no auto-retry with exponential backoff.
-
-**The real offline risk:** If the `supabase.auth.getUser()` call on line 270 fails (offline), the user sees a cryptic error. The cart is safe but the UX is poor.
-
-**What needs to be fixed:**
-- Show a specific "No internet connection — your cart is safe, try again" toast when the error is a network/fetch error.
-- Use `navigator.onLine` to detect this case before calling the RPC.
+**The only real gap: Driver Assignment UI and POS integration.** Everything else was completed in previous batches.
 
 ---
 
-### Finding 1.2 — Stock Race Condition
-**Severity: Low | Status: SOLVED at Database Level**
+## What Needs to Be Built
 
-**What the code does:**
-The `complete_pos_sale` RPC has a **two-phase approach**:
-1. **PRE-CHECK** (lines in the RPC): Before any `INSERT`/`UPDATE`, it loops through all items and checks stock with a `SELECT ... FOR UPDATE` implicit lock. If `refill_cylinder < qty`, it raises `RAISE EXCEPTION 'Insufficient stock for % (Refill). Available: %, Requested: %'`.
-2. Only after all checks pass does it proceed to deduct inventory.
+### Gap: Driver Module + POS Assignment
 
-**This is correctly handled.** The RPC runs inside a single database transaction. PostgreSQL's `RAISE EXCEPTION` causes an automatic rollback of the entire transaction.
-
-**What the second staff member sees:**
-The `catch` block in `handleCompleteSale` fires with the PostgreSQL error message:  `"Insufficient stock for Bashundhara 12kg (Refill). Available: 0, Requested: 1"`. This is shown in a toast as `description: error.message`. The message is readable but technical. It could be formatted more user-friendly (e.g. "Out of Stock: Bashundhara 12kg") — but functionally it works correctly with no data corruption.
-
-**Minor gap:** The toast title is just "Error" — it should say "Sale Failed — Out of Stock" for faster comprehension by staff.
+The `staff` table has a `role` column where users can have "Driver" role. The `pos_transactions` table has a `driver_id uuid` column that is always `null`. The `complete_pos_sale` RPC has no `p_driver_id` parameter.
 
 ---
 
-### Finding 1.3 — Cross-Brand Returns
-**Severity: Low | Status: WORKING, but with a UX gap**
+## Implementation Plan
 
-**What the code does:**
-In `usePOSCart.ts`, the `addReturnCylinder` function (lines 207-229) adds a return item using the selected brand's `id`, `name`, and `color`. It is completely independent of what is in the sale cart. A staff member can:
-- Sell "Total LPG" refill
-- Add "Jamuna" as a return cylinder
+### Step 1 — Database: Add `p_driver_id` to `complete_pos_sale` RPC
 
-**This is allowed by design** — the custom knowledge specifies this as a valid use case for offline shops.
+The `complete_pos_sale` function needs one new optional parameter. This requires a SQL migration to replace the function signature.
 
-**The RPC handles it correctly:**
-In `complete_pos_sale`, the return items loop (section 4) does `UPDATE lpg_brands SET empty_cylinder = empty_cylinder + qty WHERE id = return_brand_id`. This is brand-specific — "Jamuna" empties increment Jamuna's count, not Total's. The `inventory_summary` sync trigger also runs correctly per-brand.
+The change is:
+- Add `p_driver_id uuid DEFAULT NULL` as a new parameter
+- In the `INSERT INTO pos_transactions` block, add `driver_id` to the column list
+- Add `p_driver_id` to the values list
 
-**The UX gap:** There is no warning shown when sale brand ≠ return brand (unlike the online ordering system which blocks it). For offline POS this is intentional, but a subtle yellow info badge "Cross-brand return" on the return table would improve audit clarity.
+This is a pure additive change — all existing callers work unchanged since the parameter has a `DEFAULT NULL`.
 
 ---
 
-## Section 2: "Zombie" Data Audit
+### Step 2 — New Component: `DriversModule.tsx`
 
-### Finding 2.1 — Driver Assignment UI
-**Severity: Medium | Status: GAP CONFIRMED**
+Create `src/components/dashboard/modules/DriversModule.tsx` — a focused module that:
 
-**Database:** The `orders` table has a `driver_id uuid` column (confirmed by query). The `pos_transactions` table also has `driver_id uuid`. The `staff` table has roles including "Driver".
+1. **Lists all staff with role "Driver"** from the `staff` table using a `useQuery` hook
+2. **Shows assignment stats**: how many transactions each driver has been assigned to today (from `pos_transactions` where `driver_id = staff.id AND DATE(created_at) = TODAY`)
+3. **Card-based layout** (mobile-first): each driver card shows name, phone, status badge (active today / idle), and a count of deliveries today
+4. **No separate page/route** — accessed via `?module=drivers` in the existing dashboard switch
 
-**UI Reality:**
-- `POSModule.tsx`: No driver assignment UI anywhere in 648 lines.
-- `UtilityExpenseModule.tsx`: Staff can be added with role "Driver" and paid, but cannot be assigned to deliveries.
-- `BusinessDiaryModule.tsx`: Sales cards show "who sold" based on `created_by` (owner/manager/staff), not driver.
-- The `complete_pos_sale` RPC signature does not include a `p_driver_id` parameter at all.
+The Driver card UI:
+```
+┌─────────────────────────────┐
+│ [Avatar] Ahmed Rahman        │
+│          Driver • 📞01234    │
+│          Today: 3 deliveries │
+│ [Active Today]               │
+└─────────────────────────────┘
+```
 
-**Impact:** 
-- `driver_id` on `pos_transactions` is always `null`.
-- "Who delivered" tracking is impossible in the current system.
-- The `get_daily_sales_by_driver` type of report cannot be built without a UI to assign drivers.
-- The custom knowledge mentions "Driver" as a role who collects money and returns empty cylinders, but this workflow has no technical implementation yet.
-
-**What needs to be built:** A driver selector in the POS payment flow (shown after "Confirm"), and passing `driver_id` to the RPC.
-
----
-
-### Finding 2.2 — Tax Rate and Currency Symbol
-**Severity: Low | Status: SOLVED (but with a stale UI residual)**
-
-**Database confirmation:** `shop_profiles` table DOES have both `tax_rate` (numeric, default 0) and `currency_symbol` (text, default '৳'). Both columns exist.
-
-**Code status:**
-- `POSModule.tsx` lines 70-82: Fetches `tax_rate` and `currency_symbol` from `shop_profiles`. ✅
-- `usePOSCart.ts`: Accepts `taxRate` param and calculates `tax = (subtotal - discount) * taxRate / 100`. ✅
-- `SettingsModule.tsx` lines 662-726: `case 'business'` renders the full Financial Preferences form with inputs and save button. ✅
-
-**Residual issue — `POSPaymentDrawer.tsx` and `POSStickyFooter.tsx`:**
-Both still import and use `BANGLADESHI_CURRENCY_SYMBOL` (the hardcoded `৳` constant from `bangladeshConstants.ts`), NOT the dynamic `currencySymbol` fetched from the database.
-
-Specifically:
-- `POSPaymentDrawer.tsx` line 14: `import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";`
-- Line 62: `{BANGLADESHI_CURRENCY_SYMBOL}{total.toLocaleString()}` (Total Bill display)
-- Line 138: `{BANGLADESHI_CURRENCY_SYMBOL}{(total - paidAmount).toLocaleString()}` (Remaining Due)
-- Line 175: `` `Save Partial (৳${paidAmount.toLocaleString()} paid)` `` — hardcoded `৳` inline
-- `POSStickyFooter.tsx` line 34: `{BANGLADESHI_CURRENCY_SYMBOL}{total.toLocaleString()}`
-
-The invoice/memo template DOES correctly receive `currencySymbol` from `POSModule.tsx` (line 356 of the transaction data). But the payment drawer UI and sticky footer show the hardcoded symbol.
+5. **"Mark as Available" / "Mark as Busy" toggle** — updates a local status (no DB change needed, just UI state for the session)
 
 ---
 
-## Section 3: Performance Bottleneck Check
+### Step 3 — POS Payment Drawer: Add Driver Selector
 
-### Finding 3.1 — Unified Real-time Subscription Analysis
-**Severity: Low | Status: WELL IMPLEMENTED, one minor gap**
+Modify `POSPaymentDrawer.tsx` to include an optional driver selector:
 
-**Channel architecture:**
-`useUnifiedRealtime()` in `useSharedQueries.ts` creates exactly **one** Supabase channel (`'stock-x-unified'`) listening to 9 tables. This is the correct architecture — using a single channel is far more efficient than 9 separate channels.
+- Add a new `drivers` prop (list of active driver staff members)
+- Add `selectedDriverId` + `onDriverChange` props
+- Render a `Select` dropdown **after the Payment Method** section labeled "Assign Driver (Optional)"
+- If no drivers exist, skip rendering the selector entirely (graceful degradation)
 
-**Debounce tiers — ARE they working?**
-Yes. The implementation uses a `debounceRefs` ref (`useRef<Record<string, NodeJS.Timeout | null>>`) that stores a separate timer per query key. When 50 changes arrive simultaneously:
-1. Each change event calls `invalidateWithDebounce(queryKey, tier)`
-2. The function cancels the existing timer for that key (`clearTimeout(debounceRefs.current[key])`)
-3. Sets a new timer with the tier delay (500ms critical, 1500ms normal, 3000ms low)
-4. Result: only ONE invalidation fires per key, no matter how many events arrived during the debounce window
-
-This is correct. 50 simultaneous `lpg_brands` changes would trigger exactly 1 query invalidation after 1500ms.
-
-**The React re-render count:**
-Each query invalidation causes React Query to mark the cache as stale and trigger a background refetch. The components that subscribe via `useSharedLPGBrands()`, `useSharedCustomers()` etc. only re-render when the NEW data arrives (not when the cache is marked stale). This is efficient.
-
-**Potential bottleneck on low-end Android:**
-The 9 table listeners in one channel means the Supabase WebSocket receives all `postgres_changes` events. The JavaScript event handler runs for each event. At 50 events/second, this is 50 JS function calls — negligible on any device.
-
-**The actual bottleneck risk** is not in the subscription, but in the **refetch itself**. When `overview` is invalidated:
-- `fetchOverviewStats()` fires 5 parallel RPCs simultaneously
-- Each RPC hits PostgreSQL
-- On a slow network, all 5 results return together and trigger a single re-render of `DashboardOverview`
-
-This is acceptable. The real performance risk is not in the debounce but in having `refetchInterval: 60 * 1000` on `useSharedOverviewStats()` (line 288). This means even without realtime events, the overview refetches every minute, triggering 5 RPC calls. On a slow 3G connection this could cause noticeable lag as all KPIs briefly flicker to their loading state.
-
-**Minor gap — no `filter` in the Supabase channel:**
-The channel uses no `filter: 'owner_id=eq.xxx'` clause. This means it receives ALL changes from ALL users on ALL rows of each table. The PostgreSQL RLS policies ensure the subsequent query only returns the user's data, but the WebSocket receives every change event in the system. For a multi-tenant system with many shops, this is inefficient. For a single-shop deployment, it is harmless.
+The UI:
+```
+Payment Method: [Cash] [bKash] [Nagad] [Rocket]
+──────────────────────────────────────────────
+Assign Driver (Optional):
+[ Select driver... ▼ ]
+  • Ahmed Rahman
+  • Karim Uddin
+  • No driver
+──────────────────────────────────────────────
+Amount Paid: [input]
+```
 
 ---
 
-## Summary Table
+### Step 4 — POSModule: Wire Driver Data + Pass to Drawer
 
-| # | Finding | Severity | Status | Effort to Fix |
-|---|---|---|---|---|
-| 1.1 | Network failure shows cryptic toast; no offline-aware retry | Medium | Gap | Small — 10 lines |
-| 1.2 | Race condition stock oversell | Low | Solved (DB level) | None |
-| 1.3 | Cross-brand returns — no audit warning | Low | Intentional / Minor UX | Small |
-| 2.1 | Driver assignment has no UI — `driver_id` always null | Medium | Gap | Large — new feature |
-| 2.2 | `POSPaymentDrawer` and `POSStickyFooter` still use hardcoded `৳` | Low | Residual | Small — 4 lines |
-| 3.1 | Overview `refetchInterval` causes 5 RPCs every 60s; no channel filter | Low | Architecture | Medium |
+In `POSModule.tsx`:
+
+1. Add a `useQuery` to fetch active driver staff: `supabase.from('staff').select('*').eq('role', 'Driver').eq('is_active', true).order('name')`
+2. Add state: `const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null)`
+3. Pass `drivers`, `selectedDriverId`, `onDriverChange` to `POSPaymentDrawer`
+4. Pass `p_driver_id: selectedDriverId` to the `complete_pos_sale` RPC call
+5. Reset `selectedDriverId` on `cart.resetCart()`
 
 ---
 
-## Recommended Fix Priority
+### Step 5 — Dashboard: Register `drivers` Module
 
-**Implement now (small effort, visible improvement):**
+In `src/pages/Dashboard.tsx`, add `case "drivers":` to `renderActiveModule()`:
 
-1. **Fix 2.2** — Pass `currencySymbol` prop to `POSPaymentDrawer` and `POSStickyFooter`. Replace `BANGLADESHI_CURRENCY_SYMBOL` with the prop. 4 files, ~10 line changes.
+```typescript
+case "drivers":
+  return <DriversModule />;
+```
 
-2. **Fix 1.1** — In `handleCompleteSale`, before calling any Supabase RPC, check `navigator.onLine`. If offline, show: `toast({ title: "No internet connection", description: "Your cart is saved. Please reconnect and try again.", variant: "destructive" })`. For the race condition error (1.2), parse `error.message` and show "Out of Stock: [brand name]" instead of the raw PostgreSQL error.
+---
 
-3. **Fix 3.1 (partial)** — Increase `refetchInterval` on `useSharedOverviewStats` from 60s to 120s to halve the background RPC load.
+### Step 6 — Sidebar: Add Drivers Nav Item
 
-**Plan as a future sprint:**
+In `src/components/dashboard/AppSidebar.tsx`, add a "Drivers" nav item between `utility-expense` and `analysis-search`:
 
-4. **Fix 2.1** — Driver assignment. This requires: (a) a driver selector UI in `POSPaymentDrawer`, (b) adding `p_driver_id` parameter to `complete_pos_sale` RPC via a database migration, (c) updating the Business Diary to show delivery attribution.
+```typescript
+{ id: 'drivers', titleKey: 'drivers', icon: Truck, roles: ['owner', 'manager'] },
+```
+
+And add the translation key `'drivers'` → "Drivers" to the language context.
+
+---
+
+### Step 7 — Business Diary: Show Driver Attribution
+
+In `src/components/diary/SaleEntryCard.tsx`, if a `driver_id` is present in the sale, show a small badge "Delivery: [Driver Name]" below the "Sold by" line. This requires:
+- The `BusinessDiaryModule.tsx` to join `pos_transactions` with `staff` on `driver_id`
+- Add `driver_name` to the diary sale data shape
+
+---
+
+## File Change Summary
+
+| # | File | Change | Type |
+|---|---|---|---|
+| 1 | DB migration | Add `p_driver_id` to `complete_pos_sale` RPC | SQL |
+| 2 | `src/components/dashboard/modules/DriversModule.tsx` | **NEW** — Driver list + daily assignment stats | New file |
+| 3 | `src/components/pos/POSPaymentDrawer.tsx` | Add driver selector `Select` + new props | Modify |
+| 4 | `src/components/dashboard/modules/POSModule.tsx` | Fetch drivers, add state, pass to drawer, pass to RPC | Modify |
+| 5 | `src/pages/Dashboard.tsx` | Add `case "drivers"` to module router | Modify |
+| 6 | `src/components/dashboard/AppSidebar.tsx` | Add Drivers nav item (Truck icon) | Modify |
+| 7 | `src/components/dashboard/MobileBottomNav.tsx` | Add Drivers to "More" items | Modify |
+
+**Zero new dependencies. Uses existing `supabase`, `useQuery`, `Select`, `Card` from the design system.**
+
+---
+
+## Risk Assessment
+
+| Change | Risk | Mitigation |
+|---|---|---|
+| RPC migration | Low — additive parameter with DEFAULT NULL | All existing callers unaffected |
+| `DriversModule.tsx` | Zero — new file, no impact on existing code | None needed |
+| `POSPaymentDrawer` driver selector | Low — only shows if `drivers.length > 0` | Graceful degradation |
+| Dashboard case addition | Zero — additive switch case | None needed |
+| Sidebar item | Zero — additive array entry | None needed |
