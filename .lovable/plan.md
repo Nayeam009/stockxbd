@@ -1,161 +1,136 @@
 
-# Driver Management — Full Implementation Plan
+# "StockX Premium" Design Language Enforcement Plan
 
-## Audit Summary: What's Already Done
+## Audit Findings (What Is Already Correct)
 
-After reading every file in full:
+After reading every relevant file in full, many items requested are already implemented:
 
-| Requirement | Status |
+| Item | Status |
 |---|---|
-| `tax_rate` + `currency_symbol` in `shop_profiles` | Done — columns exist |
-| Settings "Financial Preferences" form | Done — `case 'business'` fully implemented |
-| POS reads tax/currency dynamically | Done — `shopSettings` query at line 70-77 |
-| `POSPaymentDrawer` uses prop not hardcoded `৳` | Done — `currencySymbol = '৳'` prop default |
-| `POSStickyFooter` uses prop not hardcoded `৳` | Done — same |
-| POS `processing` state blocks double-clicks | Done — `disabled={disabled || processing}` |
-| `navigator.onLine` offline check | Done — lines 268-275 in `handleCompleteSale` |
-| Stock race condition friendly toast | Done — `Insufficient stock for` parser |
-| `expense-added` event from salary/bonus | Done — lines 240, 277 |
+| Inter font on `html` element | Done — `index.css` line 171 |
+| Tabular nums on KPI values in `DashboardOverview` | Done — line 235 |
+| Tabular nums in `CustomerCard` due amounts | Done — lines 79, 85 |
+| Tabular nums in `UtilityExpenseModule` salary cards | Done — lines 588, 592, 596 |
+| `EmptyStateCard` in `DriversModule` (no drivers) | Done |
+| Staff empty state in `UtilityExpenseModule` | Uses custom card-dashed — needs upgrade |
+| `touch-manipulation` on buttons | Done throughout |
+| Dashboard KPI cards use `tabular-nums` on values | Done |
 
-**The only real gap: Driver Assignment UI and POS integration.** Everything else was completed in previous batches.
-
----
-
-## What Needs to Be Built
-
-### Gap: Driver Module + POS Assignment
-
-The `staff` table has a `role` column where users can have "Driver" role. The `pos_transactions` table has a `driver_id uuid` column that is always `null`. The `complete_pos_sale` RPC has no `p_driver_id` parameter.
+## What Is NOT Yet Done (The 6 Real Gaps)
 
 ---
 
-## Implementation Plan
+### Gap 1 — Business Diary: Date Filter Is NOT Sticky
 
-### Step 1 — Database: Add `p_driver_id` to `complete_pos_sale` RPC
+**Current behavior:** The date controls (Cash Flow / Profit toggle + Today/Yesterday/Week/Month/Custom buttons) are in a plain `div` at line 385-469 inside the scrollable content area. When you scroll down past 6 summary cards and a list of 20+ transactions, you lose sight of the filter bar completely.
 
-The `complete_pos_sale` function needs one new optional parameter. This requires a SQL migration to replace the function signature.
+**Fix:** Wrap the header+controls div in a `sticky top-0 z-10` container with `bg-background/95 backdrop-blur-sm border-b border-border/40` so the date filter and view toggle pins to the top as you scroll the sales/expense list.
 
-The change is:
-- Add `p_driver_id uuid DEFAULT NULL` as a new parameter
-- In the `INSERT INTO pos_transactions` block, add `driver_id` to the column list
-- Add `p_driver_id` to the values list
-
-This is a pure additive change — all existing callers work unchanged since the parameter has a `DEFAULT NULL`.
+**File:** `src/components/dashboard/modules/BusinessDiaryModule.tsx`  
+**Change:** Add `sticky top-0 z-10 bg-background/95 backdrop-blur-sm` to the outer header div (lines 369-470) and add `pb-2` to provide spacing below the sticky bar.
 
 ---
 
-### Step 2 — New Component: `DriversModule.tsx`
+### Gap 2 — Sidebar Active State: Full Primary Fill vs Subtle bg-primary/10
 
-Create `src/components/dashboard/modules/DriversModule.tsx` — a focused module that:
+**Current behavior:** Active sidebar items use `bg-primary text-primary-foreground shadow-sm` — a full navy blue fill with white text.
 
-1. **Lists all staff with role "Driver"** from the `staff` table using a `useQuery` hook
-2. **Shows assignment stats**: how many transactions each driver has been assigned to today (from `pos_transactions` where `driver_id = staff.id AND DATE(created_at) = TODAY`)
-3. **Card-based layout** (mobile-first): each driver card shows name, phone, status badge (active today / idle), and a count of deliveries today
-4. **No separate page/route** — accessed via `?module=drivers` in the existing dashboard switch
+**Requested behavior:** "StockX Premium" spec requires `bg-primary/10 text-primary` — a subtle tinted highlight with navy text on white, matching the "More menu" active state in `MobileBottomNav` (which already uses `bg-primary/10 border-primary/30 text-primary`).
 
-The Driver card UI:
+**Fix:** Change the active class in `renderMenuItem` from:  
+`'bg-primary text-primary-foreground shadow-sm'`  
+to:  
+`'bg-primary/10 text-primary'`
+
+Also update the inner icon container active class from `'bg-white/20'` to `'bg-primary/15'` and the icon color from `'text-primary-foreground'` to `'text-primary'`.
+
+**File:** `src/components/dashboard/AppSidebar.tsx`
+
+---
+
+### Gap 3 — Inventory LPG Brand Cards: Stock Numbers Lack tabular-nums
+
+**Current behavior:** The `EditableStockCell` component (inside `LPGBrandCard.tsx`) renders the stock value as:  
 ```
-┌─────────────────────────────┐
-│ [Avatar] Ahmed Rahman        │
-│          Driver • 📞01234    │
-│          Today: 3 deliveries │
-│ [Active Today]               │
-└─────────────────────────────┘
+<div className="px-2 sm:px-3 py-2 rounded-md cursor-pointer ... font-medium text-sm sm:text-base">
+  {value}
+</div>
 ```
+No `tabular-nums` class. When you have numbers like "0", "10", "100" in the same column, they do not align.
 
-5. **"Mark as Available" / "Mark as Busy" toggle** — updates a local status (no DB change needed, just UI state for the session)
+**Fix:** Add `tabular-nums` to the value display `div` in `EditableStockCell`.
+
+Also, the editing `Input` should have `tabular-nums` for consistency during in-place editing.
+
+**File:** `src/components/inventory/LPGBrandCard.tsx`
 
 ---
 
-### Step 3 — POS Payment Drawer: Add Driver Selector
+### Gap 4 — Customer Desktop Table Rows Need py-3 Touch Target
 
-Modify `POSPaymentDrawer.tsx` to include an optional driver selector:
+**Current behavior:** The `TableRow` elements in the Due Customers desktop table (lines 1298-1352) and the Paid Customers desktop table have no explicit padding override — they rely on the default `TableCell` padding which is `px-4 py-2` (16px height, too small for touch).
 
-- Add a new `drivers` prop (list of active driver staff members)
-- Add `selectedDriverId` + `onDriverChange` props
-- Render a `Select` dropdown **after the Payment Method** section labeled "Assign Driver (Optional)"
-- If no drivers exist, skip rendering the selector entirely (graceful degradation)
+**Fix:** Add `className="py-3"` to each `TableCell` in the due and paid customer table rows, giving them a 48px+ touch height per the mobile standards spec.
 
-The UI:
-```
-Payment Method: [Cash] [bKash] [Nagad] [Rocket]
-──────────────────────────────────────────────
-Assign Driver (Optional):
-[ Select driver... ▼ ]
-  • Ahmed Rahman
-  • Karim Uddin
-  • No driver
-──────────────────────────────────────────────
-Amount Paid: [input]
-```
+**File:** `src/components/dashboard/modules/CustomerManagementModule.tsx`
 
 ---
 
-### Step 4 — POSModule: Wire Driver Data + Pass to Drawer
+### Gap 5 — Utility Module: Staff & Vehicle Empty States Use Custom Card Instead of EmptyStateCard
 
-In `POSModule.tsx`:
+**Current behavior:** When `staffList.length === 0` (line 554-564), the Utility module renders a hand-coded `Card` with `border-dashed` and custom icon/text — not the standardized `EmptyStateCard` component. Same for the vehicles empty state.
 
-1. Add a `useQuery` to fetch active driver staff: `supabase.from('staff').select('*').eq('role', 'Driver').eq('is_active', true).order('name')`
-2. Add state: `const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null)`
-3. Pass `drivers`, `selectedDriverId`, `onDriverChange` to `POSPaymentDrawer`
-4. Pass `p_driver_id: selectedDriverId` to the `complete_pos_sale` RPC call
-5. Reset `selectedDriverId` on `cart.resetCart()`
+**Fix:** Replace both custom empty-state cards with `<EmptyStateCard>` from `@/components/shared/EmptyStateCard`. Import `EmptyStateCard` and replace the existing `staffList.length === 0` block.
+
+**File:** `src/components/dashboard/modules/UtilityExpenseModule.tsx`
 
 ---
 
-### Step 5 — Dashboard: Register `drivers` Module
+### Gap 6 — Dashboard KPI Cards: Per-Card Shimmer Skeleton
 
-In `src/pages/Dashboard.tsx`, add `case "drivers":` to `renderActiveModule()`:
+**Current behavior:** The entire module falls back to `ModuleSkeleton` (the full-page skeleton) via the `Suspense` fallback in `Dashboard.tsx`. But when the module JS is already cached (revisit), the component renders immediately and the `DashboardOverview` KPI cards flash from `৳0` to real values during the first data fetch.
+
+**Fix:** In `DashboardOverview.tsx`, accept an `isLoading` prop from `Dashboard.tsx` and render `Skeleton` shimmer cells for the KPI card values when loading:
 
 ```typescript
-case "drivers":
-  return <DriversModule />;
+// In DashboardOverview.tsx
+interface DashboardOverviewProps {
+  // existing props...
+  isLoading?: boolean;
+}
+
+// In each KPI card value:
+{isLoading ? (
+  <Skeleton className="h-8 w-28 rounded-md" />
+) : (
+  <div className="text-xl sm:text-2xl lg:text-3xl font-extrabold tabular-nums">{card.value}</div>
+)}
 ```
 
----
-
-### Step 6 — Sidebar: Add Drivers Nav Item
-
-In `src/components/dashboard/AppSidebar.tsx`, add a "Drivers" nav item between `utility-expense` and `analysis-search`:
-
-```typescript
-{ id: 'drivers', titleKey: 'drivers', icon: Truck, roles: ['owner', 'manager'] },
-```
-
-And add the translation key `'drivers'` → "Drivers" to the language context.
+**Files:** `src/components/dashboard/modules/DashboardOverview.tsx` + `src/pages/Dashboard.tsx` (pass `isLoading` from `useDashboardData` to DashboardOverview)
 
 ---
 
-### Step 7 — Business Diary: Show Driver Attribution
+## Technical File Change Summary
 
-In `src/components/diary/SaleEntryCard.tsx`, if a `driver_id` is present in the sale, show a small badge "Delivery: [Driver Name]" below the "Sold by" line. This requires:
-- The `BusinessDiaryModule.tsx` to join `pos_transactions` with `staff` on `driver_id`
-- Add `driver_name` to the diary sale data shape
+| # | File | Change | Lines Affected | Risk |
+|---|---|---|---|---|
+| 1 | `BusinessDiaryModule.tsx` | Make header+date controls `sticky top-0 z-10` | ~370 | Zero — CSS only |
+| 2 | `AppSidebar.tsx` | Change active item style from `bg-primary` fill to `bg-primary/10 text-primary` | ~86-89 | Zero — visual only |
+| 3 | `LPGBrandCard.tsx` | Add `tabular-nums` to `EditableStockCell` value display and input | ~83 | Zero — additive class |
+| 4 | `CustomerManagementModule.tsx` | Add `py-3` to TableCell in due+paid table rows | ~1298-1352, ~1700-1780 | Zero — CSS padding |
+| 5 | `UtilityExpenseModule.tsx` | Replace 2 custom empty cards with `<EmptyStateCard>` | ~554-564, ~700-720 | Zero — component swap |
+| 6 | `DashboardOverview.tsx` + `Dashboard.tsx` | Add `isLoading` prop + Skeleton shimmer in KPI cards | ~200-255 | Zero — additive prop |
 
----
-
-## File Change Summary
-
-| # | File | Change | Type |
-|---|---|---|---|
-| 1 | DB migration | Add `p_driver_id` to `complete_pos_sale` RPC | SQL |
-| 2 | `src/components/dashboard/modules/DriversModule.tsx` | **NEW** — Driver list + daily assignment stats | New file |
-| 3 | `src/components/pos/POSPaymentDrawer.tsx` | Add driver selector `Select` + new props | Modify |
-| 4 | `src/components/dashboard/modules/POSModule.tsx` | Fetch drivers, add state, pass to drawer, pass to RPC | Modify |
-| 5 | `src/pages/Dashboard.tsx` | Add `case "drivers"` to module router | Modify |
-| 6 | `src/components/dashboard/AppSidebar.tsx` | Add Drivers nav item (Truck icon) | Modify |
-| 7 | `src/components/dashboard/MobileBottomNav.tsx` | Add Drivers to "More" items | Modify |
-
-**Zero new dependencies. Uses existing `supabase`, `useQuery`, `Select`, `Card` from the design system.**
+**Total: 6 files. Zero database changes. Zero new dependencies. Zero breaking changes. All purely additive or visual.**
 
 ---
 
-## Risk Assessment
+## What Is NOT Changing (Already Correct)
 
-| Change | Risk | Mitigation |
-|---|---|---|
-| RPC migration | Low — additive parameter with DEFAULT NULL | All existing callers unaffected |
-| `DriversModule.tsx` | Zero — new file, no impact on existing code | None needed |
-| `POSPaymentDrawer` driver selector | Low — only shows if `drivers.length > 0` | Graceful degradation |
-| Dashboard case addition | Zero — additive switch case | None needed |
-| Sidebar item | Zero — additive array entry | None needed |
+- Inter font — already declared in `index.css` ✅
+- `tabular-nums` on KPI card values in DashboardOverview — already present ✅
+- `tabular-nums` in CustomerCard and UtilityExpenseModule — already present ✅
+- EmptyStateCard in DriversModule — already used ✅
+- `touch-manipulation` on action buttons — already present ✅
+- Mobile bottom nav active state `bg-primary/10` — already correctly implemented ✅
