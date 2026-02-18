@@ -378,6 +378,7 @@ export function useUnifiedRealtime() {
         () => {
           invalidateWithDebounce(sharedKeys.overview(), 'critical');
           invalidateWithDebounce(sharedKeys.todayStats(), 'critical');
+          invalidateWithDebounce(sharedKeys.customers(), 'critical'); // safety net: ensures customer list refreshes even if customers UPDATE event is delayed/dropped
         }
       )
       // Product prices
