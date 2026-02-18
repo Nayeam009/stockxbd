@@ -45,7 +45,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
 import { sanitizeString, customerSchema } from "@/lib/validationSchemas";
@@ -71,6 +71,8 @@ interface Customer {
   created_at: string;
   customer_type: 'retail' | 'wholesale';
   credit_limit?: number;
+  company_name?: string;
+  trade_license?: string;
 }
 
 interface SalesRecord {
@@ -138,6 +140,8 @@ export const CustomerManagementModule = () => {
     created_at: c.created_at,
     customer_type: c.customer_type || 'retail',
     credit_limit: c.credit_limit,
+    company_name: (c as any).company_name,
+    trade_license: (c as any).trade_license,
   }));
   
   const [viewMode, setViewMode] = useState<ViewMode>('main');
@@ -161,7 +165,9 @@ export const CustomerManagementModule = () => {
     address: "",
     total_due: "",
     cylinders_due: "",
-    credit_limit: "10000"
+    credit_limit: "10000",
+    company_name: "",
+    trade_license: "",
   });
 
   // Memo Recall Feature State
@@ -514,7 +520,11 @@ export const CustomerManagementModule = () => {
         customer_type: newCustomerType,
         billing_status: totalDue > 0 || cylindersDue > 0 ? 'pending' : 'clear',
         created_by: user?.id,
-        owner_id: ownerId || user?.id
+        owner_id: ownerId || user?.id,
+        ...(newCustomerType === 'wholesale' && {
+          company_name: newCustomer.company_name || null,
+          trade_license: newCustomer.trade_license || null,
+        }),
       } as any);
 
     if (error) {
@@ -526,7 +536,7 @@ export const CustomerManagementModule = () => {
     toast({ title: "Customer added successfully" });
     setAddCustomerDialogOpen(false);
     setNewCustomerType('retail');
-    setNewCustomer({ name: "", email: "", phone: "", address: "", total_due: "", cylinders_due: "", credit_limit: "10000" });
+    setNewCustomer({ name: "", email: "", phone: "", address: "", total_due: "", cylinders_due: "", credit_limit: "10000", company_name: "", trade_license: "" });
     fetchCustomers();
   };
 
@@ -1023,6 +1033,28 @@ export const CustomerManagementModule = () => {
                 />
                 <p className="text-xs text-muted-foreground mt-1">Maximum credit allowed</p>
               </div>
+              {newCustomerType === 'wholesale' && (
+                <>
+                  <div>
+                    <label className="text-sm font-medium text-foreground">Company Name</label>
+                    <Input
+                      value={newCustomer.company_name}
+                      onChange={(e) => setNewCustomer({ ...newCustomer, company_name: e.target.value })}
+                      placeholder="Company or business name"
+                      className="mt-1 h-11"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-foreground">Trade License No.</label>
+                    <Input
+                      value={newCustomer.trade_license}
+                      onChange={(e) => setNewCustomer({ ...newCustomer, trade_license: e.target.value })}
+                      placeholder="e.g. TL-2024-XXXXX"
+                      className="mt-1 h-11"
+                    />
+                  </div>
+                </>
+              )}
             </div>
             <DialogFooter className="gap-2 sm:gap-0">
               <Button variant="outline" onClick={() => setAddCustomerDialogOpen(false)} className="h-11">Cancel</Button>
@@ -1193,20 +1225,35 @@ export const CustomerManagementModule = () => {
           subtitle={isWholesale ? 'Credit & ledger management' : 'Speed & volume · Walk-in customers'}
           icon={isWholesale ? <Building2 className="h-6 w-6 text-primary-foreground" /> : <ShoppingCart className="h-6 w-6 text-primary-foreground" />}
           actions={
-            <Button variant="outline" size="sm" className="h-10" onClick={() => setViewMode('main')}>
-              ← Back
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                className="h-10 bg-primary hover:bg-primary/90 touch-manipulation"
+                onClick={() => {
+                  setNewCustomerType(isWholesale ? 'wholesale' : 'retail');
+                  setAddCustomerDialogOpen(true);
+                }}
+              >
+                <Plus className="h-4 w-4 mr-1.5" />
+                <span className="hidden sm:inline">Add</span>
+              </Button>
+              <Button variant="outline" size="sm" className="h-10" onClick={() => setViewMode('main')}>
+                ← Back
+              </Button>
+            </div>
           }
         />
 
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder={`Search ${isWholesale ? 'wholesale' : 'retail'} customers...`}
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            className="pl-10 h-11"
-          />
+        <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm pb-3 pt-1 -mx-4 px-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder={`Search ${isWholesale ? 'wholesale' : 'retail'} customers...`}
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="pl-10 h-11"
+            />
+          </div>
         </div>
 
         {filtered.length === 0 ? (
@@ -1233,7 +1280,18 @@ export const CustomerManagementModule = () => {
                           {isWholesale ? 'Wholesale' : 'Retail'}
                         </Badge>
                       </div>
+                      {isWholesale && c.company_name && (
+                        <p className="text-xs text-muted-foreground italic">{c.company_name}</p>
+                      )}
                       <p className="text-xs text-muted-foreground">{c.phone || 'No phone'}</p>
+                      {!isWholesale && c.last_order_date && (
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Visited {formatDistanceToNow(new Date(c.last_order_date), { addSuffix: true })}
+                        </p>
+                      )}
+                      {!isWholesale && !c.last_order_date && (
+                        <p className="text-xs text-muted-foreground/50 mt-0.5">No purchase yet</p>
+                      )}
                       {isWholesale && c.credit_limit && (
                         <div className="mt-1.5">
                           {c.total_due > 0 && (

@@ -399,6 +399,7 @@ export type Database = {
         Row: {
           address: string | null
           billing_status: string | null
+          company_name: string | null
           created_at: string
           created_by: string | null
           credit_limit: number | null
@@ -412,11 +413,13 @@ export type Database = {
           owner_id: string | null
           phone: string | null
           total_due: number | null
+          trade_license: string | null
           updated_at: string | null
         }
         Insert: {
           address?: string | null
           billing_status?: string | null
+          company_name?: string | null
           created_at?: string
           created_by?: string | null
           credit_limit?: number | null
@@ -430,11 +433,13 @@ export type Database = {
           owner_id?: string | null
           phone?: string | null
           total_due?: number | null
+          trade_license?: string | null
           updated_at?: string | null
         }
         Update: {
           address?: string | null
           billing_status?: string | null
+          company_name?: string | null
           created_at?: string
           created_by?: string | null
           credit_limit?: number | null
@@ -448,6 +453,7 @@ export type Database = {
           owner_id?: string | null
           phone?: string | null
           total_due?: number | null
+          trade_license?: string | null
           updated_at?: string | null
         }
         Relationships: []
