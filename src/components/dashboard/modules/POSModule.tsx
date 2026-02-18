@@ -66,8 +66,20 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
     staleTime: 5 * 60 * 1000,
   });
   
+  // Shop settings for tax & currency
+  const { data: shopSettings } = useQuery({
+    queryKey: ['shop-settings-pos'],
+    queryFn: async () => {
+      const { data } = await supabase.from('shop_profiles').select('tax_rate, currency_symbol').maybeSingle();
+      return data;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+  const currencySymbol = shopSettings?.currency_symbol ?? '৳';
+  const taxRate = Number(shopSettings?.tax_rate ?? 0);
+
   // Cart hook
-  const cart = usePOSCart();
+  const cart = usePOSCart(taxRate);
 
   // UI State
   const [activeTable, setActiveTable] = useState<'sale' | 'return'>('sale');
@@ -334,11 +346,14 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
         })),
         subtotal: cart.subtotal,
         discount: cart.discount,
+        tax: cart.tax,
+        taxRate: taxRate,
         total: cart.total,
         paid: paidAmount,
         due: remainingDue,
         paymentStatus: finalPaymentStatus,
         paymentMethod: paymentMethod,
+        currencySymbol,
         notes: cart.returnItems.length > 0 
           ? `Return: ${cart.returnItems.map(r => `${r.quantity}x ${r.brandName}${r.isLeaked ? ' (Leaked)' : ''}`).join(', ')}` 
           : undefined
