@@ -1,272 +1,242 @@
 
-# UI/UX Modernization Audit & Implementation Plan
+# State & Design Consistency Audit — Optimization Roadmap
 
-## TOP 3 INCONSISTENCIES FOUND IN THE CURRENT APP
+## Audit Findings Summary
 
-### Inconsistency #1 — Mixed Card Style: `border-0 shadow-lg` vs `border border-border/40 shadow-md`
-Two competing card styles coexist across modules with no single standard. The Analytics module (`AnalysisTrendChart`, `AnalysisPieCharts`, `AnalysisTopItems`) uses `border-0 shadow-lg` (borderless, heavy shadow). The Dashboard Overview and POS module uses `border border-border/40 shadow-md`. The Inventory and Customer modules use plain `Card` with no explicit shadow override. This creates a visually inconsistent "patchwork" feeling — some panels look floating, others look flat. The fix is to standardize on a single card treatment: a subtle `border border-border/40 rounded-xl shadow-sm` for all content cards and `shadow-lg` only for modal/overlay surfaces.
-
-### Inconsistency #2 — POS Has No Keyboard Shortcut for Checkout (Enter to Pay)
-The Dashboard Overview implements keyboard shortcuts (F1, F2, F3) via `useEffect`. The `POSPaymentDrawer` has an `autoFocus` on the amount input. However, pressing **Enter** in the payment drawer does NOT trigger `onComplete` — there is no `onKeyDown` handler on the input or the drawer. For a POS optimized for speed, this is a critical UX gap. A cashier cannot complete a transaction without lifting their hands from the keyboard to click "Confirm & Print."
-
-### Inconsistency #3 — Module Header Design Is Not Standardized
-Three header patterns exist simultaneously:
-- **Pattern A (Full PremiumModuleHeader):** Used in `ProductPricingModule` and `AnalysisSearchReportModule` — gradient background, icon, title, subtitle, refresh button.
-- **Pattern B (Inline custom header):** Used in `POSModule` (simple `flex + h-9 w-9 div + h1 text-lg font-bold`) and `InventoryModule` (inline icon with `h-12 w-12 rounded-2xl`).
-- **Pattern C (No header at all):** Used in `BusinessDiaryModule` which goes straight to tabs.
-
-The `PremiumModuleHeader` component exists specifically for standardization but is only used in 2 of 10 modules. This means every module visually "begins" differently.
+After reading `UtilityExpenseModule.tsx` (883 lines), `SettingsModule.tsx` (970 lines), `CustomerManagementModule.tsx` (1913 lines), `POSModule.tsx`, `usePOSCart.ts`, `useSharedQueries.ts`, `moduleEvents.ts`, and `bangladeshConstants.ts`, here are the verified findings.
 
 ---
 
-## IMPLEMENTATION PLAN
+## Section 1: "Zombie" State Audit (useEffect vs useQuery)
 
-### Global Standards to Enforce
-Before implementing module-by-module, the following global tokens are already defined and should be used consistently:
+### Finding 1A — UtilityExpenseModule: Full Zombie State (Confirmed)
 
-- **Font:** Inter (already set on `html` in `index.css` line 171) — no change needed.
-- **Primary color:** `hsl(var(--primary))` = Navy `215 65% 17%` in light mode. This is the correct single action color — already used. No indigo migration needed.
-- **Border radius:** `--radius: 0.75rem` → `rounded-xl` = the standard. Already used inconsistently.
-- **Card standard:** Target = `border border-border/40 rounded-xl shadow-sm` — enforced via a global CSS utility class.
+`UtilityExpenseModule.tsx` lines 138-192 contain three `useCallback` fetch functions (`fetchStaffData`, `fetchVehicleData`, `fetchAllData`) and one `useEffect` that calls `fetchAllData()` on mount. This is classic zombie state:
 
----
+```typescript
+// Lines 138-192: Zombie pattern — direct useState + useCallback + useEffect
+const [staffList, setStaffList] = useState<StaffWithPayments[]>([]);
+const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+const [costs, setCosts] = useState<VehicleCost[]>([]);
+const [loading, setLoading] = useState(true);
 
-### BATCH 1 — Global Shell Fixes (2 files)
+const fetchStaffData = useCallback(async () => { ... supabase queries ... setStaffList(...) }, []);
+const fetchVehicleData = useCallback(async () => { ... supabase queries ... setVehicles(...) }, []);
 
-**Target:** `src/index.css`, `src/components/ui/card.tsx`
+useEffect(() => {
+  fetchAllData(); // Zombie
+  return () => { mountedRef.current = false; };
+}, [fetchAllData]);
+```
 
-**Changes:**
+After mutations (add staff, pay staff, bonus, add vehicle, add cost), it calls `fetchStaffData()` or `fetchVehicleData()` directly — bypassing the shared cache entirely. The data in this module is isolated from every other module.
 
-1. **`src/index.css`** — Add a new `.module-card` component class that enforces the standard card treatment:
-   ```css
-   .module-card {
-     @apply border border-border/40 rounded-xl shadow-sm bg-card;
-   }
-   ```
-   Add a `.section-header` utility for the common icon + title + subtitle pattern used across all modules.
+**Impact:** After paying a staff salary, the Business Diary and Dashboard don't update until the real-time subscription fires (up to 1.5s delay). After adding a new vehicle, nothing else knows about it.
 
-2. **`src/components/ui/card.tsx`** — Update the default `Card` className from `rounded-lg` to `rounded-xl` and from `shadow-sm` to maintain `shadow-sm`. This single change propagates to all 10 modules instantly since they all import `Card` from this file. Before: `"rounded-lg border bg-card text-card-foreground shadow-sm"`. After: `"rounded-xl border bg-card text-card-foreground shadow-sm"`.
+**Note:** The vehicle cost `handleAddCost` DOES call `queryClient.invalidateQueries({ queryKey: sharedKeys.overview() })` (line 359) — that part was already fixed. But the module's own data is still zombie state.
 
-**Why Card.tsx:** The `border-0` usage in Analytics will remain where explicitly set, but the default for every other module upgrades to `rounded-xl` automatically.
+### Finding 1B — CustomerManagementModule: Partially Migrated (Confirmed)
 
----
+`CustomerManagementModule.tsx` correctly uses `useSharedCustomers()` from the shared query cache (line 115). Customer list data is NOT zombie.
 
-### BATCH 2 — POS Module Polish (2 files)
+However, two secondary data fetches are still zombie:
+- `fetchPayments()` (lines 179-196): plain `useCallback` + direct `supabase` call, stored in local `useState`. Called manually when opening the history dialog.
+- `fetchCustomerSalesHistory()` (lines 199-234): plain async function, stores in local `useState`.
 
-**Target:** `src/components/pos/POSPaymentDrawer.tsx`, `src/components/dashboard/modules/POSModule.tsx`
+These are acceptable since they are on-demand fetches for dialogs, not module-level data. Not a critical issue.
 
-**Changes:**
+### Finding 1C — Event Bus → Cache Invalidation Mapping (Confirmed Working)
 
-1. **`POSPaymentDrawer.tsx`** — Add `onKeyDown` handler to the payment amount `Input`:
-   ```tsx
-   onKeyDown={(e) => {
-     if (e.key === 'Enter') {
-       e.preventDefault();
-       onComplete();
-     }
-   }}
-   ```
-   This lets cashiers type the amount and press Enter to confirm. No other changes needed — the `autoFocus` is already there.
+Verified in `moduleEvents.ts` (lines 125-166), the `useModuleEventSync` hook correctly maps:
+- `sale-completed` → `sharedKeys.overview()` + `sharedKeys.customers()` + `sharedKeys.lpgBrands()` ✅
+- `purchase-completed` → `sharedKeys.overview()` + `sharedKeys.lpgBrands()` ✅
+- `inventory-updated` → `sharedKeys.lpgBrands()` + `sharedKeys.stoves()` + `sharedKeys.regulators()` ✅
+- `customer-updated` → `sharedKeys.customers()` ✅
+- `price-updated` → `sharedKeys.prices()` ✅
 
-2. **`POSModule.tsx` header** — Replace the inline ad-hoc header (lines 385-402):
-   ```tsx
-   // Before: Custom inline div with h-9 w-9 div + h1 text-lg
-   // After: <PremiumModuleHeader> with ShoppingCart icon
-   ```
-   Import and use `PremiumModuleHeader` with `title={t('pos')}`, `subtitle="Point of Sale — Fast Checkout"`, barcode and clear-cart buttons passed as `actions`.
+**Gap found:** The `expense-added` event type exists in the `ModuleEventType` union (line 14 of moduleEvents.ts) but has **no handler** in `useModuleEventSync`. When a manual expense is added via a module, no cache invalidation is triggered via the event bus. The real-time subscription to `daily_expenses` handles it with a 1.5s delay, but there's no instant path.
 
-3. **`POSModule.tsx` — Add Enter key handler at module level** for the entire POS flow:
-   - When `showPaymentDrawer` is closed, pressing `Enter` with items in cart opens the payment drawer (same as clicking the sticky footer).
-   - When `showPaymentDrawer` is open, `Enter` triggers `handleCompleteSale`.
-   - Wire this via a `useEffect` with a `keydown` listener that checks `!processing` before acting.
+**Also gap:** `sharedKeys.stoves()` and `sharedKeys.regulators()` are NOT invalidated on `sale-completed`. If a stove or regulator is sold via POS, the inventory count in the Inventory module won't refresh until the 1.5s realtime subscription fires, not instantly.
 
 ---
 
-### BATCH 3 — Inventory Module Header & Empty States (1 file)
+## Section 2: UI Inconsistency Audit
 
-**Target:** `src/components/dashboard/modules/InventoryModule.tsx`
+### Finding 2A — Modules Missing PremiumModuleHeader
 
-**Changes:**
+| Module | Current Header Pattern | Status |
+|---|---|---|
+| POS | Inline `div` with icon + `h1` | MISSING PremiumModuleHeader |
+| Inventory | Inline `div` with gradient icon | MISSING |
+| Business Diary | No header at all | MISSING |
+| Customer Management | Inline custom `div` | MISSING |
+| **Utility Expense** | Inline `div` (lines 414-430) | **STILL MISSING** |
+| Settings | No module header (uses sidebar layout) | N/A — different pattern |
+| Analytics | Uses PremiumModuleHeader | ✅ DONE |
+| Product Pricing | Uses PremiumModuleHeader | ✅ DONE |
 
-1. **Replace inline header** (lines 169-183) with `PremiumModuleHeader`:
-   ```tsx
-   <PremiumModuleHeader
-     title="Inventory"
-     subtitle="Manage your stock levels"
-     icon={<Package className="h-6 w-6 text-primary-foreground" />}
-     actions={<Button onClick={() => openPOB('lpg')} ...>+ Add Stock</Button>}
-   />
-   ```
+Note: The previous UI/UX plan said it added `PremiumModuleHeader` to UtilityExpenseModule, but looking at the actual code (lines 413-430), the old inline `div` pattern is still there. The plan was approved but based on the current code, it was not applied to Utility.
 
-2. **Add empty state for filtered results** — when `filteredLpgBrands.length === 0` and `lpgSearchQuery` is set:
-   ```tsx
-   <EmptyStateCard
-     icon={Package}
-     title="No brands found"
-     subtitle={`No results for "${lpgSearchQuery}"`}
-     colorScheme="muted"
-     actionLabel="Clear Search"
-     onAction={() => setLpgSearchQuery('')}
-   />
-   ```
-   The `EmptyStateCard` component already exists at `src/components/shared/EmptyStateCard.tsx`.
+### Finding 2B — Sticky Header Coverage
 
-3. **Sticky filter bar** — wrap the filter row (size tabs + weight + search) in a `sticky top-0 z-10 bg-background/95 backdrop-blur-sm pb-2` div so headers stay visible on long cylinder lists.
+From code inspection:
+- **POS**: POSSaleTable and POSReturnTable — no sticky header on the table column labels. Mobile users scroll and lose context.
+- **Customer Management**: The `Table` component at lines ~800-950 has `TableHeader` but no `sticky top-0` class on it.
+- **Utility Expense**: The staff list and vehicle list use card-based layouts, not tables — sticky headers are not applicable.
+- **Inventory**: The filter bar (`sticky top-0 z-10 bg-background/95 backdrop-blur-sm`) was added by the previous plan — confirmed present.
 
----
+### Finding 2C — Touch Target Heights
 
-### BATCH 4 — Business Diary & Analytics Header Standardization (2 files)
-
-**Target:** `src/components/dashboard/modules/BusinessDiaryModule.tsx`, `src/components/dashboard/modules/AnalysisSearchReportModule.tsx`
-
-**Changes to `BusinessDiaryModule.tsx`:**
-
-1. Add `PremiumModuleHeader` at the top of the component render, before the date filter tabs. Currently the module has no header at all — it jumps straight into summary cards. Add:
-   ```tsx
-   <PremiumModuleHeader
-     title="Business Diary"
-     subtitle="Daily sales & expense ledger"
-     icon={<BookOpen className="h-6 w-6 text-primary-foreground" />}
-     gradientFrom="from-indigo-500/5"
-     gradientTo="to-primary/5"
-     onRefresh={refetch}
-     actions={<SoftRefreshBadge />}
-   />
-   ```
-
-2. The `SoftRefreshBadge` is already imported in similar modules — use it here too.
-
-**Changes to `AnalysisSearchReportModule.tsx`:**
-
-The module already uses `PremiumModuleHeader`. The primary change here is **chart color token alignment**. Currently:
-- `CHART_COLORS = ['#22c55e', '#3b82f6', ...]` (line 75) — hardcoded hex values
-- `AnalysisTrendChart` uses `"hsl(var(--primary))"` for income and `"#ef4444"` for expenses — mismatched
-
-**Fix:** Replace the hardcoded red `#ef4444` in `AnalysisTrendChart.tsx` with `hsl(var(--destructive))` so it responds to the app's theme tokens. Replace the `expenseGradient` stop colors similarly.
-
-Update `CHART_COLORS` in the Analytics module to use semantic color mappings that pull from the CSS variables via computed style, or use the explicitly defined palette that matches the app's design system (`emerald-500` for income, `rose-500` for expenses, `primary` for highlights).
+The primary issue is in **POSPaymentDrawer** and **POSModule** action buttons. The `h-12` standard (48px) is partially applied:
+- POS "Proceed to Pay" footer button: Uses `h-14` — exceeds standard ✅
+- POS payment method selector buttons in `POSPaymentDrawer`: Uses `py-3` (variable height based on content) — not explicitly `h-12`
+- Utility Expense "Add Staff", "Pay", "Bonus" buttons: Use default `Button` size with no `h-12` override — 40px height (below 44px minimum)
+- Settings section buttons: Use `min-h-[64px]` (line 79) ✅ 
 
 ---
 
-### BATCH 5 — Customers Module: Empty State + Table Headers (1 file)
+## Section 3: Missing Link — Tax & Currency
 
-**Target:** `src/components/dashboard/modules/CustomerManagementModule.tsx`
+### Finding 3A — No Currency/Tax Infrastructure (Confirmed)
 
-The module is 1,913 lines. The specific UX changes:
+- `BANGLADESHI_CURRENCY_SYMBOL = '৳'` is hardcoded in `bangladeshConstants.ts` line 3 and imported in 15+ components
+- `usePOSCart.ts` line 46-48: `total = Math.max(0, subtotal - discount)` — no tax multiplier
+- The `shop_profiles` table has no `tax_rate` or `currency_symbol` columns (confirmed from schema)
+- `complete_pos_sale` RPC receives `p_total` as a pre-calculated value — tax would need to be applied client-side before calling the RPC, OR the RPC could apply it server-side
 
-1. **Add empty state** when `customers.length === 0` (initial state for a new shop owner):
-   Use the existing `EmptyStateCard` with `icon={Users}`, `title="No customers yet"`, `subtitle="Add your first customer or complete a POS sale"`, `actionLabel="Add Customer"`.
+### Finding 3B — Implementation Path for Tax & Currency
 
-2. **Sticky table header** for the customer list — wrap the customer list header row in `sticky top-0 bg-card z-10` so column labels don't scroll off on long lists.
-
-3. **Module header** — the Customer module currently starts with an inline custom header div. Migrate to `PremiumModuleHeader`.
-
----
-
-### BATCH 6 — Settings Module: Breadcrumb Navigation (1 file)
-
-**Target:** `src/components/dashboard/modules/SettingsModule.tsx`
-
-The Settings module currently uses a custom sidebar + content layout. When a sub-section is selected (e.g., "Team Management"), there is no back-navigation breadcrumb on mobile — users must know to press the Settings section button again.
-
-**Changes:**
-
-1. **Add breadcrumb** using the existing `Breadcrumb` component from `src/components/ui/breadcrumb.tsx`:
-   ```tsx
-   {isMobile && activeSection !== null && (
-     <Breadcrumb>
-       <BreadcrumbList>
-         <BreadcrumbItem>
-           <BreadcrumbLink onClick={() => setActiveSection(null)}>Settings</BreadcrumbLink>
-         </BreadcrumbItem>
-         <BreadcrumbSeparator />
-         <BreadcrumbItem>
-           <BreadcrumbPage>{currentSectionTitle}</BreadcrumbPage>
-         </BreadcrumbItem>
-       </BreadcrumbList>
-     </Breadcrumb>
-   )}
-   ```
-   The `Breadcrumb` component is already imported and available — it just needs to be used here.
-
-2. **Breadcrumb for Inventory sub-navigation** — when a brand card is expanded in Inventory (or a detail view shown), add the same breadcrumb pattern using `PremiumModuleHeader`'s `onBack` prop.
+The cleanest implementation:
+1. Add `tax_rate NUMERIC DEFAULT 0` and `currency_symbol TEXT DEFAULT '৳'` to `shop_profiles`
+2. Create a `useShopSettings` hook that fetches these values once and caches them
+3. Update `usePOSCart` to accept a `taxRate` parameter and compute `tax = subtotal * taxRate/100`, then `total = subtotal - discount + tax`
+4. Add a "Tax & Currency" sub-section to `SettingsModule.tsx`
+5. Pass `currencySymbol` from the context to all components currently importing `BANGLADESHI_CURRENCY_SYMBOL`
 
 ---
 
-### BATCH 7 — Utility Expense: Module Header + Empty States (1 file)
+## Optimization Roadmap (Numbered, Prioritized)
 
-**Target:** `src/components/dashboard/modules/UtilityExpenseModule.tsx`
+### Priority 1 — Data Integrity & Real-time Correctness
 
-The module has a large `UtilityExpenseSkeleton` (lines 76-120 area) and complex state but opens with an inline icon + title that doesn't use `PremiumModuleHeader`.
+**Item 1: Fix Stove/Regulator cache on sale-completed event**
+- File: `src/lib/moduleEvents.ts`
+- Add `queryClient.invalidateQueries({ queryKey: sharedKeys.stoves() })` and `sharedKeys.regulators()` to the `sale-completed` handler in `useModuleEventSync`.
+- Currently when a stove is sold, the stove quantity card in Inventory shows stale data for up to 1.5 seconds.
 
-**Changes:**
+**Item 2: Add expense-added event handler to event bus**
+- File: `src/lib/moduleEvents.ts`
+- The `expense-added` event is defined in the type system but has no handler in `useModuleEventSync`. Add:
+  ```typescript
+  const unsubExpense = subscribeToModuleEvent('expense-added', () => {
+    queryClient.invalidateQueries({ queryKey: sharedKeys.overview() });
+  });
+  ```
+- Also dispatch this event from `UtilityExpenseModule` after each successful `daily_expenses` insert.
 
-1. **Replace inline header** with `PremiumModuleHeader`:
-   ```tsx
-   <PremiumModuleHeader
-     title="Utility & Expenses"
-     subtitle="Staff, Vehicle & Operational costs"
-     icon={<Wallet className="h-6 w-6 text-primary-foreground" />}
-     gradientFrom="from-amber-500/5"
-     gradientTo="to-rose-500/5"
-   />
-   ```
+### Priority 2 — Migrate Utility Expense to TanStack Query (Zombie Removal)
 
-2. **Empty state for staff list** — when `staffList.length === 0`:
-   ```tsx
-   <EmptyStateCard
-     icon={Users}
-     title="No staff added yet"
-     subtitle="Add your first team member to track salaries"
-     colorScheme="emerald"
-     actionLabel="Add Staff"
-     onAction={() => setShowAddStaff(true)}
-   />
-   ```
+**Item 3: Migrate UtilityExpenseModule staff & vehicle data to useQuery**
+- File: `src/components/dashboard/modules/UtilityExpenseModule.tsx`
+- Replace `useState<StaffWithPayments[]>` + `fetchStaffData` useCallback + `useEffect` with:
+  ```typescript
+  const { data: staffData = [], isLoading: staffLoading, refetch: refetchStaff } = useQuery({
+    queryKey: ['utility', 'staff', ownerId],
+    queryFn: fetchStaffWithPayments,
+    staleTime: 2 * 60 * 1000,
+  });
+  ```
+- Replace `useState<Vehicle[]>` + `fetchVehicleData` with a parallel `useQuery`.
+- After mutations (add/pay/delete), call `queryClient.invalidateQueries({ queryKey: ['utility', 'staff'] })` instead of calling the fetch functions directly.
+- This removes 3 `useState` variables, the `mountedRef`, the `fetchAllData` function, and the orphan `useEffect`.
+
+### Priority 3 — Apply Tax & Currency Infrastructure
+
+**Item 4: Database schema — add tax_rate and currency_symbol to shop_profiles**
+- Migration: `ALTER TABLE shop_profiles ADD COLUMN tax_rate NUMERIC DEFAULT 0; ADD COLUMN currency_symbol TEXT DEFAULT '৳';`
+- No data loss risk — both columns default to existing behavior.
+
+**Item 5: Create useShopSettings hook**
+- New file: `src/hooks/useShopSettings.ts`
+- Single `useQuery` for `shop_profiles` owned by current user
+- Returns `{ taxRate, currencySymbol, bkashNumber, nagadNumber, rocketNumber }` — consolidates all shop config reads scattered across POSModule, MyShopProfileModule, InvoiceTemplate
+
+**Item 6: Wire tax into usePOSCart**
+- File: `src/hooks/usePOSCart.ts`
+- Accept `taxRate: number = 0` as a parameter
+- Add `tax = Math.round((subtotal - discount) * taxRate / 100)` calculation
+- Update `total = subtotal - discount + tax`
+- Expose `tax` from the hook's return value
+
+**Item 7: Add Tax & Currency section to SettingsModule**
+- File: `src/components/dashboard/modules/SettingsModule.tsx`
+- Add a "Business Settings" section with:
+  - Tax Rate input (0-99%, defaults to 0%)
+  - Currency Symbol input (defaults to ৳)
+  - Saves to `shop_profiles` table
+
+**Item 8: Update InvoiceTemplate to show tax line**
+- File: `src/components/invoice/InvoiceTemplate.tsx`
+- Accept `taxRate` and `taxAmount` props
+- Show a "Tax (X%): ৳Y" line between Subtotal and Total when `taxRate > 0`
+
+### Priority 4 — UI Header Standardization (Complete the Previous Plan)
+
+**Item 9: Apply PremiumModuleHeader to UtilityExpenseModule**
+- File: `src/components/dashboard/modules/UtilityExpenseModule.tsx`
+- Replace lines 413-430 (inline `div` with Wallet icon + h2 title) with `<PremiumModuleHeader>`.
+- The previous plan approved this but the code still shows the old inline pattern.
+
+**Item 10: Apply PremiumModuleHeader to POSModule**
+- File: `src/components/dashboard/modules/POSModule.tsx`
+- The POS module currently uses an inline header. Apply `PremiumModuleHeader` with `ShoppingCart` icon.
+- The previous plan approved this — verify it was applied and apply if not.
+
+### Priority 5 — Touch Target & Table Header Polish
+
+**Item 11: Sticky table header in CustomerManagementModule**
+- File: `src/components/dashboard/modules/CustomerManagementModule.tsx`
+- Add `className="sticky top-0 z-10 bg-card"` to the `<TableHeader>` element in the customer list table.
+- This keeps Name / Phone / Status / Due / Actions labels visible during scroll on mobile.
+
+**Item 12: h-12 touch targets on Utility Expense action buttons**
+- File: `src/components/dashboard/modules/UtilityExpenseModule.tsx`
+- Add `className="h-12"` to the "Add Staff", "Pay Salary", "Give Bonus", "Add Cost", and "Add Vehicle" buttons.
+- Current default Button height is 40px, below the 44px minimum for touch targets.
 
 ---
 
-### BATCH 8 — Product Pricing: Header Fine-Tuning (1 file)
+## Complete File Change Summary
 
-**Target:** `src/components/dashboard/modules/ProductPricingModule.tsx`
+| Item | File(s) | Type | Risk |
+|---|---|---|---|
+| 1 | `src/lib/moduleEvents.ts` | Add 2 lines to event handler | Zero |
+| 2 | `src/lib/moduleEvents.ts` | Add expense-added handler | Zero |
+| 3 | `src/components/dashboard/modules/UtilityExpenseModule.tsx` | Migrate 3 useState to useQuery | Low |
+| 4 | New migration SQL | Schema: 2 new nullable columns | Zero |
+| 5 | New `src/hooks/useShopSettings.ts` | New hook (additive) | Zero |
+| 6 | `src/hooks/usePOSCart.ts` | Add tax parameter + calculation | Low |
+| 7 | `src/components/dashboard/modules/SettingsModule.tsx` | Add Business Settings section | Low |
+| 8 | `src/components/invoice/InvoiceTemplate.tsx` | Add optional tax line | Low |
+| 9 | `src/components/dashboard/modules/UtilityExpenseModule.tsx` | Replace inline header div | Zero |
+| 10 | `src/components/dashboard/modules/POSModule.tsx` | Apply/verify PremiumModuleHeader | Zero |
+| 11 | `src/components/dashboard/modules/CustomerManagementModule.tsx` | Add sticky class to TableHeader | Zero |
+| 12 | `src/components/dashboard/modules/UtilityExpenseModule.tsx` | Add h-12 to action buttons | Zero |
 
-This module already uses `PremiumModuleHeader` and `EmptyStateCard` — it's the most polished. Minor fix:
-
-1. **Save button UX** — The "Save Changes" button (`handleSaveChanges`) currently appears at the top. On mobile this means scroll-down-to-save. Move the button to a sticky bottom bar only when `hasChanges === true`:
-   ```tsx
-   {hasChanges && (
-     <div className="sticky bottom-16 md:bottom-0 z-20 bg-background/95 border-t border-border p-3">
-       <Button onClick={saveChanges} disabled={isSaving} className="w-full h-12">
-         {isSaving ? <Loader2 className="animate-spin" /> : `Save ${pendingCount} Changes`}
-       </Button>
-     </div>
-   )}
-   ```
-
----
-
-### BATCH 9 — My Shop Module Header (1 file)
-
-**Target:** `src/components/dashboard/modules/MyShopProfileModule.tsx`
-
-Read the file to confirm current header pattern, then apply `PremiumModuleHeader` with `Store` icon, `title="My Shop"`, `subtitle="Online shop settings & orders"`.
+**Total: 9 existing files + 1 new hook + 1 database migration. Zero new dependencies.**
 
 ---
 
-## Summary of All File Changes
+## What Is Already Correct (No Action Needed)
 
-| Batch | Files | What Changes |
-|-------|-------|------|
-| 1 | `src/index.css`, `src/components/ui/card.tsx` | Global card border-radius → `rounded-xl`, add `.module-card` utility |
-| 2 | `src/components/pos/POSPaymentDrawer.tsx`, `src/components/dashboard/modules/POSModule.tsx` | Enter key = Pay, POS header standardized |
-| 3 | `src/components/dashboard/modules/InventoryModule.tsx` | PremiumModuleHeader, empty states, sticky filter bar |
-| 4 | `src/components/dashboard/modules/BusinessDiaryModule.tsx`, `src/components/analysis/AnalysisTrendChart.tsx` | Diary header added, chart colors use CSS tokens |
-| 5 | `src/components/dashboard/modules/CustomerManagementModule.tsx` | Empty state, sticky header, PremiumModuleHeader |
-| 6 | `src/components/dashboard/modules/SettingsModule.tsx` | Breadcrumb on mobile sub-section navigation |
-| 7 | `src/components/dashboard/modules/UtilityExpenseModule.tsx` | PremiumModuleHeader, empty states for staff/vehicle |
-| 8 | `src/components/dashboard/modules/ProductPricingModule.tsx` | Sticky save button bar on mobile |
-| 9 | `src/components/dashboard/modules/MyShopProfileModule.tsx` | PremiumModuleHeader |
-
-**Total: 11 files, 0 database changes, 0 new dependencies.**
-
-All changes use existing components (`PremiumModuleHeader`, `EmptyStateCard`, `Breadcrumb`) and existing CSS tokens. No new packages required.
+- `sale-completed` → `sharedKeys.overview()` + `customers()` + `lpgBrands()`: Working correctly
+- `purchase-completed` → `sharedKeys.overview()` + `lpgBrands()`: Working correctly  
+- `customer-updated` → `sharedKeys.customers()`: Working correctly
+- `price-updated` → `sharedKeys.prices()`: Working correctly
+- CustomerManagementModule: Uses `useSharedCustomers()` correctly — NOT zombie state
+- Vehicle cost saves already call `queryClient.invalidateQueries(sharedKeys.overview())`: Confirmed at line 359
+- Staff salary saves already call `queryClient.invalidateQueries(sharedKeys.overview())`: Confirmed at line 245
+- Inventory filter bar: Already has `sticky top-0 z-10` from previous plan
+- Settings section buttons: Already use `min-h-[64px]` (exceeds 44px standard)
+- Unified realtime channel: Single `stock-x-unified` channel with correct tiered debounce
+- Monthly revenue stats: Correctly fetched via `get_monthly_revenue_stats` RPC in `fetchOverviewStats`
