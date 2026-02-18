@@ -126,11 +126,13 @@ export function useModuleEventSync() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    // Sale completed → refresh overview & customers
+    // Sale completed → refresh overview, customers & all inventory types
     const unsubSale = subscribeToModuleEvent('sale-completed', () => {
       queryClient.invalidateQueries({ queryKey: sharedKeys.overview() });
       queryClient.invalidateQueries({ queryKey: sharedKeys.customers() });
       queryClient.invalidateQueries({ queryKey: sharedKeys.lpgBrands() });
+      queryClient.invalidateQueries({ queryKey: sharedKeys.stoves() });
+      queryClient.invalidateQueries({ queryKey: sharedKeys.regulators() });
     });
 
     // Purchase completed → refresh inventory & overview
@@ -156,12 +158,18 @@ export function useModuleEventSync() {
       queryClient.invalidateQueries({ queryKey: sharedKeys.prices() });
     });
 
+    // Expense added → refresh overview & business diary
+    const unsubExpense = subscribeToModuleEvent('expense-added', () => {
+      queryClient.invalidateQueries({ queryKey: sharedKeys.overview() });
+    });
+
     return () => {
       unsubSale();
       unsubPurchase();
       unsubInventory();
       unsubCustomer();
       unsubPrice();
+      unsubExpense();
     };
   }, [queryClient]);
 }

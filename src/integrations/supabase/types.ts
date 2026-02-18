@@ -1372,6 +1372,7 @@ export type Database = {
           bkash_number: string | null
           cover_image_url: string | null
           created_at: string | null
+          currency_symbol: string | null
           delivery_fee: number | null
           description: string | null
           district: string
@@ -1389,6 +1390,7 @@ export type Database = {
           rating: number | null
           rocket_number: string | null
           shop_name: string
+          tax_rate: number | null
           thana: string | null
           total_orders: number | null
           total_reviews: number | null
@@ -1400,6 +1402,7 @@ export type Database = {
           bkash_number?: string | null
           cover_image_url?: string | null
           created_at?: string | null
+          currency_symbol?: string | null
           delivery_fee?: number | null
           description?: string | null
           district: string
@@ -1417,6 +1420,7 @@ export type Database = {
           rating?: number | null
           rocket_number?: string | null
           shop_name: string
+          tax_rate?: number | null
           thana?: string | null
           total_orders?: number | null
           total_reviews?: number | null
@@ -1428,6 +1432,7 @@ export type Database = {
           bkash_number?: string | null
           cover_image_url?: string | null
           created_at?: string | null
+          currency_symbol?: string | null
           delivery_fee?: number | null
           description?: string | null
           district?: string
@@ -1445,6 +1450,7 @@ export type Database = {
           rating?: number | null
           rocket_number?: string | null
           shop_name?: string
+          tax_rate?: number | null
           thana?: string | null
           total_orders?: number | null
           total_reviews?: number | null

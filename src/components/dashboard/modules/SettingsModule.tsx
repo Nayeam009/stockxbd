@@ -23,7 +23,8 @@ import {
   Eye,
   EyeOff,
   HardDrive,
-  ShieldCheck
+  ShieldCheck,
+  DollarSign,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -131,6 +132,11 @@ export const SettingsModule = () => {
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
+  // Business Settings state
+  const [taxRate, setTaxRate] = useState<string>("0");
+  const [currencySymbol, setCurrencySymbol] = useState<string>("৳");
+  const [savingBusiness, setSavingBusiness] = useState(false);
+
   // Notification settings - lazy loaded from localStorage
   const [notifications, setNotifications] = useState(() => {
     const saved = localStorage.getItem("notification-settings");
@@ -153,8 +159,8 @@ export const SettingsModule = () => {
 
       setUserEmail(user.email || "");
 
-      // Parallel fetching for role, profile, and admin status
-      const [roleResult, profileResult, adminResult] = await Promise.all([
+      // Parallel fetching for role, profile, admin status, and shop settings
+      const [roleResult, profileResult, adminResult, shopResult] = await Promise.all([
         supabase
           .from('user_roles')
           .select('role')
@@ -169,7 +175,12 @@ export const SettingsModule = () => {
           .from('admin_users')
           .select('id')
           .eq('user_id', user.id)
-          .maybeSingle()
+          .maybeSingle(),
+        supabase
+          .from('shop_profiles')
+          .select('tax_rate, currency_symbol')
+          .eq('owner_id', user.id)
+          .maybeSingle(),
       ]);
 
       // Set role
@@ -187,6 +198,12 @@ export const SettingsModule = () => {
 
       // Set admin status
       setIsAdmin(!!adminResult.data);
+
+      // Set business settings
+      if (shopResult.data) {
+        setTaxRate(String(shopResult.data.tax_rate ?? 0));
+        setCurrencySymbol(shopResult.data.currency_symbol ?? '৳');
+      }
     } catch (error) {
       console.error('Error fetching user data:', error);
     } finally {
@@ -306,6 +323,29 @@ export const SettingsModule = () => {
     }
   };
 
+  const handleSaveBusinessSettings = async () => {
+    setSavingBusiness(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const rate = parseFloat(taxRate) || 0;
+      if (rate < 0 || rate > 99) {
+        toast({ title: "Tax rate must be between 0-99%", variant: "destructive" });
+        return;
+      }
+      const { error } = await supabase
+        .from('shop_profiles')
+        .update({ tax_rate: rate, currency_symbol: currencySymbol || '৳', updated_at: new Date().toISOString() })
+        .eq('owner_id', user.id);
+      if (error) throw error;
+      toast({ title: language === 'bn' ? 'ব্যবসার সেটিংস সংরক্ষিত হয়েছে' : 'Business settings saved' });
+    } catch (error: any) {
+      toast({ title: "Failed to save", description: error.message, variant: "destructive" });
+    } finally {
+      setSavingBusiness(false);
+    }
+  };
+
   const handleSectionClick = (sectionId: string) => {
     setActiveSection(sectionId);
     if (isMobile) {
@@ -395,6 +435,16 @@ export const SettingsModule = () => {
         icon: <Settings className="h-5 w-5" />,
         title: language === 'bn' ? 'প্রিন্টার' : 'Printer',
         description: language === 'bn' ? 'রসিদ প্রিন্টিং' : 'Receipt printing',
+      });
+    }
+
+    // Business Settings - only for owners
+    if (userRole === 'owner') {
+      baseSections.push({
+        id: 'business',
+        icon: <DollarSign className="h-5 w-5" />,
+        title: language === 'bn' ? 'ব্যবসার সেটিংস' : 'Business Settings',
+        description: language === 'bn' ? 'ট্যাক্স ও মুদ্রা' : 'Tax rate & currency',
       });
     }
 
@@ -608,6 +658,72 @@ export const SettingsModule = () => {
 
       case 'printer':
         return <PrinterSettingsSection />;
+
+      case 'business':
+        return (
+          <Card className="border-border/50 shadow-sm bg-card">
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <DollarSign className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <CardTitle className="text-lg">
+                    {language === 'bn' ? 'ব্যবসার সেটিংস' : 'Business Settings'}
+                  </CardTitle>
+                  <CardDescription>
+                    {language === 'bn' ? 'ট্যাক্স হার ও মুদ্রা চিহ্ন সেট করুন' : 'Configure tax rate and currency symbol for invoices'}
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div className="space-y-2">
+                <Label htmlFor="taxRate" className="font-medium">
+                  {language === 'bn' ? 'ট্যাক্স হার (%)' : 'Tax Rate (%)'}
+                </Label>
+                <Input
+                  id="taxRate"
+                  type="number"
+                  min="0"
+                  max="99"
+                  step="0.5"
+                  value={taxRate}
+                  onChange={(e) => setTaxRate(e.target.value)}
+                  placeholder="0"
+                  className="h-12 text-base"
+                />
+                <p className="text-xs text-muted-foreground">
+                  {language === 'bn' ? '০% মানে কোনো ট্যাক্স নেই। POS মেমো-তে দেখাবে।' : 'Set to 0% for no tax. Shown on POS invoices.'}
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="currencySymbol" className="font-medium">
+                  {language === 'bn' ? 'মুদ্রা চিহ্ন' : 'Currency Symbol'}
+                </Label>
+                <Input
+                  id="currencySymbol"
+                  value={currencySymbol}
+                  onChange={(e) => setCurrencySymbol(e.target.value)}
+                  placeholder="৳"
+                  className="h-12 text-base"
+                  maxLength={4}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {language === 'bn' ? 'ডিফল্ট: ৳ (টাকা)' : 'Default: ৳ (Taka)'}
+                </p>
+              </div>
+              <Button
+                onClick={handleSaveBusinessSettings}
+                disabled={savingBusiness}
+                className="w-full h-12"
+              >
+                {savingBusiness && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                {language === 'bn' ? 'সংরক্ষণ করুন' : 'Save Business Settings'}
+              </Button>
+            </CardContent>
+          </Card>
+        );
 
       default:
         return null;

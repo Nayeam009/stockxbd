@@ -25,6 +25,8 @@ interface InvoiceData {
   items: InvoiceItem[];
   subtotal: number;
   discount: number;
+  tax?: number;
+  taxRate?: number;
   total: number;
   paid?: number;
   due?: number;
@@ -160,6 +162,12 @@ export const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
               <div className="flex justify-between py-1 border-b border-gray-300 text-green-600">
                 <span>{language === "bn" ? "ছাড়" : "Discount"}:</span>
                 <span>-{formatCurrency(data.discount)}</span>
+              </div>
+            )}
+            {data.tax != null && data.tax > 0 && (
+              <div className="flex justify-between py-1 border-b border-gray-300 text-orange-600">
+                <span>{language === "bn" ? `কর (${data.taxRate ?? 0}%)` : `Tax (${data.taxRate ?? 0}%)`}:</span>
+                <span>+{formatCurrency(data.tax)}</span>
               </div>
             )}
             <div className="flex justify-between py-2 border-b-2 border-black font-bold text-lg">

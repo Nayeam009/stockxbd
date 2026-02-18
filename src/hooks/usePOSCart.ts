@@ -30,7 +30,7 @@ export interface ReturnItem {
 }
 
 // ============= MAIN HOOK =============
-export function usePOSCart() {
+export function usePOSCart(taxRate: number = 0) {
   const [saleItems, setSaleItems] = useState<SaleItem[]>([]);
   const [returnItems, setReturnItems] = useState<ReturnItem[]>([]);
   const [discount, setDiscount] = useState(0);
@@ -43,9 +43,14 @@ export function usePOSCart() {
     [saleItems]
   );
 
+  const tax = useMemo(() =>
+    taxRate > 0 ? Math.round((subtotal - discount) * taxRate / 100) : 0,
+    [subtotal, discount, taxRate]
+  );
+
   const total = useMemo(() => 
-    Math.max(0, subtotal - discount), 
-    [subtotal, discount]
+    Math.max(0, subtotal - discount + tax), 
+    [subtotal, discount, tax]
   );
 
   const saleItemsCount = useMemo(() => 
@@ -304,6 +309,7 @@ export function usePOSCart() {
     onlineOrderId,
     // Calculations
     subtotal,
+    tax,
     total,
     saleItemsCount,
     refillCylindersCount,
