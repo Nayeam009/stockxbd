@@ -1,6 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import {
   Users, Banknote, TrendingUp, TrendingDown, Truck, Receipt, Wallet,
@@ -19,6 +20,7 @@ interface DashboardOverviewProps {
   userRole: 'owner' | 'manager';
   setActiveModule?: (module: string) => void;
   onRefresh?: () => void;
+  isLoading?: boolean;
 }
 
 export const DashboardOverview = ({
@@ -27,7 +29,8 @@ export const DashboardOverview = ({
   cylinderStock = [],
   userRole,
   setActiveModule,
-  onRefresh
+  onRefresh,
+  isLoading = false,
 }: DashboardOverviewProps) => {
   const { t } = useLanguage();
 
@@ -233,16 +236,24 @@ export const DashboardOverview = ({
               <CardContent className="p-3 sm:p-4 pt-0">
                 <div className="space-y-1">
                   <div className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-foreground truncate tabular-nums">
-                    {card.value}
+                    {isLoading ? (
+                      <Skeleton className="h-8 w-28 rounded-md" />
+                    ) : (
+                      card.value
+                    )}
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <Badge className={`text-[10px] sm:text-xs font-semibold border px-1.5 ${isNegative ? 'bg-destructive/15 text-destructive border-destructive/30' :
-                      isWarning ? 'bg-warning/15 text-warning border-warning/30' :
-                        'bg-success/15 text-success border-success/30'
-                      }`}>
-                      {isNegative ? <TrendingDown className="h-2.5 w-2.5 mr-0.5" aria-hidden="true" /> : <TrendingUp className="h-2.5 w-2.5 mr-0.5" aria-hidden="true" />}
-                      {card.change}
-                    </Badge>
+                    {isLoading ? (
+                      <Skeleton className="h-5 w-16 rounded-full" />
+                    ) : (
+                      <Badge className={`text-[10px] sm:text-xs font-semibold border px-1.5 ${isNegative ? 'bg-destructive/15 text-destructive border-destructive/30' :
+                        isWarning ? 'bg-warning/15 text-warning border-warning/30' :
+                          'bg-success/15 text-success border-success/30'
+                        }`}>
+                        {isNegative ? <TrendingDown className="h-2.5 w-2.5 mr-0.5" aria-hidden="true" /> : <TrendingUp className="h-2.5 w-2.5 mr-0.5" aria-hidden="true" />}
+                        {card.change}
+                      </Badge>
+                    )}
                   </div>
                   <p className="text-[10px] sm:text-xs text-muted-foreground truncate">{card.subtitle}</p>
                 </div>

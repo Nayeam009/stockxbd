@@ -104,7 +104,7 @@ export const EditableStockCell = ({
         <span className="text-[10px] font-medium text-muted-foreground">{label}</span>
       </div>
       {isEditing ? (
-        <Input
+      <Input
           ref={inputRef}
           type="number"
           inputMode="numeric"
@@ -113,7 +113,7 @@ export const EditableStockCell = ({
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
           className={cn(
-            "h-7 w-16 text-center text-lg font-bold p-0 border-0 bg-transparent focus-visible:ring-1",
+            "h-7 w-16 text-center text-lg font-bold p-0 border-0 bg-transparent focus-visible:ring-1 tabular-nums",
             colors.text
           )}
         />

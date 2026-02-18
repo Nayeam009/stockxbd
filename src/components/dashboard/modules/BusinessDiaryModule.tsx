@@ -368,8 +368,9 @@ export const BusinessDiaryModule = () => {
 
   return (
     <div className="space-y-4 sm:space-y-5 pb-4">
-      {/* Header */}
-      <div className="relative">
+      {/* Header — sticky so the date filter stays visible while scrolling */}
+      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border/40 -mx-1 px-1 pb-3 pt-1 sm:-mx-0 sm:px-0">
+        <div className="relative">
         <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-secondary/5 rounded-xl -z-10" />
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 sm:p-0">
           <div className="flex items-center gap-3">
@@ -466,6 +467,7 @@ export const BusinessDiaryModule = () => {
               <RefreshCcw className="h-3.5 w-3.5" />
             </Button>
           </div>
+        </div>
         </div>
       </div>
 

@@ -1297,7 +1297,7 @@ export const CustomerManagementModule = () => {
                 <TableBody>
                   {filteredDueCustomers.map((customer) => (
                     <TableRow key={customer.id} className="border-border hover:bg-muted/30 transition-colors">
-                      <TableCell>
+                      <TableCell className="py-3">
                         <div className="flex items-center gap-3">
                           <Avatar className="h-10 w-10 bg-rose-500/10">
                             <AvatarFallback className="bg-rose-500/10 text-rose-600 font-semibold">
@@ -1310,18 +1310,18 @@ export const CustomerManagementModule = () => {
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="py-3">
                         {getBillingBadge(customer.billing_status, customer.total_due)}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="py-3 text-right">
                         <span className="font-bold text-rose-600 dark:text-rose-400 tabular-nums">
                           {BANGLADESHI_CURRENCY_SYMBOL}{Number(customer.total_due).toLocaleString()}
                         </span>
                       </TableCell>
-                      <TableCell className="text-right font-medium text-purple-600 dark:text-purple-400 tabular-nums">
+                      <TableCell className="py-3 text-right font-medium text-purple-600 dark:text-purple-400 tabular-nums">
                         {customer.cylinders_due}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="py-3">
                         <div className="flex items-center justify-center gap-2">
                           <Button
                             size="sm"
@@ -1714,10 +1714,10 @@ export const CustomerManagementModule = () => {
               <TableBody>
                 {filteredPaidCustomers.map((customer, index) => (
                   <TableRow key={customer.id} className="border-border hover:bg-muted/30 transition-colors">
-                    <TableCell className="font-mono text-sm text-muted-foreground">
+                    <TableCell className="py-3 font-mono text-sm text-muted-foreground">
                       CUST-{String(index + 1).padStart(3, '0')}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="py-3">
                       <div className="flex items-center gap-3">
                         <Avatar className="h-9 w-9 bg-emerald-500/10">
                           <AvatarFallback className="bg-emerald-500/10 text-emerald-600 font-semibold text-sm">
@@ -1727,10 +1727,10 @@ export const CustomerManagementModule = () => {
                         <span className="font-medium text-foreground">{customer.name}</span>
                       </div>
                     </TableCell>
-                    <TableCell className="text-muted-foreground">
+                    <TableCell className="py-3 text-muted-foreground">
                       {customer.phone || customer.email || 'N/A'}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="py-3">
                       {customer.last_order_date ? (
                         <button
                           className="text-sm text-primary underline-offset-2 hover:underline cursor-pointer"
@@ -1745,12 +1745,12 @@ export const CustomerManagementModule = () => {
                         <span className="text-muted-foreground">N/A</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-center">
+                    <TableCell className="py-3 text-center">
                       <Badge className="bg-emerald-500/20 text-emerald-600 border-emerald-500/30">
                         Clear
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-center">
+                    <TableCell className="py-3 text-center">
                       <Button
                         size="sm"
                         variant="outline"
