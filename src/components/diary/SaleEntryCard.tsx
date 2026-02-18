@@ -116,6 +116,14 @@ export const SaleEntryCard = ({ entry, onViewDetails }: SaleEntryCardProps) => {
               </Badge>
             )}
 
+            {/* Driver Attribution */}
+            {entry.driverName && (
+              <Badge variant="outline" className="bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800 text-[10px] h-5">
+                <Truck className="h-2.5 w-2.5 mr-0.5" />
+                Driver: {entry.driverName}
+              </Badge>
+            )}
+
             {/* Customer & Time */}
             <div className="flex items-center gap-2 text-[10px] text-muted-foreground flex-wrap">
               <span className="flex items-center gap-1 bg-muted/50 px-1.5 py-0.5 rounded">

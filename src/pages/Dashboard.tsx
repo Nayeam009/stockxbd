@@ -33,6 +33,7 @@ const SettingsModule = lazy(() => import("@/components/dashboard/modules/Setting
 const ProfileModule = lazy(() => import("@/components/dashboard/modules/ProfileModule").then(m => ({ default: m.ProfileModule })));
 const MyShopProfileModule = lazy(() => import("@/components/dashboard/modules/MyShopProfileModule").then(m => ({ default: m.MyShopProfileModule })));
 const AdminPanelModule = lazy(() => import("@/components/dashboard/modules/AdminPanelModule").then(m => ({ default: m.AdminPanelModule })));
+const DriversModule = lazy(() => import("@/components/dashboard/modules/DriversModule").then(m => ({ default: m.DriversModule })));
 const Dashboard = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -328,6 +329,8 @@ const Dashboard = () => {
           return <CommunityModule />;
         case "admin-panel":
           return isAdmin ? <AdminPanelModule /> : null;
+        case "drivers":
+          return <DriversModule />;
         case "utility-expense":
         case "vehicle-cost":
           return <UtilityExpenseModule />;

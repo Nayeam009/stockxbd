@@ -44,6 +44,8 @@ export interface SaleEntry {
   communityOrderId: string | null;
   cogs: number;
   saleChannel: 'offline' | 'online';
+  driverName: string | null;
+  driverId: string | null;
 }
 
 export interface ExpenseEntry {
@@ -151,7 +153,7 @@ const getPaymentAmounts = (paymentStatus: string, total: number, notes: string |
 // ===== Fetch Functions =====
 async function fetchSalesData(startDate: string, endDate: string): Promise<SaleEntry[]> {
   try {
-    const [userRolesResult, posResult, paymentsResult, customersResult, pricesResult] = await Promise.all([
+    const [userRolesResult, posResult, paymentsResult, customersResult, pricesResult, staffResult] = await Promise.all([
       supabase.from('user_roles').select('user_id, role'),
       supabase
         .from('pos_transactions')
@@ -202,11 +204,13 @@ async function fetchSalesData(startDate: string, endDate: string): Promise<SaleE
         .lte('payment_date', endDate)
         .order('created_at', { ascending: false }),
       supabase.from('customers').select('id, name, phone'),
-      supabase.from('product_prices').select('product_name, company_price, is_active')
+      supabase.from('product_prices').select('product_name, company_price, is_active'),
+      supabase.from('staff').select('id, name, role'),
     ]);
 
     const roleMap = new Map<string, string>(userRolesResult.data?.map(r => [r.user_id, r.role]) || []);
     const customerMap = new Map(customersResult.data?.map(c => [c.id, c]) || []);
+    const staffMap = new Map<string, string>((staffResult.data || []).map(s => [s.id, s.name]));
     const priceMap = new Map<string, number>();
     
     if (pricesResult.data) {
@@ -258,7 +262,9 @@ async function fetchSalesData(startDate: string, endDate: string): Promise<SaleE
           isOnlineOrder,
           communityOrderId,
           cogs: 0,
-          saleChannel: isOnlineOrder ? 'online' as const : 'offline' as const
+          saleChannel: isOnlineOrder ? 'online' as const : 'offline' as const,
+          driverName: txn.driver_id ? (staffMap.get(txn.driver_id) || null) : null,
+          driverId: txn.driver_id || null,
         }];
       }
 
@@ -303,7 +309,9 @@ async function fetchSalesData(startDate: string, endDate: string): Promise<SaleE
           isOnlineOrder,
           communityOrderId,
           cogs: itemCogs,
-          saleChannel: isOnlineOrder ? 'online' as const : 'offline' as const
+          saleChannel: isOnlineOrder ? 'online' as const : 'offline' as const,
+          driverName: txn.driver_id ? (staffMap.get(txn.driver_id) || null) : null,
+          driverId: txn.driver_id || null,
         };
       });
     });
@@ -340,7 +348,9 @@ async function fetchSalesData(startDate: string, endDate: string): Promise<SaleE
         isOnlineOrder: false,
         communityOrderId: null,
         cogs: 0,
-        saleChannel: 'offline' as const
+        saleChannel: 'offline' as const,
+        driverName: null,
+        driverId: null,
       };
     });
 

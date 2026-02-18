@@ -336,6 +336,7 @@ export const translations: Translations = {
   "completed_orders": { en: "Completed Orders", bn: "সম্পন্ন অর্ডার" },
   "delivery_address": { en: "Delivery Address", bn: "ডেলিভারি ঠিকানা" },
   "assign_driver": { en: "Assign Driver", bn: "ড্রাইভার নিয়োগ করুন" },
+  "drivers": { en: "Drivers", bn: "ড্রাইভার" },
   "order_status": { en: "Order Status", bn: "অর্ডার অবস্থা" },
   "order_placed": { en: "Order Placed", bn: "অর্ডার দেওয়া হয়েছে" },
   "processing": { en: "Processing", bn: "প্রক্রিয়াধীন" },
