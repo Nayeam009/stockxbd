@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { EmptyStateCard } from "@/components/shared/EmptyStateCard";
 import {
   RefreshCcw,
   TrendingUp,
@@ -544,13 +545,14 @@ export const BusinessDiaryModule = () => {
               ))}
             </div>
             {filteredSales.length === 0 ? (
-              <Card className="border-dashed border-2 border-muted bg-muted/20">
-                <CardContent className="flex flex-col items-center justify-center py-10">
-                  <Receipt className="h-10 w-10 text-muted-foreground/50 mb-3" />
-                  <p className="font-medium">No sales found</p>
-                  <p className="text-xs text-muted-foreground mt-1">No {paymentFilter !== 'all' ? paymentFilter : ''} {saleChannelFilter !== 'all' ? saleChannelFilter : ''} sales for {format(new Date(selectedDate), 'MMM dd')}</p>
-                </CardContent>
-              </Card>
+              <EmptyStateCard
+                icon={<Receipt className="h-10 w-10" />}
+                title={searchQuery || paymentFilter !== 'all' || saleChannelFilter !== 'all' ? "No sales match your filters" : "No sales recorded today"}
+                subtitle="Complete a POS transaction to see it here"
+                colorScheme="muted"
+                actionLabel={searchQuery ? "Clear Search" : undefined}
+                onAction={searchQuery ? () => setSearchQuery('') : undefined}
+              />
             ) : (
               filteredSales.map(entry => <SaleEntryCard key={entry.id} entry={entry} onViewDetails={setSelectedSale} />)
             )}
@@ -573,13 +575,14 @@ export const BusinessDiaryModule = () => {
               ))}
             </div>
             {filteredExpenses.length === 0 ? (
-              <Card className="border-dashed border-2 border-rose-200 dark:border-rose-800/50 bg-rose-50/50 dark:bg-rose-950/20">
-                <CardContent className="flex flex-col items-center justify-center py-10">
-                  <CircleDollarSign className="h-10 w-10 text-rose-400 mb-3" />
-                  <p className="font-medium">No expenses found</p>
-                  <p className="text-xs text-muted-foreground mt-1">POB, Staff Salary & Vehicle costs appear here</p>
-                </CardContent>
-              </Card>
+              <EmptyStateCard
+                icon={<Wallet className="h-10 w-10" />}
+                title={searchQuery || expenseSourceFilter !== 'all' ? "No expenses match your filters" : "No expenses recorded today"}
+                subtitle="Add an expense or make a purchase to see it here"
+                colorScheme="muted"
+                actionLabel="Add Expense"
+                onAction={() => setAddDialogOpen(true)}
+              />
             ) : (
               filteredExpenses.map(entry => <ExpenseEntryCard key={entry.id} entry={entry} onNavigateToSource={handleNavigateToSource} />)
             )}
