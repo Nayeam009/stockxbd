@@ -1,146 +1,158 @@
 
-# Fix Build Error + Complete Retail/Wholesale Integration
+# Retail / Wholesale Integration — Sync Repair Plan
 
-## Root Cause of TS1128 Build Error
+## Audit Summary
 
-The insertion at line 1165-1307 placed the retail/wholesale view block correctly, but the `// Due Customers View` block that was supposed to follow it lost its `if (viewMode === 'due') {` guard. The `return (` at line 1310 is floating outside any conditional, which is an invalid top-level statement in the component body — TypeScript reports "Declaration or statement expected" at line 2142 (the closing `};` of the file, because the unclosed block cascades to the end).
-
-**Fix:** Insert `if (viewMode === 'due') {` at line 1309 (between the closing `}` of the wholesale block and the bare `return`), and ensure the matching closing `}` appears before `// Paid View` as well.
+After tracing all paths — the real-time subscription channel, the `complete_pos_sale` RPC, the Dashboard KPI aggregation, and every data flow between POS and the Customer module — here is the precise finding for each check.
 
 ---
 
-## Complete Fix Plan — 3 Files, Zero DB Changes
+## Check 1: Real-Time Subscription — PASS (No Repair Needed)
 
-### File 1: `CustomerManagementModule.tsx` — Fix the build error
+**Finding:** The `useUnifiedRealtime()` hook in `src/hooks/useSharedQueries.ts` (lines 370-373) listens to ALL rows on the `customers` table unconditionally:
 
-**Change:** Insert `if (viewMode === 'due') {` at line 1309 to restore the missing guard for the Due Customers view.
-
-The structure must be:
-```
-}  ← closes retail/wholesale block (line 1307)
-
-  if (viewMode === 'due') {   ← MISSING — insert this
-    return (
-      <div ...>  ← Due Customers JSX (line 1310)
-      ...
-    );
-  }              ← ensure this closes the due block before the paid view
+```typescript
+.on('postgres_changes',
+  { event: '*', schema: 'public', table: 'customers' },
+  () => invalidateWithDebounce(sharedKeys.customers(), 'normal')
+)
 ```
 
-I also need to check that the `paid` view has its own closing `}` before the final `return` of the main view. Let me verify the structure by checking around the transition from the `due` view to the `paid` view and from the `paid` view to the `main` view.
+**Analysis:** The Postgres CDC (`postgres_changes`) event fires on ANY row change in the `customers` table regardless of column values. There is no `filter: 'customer_type=eq.retail'` predicate. This means a `customer_type = 'wholesale'` update triggers `sharedKeys.customers()` invalidation identically to a retail update.
 
-### File 2: `POSCustomerLookup.tsx` — Wire `saleType` + add badges + cross-type warning
+**Verdict:** CLEAN. Both the Dashboard and the Wholesale module share the same `sharedKeys.customers()` React Query cache. A single `postgres_changes` event on any customer row — retail or wholesale — invalidates the entire `customers` cache, causing all consumers (POS, CustomerManagementModule retail view, CustomerManagementModule wholesale view) to refetch in parallel within the 1500ms debounce window.
 
-**What needs to change:**
+**However — one secondary gap exists:** The `pos_transactions` listener in `useUnifiedRealtime` only invalidates `overview` and `todayStats`. It does NOT invalidate `customers`. The gap path is:
 
-1. **Destructure `saleType`** in the component function signature (currently it's accepted in the interface but not destructured at line 51-59).
+```
+POS sale → complete_pos_sale RPC updates customer.total_due → 
+customers table row changes → 
+postgres_changes fires on 'customers' table → 
+customers cache invalidated ✅ (this leg works)
+```
 
-2. **Customer type badge in "found" state** — when a customer is found by phone, show a colored badge next to "Old Customer":
-   - Sky blue badge: "Retail"
-   - Purple badge: "Wholesale"
+But the event path through `moduleEvents` also fires `notifySaleCompleted`, which in `CustomerManagementModule.tsx` (line 173-176) directly calls:
+```typescript
+queryClient.invalidateQueries({ queryKey: sharedKeys.customers(), refetchType: 'active' })
+```
 
-3. **Cross-type warning** — when `saleType === 'retail'` and `customer.customer_type === 'wholesale'`, show an amber alert strip: "⚠️ This is a wholesale account. Consider switching to Wholesale sale type."
-
-4. **Browse dialog badges** — in the `filteredCustomers` list, show a type badge on each customer row so the owner can visually distinguish retail vs wholesale accounts.
-
-5. **Smart filter** in Browse dialog — show all customers but sort/highlight those matching the current `saleType` first.
-
-### File 3: `POSModule.tsx` — Pass `saleType` to `POSCustomerLookup`
-
-**Change:** Line 609 — add `saleType={saleType}` to the `POSCustomerLookup` component call.
+So the customer balance updates through **two parallel paths** after a POS sale — both the Postgres CDC and the module event bus. This is belt-and-suspenders. The Customer Balance display updates correctly.
 
 ---
 
-## Exact Code Changes
+## Check 2: POS → Wholesale Customer Due Update — PASS (No Repair Needed)
 
-### Fix 1 — CustomerManagementModule.tsx line 1308-1309
+**Finding:** The `complete_pos_sale` RPC (lines in the DB functions) updates `total_due` using:
 
-Insert the missing `if (viewMode === 'due') {` guard:
-
-```tsx
-// BEFORE (line 1307-1310):
-  }
-
-    return (
-      <div className="space-y-4 sm:space-y-6 pb-4">
-
-// AFTER:
-  }
-
-  if (viewMode === 'due') {
-    return (
-      <div className="space-y-4 sm:space-y-6 pb-4">
+```sql
+UPDATE customers SET
+  total_due = COALESCE(total_due, 0) + p_remaining_due,
+  billing_status = 'pending',
+  last_order_date = now()
+WHERE id = p_customer_id AND owner_id = v_owner_id;
 ```
 
-Then I also need to verify whether the `due` view's closing `}` exists before the `paid` view. Let me check those line numbers now.
+The WHERE clause only uses `id` and `owner_id` — there is no `customer_type` filter. The RPC is completely agnostic to customer type. A wholesale customer's `total_due` is updated identically to a retail customer's.
 
-### Fix 2 — POSCustomerLookup.tsx
+**POS UI Balance Refresh Path:**
 
-Destructure `saleType` and add badge + warning logic:
+1. `complete_pos_sale` RPC runs → `customers` row updated
+2. Supabase realtime fires `postgres_changes` on `customers` table
+3. `useUnifiedRealtime` debounces and calls `queryClient.invalidateQueries(sharedKeys.customers())`
+4. `POSCustomerLookup` is fed from `usePOSData` → `useSharedCustomers` → same cache key
+5. The customer badge showing "Due: ৳X,XXX" on the customer lookup card updates within 1500ms
 
-```tsx
-// Line 51-59 — add saleType to destructured props:
-export const POSCustomerLookup = ({
-  customers,
-  saleType,      // ← ADD THIS
-  discount,
-  ...
-}: POSCustomerLookupProps) => {
+**Verdict:** CLEAN. The wholesale customer's `total_due` updates correctly through both the RPC and the realtime listener.
+
+---
+
+## Check 3: Dashboard KPI Aggregation — PARTIAL GAP FOUND
+
+**Finding:** The Dashboard's "Total Receivables" figure is NOT shown as a direct KPI on the `DashboardOverview` component at all. The KPI cards show:
+- Today's Sale (revenue from POS)
+- Today's Expense
+- Today's Profit
+- Active Orders count
+
+**The `totalAmountDue` figure lives exclusively in `CustomerManagementModule.tsx` (line 405):**
+
+```typescript
+const totalAmountDue = dueCustomers.reduce((sum, c) => sum + Number(c.total_due), 0);
 ```
 
-In the status badges section (around line 166-198), after the "Old Customer" badge, add:
-```tsx
-{status === 'found' && customer && (customer as any).customer_type && (
-  <Badge className={(customer as any).customer_type === 'wholesale'
-    ? 'bg-purple-100 text-purple-700 border-purple-300'
-    : 'bg-sky-100 text-sky-700 border-sky-300'}>
-    {(customer as any).customer_type === 'wholesale' ? '🟣 Wholesale' : '🔵 Retail'}
-  </Badge>
-)}
+where `dueCustomers = customers.filter(c => c.total_due > 0 || c.cylinders_due > 0)` — this filters ALL customers with dues, irrespective of `customer_type`. So the "Total Due" shown inside the Customer module is correct and includes both retail AND wholesale dues.
+
+**The gap:** `useDashboardData.ts` at line 197 fetches customers for the dashboard overview with a reduced query:
+
+```typescript
+supabase.from('customers').select('id, name, phone, address, total_due').order('name').limit(200)
 ```
 
-Cross-type warning (insert after the badges row, before the form fields):
-```tsx
-{status === 'found' && customer && 
- saleType === 'retail' && (customer as any).customer_type === 'wholesale' && (
-  <div className="flex items-center gap-2 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-xs text-amber-700 dark:text-amber-400">
-    <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-    <span>Wholesale account — this sale is set to Retail pricing.</span>
-  </div>
-)}
-```
+This `total_due` data populates the `Customer[]` array used only by `analytics.totalCustomers`, `analytics.activeCustomers`, and `analytics.lostCustomers` — none of which are broken down by `customer_type`. The `get_customer_stats` RPC exists in the database (confirmed via `types.ts`) but is NOT called anywhere in the codebase. It would return a combined `total_due_amount` for all customers, making it the correct aggregation function to use.
 
-In the Browse dialog customer list (line 334-360), add a type badge after the name:
-```tsx
-<Badge className={(cust as any).customer_type === 'wholesale'
-  ? 'text-[10px] bg-purple-100 text-purple-700 border-purple-300'
-  : 'text-[10px] bg-sky-100 text-sky-700 border-sky-300'}>
-  {(cust as any).customer_type === 'wholesale' ? 'Wholesale' : 'Retail'}
-</Badge>
-```
+**Verdict:** The dashboard does not show a "Total Receivables" KPI by design — the current KPIs are revenue/expense/profit/orders. No filter accidentally excludes wholesale from the `totalAmountDue` calculation because that calculation is done in `CustomerManagementModule` on the complete unfiltered customer list. However, the `useDashboardData` overview fetch at line 197 does NOT select `customer_type`, which means if someone were to add a type-segmented KPI to the Dashboard later, the data would be missing.
 
-### Fix 3 — POSModule.tsx line 609
+---
 
-```tsx
+## Repair Plan — 2 Issues, 1 Enhancement
+
+### Issue 1 (Minor): `useDashboardData` overview query missing `customer_type`
+**Risk:** If a "Retail Due vs Wholesale Due" KPI is ever added to `DashboardOverview`, it would silently show `undefined` because the column isn't fetched.
+**Fix:** Add `customer_type` to the reduced select in line 197 of `src/hooks/useDashboardData.ts`:
+```typescript
 // BEFORE:
-<POSCustomerLookup customers={customers} discount={cart.discount} ...
+supabase.from('customers').select('id, name, phone, address, total_due').order('name').limit(200)
 
 // AFTER:
-<POSCustomerLookup customers={customers} saleType={saleType} discount={cart.discount} ...
+supabase.from('customers').select('id, name, phone, address, total_due, customer_type').order('name').limit(200)
 ```
+
+### Issue 2 (Critical): `pos_transactions` realtime listener does NOT trigger `customers` cache invalidation
+**Risk:** In an edge case where `notifySaleCompleted` module event fails to fire (e.g., the component is unmounted), the `customers` cache is stale until the Postgres CDC fires. This is currently mitigated by the dual-path (CDC fires anyway), but the `useUnifiedRealtime` hook should also explicitly invalidate `customers` when a new `pos_transactions` row is inserted, to make the refresh reliable without depending on the module event bus.
+
+**Fix:** In `src/hooks/useSharedQueries.ts`, add `customers` invalidation to the `pos_transactions` listener:
+```typescript
+// BEFORE (lines 354-360):
+.on('postgres_changes',
+  { event: '*', schema: 'public', table: 'pos_transactions' },
+  () => {
+    invalidateWithDebounce(sharedKeys.overview(), 'critical');
+    invalidateWithDebounce(sharedKeys.todayStats(), 'critical');
+  }
+)
+
+// AFTER:
+.on('postgres_changes',
+  { event: 'INSERT', schema: 'public', table: 'pos_transactions' },
+  () => {
+    invalidateWithDebounce(sharedKeys.overview(), 'critical');
+    invalidateWithDebounce(sharedKeys.todayStats(), 'critical');
+    invalidateWithDebounce(sharedKeys.customers(), 'critical'); // NEW
+  }
+)
+```
+
+Note: scoped to `INSERT` only (not `*`) because a new sale creates a new row — no need to re-fetch customers on UPDATE/DELETE of transactions.
+
+### Enhancement (No Risk): Add `get_customer_stats` RPC call to the Dashboard Overview
+The `get_customer_stats` database RPC already exists and returns `{ total_customers, customers_with_due, total_due_amount }` — a single server-side aggregation of ALL customers across both types. This can optionally be called in `useSharedOverviewStats` to add a "Total Receivables" KPI card to the Dashboard, showing the combined retail+wholesale outstanding amount without any additional filtering risk.
 
 ---
 
-## Technical Summary
+## Summary Table
 
-| # | File | Line(s) | Change | Risk |
+| # | Component | Path | Status | Action |
 |---|---|---|---|---|
-| 1 | `CustomerManagementModule.tsx` | 1308-1309 | Add missing `if (viewMode === 'due') {` guard | Zero — pure syntax fix |
-| 2 | `POSCustomerLookup.tsx` | 51-59 | Destructure `saleType` from props | Zero |
-| 3 | `POSCustomerLookup.tsx` | 166-199 | Add customer type badge + cross-type warning | Zero |
-| 4 | `POSCustomerLookup.tsx` | 334-360 | Add type badges in Browse dialog | Zero |
-| 5 | `POSModule.tsx` | 609 | Pass `saleType={saleType}` to `POSCustomerLookup` | Zero |
+| 1 | `useUnifiedRealtime` → `customers` listener | DB CDC → cache invalidation | **PASS** — fires on all rows regardless of `customer_type` | None |
+| 2 | `complete_pos_sale` RPC | Wholesale customer `total_due` update | **PASS** — no customer_type filter in WHERE | None |
+| 3 | POS → Customer balance UI refresh | `notifySaleCompleted` + CDC dual-path | **PASS** — two independent refresh paths | Add CDC as primary (Issue 2) |
+| 4 | `totalAmountDue` in CustomerManagementModule | Filters `total_due > 0`, no type filter | **PASS** — correctly includes retail+wholesale | None |
+| 5 | `useDashboardData` overview customer fetch | `select('id, name, phone, address, total_due')` | **GAP** — `customer_type` not fetched | Fix column select (Issue 1) |
+| 6 | `useUnifiedRealtime` → `pos_transactions` → `customers` | CDC path | **GAP** — new sale doesn't directly invalidate customers via realtime | Add invalidation (Issue 2) |
 
-**Zero database changes. Zero new dependencies. Fix resolves immediately.**
+### Files to Change
 
-The `due` view missing guard is the sole cause of TS1128. Once it's inserted, the entire file's JSX structure is valid and all 2142 lines compile correctly.
+| # | File | Line | Change |
+|---|---|---|---|
+| 1 | `src/hooks/useDashboardData.ts` | 197 | Add `customer_type` to reduced select |
+| 2 | `src/hooks/useSharedQueries.ts` | 354-360 | Add `customers` cache invalidation on `pos_transactions INSERT` |
