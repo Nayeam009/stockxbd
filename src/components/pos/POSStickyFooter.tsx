@@ -1,7 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
 
 interface POSStickyFooterProps {
   total: number;
@@ -9,6 +8,7 @@ interface POSStickyFooterProps {
   onProceed: () => void;
   disabled: boolean;
   processing: boolean;
+  currencySymbol?: string;
 }
 
 export const POSStickyFooter = ({
@@ -16,7 +16,8 @@ export const POSStickyFooter = ({
   itemCount,
   onProceed,
   disabled,
-  processing
+  processing,
+  currencySymbol = '৳'
 }: POSStickyFooterProps) => {
   if (itemCount === 0) return null;
 
@@ -31,7 +32,7 @@ export const POSStickyFooter = ({
       <div className="flex items-center justify-between p-3 max-w-7xl mx-auto gap-4">
         <div className="min-w-0">
           <p className="text-2xl font-bold text-foreground tabular-nums truncate">
-            {BANGLADESHI_CURRENCY_SYMBOL}{total.toLocaleString()}
+            {currencySymbol}{total.toLocaleString()}
           </p>
           <p className="text-xs text-muted-foreground">
             {itemCount} item{itemCount !== 1 ? 's' : ''}

@@ -264,6 +264,16 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
       return;
     }
 
+    // Offline pre-check before any RPC call
+    if (!navigator.onLine) {
+      toast({
+        title: "No internet connection",
+        description: "Your cart is safe. Please reconnect and try again.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setProcessing(true);
 
     try {
@@ -385,7 +395,27 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
 
     } catch (error: any) {
       logger.error('POS sale error', error, { component: 'POS' });
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+
+      // Friendly error parsing
+      const msg: string = error?.message || '';
+      if (!navigator.onLine || msg.toLowerCase().includes('fetch') || msg.toLowerCase().includes('network')) {
+        toast({
+          title: "No internet connection",
+          description: "Your cart is safe. Please reconnect and try again.",
+          variant: "destructive"
+        });
+      } else if (msg.includes('Insufficient stock for')) {
+        // Parse: "Insufficient stock for Bashundhara 12kg (Refill). Available: 0, Requested: 1"
+        const match = msg.match(/Insufficient stock for (.+?)\./);
+        const productName = match ? match[1] : 'a product';
+        toast({
+          title: "Sale Failed — Out of Stock",
+          description: `Not enough stock for ${productName}. Please update quantities.`,
+          variant: "destructive"
+        });
+      } else {
+        toast({ title: "Sale Error", description: msg, variant: "destructive" });
+      }
     } finally {
       setProcessing(false);
     }
@@ -559,10 +589,10 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
         <POSCustomerLookup customers={customers} discount={cart.discount} onDiscountChange={cart.setDiscount} userRole={userRole} userName={userName} customerState={customerState} onCustomerChange={setCustomerState} />
 
         {/* Sticky Footer */}
-        <POSStickyFooter total={cart.total} itemCount={cart.saleItemsCount} onProceed={() => { setPaymentAmount(cart.total.toString()); setShowPaymentDrawer(true); }} disabled={!cart.isReturnCountMatched} processing={processing} />
+        <POSStickyFooter total={cart.total} itemCount={cart.saleItemsCount} onProceed={() => { setPaymentAmount(cart.total.toString()); setShowPaymentDrawer(true); }} disabled={!cart.isReturnCountMatched} processing={processing} currencySymbol={currencySymbol} />
 
         {/* Payment Drawer */}
-        <POSPaymentDrawer open={showPaymentDrawer} onOpenChange={setShowPaymentDrawer} total={cart.total} paymentAmount={paymentAmount} onPaymentAmountChange={setPaymentAmount} paymentMethod={paymentMethod} onPaymentMethodChange={setPaymentMethod} onComplete={handleCompleteSale} processing={processing} hasCustomer={hasCustomer} />
+        <POSPaymentDrawer open={showPaymentDrawer} onOpenChange={setShowPaymentDrawer} total={cart.total} paymentAmount={paymentAmount} onPaymentAmountChange={setPaymentAmount} paymentMethod={paymentMethod} onPaymentMethodChange={setPaymentMethod} onComplete={handleCompleteSale} processing={processing} hasCustomer={hasCustomer} currencySymbol={currencySymbol} />
 
         {/* Barcode Scanner */}
         <BarcodeScanner open={showBarcodeScanner} onOpenChange={setShowBarcodeScanner} onProductFound={(product) => { setShowBarcodeScanner(false); toast({ title: "Product scanned", description: product.name }); }} />
