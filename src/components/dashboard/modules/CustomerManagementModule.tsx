@@ -945,21 +945,21 @@ export const CustomerManagementModule = () => {
 
 
         <Dialog open={addCustomerDialogOpen} onOpenChange={setAddCustomerDialogOpen}>
-          <DialogContent className="bg-card border-border max-w-md">
-            <DialogHeader>
+          <DialogContent className="bg-card border-border max-w-md max-h-[90dvh] flex flex-col overflow-hidden p-0">
+            <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
               <DialogTitle>Add New Customer</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4 py-4">
+            <div className="space-y-4 py-4 px-6 flex-1 overflow-y-auto">
               {/* Customer Type Toggle */}
               <div>
                 <label className="text-sm font-medium text-foreground">Customer Type</label>
                 <div className="grid grid-cols-2 gap-2 p-1 bg-muted rounded-lg mt-1">
                   <button type="button" onClick={() => { setNewCustomerType('retail'); setNewCustomer(p => ({...p, credit_limit: '10000'})); }}
-                    className={`flex items-center justify-center gap-2 h-10 rounded-md text-sm font-semibold transition-all ${newCustomerType === 'retail' ? 'bg-sky-500 text-white shadow-md' : 'text-muted-foreground'}`}>
+                    className={`flex items-center justify-center gap-2 h-12 rounded-md text-sm font-semibold transition-all ${newCustomerType === 'retail' ? 'bg-sky-500 text-white shadow-md' : 'text-muted-foreground'}`}>
                     <ShoppingCart className="h-4 w-4" /> Retail
                   </button>
                   <button type="button" onClick={() => { setNewCustomerType('wholesale'); setNewCustomer(p => ({...p, credit_limit: '50000'})); }}
-                    className={`flex items-center justify-center gap-2 h-10 rounded-md text-sm font-semibold transition-all ${newCustomerType === 'wholesale' ? 'bg-purple-600 text-white shadow-md' : 'text-muted-foreground'}`}>
+                    className={`flex items-center justify-center gap-2 h-12 rounded-md text-sm font-semibold transition-all ${newCustomerType === 'wholesale' ? 'bg-purple-600 text-white shadow-md' : 'text-muted-foreground'}`}>
                     <Building2 className="h-4 w-4" /> Wholesale
                   </button>
                 </div>
@@ -970,26 +970,30 @@ export const CustomerManagementModule = () => {
                   value={newCustomer.name}
                   onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })}
                   placeholder="Enter customer name"
-                  className="mt-1 h-11"
+                  className="mt-1 h-12 text-base"
                 />
               </div>
               <div>
                 <label className="text-sm font-medium text-foreground">Phone</label>
                 <Input
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
                   value={newCustomer.phone}
                   onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })}
                   placeholder="01XXX-XXXXXX"
-                  className="mt-1 h-11"
+                  className="mt-1 h-12 text-base"
                 />
               </div>
               <div>
                 <label className="text-sm font-medium text-foreground">Email</label>
                 <Input
                   type="email"
+                  autoComplete="email"
                   value={newCustomer.email}
                   onChange={(e) => setNewCustomer({ ...newCustomer, email: e.target.value })}
                   placeholder="customer@example.com"
-                  className="mt-1 h-11"
+                  className="mt-1 h-12 text-base"
                 />
               </div>
               <div>
@@ -998,10 +1002,10 @@ export const CustomerManagementModule = () => {
                   value={newCustomer.address}
                   onChange={(e) => setNewCustomer({ ...newCustomer, address: e.target.value })}
                   placeholder="Enter address"
-                  className="mt-1 h-11"
+                  className="mt-1 h-12 text-base"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium text-foreground">Initial Due</label>
                   <Input
@@ -1010,7 +1014,7 @@ export const CustomerManagementModule = () => {
                     value={newCustomer.total_due}
                     onChange={(e) => setNewCustomer({ ...newCustomer, total_due: e.target.value })}
                     placeholder="0"
-                    className="mt-1 h-11"
+                    className="mt-1 h-12 text-base"
                   />
                 </div>
                 <div>
@@ -1021,7 +1025,7 @@ export const CustomerManagementModule = () => {
                     value={newCustomer.cylinders_due}
                     onChange={(e) => setNewCustomer({ ...newCustomer, cylinders_due: e.target.value })}
                     placeholder="0"
-                    className="mt-1 h-11"
+                    className="mt-1 h-12 text-base"
                   />
                 </div>
               </div>
@@ -1033,7 +1037,7 @@ export const CustomerManagementModule = () => {
                   value={newCustomer.credit_limit}
                   onChange={(e) => setNewCustomer({ ...newCustomer, credit_limit: e.target.value })}
                   placeholder="10000"
-                  className="mt-1 h-11"
+                  className="mt-1 h-12 text-base"
                 />
                 <p className="text-xs text-muted-foreground mt-1">Maximum credit allowed</p>
               </div>
@@ -1045,7 +1049,7 @@ export const CustomerManagementModule = () => {
                       value={newCustomer.company_name}
                       onChange={(e) => setNewCustomer({ ...newCustomer, company_name: e.target.value })}
                       placeholder="Company or business name"
-                      className="mt-1 h-11"
+                      className="mt-1 h-12 text-base"
                     />
                   </div>
                   <div>
@@ -1054,19 +1058,21 @@ export const CustomerManagementModule = () => {
                       value={newCustomer.trade_license}
                       onChange={(e) => setNewCustomer({ ...newCustomer, trade_license: e.target.value })}
                       placeholder="e.g. TL-2024-XXXXX"
-                      className="mt-1 h-11"
+                      className="mt-1 h-12 text-base"
                     />
                   </div>
                 </>
               )}
             </div>
-            <MobileFormActions
-              onCancel={() => setAddCustomerDialogOpen(false)}
-              onConfirm={handleAddCustomer}
-              cancelLabel="Cancel"
-              confirmLabel="Add Customer"
-              disabled={!newCustomer.name.trim()}
-            />
+            <div className="px-6 pb-4 pt-2 shrink-0 border-t">
+              <MobileFormActions
+                onCancel={() => setAddCustomerDialogOpen(false)}
+                onConfirm={handleAddCustomer}
+                cancelLabel="Cancel"
+                confirmLabel="Add Customer"
+                disabled={!newCustomer.name.trim()}
+              />
+            </div>
           </DialogContent>
         </Dialog>
 
@@ -1603,9 +1609,9 @@ export const CustomerManagementModule = () => {
             <DialogHeader><DialogTitle>Settle Account — {selectedCustomer?.name}</DialogTitle></DialogHeader>
             <div className="space-y-3 py-2">
               <div><label className="text-sm font-medium">Payment Amount ({BANGLADESHI_CURRENCY_SYMBOL})</label>
-                <Input type="number" inputMode="numeric" value={paymentAmount} onChange={e => setPaymentAmount(e.target.value)} className="mt-1 h-11" placeholder="0" /></div>
+                <Input type="number" inputMode="numeric" value={paymentAmount} onChange={e => setPaymentAmount(e.target.value)} className="mt-1 h-12 text-base font-semibold" placeholder="0" /></div>
               <div><label className="text-sm font-medium">Cylinders to Collect</label>
-                <Input type="number" inputMode="numeric" value={cylindersToCollect} onChange={e => setCylindersToCollect(e.target.value)} className="mt-1 h-11" placeholder="0" /></div>
+                <Input type="number" inputMode="numeric" value={cylindersToCollect} onChange={e => setCylindersToCollect(e.target.value)} className="mt-1 h-12 text-base" placeholder="0" /></div>
             </div>
             <MobileFormActions
               onCancel={() => setSettleDialogOpen(false)}
@@ -1929,7 +1935,7 @@ export const CustomerManagementModule = () => {
                     value={paymentAmount}
                     onChange={(e) => setPaymentAmount(e.target.value)}
                     placeholder="0"
-                    className="mt-1.5 h-11 text-lg font-semibold"
+                    className="mt-1.5 h-12 text-base font-semibold"
                   />
                 </div>
               </div>
@@ -1950,7 +1956,7 @@ export const CustomerManagementModule = () => {
                     value={cylindersToCollect}
                     onChange={(e) => setCylindersToCollect(e.target.value)}
                     placeholder="0"
-                    className="mt-1.5 h-11 text-lg font-semibold"
+                    className="mt-1.5 h-12 text-base font-semibold"
                   />
                 </div>
               </div>
