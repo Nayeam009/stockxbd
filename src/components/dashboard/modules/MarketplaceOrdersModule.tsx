@@ -13,6 +13,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { InvoiceDialog } from "@/components/invoice/InvoiceDialog";
 import { ModuleLoadErrorCard } from "@/components/shared/ModuleLoadErrorCard";
 import { SoftRefreshBadge } from "@/components/shared/SoftRefreshBadge";
+import { PremiumModuleHeader } from "@/components/shared/PremiumModuleHeader";
+import { EmptyStateCard } from "@/components/shared/EmptyStateCard";
 
 // Refactored imports
 import {
@@ -198,26 +200,23 @@ export const MarketplaceOrdersModule = () => {
     <div className="space-y-4 sm:space-y-6">
       <SoftRefreshBadge isRefreshing={softLoading} />
 
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
-            <ShoppingBag className="h-6 w-6 text-primary" />
-            Marketplace Orders
-          </h1>
-          <p className="text-sm text-muted-foreground">Manage orders from your LPG Community shop</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => fetchData(true)} className="gap-2">
-            <RefreshCw className="h-4 w-4" />
-            Refresh
-          </Button>
-          <Button size="sm" onClick={() => navigate('/community')} className="gap-2">
+      {/* Premium Header */}
+      <PremiumModuleHeader
+        title="Marketplace Orders"
+        subtitle="Manage orders from your LPG Community shop"
+        icon={<ShoppingBag className="h-5 w-5 sm:h-6 sm:w-6 text-primary-foreground" />}
+        onRefresh={() => fetchData(true)}
+        actions={
+          <Button
+            size="sm"
+            onClick={() => navigate('/community')}
+            className="h-11 gap-2 touch-manipulation"
+          >
             <ExternalLink className="h-4 w-4" />
             View Shop
           </Button>
-        </div>
-      </div>
+        }
+      />
 
       <OrderStatsGrid analytics={analytics} />
 
@@ -229,17 +228,14 @@ export const MarketplaceOrdersModule = () => {
         analytics={analytics}
       >
         {filteredOrders.length === 0 ? (
-          <Card className="border-dashed">
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <Package className="h-12 w-12 text-muted-foreground/40 mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No Orders Found</h3>
-              <p className="text-muted-foreground text-center">
-                {activeTab === 'all'
-                  ? "You haven't received any orders yet. Share your shop with customers!"
-                  : `No ${activeTab} orders at the moment.`}
-              </p>
-            </CardContent>
-          </Card>
+          <EmptyStateCard
+            icon={<Package className="h-8 w-8" />}
+            title="No Orders Found"
+            subtitle={activeTab === 'all'
+              ? "You haven't received any orders yet. Share your shop with customers!"
+              : `No ${activeTab} orders at the moment.`}
+            colorScheme="muted"
+          />
         ) : (
           <div className="space-y-3">
             {filteredOrders.map((order) => (

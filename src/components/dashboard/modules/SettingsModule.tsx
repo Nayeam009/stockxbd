@@ -61,6 +61,7 @@ import { AccountSettingsSection } from "@/components/settings/AccountSettingsSec
 import { TeamSettingsSection } from "@/components/settings/TeamSettingsSection";
 import { PrinterSettingsSection } from "@/components/settings/PrinterSettingsSection";
 import { SettingsSkeleton } from "@/components/settings/SettingsSkeleton";
+import { PremiumModuleHeader } from "@/components/shared/PremiumModuleHeader";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -783,6 +784,15 @@ export const SettingsModule = () => {
 
   return (
     <div className="min-h-[calc(100vh-200px)]">
+      {/* Module Header — always visible */}
+      <div className="mb-5">
+        <PremiumModuleHeader
+          title={language === 'bn' ? 'সেটিংস' : 'Settings'}
+          subtitle={language === 'bn' ? 'অ্যাকাউন্ট, নিরাপত্তা ও ব্যবসায়িক পছন্দ' : 'Account, security & business preferences'}
+          icon={<Settings className="h-5 w-5 sm:h-6 sm:w-6 text-primary-foreground" />}
+        />
+      </div>
+
       {/* Mobile Layout */}
       <div className="lg:hidden">
         {!isMobileDetailView ? (

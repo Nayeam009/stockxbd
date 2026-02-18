@@ -427,7 +427,7 @@ export const BusinessDiaryModule = () => {
             {/* Add Expense */}
             <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
               <DialogTrigger asChild>
-                <Button size="sm" className="h-8 bg-primary hover:bg-primary/90 shadow touch-manipulation">
+                <Button size="sm" className="h-9 bg-primary hover:bg-primary/90 shadow touch-manipulation">
                   <Plus className="h-3.5 w-3.5 sm:mr-1" />
                   <span className="hidden sm:inline text-xs">Add</span>
                 </Button>
@@ -463,7 +463,7 @@ export const BusinessDiaryModule = () => {
               </DialogContent>
             </Dialog>
 
-            <Button variant="outline" size="icon" onClick={refetch} className="h-8 w-8 shrink-0 border-border/50 hover:bg-primary/10">
+            <Button variant="outline" size="icon" onClick={refetch} className="h-9 w-9 shrink-0 border-border/50 hover:bg-primary/10">
               <RefreshCcw className="h-3.5 w-3.5" />
             </Button>
           </div>
