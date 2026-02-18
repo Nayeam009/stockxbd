@@ -635,10 +635,12 @@ export const BusinessDiaryModule = () => {
               <ScrollArea className="h-[420px] pr-2">
                 <div className="space-y-2.5">
                   {filteredSales.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                      <Receipt className="h-10 w-10 text-emerald-300 mb-3" />
-                      <p className="text-sm font-medium">No sales found</p>
-                    </div>
+                    <EmptyStateCard
+                      icon={<Receipt className="h-10 w-10" />}
+                      title={searchQuery || paymentFilter !== 'all' || saleChannelFilter !== 'all' ? "No sales match filters" : "No sales recorded today"}
+                      subtitle="Complete a POS transaction to see it here"
+                      colorScheme="muted"
+                    />
                   ) : (
                     filteredSales.map(entry => <SaleEntryCard key={entry.id} entry={entry} onViewDetails={setSelectedSale} />)
                   )}
@@ -679,10 +681,12 @@ export const BusinessDiaryModule = () => {
               <ScrollArea className="h-[420px] pr-2">
                 <div className="space-y-2.5">
                   {filteredExpenses.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                      <CircleDollarSign className="h-10 w-10 text-rose-300 mb-3" />
-                      <p className="text-sm font-medium">No expenses found</p>
-                    </div>
+                    <EmptyStateCard
+                      icon={<Wallet className="h-10 w-10" />}
+                      title={searchQuery || expenseSourceFilter !== 'all' ? "No expenses match filters" : "No expenses recorded today"}
+                      subtitle="Add an expense or make a purchase to see it here"
+                      colorScheme="muted"
+                    />
                   ) : (
                     filteredExpenses.map(entry => <ExpenseEntryCard key={entry.id} entry={entry} onNavigateToSource={handleNavigateToSource} />)
                   )}
