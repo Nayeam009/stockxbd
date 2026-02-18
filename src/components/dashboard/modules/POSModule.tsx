@@ -267,7 +267,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
 
       // Build items JSONB for the RPC
       const rpcItems = cart.saleItems.map(item => ({
-        product_id: item.brandId || item.stoveId || item.regulatorId || null,
+        product_id: null, // FK removed; inventory refs are in brand_id/stove_id/regulator_id
         product_name: `${item.name} - ${item.details}`,
         quantity: item.quantity,
         unit_price: item.price,
