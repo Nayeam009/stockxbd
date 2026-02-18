@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -231,6 +231,15 @@ export const BusinessDiaryModule = () => {
   const isMobile = useIsMobile();
   const [activeTab, setActiveTab] = useState<'sales' | 'expenses'>('sales');
   const [searchQuery, setSearchQuery] = useState("");
+
+  // On mount: check for a pending diary filter handed off via sessionStorage (e.g. from Customers)
+  useEffect(() => {
+    const pending = sessionStorage.getItem('pending-diary-filter');
+    if (pending) {
+      setSearchQuery(pending);
+      sessionStorage.removeItem('pending-diary-filter');
+    }
+  }, []);
   
   // Filter states
   const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>('all');
