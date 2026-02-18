@@ -1,249 +1,146 @@
 
-# Retail / Wholesale Customer Segmentation Roadmap
+# Fix Build Error + Complete Retail/Wholesale Integration
 
-## Database Audit Results
+## Root Cause of TS1128 Build Error
 
-The `customers` table currently has these columns:
-`id, name, phone, address, email, total_due, cylinders_due, billing_status, last_order_date, credit_limit, owner_id, created_by, is_demo, created_at, updated_at`
+The insertion at line 1165-1307 placed the retail/wholesale view block correctly, but the `// Due Customers View` block that was supposed to follow it lost its `if (viewMode === 'due') {` guard. The `return (` at line 1310 is floating outside any conditional, which is an invalid top-level statement in the component body — TypeScript reports "Declaration or statement expected" at line 2142 (the closing `};` of the file, because the unclosed block cascades to the end).
 
-**Critical finding:** NO `customer_type` column exists. All 19 existing customers have `credit_limit = 10000` (the default). There are no existing wholesalers — a clean slate for the migration.
-
-**No extra wholesale-specific columns needed** beyond `customer_type`. The existing `credit_limit` column already serves the "wholesale credit limit" purpose. `company_name` and `trade_license_no` would be over-engineering for an LPG shop CRM — the owner sets wholesale price in Product Pricing, not per-customer. This keeps the data model clean.
+**Fix:** Insert `if (viewMode === 'due') {` at line 1309 (between the closing `}` of the wholesale block and the bare `return`), and ensure the matching closing `}` appears before `// Paid View` as well.
 
 ---
 
-## Phase 1 — Database Migration
+## Complete Fix Plan — 3 Files, Zero DB Changes
 
-### SQL Changes (1 migration)
+### File 1: `CustomerManagementModule.tsx` — Fix the build error
 
-```sql
--- Add customer_type column with 'retail' as default
-ALTER TABLE public.customers 
-  ADD COLUMN customer_type TEXT NOT NULL DEFAULT 'retail' 
-  CHECK (customer_type IN ('retail', 'wholesale'));
+**Change:** Insert `if (viewMode === 'due') {` at line 1309 to restore the missing guard for the Due Customers view.
 
--- Migrate all existing customers to 'retail' (the default covers it,
--- but this explicit UPDATE ensures data integrity for any NULL edge cases)
-UPDATE public.customers SET customer_type = 'retail' WHERE customer_type IS NULL;
+The structure must be:
+```
+}  ← closes retail/wholesale block (line 1307)
 
--- Set higher default credit limit for wholesale-aware future inserts
--- (no change to existing data — retail stays at 10,000)
+  if (viewMode === 'due') {   ← MISSING — insert this
+    return (
+      <div ...>  ← Due Customers JSX (line 1310)
+      ...
+    );
+  }              ← ensure this closes the due block before the paid view
 ```
 
-**Risk: Zero** — `DEFAULT 'retail'` means all existing rows automatically get the correct value. No NULL migration issues. The existing `credit_limit` column continues to serve both types (retail default: 10,000; wholesale: owner sets a higher value like 50,000 or 100,000 when adding).
+I also need to check that the `paid` view has its own closing `}` before the final `return` of the main view. Let me verify the structure by checking around the transition from the `due` view to the `paid` view and from the `paid` view to the `main` view.
+
+### File 2: `POSCustomerLookup.tsx` — Wire `saleType` + add badges + cross-type warning
+
+**What needs to change:**
+
+1. **Destructure `saleType`** in the component function signature (currently it's accepted in the interface but not destructured at line 51-59).
+
+2. **Customer type badge in "found" state** — when a customer is found by phone, show a colored badge next to "Old Customer":
+   - Sky blue badge: "Retail"
+   - Purple badge: "Wholesale"
+
+3. **Cross-type warning** — when `saleType === 'retail'` and `customer.customer_type === 'wholesale'`, show an amber alert strip: "⚠️ This is a wholesale account. Consider switching to Wholesale sale type."
+
+4. **Browse dialog badges** — in the `filteredCustomers` list, show a type badge on each customer row so the owner can visually distinguish retail vs wholesale accounts.
+
+5. **Smart filter** in Browse dialog — show all customers but sort/highlight those matching the current `saleType` first.
+
+### File 3: `POSModule.tsx` — Pass `saleType` to `POSCustomerLookup`
+
+**Change:** Line 609 — add `saleType={saleType}` to the `POSCustomerLookup` component call.
 
 ---
 
-## Phase 2 — SharedCustomer Interface Update
+## Exact Code Changes
 
-**File:** `src/hooks/useSharedQueries.ts`
+### Fix 1 — CustomerManagementModule.tsx line 1308-1309
 
-The `SharedCustomer` interface must gain the new field so it flows to all consumers (POS, CustomerManagement, POSCustomerLookup):
+Insert the missing `if (viewMode === 'due') {` guard:
 
-```typescript
-export interface SharedCustomer {
-  id: string;
-  name: string;
-  email: string | null;
-  phone: string | null;
-  address: string | null;
-  total_due: number;
-  cylinders_due: number;
-  billing_status: string;
-  last_order_date: string | null;
-  credit_limit?: number;
-  customer_type: 'retail' | 'wholesale';  // NEW
-  created_at: string;
-}
-```
-
-The `fetchCustomers()` function in `useSharedQueries.ts` already selects `'*'` so no query change is needed — the new column arrives automatically.
-
----
-
-## Phase 3 — Customer Management Module Refactor
-
-**File:** `src/components/dashboard/modules/CustomerManagementModule.tsx`
-
-### 3A — Local `Customer` Interface Update
-
-Add `customer_type` to the local interface and to the mapping from `sharedCustomers`:
-
-```typescript
-interface Customer {
-  // ...existing fields...
-  customer_type: 'retail' | 'wholesale';
-}
-
-// In the mapping:
-customer_type: (c as any).customer_type || 'retail',
-```
-
-### 3B — New ViewMode
-
-Extend the `ViewMode` type:
-```typescript
-type ViewMode = 'main' | 'due' | 'paid' | 'retail' | 'wholesale';
-```
-
-### 3C — New Customer Type Tab on Main View
-
-Replace the existing 2-card grid (Due / Paid) with a **3-section layout**:
-1. The existing `Due Customers` and `Paid Customers` action cards — kept as-is
-2. A new **Customer Segments** section below the stats with two new entry cards:
-
-**Retail Customers card** (sky/blue theme):
-- Shows count of retail customers
-- "Manage Retail" → sets `viewMode = 'retail'`
-
-**Wholesale Customers card** (purple/amber theme):
-- Shows count of wholesale customers  
-- Metrics: total due amount from wholesale only, credit utilization count
-- "Manage Wholesale" → sets `viewMode = 'wholesale'`
-
-### 3D — Retail View (`viewMode === 'retail'`)
-
-Speed-optimized. Shows only `customer_type === 'retail'` customers. Focus:
-- Mobile card layout with Name + Phone + Last Visit date + Total Spent (sum from history — derived from `total_due`)
-- Quick search bar
-- "Quick Add" button (only requires Name + Phone, defaults to retail)
-- History and Settle actions remain the same
-
-### 3E — Wholesale View (`viewMode === 'wholesale'`)
-
-Account-management focused. Shows only `customer_type === 'wholesale'` customers. Focus:
-- Credit Limit vs Current Due progress bar on each customer card
-- "Bulk Payment" entry: a drawer that lets the owner record payments for multiple wholesale customers in one flow without re-opening dialogs for each
-- Ledger History tab in the history dialog (already exists as the "Sales + Payments" history — just scoped to wholesale)
-- Elevated visual treatment (purple/amber theme to distinguish from retail)
-
-### 3F — Add Customer Dialog Update
-
-**File:** `src/components/customer/CustomerAddDialog.tsx` and inline dialog in `CustomerManagementModule.tsx`
-
-Add a **Customer Type** radio/toggle at the top of the form:
-- `Retail` (default) — credit limit defaults to 10,000
-- `Wholesale` — credit limit field becomes editable and defaults to 50,000
-
-When type = `wholesale`, the insert includes `customer_type: 'wholesale'` and the higher credit limit.
-
----
-
-## Phase 4 — POS Module Integration (Filter by saleType)
-
-**File:** `src/components/pos/POSCustomerLookup.tsx`
-
-### The Core Logic
-
-The POS already has `saleType: 'retail' | 'wholesale'` state (line 103 of `POSModule.tsx`). This must be passed down to `POSCustomerLookup` and used to filter the Browse list and the phone lookup.
-
-**Current `POSCustomerLookupProps`:**
-```typescript
-interface POSCustomerLookupProps {
-  customers: Customer[];
-  ...
-}
-```
-
-**Updated:**
-```typescript
-interface POSCustomerLookupProps {
-  customers: Customer[];
-  saleType: 'retail' | 'wholesale';  // NEW
-  ...
-}
-```
-
-### Filter Behavior
-
-In `POSCustomerLookup`, filter the `filteredCustomers` for the Browse dialog:
-```typescript
-// When saleType is wholesale, show ALL customers but highlight wholesale ones
-// When saleType is retail, show ALL customers (owner may sell retail to any)
-// But WARN if selecting a wholesale customer for a retail sale
-
-const filteredCustomers = customerSearch
-  ? customers.filter(c => 
-      c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
-      c.phone?.includes(customerSearch)
-    )
-  : customers;
-
-// Show a type badge on each customer in the browse list
-// 🔵 Retail | 🟣 Wholesale
-```
-
-**Phone lookup auto-detection:** When a customer is found by phone, show their type as a badge next to "Old Customer":
-- Blue badge for Retail
-- Purple badge for Wholesale
-
-**Context-aware warning:** If `saleType === 'retail'` and the looked-up customer is `customer_type === 'wholesale'`, show a subtle amber notice: "This is a wholesale account. Switch to Wholesale sale type?" — with a link/button to switch.
-
-**In `POSModule.tsx`:** Pass `saleType` to `POSCustomerLookup`:
 ```tsx
-<POSCustomerLookup
-  customers={customers}
-  saleType={saleType}  // NEW
+// BEFORE (line 1307-1310):
+  }
+
+    return (
+      <div className="space-y-4 sm:space-y-6 pb-4">
+
+// AFTER:
+  }
+
+  if (viewMode === 'due') {
+    return (
+      <div className="space-y-4 sm:space-y-6 pb-4">
+```
+
+Then I also need to verify whether the `due` view's closing `}` exists before the `paid` view. Let me check those line numbers now.
+
+### Fix 2 — POSCustomerLookup.tsx
+
+Destructure `saleType` and add badge + warning logic:
+
+```tsx
+// Line 51-59 — add saleType to destructured props:
+export const POSCustomerLookup = ({
+  customers,
+  saleType,      // ← ADD THIS
+  discount,
   ...
-/>
+}: POSCustomerLookupProps) => {
+```
+
+In the status badges section (around line 166-198), after the "Old Customer" badge, add:
+```tsx
+{status === 'found' && customer && (customer as any).customer_type && (
+  <Badge className={(customer as any).customer_type === 'wholesale'
+    ? 'bg-purple-100 text-purple-700 border-purple-300'
+    : 'bg-sky-100 text-sky-700 border-sky-300'}>
+    {(customer as any).customer_type === 'wholesale' ? '🟣 Wholesale' : '🔵 Retail'}
+  </Badge>
+)}
+```
+
+Cross-type warning (insert after the badges row, before the form fields):
+```tsx
+{status === 'found' && customer && 
+ saleType === 'retail' && (customer as any).customer_type === 'wholesale' && (
+  <div className="flex items-center gap-2 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-xs text-amber-700 dark:text-amber-400">
+    <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+    <span>Wholesale account — this sale is set to Retail pricing.</span>
+  </div>
+)}
+```
+
+In the Browse dialog customer list (line 334-360), add a type badge after the name:
+```tsx
+<Badge className={(cust as any).customer_type === 'wholesale'
+  ? 'text-[10px] bg-purple-100 text-purple-700 border-purple-300'
+  : 'text-[10px] bg-sky-100 text-sky-700 border-sky-300'}>
+  {(cust as any).customer_type === 'wholesale' ? 'Wholesale' : 'Retail'}
+</Badge>
+```
+
+### Fix 3 — POSModule.tsx line 609
+
+```tsx
+// BEFORE:
+<POSCustomerLookup customers={customers} discount={cart.discount} ...
+
+// AFTER:
+<POSCustomerLookup customers={customers} saleType={saleType} discount={cart.discount} ...
 ```
 
 ---
 
-## Phase 5 — New Customer Creation in POS (Preserves Type)
+## Technical Summary
 
-When POS creates a new customer (`status === 'new'`), it must pass `customer_type`. The POS determines this from its own `saleType`:
-
-```typescript
-// In handleCompleteSale (POSModule.tsx), when inserting new customer:
-const { data: newCust } = await supabase.from('customers').insert({
-  name: sanitizeString(customerState.newCustomerName),
-  phone: normalizedPhone,
-  address: customerState.newCustomerAddress || null,
-  customer_type: saleType,  // NEW: 'retail' or 'wholesale'
-  created_by: user.id,
-  owner_id: ownerId || user.id
-}).select().single();
-```
-
----
-
-## Complete File Change Summary
-
-| # | File | Change | Type | Risk |
+| # | File | Line(s) | Change | Risk |
 |---|---|---|---|---|
-| 1 | **DB Migration** | Add `customer_type TEXT DEFAULT 'retail'` to `customers` table | Schema | Zero — additive |
-| 2 | `src/hooks/useSharedQueries.ts` | Add `customer_type` to `SharedCustomer` interface | Interface | Zero — additive |
-| 3 | `src/components/dashboard/modules/CustomerManagementModule.tsx` | Add `customer_type` to local interface + mapping; add `retail`/`wholesale` view modes; add segment cards; add Bulk Payment feature for wholesale | Feature | Low |
-| 4 | `src/components/customer/CustomerAddDialog.tsx` | Add Customer Type toggle (Retail/Wholesale) + conditional credit limit default | Feature | Zero |
-| 5 | `src/components/pos/POSCustomerLookup.tsx` | Accept `saleType` prop; show customer type badges in Browse list; add cross-type warning | Feature | Zero |
-| 6 | `src/components/dashboard/modules/POSModule.tsx` | Pass `saleType` to `POSCustomerLookup`; pass `saleType` when creating new customers | Logic | Zero |
+| 1 | `CustomerManagementModule.tsx` | 1308-1309 | Add missing `if (viewMode === 'due') {` guard | Zero — pure syntax fix |
+| 2 | `POSCustomerLookup.tsx` | 51-59 | Destructure `saleType` from props | Zero |
+| 3 | `POSCustomerLookup.tsx` | 166-199 | Add customer type badge + cross-type warning | Zero |
+| 4 | `POSCustomerLookup.tsx` | 334-360 | Add type badges in Browse dialog | Zero |
+| 5 | `POSModule.tsx` | 609 | Pass `saleType={saleType}` to `POSCustomerLookup` | Zero |
 
-**Total: 1 DB migration + 5 component files. Zero new dependencies. Zero breaking changes.**
+**Zero database changes. Zero new dependencies. Fix resolves immediately.**
 
----
-
-## What Is NOT Changing
-
-- The `complete_pos_sale` RPC function — no changes needed, it already handles customer creation
-- The `credit_limit` enforcement logic — already works, wholesale customers will simply get a higher limit set by the owner
-- RLS policies — no changes needed (retail/wholesale is a business-layer distinction, not a security boundary)
-- The `customers` table RLS — policies already scope by `owner_id` which is correct
-- Existing customer data — all 19 existing customers default cleanly to `'retail'`
-- The `SharedCustomer` fetch query — already uses `select('*')`, new column arrives automatically
-
----
-
-## UI Design for the New Segment Cards
-
-```text
-┌─────────────────────────────┐  ┌─────────────────────────────┐
-│ 🔵 Retail Customers         │  │ 🟣 Wholesale Accounts        │
-│ 15 customers                │  │ 4 accounts                  │
-│ Focus: Speed & Volume       │  │ Focus: Credit & Ledger      │
-│ Last Visit • Total Spent    │  │ Credit Limit • Due Amount   │
-│ [Manage Retail →]          │  │ [Manage Wholesale →]        │
-└─────────────────────────────┘  └─────────────────────────────┘
-```
-
-The existing "Due / Paid" summary cards remain on the main view as they are cross-type totals.
+The `due` view missing guard is the sole cause of TS1128. Once it's inserted, the entire file's JSX structure is valid and all 2142 lines compile correctly.
