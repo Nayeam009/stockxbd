@@ -38,7 +38,10 @@ import {
   Phone,
   X,
   Building2,
-  BookOpen
+  BookOpen,
+  MessageSquare,
+  TrendingUp,
+  CreditCard
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -1232,45 +1235,98 @@ export const CustomerManagementModule = () => {
                       </div>
                       <p className="text-xs text-muted-foreground">{c.phone || 'No phone'}</p>
                       {isWholesale && c.credit_limit && (
-                        <div className="mt-1">
-                          <div className="flex justify-between text-xs mb-0.5">
+                        <div className="mt-1.5">
+                          {c.total_due > 0 && (
+                            <p className="text-sm font-bold text-rose-600 dark:text-rose-400 tabular-nums mb-1">
+                              {BANGLADESHI_CURRENCY_SYMBOL}{c.total_due.toLocaleString()} due
+                            </p>
+                          )}
+                          <div className="flex justify-between text-xs mb-1">
                             <span className="text-muted-foreground">Credit used</span>
-                            <span className="tabular-nums">{BANGLADESHI_CURRENCY_SYMBOL}{(c.total_due || 0).toLocaleString()} / {BANGLADESHI_CURRENCY_SYMBOL}{c.credit_limit.toLocaleString()}</span>
+                            <span className="tabular-nums text-muted-foreground">
+                              {BANGLADESHI_CURRENCY_SYMBOL}{(c.total_due || 0).toLocaleString()} / {BANGLADESHI_CURRENCY_SYMBOL}{c.credit_limit.toLocaleString()}
+                            </span>
                           </div>
-                          <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                          <div className="h-2 rounded-full bg-muted overflow-hidden">
                             <div
-                              className="h-full rounded-full bg-purple-500 transition-all"
+                              className={`h-full rounded-full transition-all ${
+                                ((c.total_due || 0) / c.credit_limit) > 0.8
+                                  ? 'bg-rose-500'
+                                  : ((c.total_due || 0) / c.credit_limit) > 0.5
+                                  ? 'bg-amber-500'
+                                  : 'bg-emerald-500'
+                              }`}
                               style={{ width: `${Math.min(100, ((c.total_due || 0) / c.credit_limit) * 100)}%` }}
                             />
                           </div>
                         </div>
                       )}
                     </div>
-                    <div className="flex flex-col gap-1 shrink-0">
-                      {c.total_due > 0 && (
-                        <Badge variant="destructive" className="text-[10px]">Due: {BANGLADESHI_CURRENCY_SYMBOL}{c.total_due.toLocaleString()}</Badge>
+                    <div className="flex flex-col gap-1 shrink-0 items-end">
+                      {!isWholesale && c.total_due > 0 && (
+                        <Badge variant="destructive" className="text-xs px-2 py-0.5">
+                          {BANGLADESHI_CURRENCY_SYMBOL}{c.total_due.toLocaleString()}
+                        </Badge>
                       )}
                       <div className="flex gap-1">
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => { setSelectedCustomer(c); fetchCustomerSalesHistory(c.id); fetchPayments(); setHistoryDialogOpen(true); }}>
-                          <History className="h-3.5 w-3.5" />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-11 w-11 p-0 touch-manipulation"
+                          title="View History"
+                          onClick={() => { setSelectedCustomer(c); fetchCustomerSalesHistory(c.id); fetchPayments(); setHistoryDialogOpen(true); }}
+                        >
+                          <History className="h-4 w-4" />
                         </Button>
+                        {!isWholesale && c.phone && (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-11 w-11 p-0 text-emerald-600 hover:bg-emerald-500/10 touch-manipulation"
+                              asChild
+                            >
+                              <a href={`tel:${c.phone}`} aria-label={`Call ${c.name}`}>
+                                <Phone className="h-4 w-4" />
+                              </a>
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-11 w-11 p-0 text-green-600 hover:bg-green-500/10 touch-manipulation"
+                              asChild
+                            >
+                              <a
+                                href={`https://wa.me/${c.phone.replace(/\D/g, '')}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                aria-label={`WhatsApp ${c.name}`}
+                              >
+                                <MessageSquare className="h-4 w-4" />
+                              </a>
+                            </Button>
+                          </>
+                        )}
                         {isWholesale && (
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-8 w-8 p-0 text-purple-600 hover:text-purple-700 hover:bg-purple-500/10"
+                            className="h-11 w-11 p-0 text-purple-600 hover:text-purple-700 hover:bg-purple-500/10 touch-manipulation"
                             title="View Ledger"
-                            onClick={() => {
-                              sessionStorage.setItem('pending-diary-filter', c.name);
-                              window.dispatchEvent(new CustomEvent('navigate-module', { detail: 'business-diary' }));
-                            }}
+                            onClick={() => { setSelectedCustomer(c); fetchCustomerSalesHistory(c.id); fetchPayments(); setHistoryDialogOpen(true); }}
                           >
-                            <BookOpen className="h-3.5 w-3.5" />
+                            <BookOpen className="h-4 w-4" />
                           </Button>
                         )}
                         {c.total_due > 0 && (
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-emerald-600" onClick={() => { setSelectedCustomer(c); fetchPayments(); setSettleDialogOpen(true); }}>
-                            <Banknote className="h-3.5 w-3.5" />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-11 w-11 p-0 text-emerald-600 hover:bg-emerald-500/10 touch-manipulation"
+                            title="Settle Account"
+                            onClick={() => { setSelectedCustomer(c); fetchPayments(); setSettleDialogOpen(true); }}
+                          >
+                            <Banknote className="h-4 w-4" />
                           </Button>
                         )}
                       </div>
@@ -1282,36 +1338,203 @@ export const CustomerManagementModule = () => {
           </div>
         )}
 
-        {/* Reuse existing dialogs */}
+        {/* Customer History / Ledger Dialog */}
         <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
           <DialogContent className="bg-card border-border max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
             <DialogHeader className="shrink-0">
-              <DialogTitle>Customer History — {selectedCustomer?.name}</DialogTitle>
+              <div className="flex items-center gap-3">
+                <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${isWholesale ? 'bg-purple-500/20' : 'bg-sky-500/20'}`}>
+                  {isWholesale ? <Building2 className="h-5 w-5 text-purple-600" /> : <ShoppingCart className="h-5 w-5 text-sky-600" />}
+                </div>
+                <div>
+                  <DialogTitle className="text-lg">{selectedCustomer?.name}</DialogTitle>
+                  <p className="text-sm text-muted-foreground">
+                    {isWholesale ? 'Wholesale Account' : 'Retail Customer'} • {selectedCustomer?.phone || 'No phone'}
+                  </p>
+                </div>
+              </div>
             </DialogHeader>
-            <Tabs defaultValue="sales" className="flex-1 overflow-hidden flex flex-col">
-              <TabsList className="grid w-full grid-cols-2 shrink-0">
-                <TabsTrigger value="sales"><ShoppingCart className="h-4 w-4 mr-2" />Purchase History</TabsTrigger>
-                <TabsTrigger value="payments"><Banknote className="h-4 w-4 mr-2" />Payments</TabsTrigger>
+
+            {/* Wholesale credit summary bar */}
+            {isWholesale && selectedCustomer?.credit_limit && (
+              <div className="shrink-0 px-1 pb-1">
+                <div className="p-3 rounded-xl bg-muted/40 border border-border/50">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <CreditCard className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-xs font-medium text-muted-foreground">Credit Utilization</span>
+                    </div>
+                    <div className="flex gap-3">
+                      <div className="text-right">
+                        <p className="text-xs text-muted-foreground">Used</p>
+                        <p className="text-sm font-bold text-rose-600 dark:text-rose-400 tabular-nums">
+                          {BANGLADESHI_CURRENCY_SYMBOL}{(selectedCustomer.total_due || 0).toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs text-muted-foreground">Limit</p>
+                        <p className="text-sm font-bold text-foreground tabular-nums">
+                          {BANGLADESHI_CURRENCY_SYMBOL}{selectedCustomer.credit_limit.toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="h-2 rounded-full bg-muted overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${
+                        ((selectedCustomer.total_due || 0) / selectedCustomer.credit_limit) > 0.8
+                          ? 'bg-rose-500'
+                          : ((selectedCustomer.total_due || 0) / selectedCustomer.credit_limit) > 0.5
+                          ? 'bg-amber-500'
+                          : 'bg-emerald-500'
+                      }`}
+                      style={{ width: `${Math.min(100, ((selectedCustomer.total_due || 0) / selectedCustomer.credit_limit) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <Tabs defaultValue="ledger" className="flex-1 overflow-hidden flex flex-col">
+              <TabsList className={`grid w-full shrink-0 ${isWholesale ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                {isWholesale && (
+                  <TabsTrigger value="ledger" className="gap-1.5 text-xs sm:text-sm">
+                    <TrendingUp className="h-3.5 w-3.5" />Ledger
+                  </TabsTrigger>
+                )}
+                <TabsTrigger value="sales" className="gap-1.5 text-xs sm:text-sm">
+                  <ShoppingCart className="h-3.5 w-3.5" />Purchases
+                </TabsTrigger>
+                <TabsTrigger value="payments" className="gap-1.5 text-xs sm:text-sm">
+                  <Banknote className="h-3.5 w-3.5" />Payments
+                </TabsTrigger>
               </TabsList>
+
+              {/* LEDGER TAB — Combined chronological view with running balance */}
+              {isWholesale && (
+                <TabsContent value="ledger" className="flex-1 overflow-auto mt-4">
+                  {(() => {
+                    const custPayments = selectedCustomer ? getCustomerPayments(selectedCustomer.id) : [];
+                    // Merge sales and payments into one ledger
+                    type LedgerEntry = {
+                      id: string; date: string; type: 'sale' | 'payment';
+                      transactionNumber?: string; saleTotal?: number; paymentStatus?: string; items?: string;
+                      amountPaid?: number; cylindersCollected?: number; notes?: string | null;
+                    };
+                    const ledgerEntries: LedgerEntry[] = [
+                      ...salesHistory.map(tx => ({
+                        id: tx.id, date: tx.created_at, type: 'sale' as const,
+                        transactionNumber: tx.transaction_number, saleTotal: tx.total,
+                        paymentStatus: tx.payment_status, items: tx.items,
+                      })),
+                      ...custPayments.map(p => ({
+                        id: p.id, date: p.payment_date, type: 'payment' as const,
+                        amountPaid: p.amount, cylindersCollected: p.cylinders_collected, notes: p.notes,
+                      })),
+                    ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+                    // Compute running balance (oldest to newest, then reverse display)
+                    let runningBalance = 0;
+                    const withBalance = [...ledgerEntries].reverse().map(e => {
+                      if (e.type === 'sale') runningBalance += e.saleTotal || 0;
+                      else runningBalance -= e.amountPaid || 0;
+                      return { ...e, balanceAfter: runningBalance };
+                    }).reverse();
+
+                    if (withBalance.length === 0) {
+                      return <div className="text-center py-12 text-muted-foreground">No ledger entries found</div>;
+                    }
+                    return (
+                      <div className="space-y-2">
+                        {withBalance.map(entry => (
+                          <Card key={entry.id} className={`border shadow-sm ${entry.type === 'sale' ? 'border-rose-500/20 bg-rose-500/5' : 'border-emerald-500/20 bg-emerald-500/5'}`}>
+                            <CardContent className="p-3">
+                              <div className="flex items-center justify-between gap-3">
+                                <div className="flex items-center gap-3 min-w-0">
+                                  <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 ${entry.type === 'sale' ? 'bg-rose-500/20' : 'bg-emerald-500/20'}`}>
+                                    {entry.type === 'sale'
+                                      ? <Receipt className="h-4 w-4 text-rose-600 dark:text-rose-400" />
+                                      : <Banknote className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                                    }
+                                  </div>
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-2">
+                                      <Badge className={`text-[10px] ${entry.type === 'sale' ? 'bg-rose-500/20 text-rose-600 border-rose-500/30' : 'bg-emerald-500/20 text-emerald-600 border-emerald-500/30'}`}>
+                                        {entry.type === 'sale' ? 'Sale' : 'Payment'}
+                                      </Badge>
+                                      {entry.transactionNumber && (
+                                        <span className="font-mono text-xs text-muted-foreground">{entry.transactionNumber}</span>
+                                      )}
+                                    </div>
+                                    <p className="text-xs text-muted-foreground mt-0.5">
+                                      {format(new Date(entry.date), 'MMM dd, yyyy • HH:mm')}
+                                    </p>
+                                    {entry.items && <p className="text-xs text-muted-foreground truncate max-w-[180px]">{entry.items}</p>}
+                                    {entry.notes && <p className="text-xs italic text-muted-foreground truncate max-w-[180px]">{entry.notes}</p>}
+                                  </div>
+                                </div>
+                                <div className="text-right shrink-0">
+                                  <p className={`font-bold tabular-nums text-sm ${entry.type === 'sale' ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                                    {entry.type === 'sale' ? '+' : '-'}{BANGLADESHI_CURRENCY_SYMBOL}{(entry.saleTotal || entry.amountPaid || 0).toLocaleString()}
+                                  </p>
+                                  <p className={`text-xs font-semibold tabular-nums ${entry.balanceAfter > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
+                                    Bal: {BANGLADESHI_CURRENCY_SYMBOL}{Math.abs(entry.balanceAfter).toLocaleString()}
+                                  </p>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </TabsContent>
+              )}
+
               <TabsContent value="sales" className="flex-1 overflow-auto mt-4">
-                {salesHistory.length === 0 ? <div className="text-center py-8 text-muted-foreground">No purchases found</div> : salesHistory.map(tx => (
-                  <Card key={tx.id} className="border-border/50 shadow-sm mb-2 cursor-pointer" onClick={() => handleViewTransaction(tx)}>
-                    <CardContent className="p-3 flex items-center justify-between gap-3">
-                      <div><p className="font-mono text-sm font-semibold">{tx.transaction_number}</p><p className="text-xs text-muted-foreground">{format(new Date(tx.created_at), 'MMM dd, yyyy')}</p></div>
-                      <p className="font-bold tabular-nums">{BANGLADESHI_CURRENCY_SYMBOL}{tx.total.toLocaleString()}</p>
-                    </CardContent>
-                  </Card>
-                ))}
+                {salesHistory.length === 0
+                  ? <div className="text-center py-8 text-muted-foreground">No purchases found</div>
+                  : salesHistory.map(tx => (
+                    <Card key={tx.id} className="border-border/50 shadow-sm mb-2 cursor-pointer" onClick={() => handleViewTransaction(tx)}>
+                      <CardContent className="p-3 flex items-center justify-between gap-3">
+                        <div>
+                          <p className="font-mono text-sm font-semibold">{tx.transaction_number}</p>
+                          <p className="text-xs text-muted-foreground">{format(new Date(tx.created_at), 'MMM dd, yyyy')}</p>
+                          <p className="text-xs text-muted-foreground truncate max-w-[200px]">{tx.items}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold tabular-nums">{BANGLADESHI_CURRENCY_SYMBOL}{tx.total.toLocaleString()}</p>
+                          <Badge className={tx.payment_status === 'paid' || tx.payment_status === 'completed'
+                            ? 'bg-emerald-500/20 text-emerald-600 border-emerald-500/30'
+                            : 'bg-amber-500/20 text-amber-600 border-amber-500/30'
+                          }>{tx.payment_status}</Badge>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))
+                }
               </TabsContent>
+
               <TabsContent value="payments" className="flex-1 overflow-auto mt-4">
-                {selectedCustomer && getCustomerPayments(selectedCustomer.id).length === 0 ? <div className="text-center py-8 text-muted-foreground">No payments found</div> : selectedCustomer && getCustomerPayments(selectedCustomer.id).map(p => (
-                  <Card key={p.id} className="border-border/50 shadow-sm mb-2">
-                    <CardContent className="p-3 flex items-center justify-between">
-                      <p className="text-sm">{format(new Date(p.payment_date), 'MMM dd, yyyy')}</p>
-                      <p className="font-bold text-emerald-600 tabular-nums">{BANGLADESHI_CURRENCY_SYMBOL}{Number(p.amount).toLocaleString()}</p>
-                    </CardContent>
-                  </Card>
-                ))}
+                {selectedCustomer && getCustomerPayments(selectedCustomer.id).length === 0
+                  ? <div className="text-center py-8 text-muted-foreground">No payments found</div>
+                  : selectedCustomer && getCustomerPayments(selectedCustomer.id).map(p => (
+                    <Card key={p.id} className="border-border/50 shadow-sm mb-2">
+                      <CardContent className="p-3 flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium">{format(new Date(p.payment_date), 'MMM dd, yyyy HH:mm')}</p>
+                          {p.notes && <p className="text-xs text-muted-foreground italic">{p.notes}</p>}
+                          {p.cylinders_collected > 0 && (
+                            <p className="text-xs text-muted-foreground">{p.cylinders_collected} cylinders collected</p>
+                          )}
+                        </div>
+                        <p className="font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                          {BANGLADESHI_CURRENCY_SYMBOL}{Number(p.amount).toLocaleString()}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  ))
+                }
               </TabsContent>
             </Tabs>
           </DialogContent>
