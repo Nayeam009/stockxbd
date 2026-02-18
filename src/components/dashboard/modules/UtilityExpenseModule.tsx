@@ -15,12 +15,14 @@ import {
   Fuel, Wallet, TrendingUp, Calendar, Receipt, Wrench,
   ChevronRight, ArrowUpRight, ArrowDownRight
 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { cn } from "@/lib/utils";
+import { sharedKeys } from "@/hooks/useSharedQueries";
 
 // ==================== Types ====================
 interface Staff {
@@ -97,6 +99,7 @@ const UtilityExpenseSkeleton = () => (
 // ==================== Main Component ====================
 export const UtilityExpenseModule = () => {
   const { t } = useLanguage();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("staff");
   const mountedRef = useRef(true);
   
@@ -207,6 +210,7 @@ export const UtilityExpenseModule = () => {
       toast({ title: "Staff added successfully" });
       setStaffDialogOpen(false);
       setNewStaff({ name: "", role: "Staff", salary: 0, phone: "" });
+      fetchStaffData();
     }
   };
 
@@ -237,11 +241,14 @@ export const UtilityExpenseModule = () => {
         amount: payAmount,
         created_by: user.user.id,
       });
+      // Invalidate shared cache so Business Diary updates immediately
+      queryClient.invalidateQueries({ queryKey: sharedKeys.overview() });
       toast({ title: "Payment recorded successfully" });
       setPayDialogOpen(false);
       setPayAmount(0);
       setPayNote("");
       setSelectedStaff(null);
+      fetchStaffData();
     }
   };
 
@@ -271,11 +278,13 @@ export const UtilityExpenseModule = () => {
         amount: bonusAmount,
         created_by: user.user.id,
       });
+      queryClient.invalidateQueries({ queryKey: sharedKeys.overview() });
       toast({ title: "Bonus recorded successfully" });
       setBonusDialogOpen(false);
       setBonusAmount(0);
       setBonusNote("");
       setSelectedStaff(null);
+      fetchStaffData();
     }
   };
 
@@ -285,6 +294,7 @@ export const UtilityExpenseModule = () => {
       toast({ title: "Error deleting staff", variant: "destructive" });
     } else {
       toast({ title: "Staff removed" });
+      fetchStaffData();
     }
   };
 
@@ -345,9 +355,12 @@ export const UtilityExpenseModule = () => {
         amount: newCost.amount,
         created_by: user.user.id,
       });
+      // Invalidate shared cache so Business Diary updates immediately
+      queryClient.invalidateQueries({ queryKey: sharedKeys.overview() });
       toast({ title: "Cost added successfully" });
       setCostDialogOpen(false);
       setNewCost({ vehicle_id: "", cost_type: "Fuel", description: "", amount: 0, cost_date: format(new Date(), "yyyy-MM-dd"), liters_filled: 0, odometer_reading: 0 });
+      fetchVehicleData();
     }
   };
 

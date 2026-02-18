@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -54,6 +54,16 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
 
   // Data hook
   const { lpgBrands, stoves, regulators, customers, todayStats, isLoading, getLPGPrice, getStovePrice, getRegulatorPrice } = usePOSData();
+  
+  // Fetch shop profile for invoice
+  const { data: shopProfile } = useQuery({
+    queryKey: ['shop-profile-pos'],
+    queryFn: async () => {
+      const { data } = await supabase.from('shop_profiles').select('shop_name, phone, address').maybeSingle();
+      return data;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
   
   // Cart hook
   const cart = usePOSCart();
@@ -545,7 +555,9 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
           open={showInvoiceDialog} 
           onOpenChange={setShowInvoiceDialog} 
           invoiceData={lastTransaction}
-          businessName="Stock-X LPG"
+          businessName={shopProfile?.shop_name || "Stock-X LPG"}
+          businessPhone={shopProfile?.phone || undefined}
+          businessAddress={shopProfile?.address || undefined}
         />
 
         {/* Print Type Dialog */}
