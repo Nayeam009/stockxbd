@@ -300,6 +300,7 @@ const Dashboard = () => {
               userRole={dashboardRole}
               setActiveModule={handleModuleChange}
               onRefresh={refetchStats}
+              isLoading={statsLoading}
             />
           );
         case "pos":
@@ -341,7 +342,7 @@ const Dashboard = () => {
               userRole={dashboardRole}
             />
           );
-        default:
+          default:
           return (
             <DashboardOverview
               analytics={analytics}
@@ -350,6 +351,7 @@ const Dashboard = () => {
               userRole={dashboardRole}
               setActiveModule={handleModuleChange}
               onRefresh={refetchStats}
+              isLoading={statsLoading}
             />
           );
       }

@@ -552,16 +552,15 @@ export const UtilityExpenseModule = () => {
           </div>
 
           {staffList.length === 0 ? (
-            <Card className="border-dashed">
-              <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                <Users className="h-12 w-12 text-muted-foreground/40 mb-4" />
-                <p className="text-muted-foreground font-medium">No staff members yet</p>
-                <p className="text-sm text-muted-foreground/70">Add your first staff member to get started</p>
-                <Button className="mt-4 h-12 gap-2" onClick={() => setStaffDialogOpen(true)}>
-                  <Plus className="h-4 w-4" /> Add Staff
-                </Button>
-              </CardContent>
-            </Card>
+            <EmptyStateCard
+              icon={<Users className="h-10 w-10" />}
+              title="No staff members yet"
+              subtitle="Add your first staff member to get started"
+              colorScheme="muted"
+              actionLabel="Add Staff"
+              actionIcon={<Plus className="h-4 w-4 mr-2" />}
+              onAction={() => setStaffDialogOpen(true)}
+            />
           ) : (
             <div className="space-y-3">
               {staffList.map(staff => (
