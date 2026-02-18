@@ -1,136 +1,181 @@
 
-# QA Audit Report: Memo Recall & Settlement Flow
+# Connectivity Repair Report: Customer Management Real-Time Audit
 
-## Test 1 — Memo Recall: Is It Joining the Correct Table?
+## Executive Finding
 
-### Finding: The code is correct — but the prompt references the wrong table
+After a complete audit of the live code, database functions, RLS policies, real-time subscriptions, and the Postgres publication table, **the root cause is singular and definitive:**
 
-The prompt says *"ensure the search bar joins with the `orders` table"*. After auditing the live code and the database, the correct table is **`pos_transactions`**, not `orders`. Here is why:
+The `customers` table and `customer_payments` table are **NOT enrolled in the `supabase_realtime` publication.** This means Supabase cannot broadcast any `postgres_changes` events for these tables to the frontend, regardless of how many `.on('postgres_changes', ...)` listeners are registered in the React code.
 
-- Every POS sale generates a `transaction_number` in the format `TXN-20260218-0002` (confirmed via live DB query showing 5 real transactions).
-- The `orders` table is the old legacy orders system used by the community marketplace, not the walk-in POS. It stores `order_number`, not `transaction_number`.
-- The memo search correctly queries `pos_transactions` with `.ilike('transaction_number', '%TXN-...%')`.
-
-**Verdict: Memo search is working on the correct table. No fix needed here.**
+Every other piece of the system — the React hooks, the query invalidation logic, the RLS policies — is already correctly implemented. The data flow architecture is sound. The real-time transport layer is simply missing the tables it needs to listen to.
 
 ---
 
-## Test 2 — Settlement Flow: 3-Part Audit
+## Section 1 — POS → Customer Connection: WORKING CORRECTLY
 
-### Part A — Does the money appear in Analytics (Today's Income)?
+The prompt asks: "Does `complete_pos_sale` explicitly UPDATE the `customers` table?"
 
-**Finding: Partially working. Today's Income updates. Monthly Analytics does NOT.**
-
-The `get_today_sales_total` RPC (which powers the Dashboard overview KPI) includes this:
+**Answer: Yes, it does.** The RPC contains this block at step 5:
 
 ```sql
-(SELECT SUM(cp.amount)
- FROM customer_payments cp
- JOIN customers c ON c.id = cp.customer_id
- WHERE c.owner_id = get_owner_id()
-   AND DATE(cp.payment_date) = CURRENT_DATE) AS payment_total
+-- Step 5 inside complete_pos_sale:
+IF p_customer_id IS NOT NULL AND p_remaining_due > 0 THEN
+  UPDATE customers SET
+    total_due = COALESCE(total_due, 0) + p_remaining_due,
+    billing_status = 'pending',
+    last_order_date = now()
+  WHERE id = p_customer_id AND owner_id = v_owner_id;
+ELSIF p_customer_id IS NOT NULL THEN
+  UPDATE customers SET last_order_date = now()
+  WHERE id = p_customer_id AND owner_id = v_owner_id;
+END IF;
 ```
 
-This correctly picks up the settlement payment — **Today's Income KPI will update after settlement**.
+The database mutation is correct. The customer's `total_due` does increment when a credit sale is made. The problem is the **Customer module never hears about it** because the real-time event for the `customers` table UPDATE is never delivered to the frontend.
 
-However, the `get_monthly_revenue_stats` RPC only sums `pos_transactions` — it does **not** include `customer_payments`. This means:
+---
 
-- Monthly Revenue card on the Dashboard will NOT reflect settlement income
-- The Analytics module's monthly trend chart will NOT reflect it either
+## Section 2 — Diary → Customer Connection: WORKING CORRECTLY
 
-**This is a genuine bug.** A settlement of ৳10,000 collected today will appear in Today's Income but NOT in the monthly total — creating a discrepancy.
+The prompt asks: "Is there a missing Trigger on `business_diary` that should auto-update the customer balance?"
 
-**Fix required: Update `get_monthly_revenue_stats` to include `customer_payments` in its monthly sum.**
+**Answer: No trigger is needed, and none is missing.** The settlement flow in `handleSettleAccount` does the following in sequence:
 
-### Part B — Does the Customer's "Due" drop to 0?
+1. Optimistic update to React Query cache (instant UI tab switch)
+2. `INSERT` into `customer_payments` — records the collection
+3. `UPDATE` on `customers` table — decrements `total_due`, `cylinders_due`, sets `billing_status`
 
-**Finding: Works correctly.**
+This is a direct, explicit update. No trigger is required because the frontend performs the UPDATE itself. The payment flow is architecturally correct.
 
-The `handleSettleAccount` function uses an optimistic update pattern:
-1. Instantly updates the React Query cache — customer moves from "Due" tab to "Paid" tab immediately (zero UI delay)
-2. Inserts into `customer_payments` table
-3. Updates `customers.total_due`, `cylinders_due`, `billing_status` in DB
-4. On error: rolls back by invalidating the cache
+---
 
-**Verdict: Due drop works correctly. No fix needed.**
+## Section 3 — The Actual Root Cause: Missing Realtime Enrollment
 
-### Part C — Does the transaction appear in Business Diary?
+The `useUnifiedRealtime` hook (in `useSharedQueries.ts`, lines 331-407) registers listeners on the `supabase_realtime` channel for `customers` and `customer_payments`:
 
-**Finding: Works correctly.**
-
-The Business Diary's `useBusinessDiaryQueries.ts` fetches `customer_payments` with:
 ```typescript
-.gte('payment_date', startDate)
-.lte('payment_date', endDate)
+// Line 371-374 — Listener exists:
+.on('postgres_changes',
+  { event: '*', schema: 'public', table: 'customers' },
+  () => invalidateWithDebounce(sharedKeys.customers(), 'normal')
+)
+
+// Line 376-382 — Listener exists:
+.on('postgres_changes',
+  { event: 'INSERT', schema: 'public', table: 'customer_payments' },
+  () => {
+    invalidateWithDebounce(sharedKeys.overview(), 'critical');
+    invalidateWithDebounce(sharedKeys.todayStats(), 'critical');
+  }
+)
 ```
 
-The settlement inserts `payment_date: new Date().toISOString().split('T')[0]` (e.g. `"2026-02-18"`). The column type is `timestamp with time zone` so the string is cast correctly. The Business Diary real-time subscription also listens to `customer_payments` INSERT events and invalidates the query immediately.
+These listeners are correctly written. However, a database query against the `pg_publication_tables` view reveals the actual publication contents:
 
-**Verdict: Business Diary updates correctly. No fix needed.**
+```
+supabase_realtime publication currently contains:
+  - community_orders ✓
+  - community_post_comments ✓
+  - community_posts ✓
+  - customer_cylinder_profiles ✓
+  - cylinder_exchange_requests ✓
+  - cylinder_exchanges ✓
+  - orders ✓
+  - products ✓
+```
+
+**`customers` is NOT in the publication. `customer_payments` is NOT in the publication. `pos_transactions` is NOT in the publication.**
+
+This is why the Customer module never receives real-time updates. The `.on('postgres_changes')` handlers in `useUnifiedRealtime` are registered correctly on the frontend but Postgres is never told to broadcast those table changes. The listeners are waiting for events that are never sent.
 
 ---
 
-## The One Genuine Bug: Monthly Stats RPC Missing Settlement Income
+## Section 4 — What Is Already Working (No Changes Needed)
 
-### Root Cause
+**React Query Keys:** The key `sharedKeys.customers()` resolves to `['shared', 'customers']`. This is the single authoritative key used by:
+- `useSharedCustomers()` — the data fetcher
+- `CustomerManagementModule.tsx` — the consumer
+- `handleSettleAccount` optimistic update
+- `useModuleEvent('sale-completed')` invalidation
+- `useModuleEvent('customer-updated')` invalidation
+- `useUnifiedRealtime` — the real-time listener (currently deaf due to missing publication)
 
-`get_monthly_revenue_stats` only aggregates `pos_transactions`:
+**No separate `['customers', 'wholesale']` or `['customers', 'retail']` keys exist.** The module filters the single shared cache client-side. No key changes are needed.
+
+**The Cross-Module Event Bus:** `moduleEvents.ts` already has `notifySaleCompleted` dispatching `'sale-completed'` and `CustomerManagementModule.tsx` already listens with `useModuleEvent('sale-completed', ...)` to invalidate the customers cache. This works now because it uses `window.dispatchEvent` (not Supabase Realtime) as its transport.
+
+**No `useCustomerSocket` hook is needed.** The existing `useUnifiedRealtime` hook already centralises all real-time subscriptions in one place. Adding another hook would create a duplicate subscription for the same tables.
+
+---
+
+## The Fix: One Database Migration
+
+Adding the three missing tables to the `supabase_realtime` publication is a single SQL statement. No frontend code changes are needed at all.
 
 ```sql
--- Current (incomplete):
-SELECT SUM(total) FROM pos_transactions
-WHERE owner_id = get_owner_id() AND is_voided = false
-  AND created_at >= DATE_TRUNC('month', ...)
+ALTER PUBLICATION supabase_realtime 
+  ADD TABLE public.customers,
+             public.customer_payments,
+             public.pos_transactions;
 ```
 
-It should also add `customer_payments` for the same period:
+**Effect after this migration:**
 
-```sql
--- Fixed version:
-WITH pos_revenue AS (
-  SELECT 
-    COALESCE(SUM(CASE WHEN DATE_TRUNC('month', created_at) = DATE_TRUNC('month', CURRENT_DATE) THEN total ELSE 0 END), 0) as current_month,
-    COALESCE(SUM(CASE WHEN DATE_TRUNC('month', created_at) = DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month') THEN total ELSE 0 END), 0) as last_month
-  FROM pos_transactions
-  WHERE owner_id = get_owner_id() AND is_voided = false
-    AND created_at >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month')
-),
-payment_revenue AS (
-  SELECT 
-    COALESCE(SUM(CASE WHEN DATE_TRUNC('month', cp.payment_date::timestamp) = DATE_TRUNC('month', CURRENT_DATE) THEN cp.amount ELSE 0 END), 0) as current_month,
-    COALESCE(SUM(CASE WHEN DATE_TRUNC('month', cp.payment_date::timestamp) = DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month') THEN cp.amount ELSE 0 END), 0) as last_month
-  FROM customer_payments cp
-  JOIN customers c ON c.id = cp.customer_id
-  WHERE c.owner_id = get_owner_id()
-    AND cp.payment_date >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month')
-)
-SELECT 
-  (p.current_month + r.current_month) AS current_month,
-  (p.last_month + r.last_month) AS last_month,
-  CASE WHEN (p.last_month + r.last_month) > 0 
-    THEN ROUND((((p.current_month + r.current_month) - (p.last_month + r.last_month)) / (p.last_month + r.last_month)) * 100, 1)
-    ELSE 0 
-  END as growth_percent
-FROM pos_revenue p, payment_revenue r;
+| Event | Before Fix | After Fix |
+|---|---|---|
+| POS credit sale → `customers.total_due` increases | Customer module stays stale until 3-min cache expires | `useUnifiedRealtime` fires within 500ms, refreshes Customer list |
+| Settlement → `customers.total_due` decreases | Optimistic update works, but no cross-device sync | DB change triggers real-time event → all tabs/devices update |
+| `customer_payments` INSERT | Dashboard overview misses the event | `sharedKeys.overview()` and `sharedKeys.todayStats()` invalidate within 500ms |
+| POS sale INSERT (`pos_transactions`) | Customer module misses the new sale-completed signal | Real-time INSERT event fires, customers cache invalidated |
+
+---
+
+## Full Connectivity Chain After Fix
+
+```text
+POS Sale (complete_pos_sale RPC)
+  ├── pos_transactions INSERT → supabase_realtime [NOW FIXED]
+  │     └── useUnifiedRealtime handler
+  │           ├── invalidate sharedKeys.overview() [500ms]
+  │           ├── invalidate sharedKeys.todayStats() [500ms]
+  │           └── invalidate sharedKeys.customers() [500ms] ← Customer module refreshes
+  │
+  ├── customers UPDATE (total_due += remaining_due) → supabase_realtime [NOW FIXED]
+  │     └── useUnifiedRealtime handler
+  │           └── invalidate sharedKeys.customers() [1500ms]
+  │
+  └── moduleEvents 'sale-completed' dispatch (window event, same device)
+        └── CustomerManagementModule useModuleEvent handler
+              └── invalidateQueries sharedKeys.customers() [immediate]
+
+Settlement (handleSettleAccount)
+  ├── Optimistic update → React Query cache patched instantly
+  ├── customer_payments INSERT → supabase_realtime [NOW FIXED]
+  │     └── useUnifiedRealtime handler
+  │           ├── invalidate sharedKeys.overview() [500ms]
+  │           └── invalidate sharedKeys.todayStats() [500ms]
+  │
+  └── customers UPDATE (total_due -= amount) → supabase_realtime [NOW FIXED]
+        └── useUnifiedRealtime handler
+              └── invalidate sharedKeys.customers() [1500ms]
+              (optimistic update already applied — 1500ms serves as a reconciliation step)
 ```
 
-### Implementation Plan
+---
 
-**1 database migration. 0 frontend code changes.**
+## Implementation Plan
 
-The fix is a single `CREATE OR REPLACE FUNCTION` statement to update the `get_monthly_revenue_stats` RPC to include `customer_payments` in the monthly aggregation, joining through the `customers` table to scope by `owner_id`.
+**1 migration. 0 frontend changes. 0 new hooks.**
 
-After this migration:
-- The Dashboard monthly revenue card will include settlement income
-- The Analytics module monthly trend chart will include settlement income
-- Both `current_month` and `last_month` aggregations will be accurate
+The migration adds `customers`, `customer_payments`, and `pos_transactions` to the `supabase_realtime` Postgres publication. After this:
 
-**No React Query invalidation changes needed** — the existing `refetchInterval: 120 * 1000` on the shared overview stats will pick up the updated RPC result automatically. The `sharedKeys.overview()` invalidation that already fires on `customer_payments` INSERT (in `useSharedQueries.ts` line 377-380) ensures the next poll immediately reflects the correct monthly total.
+- Every UPDATE to `customers.total_due` (from POS sale or settlement) fires a real-time event
+- Every INSERT into `customer_payments` fires a real-time event
+- Every INSERT into `pos_transactions` fires a real-time event
+- All existing `.on('postgres_changes', ...)` handlers in `useUnifiedRealtime` that were silently deaf will begin receiving events
 
-### File/Migration Change Summary
+The 3-minute stale time (`STALE_TIMES.customers = 3 * 60 * 1000`) on `useSharedCustomers` remains as a background fallback. Real-time events will now trigger invalidation well within that window, making the effective update latency approximately 500–1500ms instead of 3 minutes.
 
-| # | Type | Change | Impact |
-|---|---|---|---|
-| 1 | DB Migration | Update `get_monthly_revenue_stats` RPC to include `customer_payments` | Monthly revenue KPI now counts settlement income |
+**Why no `useCustomerSocket` hook:** The current architecture correctly places all Supabase real-time subscriptions in one consolidated hook (`useUnifiedRealtime`) that lives in `Dashboard.tsx`. Splitting this into a per-module socket hook would create duplicate Supabase channels and increase connection overhead. The unified channel is the correct pattern.
 
-**Zero frontend changes. Zero RLS changes. Zero new tables.**
+**Why no SQL triggers needed:** Triggers auto-update derived data when a related row changes. In this system, the settlement flow explicitly updates `customers.total_due` directly in `handleSettleAccount`. The POS RPC explicitly updates `customers.total_due` in step 5 of `complete_pos_sale`. Both are direct, intentional mutations — triggers would be redundant and harder to debug.
