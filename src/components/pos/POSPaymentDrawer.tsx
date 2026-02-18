@@ -92,10 +92,16 @@ export const POSPaymentDrawer = ({
           {/* Amount Input */}
           <div>
             <Label className="text-sm font-medium">Amount Paid</Label>
-            <Input
+          <Input
               type="number"
               value={paymentAmount}
               onChange={(e) => onPaymentAmountChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  if (!processing) onComplete();
+                }
+              }}
               placeholder="Enter amount..."
               className="h-12 text-xl font-semibold mt-1.5"
               autoFocus

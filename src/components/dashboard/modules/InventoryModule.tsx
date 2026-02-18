@@ -168,14 +168,18 @@ export const InventoryModule = () => {
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
-              <Package className="h-6 w-6 text-primary" />
+            <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg shrink-0">
+              <Package className="h-5 w-5 sm:h-6 sm:w-6 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="text-xl sm:text-2xl font-bold">Inventory</h1>
-              <p className="text-xs sm:text-sm text-muted-foreground">Manage your stock levels</p>
+              <h1 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight">Inventory</h1>
+              <p className="text-xs sm:text-sm text-muted-foreground">Manage your stock levels in real-time</p>
             </div>
           </div>
+          <Button size="sm" className="gap-1.5 h-9 shrink-0" onClick={() => openPOB('lpg')}>
+            <PackagePlus className="h-4 w-4" />
+            <span className="hidden sm:inline">Buy/Add Stock</span>
+          </Button>
         </div>
         
         {/* Quick Stats Bar */}

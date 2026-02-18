@@ -413,12 +413,12 @@ export const UtilityExpenseModule = () => {
       {/* Professional Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg">
-            <Wallet className="h-6 w-6 text-white" />
+          <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg shrink-0">
+            <Wallet className="h-5 w-5 sm:h-6 sm:w-6 text-primary-foreground" />
           </div>
           <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-foreground">{t('utility_expense')}</h2>
-            <p className="text-xs sm:text-sm text-muted-foreground">Manage staff salary and vehicle costs</p>
+            <h2 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight">{t('utility_expense')}</h2>
+            <p className="text-xs sm:text-sm text-muted-foreground">Staff salary & vehicle cost management</p>
           </div>
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
