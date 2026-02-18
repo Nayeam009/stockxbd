@@ -1991,24 +1991,44 @@ export type Database = {
         }
         Returns: boolean
       }
-      complete_pos_sale: {
-        Args: {
-          p_community_order_id?: string
-          p_customer_id?: string
-          p_discount?: number
-          p_is_online_order?: boolean
-          p_items?: Json
-          p_notes?: string
-          p_payment_method?: Database["public"]["Enums"]["payment_method"]
-          p_payment_status?: string
-          p_remaining_due?: number
-          p_return_items?: Json
-          p_subtotal?: number
-          p_total?: number
-          p_transaction_number: string
-        }
-        Returns: string
-      }
+      complete_pos_sale:
+        | {
+            Args: {
+              p_community_order_id?: string
+              p_customer_id?: string
+              p_discount?: number
+              p_is_online_order?: boolean
+              p_items?: Json
+              p_notes?: string
+              p_payment_method?: Database["public"]["Enums"]["payment_method"]
+              p_payment_status?: string
+              p_remaining_due?: number
+              p_return_items?: Json
+              p_subtotal?: number
+              p_total?: number
+              p_transaction_number: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_community_order_id?: string
+              p_customer_id?: string
+              p_discount?: number
+              p_driver_id?: string
+              p_is_online_order?: boolean
+              p_items?: Json
+              p_notes?: string
+              p_payment_method?: Database["public"]["Enums"]["payment_method"]
+              p_payment_status?: string
+              p_remaining_due?: number
+              p_return_items?: Json
+              p_subtotal?: number
+              p_total?: number
+              p_transaction_number: string
+            }
+            Returns: string
+          }
       count_demo_data: { Args: never; Returns: number }
       delete_demo_data: { Args: never; Returns: undefined }
       generate_order_number: { Args: never; Returns: string }

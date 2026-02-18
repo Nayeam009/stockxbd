@@ -2,7 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar, SidebarHeader, SidebarFooter } from "@/components/ui/sidebar";
-import { BarChart3, Users, Search, Home, Receipt, Tag, Settings, LogOut, Package, ChevronRight, Store, Wallet, Shield } from "lucide-react";
+import { BarChart3, Users, Search, Home, Receipt, Tag, Settings, LogOut, Package, ChevronRight, Store, Wallet, Shield, Truck } from "lucide-react";
 import stockXLogo from "@/assets/stock-x-logo.png";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -48,6 +48,7 @@ export const AppSidebar = ({
     { id: 'product-pricing', titleKey: 'product_pricing', icon: Tag, roles: ['owner', 'manager'] },
     { id: 'customers', titleKey: 'customers', icon: Users, roles: ['owner', 'manager'] },
     { id: 'utility-expense', titleKey: 'utility_expense', icon: Wallet, roles: ['owner', 'manager'] },
+    { id: 'drivers', titleKey: 'drivers', icon: Truck, roles: ['owner', 'manager'] },
     { id: 'analysis-search', titleKey: 'analysis_search', icon: Search, roles: ['owner', 'manager'] },
     { id: 'settings', titleKey: 'settings', icon: Settings, roles: ['owner', 'manager'] },
   ];

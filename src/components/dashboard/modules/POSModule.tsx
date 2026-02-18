@@ -78,6 +78,21 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
   const currencySymbol = shopSettings?.currency_symbol ?? '৳';
   const taxRate = Number(shopSettings?.tax_rate ?? 0);
 
+  // Fetch active drivers for POS assignment
+  const { data: drivers = [] } = useQuery({
+    queryKey: ['drivers-pos'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('staff')
+        .select('id, name, phone')
+        .eq('role', 'Driver')
+        .eq('is_active', true)
+        .order('name');
+      return data || [];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
   // Cart hook
   const cart = usePOSCart(taxRate);
 
@@ -95,6 +110,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
   const [showPaymentDrawer, setShowPaymentDrawer] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'bkash' | 'nagad' | 'rocket'>('cash');
+  const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null);
 
   // Customer State
   const [customerState, setCustomerState] = useState<CustomerState>({
@@ -334,6 +350,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
         p_items: rpcItems,
         p_return_items: rpcReturnItems,
         p_remaining_due: remainingDue,
+        p_driver_id: selectedDriverId,
       });
 
       if (rpcError) throw rpcError;
@@ -389,6 +406,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
       cart.resetCart();
       setPaymentAmount("");
       setPaymentMethod('cash');
+      setSelectedDriverId(null);
       setCustomerState({ status: 'idle', customer: null, phoneQuery: '', newCustomerName: '', newCustomerAddress: '' });
 
       toast({ title: finalPaymentStatus === 'paid' ? "Sale completed!" : finalPaymentStatus === 'partial' ? "Partial payment saved!" : "Saved as due", description: transactionNumber });
@@ -592,7 +610,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
         <POSStickyFooter total={cart.total} itemCount={cart.saleItemsCount} onProceed={() => { setPaymentAmount(cart.total.toString()); setShowPaymentDrawer(true); }} disabled={!cart.isReturnCountMatched} processing={processing} currencySymbol={currencySymbol} />
 
         {/* Payment Drawer */}
-        <POSPaymentDrawer open={showPaymentDrawer} onOpenChange={setShowPaymentDrawer} total={cart.total} paymentAmount={paymentAmount} onPaymentAmountChange={setPaymentAmount} paymentMethod={paymentMethod} onPaymentMethodChange={setPaymentMethod} onComplete={handleCompleteSale} processing={processing} hasCustomer={hasCustomer} currencySymbol={currencySymbol} />
+        <POSPaymentDrawer open={showPaymentDrawer} onOpenChange={setShowPaymentDrawer} total={cart.total} paymentAmount={paymentAmount} onPaymentAmountChange={setPaymentAmount} paymentMethod={paymentMethod} onPaymentMethodChange={setPaymentMethod} onComplete={handleCompleteSale} processing={processing} hasCustomer={hasCustomer} currencySymbol={currencySymbol} drivers={drivers} selectedDriverId={selectedDriverId} onDriverChange={setSelectedDriverId} />
 
         {/* Barcode Scanner */}
         <BarcodeScanner open={showBarcodeScanner} onOpenChange={setShowBarcodeScanner} onProductFound={(product) => { setShowBarcodeScanner(false); toast({ title: "Product scanned", description: product.name }); }} />

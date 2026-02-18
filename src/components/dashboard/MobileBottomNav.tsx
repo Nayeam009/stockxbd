@@ -1,4 +1,4 @@
-import { Home, Receipt, BarChart3, Store, Menu, Package, Tag, Users, Wallet, Search, Settings } from "lucide-react";
+import { Home, Receipt, BarChart3, Store, Menu, Package, Tag, Users, Wallet, Search, Settings, Truck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -53,6 +53,11 @@ const moreItems = [{
   id: 'utility-expense',
   labelKey: 'utility_expense',
   icon: Wallet,
+  roles: ['owner', 'manager']
+}, {
+  id: 'drivers',
+  labelKey: 'drivers',
+  icon: Truck,
   roles: ['owner', 'manager']
 }, {
   id: 'analysis-search',

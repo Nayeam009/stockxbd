@@ -8,10 +8,17 @@ import {
   DrawerTitle,
   DrawerFooter,
 } from "@/components/ui/drawer";
-import { Loader2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Loader2, Truck } from "lucide-react";
 import { useMemo } from "react";
 
 type PaymentMethodType = 'cash' | 'bkash' | 'nagad' | 'rocket';
+
+interface Driver {
+  id: string;
+  name: string;
+  phone: string | null;
+}
 
 interface POSPaymentDrawerProps {
   open: boolean;
@@ -25,6 +32,9 @@ interface POSPaymentDrawerProps {
   processing: boolean;
   hasCustomer: boolean;
   currencySymbol?: string;
+  drivers?: Driver[];
+  selectedDriverId?: string | null;
+  onDriverChange?: (driverId: string | null) => void;
 }
 
 export const POSPaymentDrawer = ({
@@ -38,7 +48,10 @@ export const POSPaymentDrawer = ({
   onComplete,
   processing,
   hasCustomer,
-  currencySymbol = '৳'
+  currencySymbol = '৳',
+  drivers = [],
+  selectedDriverId = null,
+  onDriverChange,
 }: POSPaymentDrawerProps) => {
   const paidAmount = parseFloat(paymentAmount) || 0;
 
@@ -88,6 +101,32 @@ export const POSPaymentDrawer = ({
               ))}
             </div>
           </div>
+
+          {/* Driver Selector — only shown if drivers exist */}
+          {drivers.length > 0 && (
+            <div>
+              <p className="text-sm font-medium text-foreground mb-2 flex items-center gap-1.5">
+                <Truck className="h-4 w-4 text-muted-foreground" />
+                Assign Driver <span className="text-muted-foreground font-normal">(Optional)</span>
+              </p>
+              <Select
+                value={selectedDriverId || 'none'}
+                onValueChange={(val) => onDriverChange?.(val === 'none' ? null : val)}
+              >
+                <SelectTrigger className="h-11">
+                  <SelectValue placeholder="No driver assigned" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No driver</SelectItem>
+                  {drivers.map(d => (
+                    <SelectItem key={d.id} value={d.id}>
+                      {d.name}{d.phone ? ` — ${d.phone}` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* Amount Input */}
           <div>
