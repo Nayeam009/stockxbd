@@ -285,7 +285,7 @@ export function useSharedOverviewStats(enabled = true) {
     enabled,
     staleTime: STALE_TIMES.overview,
     gcTime: GC_TIME,
-    refetchInterval: 60 * 1000, // Refresh every minute
+    refetchInterval: 120 * 1000, // Refresh every 2 minutes (halves background RPC load)
   });
 }
 

@@ -1,5 +1,4 @@
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -11,7 +10,6 @@ import {
 } from "@/components/ui/drawer";
 import { Loader2 } from "lucide-react";
 import { useMemo } from "react";
-import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
 
 type PaymentMethodType = 'cash' | 'bkash' | 'nagad' | 'rocket';
 
@@ -26,6 +24,7 @@ interface POSPaymentDrawerProps {
   onComplete: () => void;
   processing: boolean;
   hasCustomer: boolean;
+  currencySymbol?: string;
 }
 
 export const POSPaymentDrawer = ({
@@ -38,7 +37,8 @@ export const POSPaymentDrawer = ({
   onPaymentMethodChange,
   onComplete,
   processing,
-  hasCustomer
+  hasCustomer,
+  currencySymbol = '৳'
 }: POSPaymentDrawerProps) => {
   const paidAmount = parseFloat(paymentAmount) || 0;
 
@@ -59,7 +59,7 @@ export const POSPaymentDrawer = ({
           <div className="text-center py-4 bg-muted/50 rounded-xl">
             <p className="text-sm text-muted-foreground">Total Bill</p>
             <p className="text-4xl font-bold text-foreground tabular-nums">
-              {BANGLADESHI_CURRENCY_SYMBOL}{total.toLocaleString()}
+              {currencySymbol}{total.toLocaleString()}
             </p>
           </div>
 
@@ -135,7 +135,7 @@ export const POSPaymentDrawer = ({
           {paymentStatus === 'partial' && (
             <div className="text-center py-2 px-4 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
               <p className="text-sm text-amber-700 dark:text-amber-400">
-                Remaining Due: <span className="font-bold tabular-nums">{BANGLADESHI_CURRENCY_SYMBOL}{(total - paidAmount).toLocaleString()}</span>
+                Remaining Due: <span className="font-bold tabular-nums">{currencySymbol}{(total - paidAmount).toLocaleString()}</span>
               </p>
             </div>
           )}
@@ -172,7 +172,7 @@ export const POSPaymentDrawer = ({
               {processing ? (
                 <Loader2 className="h-5 w-5 animate-spin" />
               ) : (
-                `Save Partial (৳${paidAmount.toLocaleString()} paid)`
+                `Save Partial (${currencySymbol}${paidAmount.toLocaleString()} paid)`
               )}
             </Button>
           ) : (
