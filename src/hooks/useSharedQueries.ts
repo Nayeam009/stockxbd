@@ -90,6 +90,9 @@ export interface SharedProductPrice {
 export interface OverviewStats {
   todayRevenue: number;
   todayExpenses: number;
+  monthlyRevenue: number;
+  lastMonthRevenue: number;
+  monthlyGrowthPercent: number;
   inventory: {
     total_full: number;
     total_empty: number;
@@ -173,16 +176,22 @@ async function fetchProductPrices(): Promise<SharedProductPrice[]> {
 }
 
 async function fetchOverviewStats(): Promise<OverviewStats> {
-  const [salesResult, expensesResult, inventoryResult, ordersResult] = await Promise.all([
+  const [salesResult, expensesResult, inventoryResult, ordersResult, monthlyResult] = await Promise.all([
     supabase.rpc('get_today_sales_total'),
     supabase.rpc('get_today_expenses_total'),
     supabase.rpc('get_inventory_totals'),
     supabase.rpc('get_active_orders_count'),
+    supabase.rpc('get_monthly_revenue_stats'),
   ]);
+
+  const monthly = monthlyResult.data?.[0];
 
   return {
     todayRevenue: Number(salesResult.data) || 0,
     todayExpenses: Number(expensesResult.data) || 0,
+    monthlyRevenue: Number(monthly?.current_month) || 0,
+    lastMonthRevenue: Number(monthly?.last_month) || 0,
+    monthlyGrowthPercent: Number(monthly?.growth_percent) || 0,
     inventory: inventoryResult.data?.[0] || {
       total_full: 0,
       total_empty: 0,

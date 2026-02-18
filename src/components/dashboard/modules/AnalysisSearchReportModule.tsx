@@ -19,7 +19,7 @@ import {
   Plus, UserPlus, PackagePlus, Banknote, CreditCard, ChefHat, Wrench, Flame
 } from "lucide-react";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
-import { useBusinessDiaryData } from "@/hooks/useBusinessDiaryData";
+import { useBusinessSales, useBusinessExpenses } from "@/hooks/queries/useBusinessDiaryQueries";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format, startOfMonth, endOfMonth, subDays } from "date-fns";
@@ -87,8 +87,98 @@ export const AnalysisSearchReportModule = ({
   // Analysis state
   const [timeRange, setTimeRange] = useState<TimeRange>('daily');
   const [customRange, setCustomRange] = useState<{ from: Date; to: Date } | null>(null);
-  const { sales, expenses, analytics, loading: diaryLoading, refetch } = useBusinessDiaryData();
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Compute date range for diary queries
+  const dateRange = useMemo(() => {
+    const today = format(new Date(), 'yyyy-MM-dd');
+    const yearStart = format(startOfMonth(subDays(new Date(), 365)), 'yyyy-MM-dd');
+    return { start: yearStart, end: today };
+  }, []);
+
+  // Use TanStack Query hooks (no duplicate realtime subscription)
+  const { data: sales = [], isLoading: salesLoading, refetch: refetchSales } = useBusinessSales(dateRange.start, dateRange.end);
+  const { data: expenses = [], isLoading: expensesLoading, refetch: refetchExpenses } = useBusinessExpenses(dateRange.start, dateRange.end);
+  const diaryLoading = salesLoading || expensesLoading;
+
+  const refetch = useCallback(async () => {
+    await Promise.all([refetchSales(), refetchExpenses()]);
+  }, [refetchSales, refetchExpenses]);
+
+  // Compute analytics from raw data
+  const analytics = useMemo(() => {
+    const today = format(new Date(), 'yyyy-MM-dd');
+    const weekStart = format(subDays(new Date(), 6), 'yyyy-MM-dd');
+    const monthStart = format(startOfMonth(new Date()), 'yyyy-MM-dd');
+    const yearStart = format(new Date(new Date().getFullYear(), 0, 1), 'yyyy-MM-dd');
+
+    const salesInRange = (start: string, end: string) => sales.filter(s => s.date >= start && s.date <= end);
+    const expensesInRange = (start: string, end: string) => expenses.filter(e => e.date >= start && e.date <= end);
+
+    const todaySales = salesInRange(today, today);
+    const weeklySales = salesInRange(weekStart, today);
+    const monthlySales = salesInRange(monthStart, today);
+    const yearlySales = salesInRange(yearStart, today);
+
+    const todayExp = expensesInRange(today, today);
+    const weeklyExp = expensesInRange(weekStart, today);
+    const monthlyExp = expensesInRange(monthStart, today);
+    const yearlyExp = expensesInRange(yearStart, today);
+
+    const sumIncome = (arr: typeof sales) => arr.reduce((s, x) => s + (x.amountPaid ?? x.totalAmount), 0);
+    const sumExp = (arr: typeof expenses) => arr.reduce((s, x) => s + x.amount, 0);
+
+    const todayIncome = sumIncome(todaySales);
+    const monthlyIncome = sumIncome(monthlySales);
+    const monthlyExpenses = sumExp(monthlyExp);
+
+    // Top products by revenue
+    const productMap = new Map<string, number>();
+    sales.forEach(s => {
+      const key = s.productName;
+      productMap.set(key, (productMap.get(key) || 0) + (s.amountPaid ?? s.totalAmount));
+    });
+    const topProducts = Array.from(productMap.entries()).map(([name, amount]) => ({ name, amount }))
+      .sort((a, b) => b.amount - a.amount).slice(0, 5);
+
+    // Top expense categories
+    const catMap = new Map<string, { amount: number; icon: string; color: string }>();
+    expenses.forEach(e => {
+      const existing = catMap.get(e.category);
+      if (existing) existing.amount += e.amount;
+      else catMap.set(e.category, { amount: e.amount, icon: e.categoryIcon || '💸', color: e.categoryColor || '#6b7280' });
+    });
+    const topExpenseCategories = Array.from(catMap.entries()).map(([name, v]) => ({ name, ...v }))
+      .sort((a, b) => b.amount - a.amount).slice(0, 5);
+
+    // Payment breakdown
+    const payMap = new Map<string, number>();
+    sales.forEach(s => {
+      payMap.set(s.paymentMethod, (payMap.get(s.paymentMethod) || 0) + (s.amountPaid ?? s.totalAmount));
+    });
+    const paymentBreakdown = Array.from(payMap.entries()).map(([method, amount]) => ({ method, amount }));
+
+    return {
+      todayIncome,
+      todayExpenses: sumExp(todayExp),
+      todayProfit: todayIncome - sumExp(todayExp),
+      weeklyIncome: sumIncome(weeklySales),
+      weeklyExpenses: sumExp(weeklyExp),
+      weeklyProfit: sumIncome(weeklySales) - sumExp(weeklyExp),
+      monthlyIncome,
+      monthlyExpenses,
+      monthlyProfit: monthlyIncome - monthlyExpenses,
+      yearlyIncome: sumIncome(yearlySales),
+      yearlyExpenses: sumExp(yearlyExp),
+      yearlyProfit: sumIncome(yearlySales) - sumExp(yearlyExp),
+      incomeGrowth: 0,
+      expenseGrowth: 0,
+      profitMargin: monthlyIncome > 0 ? Math.round(((monthlyIncome - monthlyExpenses) / monthlyIncome) * 100) : 0,
+      topProducts,
+      topExpenseCategories,
+      paymentBreakdown,
+    };
+  }, [sales, expenses]);
   
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
