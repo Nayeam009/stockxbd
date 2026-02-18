@@ -606,7 +606,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
         </Card>
 
         {/* Customer Section */}
-        <POSCustomerLookup customers={customers} discount={cart.discount} onDiscountChange={cart.setDiscount} userRole={userRole} userName={userName} customerState={customerState} onCustomerChange={setCustomerState} />
+        <POSCustomerLookup customers={customers} saleType={saleType} discount={cart.discount} onDiscountChange={cart.setDiscount} userRole={userRole} userName={userName} customerState={customerState} onCustomerChange={setCustomerState} />
 
         {/* Sticky Footer */}
         <POSStickyFooter total={cart.total} itemCount={cart.saleItemsCount} onProceed={() => { setPaymentAmount(cart.total.toString()); setShowPaymentDrawer(true); }} disabled={!cart.isReturnCountMatched} processing={processing} currencySymbol={currencySymbol} />
