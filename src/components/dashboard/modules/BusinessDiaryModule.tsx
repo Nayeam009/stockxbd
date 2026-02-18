@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { MobileFormActions } from "@/components/shared/MobileFormActions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -432,13 +433,13 @@ export const BusinessDiaryModule = () => {
                   <span className="hidden sm:inline text-xs">Add</span>
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-[95vw] sm:max-w-md">
+              <DialogContent className="max-w-[95vw] sm:max-w-md flex flex-col max-h-[85dvh]">
                 <DialogHeader><DialogTitle>Add Daily Expense</DialogTitle></DialogHeader>
-                <div className="space-y-4 py-4">
+                <div className="space-y-4 py-4 overflow-y-auto flex-1">
                   <div className="space-y-2">
                     <Label>Category</Label>
                     <Select value={newExpense.category} onValueChange={(v) => setNewExpense({ ...newExpense, category: v })}>
-                      <SelectTrigger className="h-11"><SelectValue placeholder="Select category" /></SelectTrigger>
+                      <SelectTrigger className="h-12"><SelectValue placeholder="Select category" /></SelectTrigger>
                       <SelectContent>
                         {EXPENSE_CATEGORIES.map(cat => (
                           <SelectItem key={cat.value} value={cat.value}>{cat.icon} {cat.label}</SelectItem>
@@ -449,17 +450,20 @@ export const BusinessDiaryModule = () => {
                   <div className="space-y-2">
                     <Label>Amount ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
                     <Input type="number" inputMode="numeric" value={newExpense.amount} onChange={(e) => setNewExpense({ ...newExpense, amount: e.target.value })}
-                      placeholder="0" className="h-11 text-lg font-semibold" />
+                      placeholder="0" className="h-12 text-base font-semibold" />
                   </div>
                   <div className="space-y-2">
                     <Label>Description <span className="text-muted-foreground font-normal">(Optional)</span></Label>
                     <Input value={newExpense.description} onChange={(e) => setNewExpense({ ...newExpense, description: e.target.value })}
-                      placeholder="e.g., Office Rent for January" className="h-11" />
+                      placeholder="e.g., Office Rent for January" className="h-12 text-base" />
                   </div>
-                  <Button onClick={handleAddExpense} className="w-full h-11" disabled={!newExpense.amount || !newExpense.category}>
-                    Save Expense
-                  </Button>
                 </div>
+                <MobileFormActions
+                  onCancel={() => setAddDialogOpen(false)}
+                  onConfirm={handleAddExpense}
+                  confirmLabel="Save Expense"
+                  disabled={!newExpense.amount || !newExpense.category}
+                />
               </DialogContent>
             </Dialog>
 
