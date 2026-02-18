@@ -194,7 +194,7 @@ export const useDashboardData = () => {
           .order('created_at', { ascending: false })
           .limit(100),
         // Only fetch customers with name/phone/due for overview (reduced columns)
-        supabase.from('customers').select('id, name, phone, address, total_due').order('name').limit(200),
+        supabase.from('customers').select('id, name, phone, address, total_due, customer_type').order('name').limit(200),
         // Only fetch recent orders (last 7 days)
         supabase
           .from('orders')
