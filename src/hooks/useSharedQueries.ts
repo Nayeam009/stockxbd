@@ -350,12 +350,13 @@ export function useUnifiedRealtime() {
         { event: '*', schema: 'public', table: 'regulators' },
         () => invalidateWithDebounce(sharedKeys.regulators(), 'normal')
       )
-      // Sales transactions (critical)
+      // Sales transactions (critical) — scoped to INSERT only (new sale row)
       .on('postgres_changes',
-        { event: '*', schema: 'public', table: 'pos_transactions' },
+        { event: 'INSERT', schema: 'public', table: 'pos_transactions' },
         () => {
           invalidateWithDebounce(sharedKeys.overview(), 'critical');
           invalidateWithDebounce(sharedKeys.todayStats(), 'critical');
+          invalidateWithDebounce(sharedKeys.customers(), 'critical'); // ensures balance refreshes even if module event bus is unmounted
         }
       )
       // POB transactions
