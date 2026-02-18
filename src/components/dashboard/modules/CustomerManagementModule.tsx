@@ -1055,6 +1055,22 @@ export const CustomerManagementModule = () => {
               </div>
             </DialogHeader>
 
+            {salesHistory.length > 0 && (
+              <div className="shrink-0 px-1 pb-1">
+                <div className="flex items-center justify-between p-3 rounded-xl bg-muted/40 border border-border/50">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                    <span className="text-xs font-medium text-muted-foreground">
+                      Lifetime Value ({salesHistory.length} order{salesHistory.length !== 1 ? 's' : ''})
+                    </span>
+                  </div>
+                  <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                    {BANGLADESHI_CURRENCY_SYMBOL}{salesHistory.reduce((s, t) => s + t.total, 0).toLocaleString()}
+                  </p>
+                </div>
+              </div>
+            )}
+
             <Tabs defaultValue="sales" className="flex-1 overflow-hidden flex flex-col">
               <TabsList className="grid w-full grid-cols-2 shrink-0">
                 <TabsTrigger value="sales" className="gap-2">
