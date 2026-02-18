@@ -13,12 +13,16 @@ import { Loader2 } from "lucide-react";
 import { useMemo } from "react";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
 
+type PaymentMethodType = 'cash' | 'bkash' | 'nagad' | 'rocket';
+
 interface POSPaymentDrawerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   total: number;
   paymentAmount: string;
   onPaymentAmountChange: (value: string) => void;
+  paymentMethod: PaymentMethodType;
+  onPaymentMethodChange: (method: PaymentMethodType) => void;
   onComplete: () => void;
   processing: boolean;
   hasCustomer: boolean;
@@ -30,6 +34,8 @@ export const POSPaymentDrawer = ({
   total,
   paymentAmount,
   onPaymentAmountChange,
+  paymentMethod,
+  onPaymentMethodChange,
   onComplete,
   processing,
   hasCustomer
@@ -41,12 +47,6 @@ export const POSPaymentDrawer = ({
     if (paidAmount === 0) return 'due';
     return 'partial';
   }, [paidAmount, total]);
-
-  const statusColors = {
-    paid: 'bg-emerald-500',
-    partial: 'bg-amber-500',
-    due: 'bg-rose-500'
-  };
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
@@ -61,6 +61,32 @@ export const POSPaymentDrawer = ({
             <p className="text-4xl font-bold text-foreground tabular-nums">
               {BANGLADESHI_CURRENCY_SYMBOL}{total.toLocaleString()}
             </p>
+          </div>
+
+          {/* Payment Method Selector */}
+          <div>
+            <p className="text-sm font-medium text-foreground mb-2">Payment Method</p>
+            <div className="grid grid-cols-4 gap-2">
+              {[
+                { id: 'cash' as PaymentMethodType, label: 'Cash', emoji: '💵' },
+                { id: 'bkash' as PaymentMethodType, label: 'bKash', emoji: '🅱' },
+                { id: 'nagad' as PaymentMethodType, label: 'Nagad', emoji: '🟠' },
+                { id: 'rocket' as PaymentMethodType, label: 'Rocket', emoji: '🚀' },
+              ].map(method => (
+                <button
+                  key={method.id}
+                  onClick={() => onPaymentMethodChange(method.id)}
+                  className={`flex flex-col items-center gap-1 py-2.5 px-2 rounded-xl border-2 transition-all text-xs font-semibold ${
+                    paymentMethod === method.id
+                      ? 'border-primary bg-primary/10 text-primary'
+                      : 'border-border bg-muted/30 text-muted-foreground hover:border-primary/50'
+                  }`}
+                >
+                  <span className="text-lg">{method.emoji}</span>
+                  <span>{method.label}</span>
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Amount Input */}
@@ -79,15 +105,15 @@ export const POSPaymentDrawer = ({
           {/* Payment Status Indicator */}
           <div className="flex items-center justify-center gap-4 py-3">
             {[
-              { id: 'paid', label: 'PAID' },
-              { id: 'partial', label: 'PARTIAL' },
-              { id: 'due', label: 'DUE' },
+              { id: 'paid', label: 'PAID', color: 'bg-emerald-500' },
+              { id: 'partial', label: 'PARTIAL', color: 'bg-amber-500' },
+              { id: 'due', label: 'DUE', color: 'bg-rose-500' },
             ].map((status) => (
               <div
                 key={status.id}
                 className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all ${
                   paymentStatus === status.id
-                    ? `${statusColors[status.id as keyof typeof statusColors]} text-white`
+                    ? `${status.color} text-white`
                     : 'bg-muted text-muted-foreground'
                 }`}
               >
