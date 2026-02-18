@@ -248,34 +248,38 @@ export const InventoryPricingCard = ({
                   <TableCell className="py-2">
                     <Input
                       type="number"
+                      inputMode="numeric"
                       value={getValue(product, "company_price") as number}
                       onChange={(e) => handlePriceChange(product.id, "company_price", Number(e.target.value))}
-                      className="w-16 h-8 text-center text-xs mx-auto bg-background"
+                      className="w-20 h-11 text-center text-xs mx-auto bg-background"
                     />
                   </TableCell>
                   <TableCell className="py-2">
                     <Input
                       type="number"
+                      inputMode="numeric"
                       value={getValue(product, "distributor_price") as number}
                       onChange={(e) => handlePriceChange(product.id, "distributor_price", Number(e.target.value))}
-                      className="w-16 h-8 text-center text-xs mx-auto bg-background"
+                      className="w-20 h-11 text-center text-xs mx-auto bg-background"
                     />
                   </TableCell>
                   <TableCell className="py-2">
                     <Input
                       type="number"
+                      inputMode="numeric"
                       value={getValue(product, "retail_price") as number}
                       onChange={(e) => handlePriceChange(product.id, "retail_price", Number(e.target.value))}
-                      className="w-16 h-8 text-center text-xs mx-auto bg-background"
+                      className="w-20 h-11 text-center text-xs mx-auto bg-background"
                     />
                   </TableCell>
                   {productType === "lpg" && (
                     <TableCell className="py-2">
                       <Input
                         type="number"
+                        inputMode="numeric"
                         value={getValue(product, "package_price") as number}
                         onChange={(e) => handlePriceChange(product.id, "package_price", Number(e.target.value))}
-                        className="w-16 h-8 text-center text-xs mx-auto bg-background"
+                        className="w-20 h-11 text-center text-xs mx-auto bg-background"
                       />
                     </TableCell>
                   )}

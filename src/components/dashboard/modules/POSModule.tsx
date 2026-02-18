@@ -644,7 +644,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
             <DialogHeader><DialogTitle>Add Custom Brand</DialogTitle></DialogHeader>
             <div className="space-y-3">
               <div><Label>Brand Name *</Label><Input value={customBrand.name} onChange={e => setCustomBrand(p => ({ ...p, name: e.target.value }))} placeholder="Enter brand name" /></div>
-              <div><Label>Price ({BANGLADESHI_CURRENCY_SYMBOL})</Label><Input type="number" value={customBrand.price} onChange={e => setCustomBrand(p => ({ ...p, price: e.target.value }))} placeholder="Enter price" /></div>
+              <div><Label>Price ({BANGLADESHI_CURRENCY_SYMBOL})</Label><Input type="number" inputMode="numeric" value={customBrand.price} onChange={e => setCustomBrand(p => ({ ...p, price: e.target.value }))} placeholder="Enter price" /></div>
               <div>
                 <Label>Brand Color</Label>
                 <div className="flex items-center gap-3 mt-1.5">

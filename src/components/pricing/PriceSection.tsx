@@ -37,7 +37,7 @@ export const PriceSection = ({
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 text-destructive/60 hover:text-destructive hover:bg-destructive/10"
+          className="h-10 w-10 text-destructive/60 hover:text-destructive hover:bg-destructive/10"
           onClick={() => onDelete(product.id)}
           aria-label={`Delete ${type} pricing`}
         >
@@ -45,7 +45,7 @@ export const PriceSection = ({
         </Button>
       </div>
       
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <EditablePriceCell
           productId={product.id}
           field="company_price"

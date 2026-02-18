@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { MobileFormActions } from "@/components/shared/MobileFormActions";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -1005,6 +1006,7 @@ export const CustomerManagementModule = () => {
                   <label className="text-sm font-medium text-foreground">Initial Due</label>
                   <Input
                     type="number"
+                    inputMode="numeric"
                     value={newCustomer.total_due}
                     onChange={(e) => setNewCustomer({ ...newCustomer, total_due: e.target.value })}
                     placeholder="0"
@@ -1015,6 +1017,7 @@ export const CustomerManagementModule = () => {
                   <label className="text-sm font-medium text-foreground">Cylinders Due</label>
                   <Input
                     type="number"
+                    inputMode="numeric"
                     value={newCustomer.cylinders_due}
                     onChange={(e) => setNewCustomer({ ...newCustomer, cylinders_due: e.target.value })}
                     placeholder="0"
@@ -1026,6 +1029,7 @@ export const CustomerManagementModule = () => {
                 <label className="text-sm font-medium text-foreground">Credit Limit ({BANGLADESHI_CURRENCY_SYMBOL})</label>
                 <Input
                   type="number"
+                  inputMode="numeric"
                   value={newCustomer.credit_limit}
                   onChange={(e) => setNewCustomer({ ...newCustomer, credit_limit: e.target.value })}
                   placeholder="10000"
@@ -1056,22 +1060,19 @@ export const CustomerManagementModule = () => {
                 </>
               )}
             </div>
-            <DialogFooter className="gap-2 sm:gap-0">
-              <Button variant="outline" onClick={() => setAddCustomerDialogOpen(false)} className="h-11">Cancel</Button>
-              <Button
-                onClick={handleAddCustomer}
-                disabled={!newCustomer.name.trim()}
-                className="h-11 bg-primary hover:bg-primary/90"
-              >
-                Add Customer
-              </Button>
-            </DialogFooter>
+            <MobileFormActions
+              onCancel={() => setAddCustomerDialogOpen(false)}
+              onConfirm={handleAddCustomer}
+              cancelLabel="Cancel"
+              confirmLabel="Add Customer"
+              disabled={!newCustomer.name.trim()}
+            />
           </DialogContent>
         </Dialog>
 
         {/* History Dialog with Purchase History Tab */}
         <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
-          <DialogContent className="bg-card border-border max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogContent className="bg-card border-border max-w-2xl max-h-[85dvh] overflow-hidden flex flex-col">
             <DialogHeader className="shrink-0">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
@@ -1398,7 +1399,7 @@ export const CustomerManagementModule = () => {
 
         {/* Customer History / Ledger Dialog */}
         <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
-          <DialogContent className="bg-card border-border max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogContent className="bg-card border-border max-w-2xl max-h-[85dvh] overflow-hidden flex flex-col">
             <DialogHeader className="shrink-0">
               <div className="flex items-center gap-3">
                 <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${isWholesale ? 'bg-purple-500/20' : 'bg-sky-500/20'}`}>
@@ -1602,11 +1603,16 @@ export const CustomerManagementModule = () => {
             <DialogHeader><DialogTitle>Settle Account — {selectedCustomer?.name}</DialogTitle></DialogHeader>
             <div className="space-y-3 py-2">
               <div><label className="text-sm font-medium">Payment Amount ({BANGLADESHI_CURRENCY_SYMBOL})</label>
-                <Input type="number" value={paymentAmount} onChange={e => setPaymentAmount(e.target.value)} className="mt-1 h-11" placeholder="0" /></div>
+                <Input type="number" inputMode="numeric" value={paymentAmount} onChange={e => setPaymentAmount(e.target.value)} className="mt-1 h-11" placeholder="0" /></div>
               <div><label className="text-sm font-medium">Cylinders to Collect</label>
-                <Input type="number" value={cylindersToCollect} onChange={e => setCylindersToCollect(e.target.value)} className="mt-1 h-11" placeholder="0" /></div>
+                <Input type="number" inputMode="numeric" value={cylindersToCollect} onChange={e => setCylindersToCollect(e.target.value)} className="mt-1 h-11" placeholder="0" /></div>
             </div>
-            <DialogFooter><Button variant="outline" onClick={() => setSettleDialogOpen(false)}>Cancel</Button><Button onClick={handleSettleAccount}>Save Settlement</Button></DialogFooter>
+            <MobileFormActions
+              onCancel={() => setSettleDialogOpen(false)}
+              onConfirm={handleSettleAccount}
+              cancelLabel="Cancel"
+              confirmLabel="Save Settlement"
+            />
           </DialogContent>
         </Dialog>
       </div>
@@ -1919,6 +1925,7 @@ export const CustomerManagementModule = () => {
                   <label className="text-xs text-muted-foreground font-medium">Amount Received ({BANGLADESHI_CURRENCY_SYMBOL})</label>
                   <Input
                     type="number"
+                    inputMode="numeric"
                     value={paymentAmount}
                     onChange={(e) => setPaymentAmount(e.target.value)}
                     placeholder="0"
@@ -1939,6 +1946,7 @@ export const CustomerManagementModule = () => {
                   <label className="text-xs text-muted-foreground font-medium">Cylinders to Collect</label>
                   <Input
                     type="number"
+                    inputMode="numeric"
                     value={cylindersToCollect}
                     onChange={(e) => setCylindersToCollect(e.target.value)}
                     placeholder="0"
@@ -1947,23 +1955,19 @@ export const CustomerManagementModule = () => {
                 </div>
               </div>
             </div>
-            <DialogFooter className="gap-2 sm:gap-0">
-              <Button variant="outline" onClick={() => setSettleDialogOpen(false)} className="h-11">
-                Cancel
-              </Button>
-              <Button
-                className="h-11 bg-rose-500 hover:bg-rose-600 text-white font-medium"
-                onClick={handleSettleAccount}
-              >
-                Confirm & Settle
-              </Button>
-            </DialogFooter>
+            <MobileFormActions
+              onCancel={() => setSettleDialogOpen(false)}
+              onConfirm={handleSettleAccount}
+              cancelLabel="Cancel"
+              confirmLabel="Confirm & Settle"
+              confirmClassName="bg-rose-500 hover:bg-rose-600 text-white"
+            />
           </DialogContent>
         </Dialog>
 
         {/* History Dialog */}
         <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
-          <DialogContent className="bg-card border-border max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogContent className="bg-card border-border max-w-2xl max-h-[85dvh] overflow-hidden flex flex-col">
             <DialogHeader className="shrink-0">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
@@ -2310,7 +2314,7 @@ export const CustomerManagementModule = () => {
 
       {/* History Dialog */}
       <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
-        <DialogContent className="bg-card border-border max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent className="bg-card border-border max-w-2xl max-h-[85dvh] overflow-hidden flex flex-col">
           <DialogHeader className="shrink-0">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
