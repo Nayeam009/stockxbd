@@ -46,6 +46,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 import { BackupRestoreCard } from "@/components/settings/BackupRestoreCard";
 import { PushNotificationCard } from "@/components/settings/PushNotificationCard";
 import { AccountSettingsSection } from "@/components/settings/AccountSettingsSection";
@@ -685,15 +693,25 @@ export const SettingsModule = () => {
         ) : (
           // Mobile Detail View
           <div className="space-y-4 animate-fade-in">
-            {/* Back Button */}
-            <Button
-              variant="ghost"
-              onClick={handleBackToList}
-              className="h-12 px-4 -ml-2 hover:bg-muted/50 gap-2"
-            >
-              <ArrowLeft className="h-5 w-5" />
-              <span>{language === 'bn' ? 'সেটিংস' : 'Settings'}</span>
-            </Button>
+            {/* Breadcrumb Navigation */}
+            <Breadcrumb>
+              <BreadcrumbList>
+                <BreadcrumbItem>
+                  <BreadcrumbLink
+                    onClick={handleBackToList}
+                    className="cursor-pointer hover:text-primary transition-colors font-medium"
+                  >
+                    {language === 'bn' ? 'সেটিংস' : 'Settings'}
+                  </BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator />
+                <BreadcrumbItem>
+                  <BreadcrumbPage>
+                    {visibleSections.find(s => s.id === activeSection)?.title || ''}
+                  </BreadcrumbPage>
+                </BreadcrumbItem>
+              </BreadcrumbList>
+            </Breadcrumb>
 
             {/* Section Header */}
             {visibleSections.find(s => s.id === activeSection) && (

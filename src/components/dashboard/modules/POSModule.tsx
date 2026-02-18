@@ -383,18 +383,21 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
       <div className="space-y-3 pb-24 lg:pb-4">
         {/* Header */}
         <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center">
-              <ShoppingCart className="h-4 w-4 text-primary-foreground" />
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg shrink-0">
+              <ShoppingCart className="h-5 w-5 text-primary-foreground" />
             </div>
-            <h1 className="text-lg font-bold">{t('pos')}</h1>
+            <div>
+              <h1 className="text-lg sm:text-xl font-bold text-foreground tracking-tight">{t('pos')}</h1>
+              <p className="text-[10px] sm:text-xs text-muted-foreground">Point of Sale — Fast Checkout <span className="hidden sm:inline text-primary/70">• Enter to Pay</span></p>
+            </div>
           </div>
           <div className="flex items-center gap-1.5">
-            <Button onClick={() => setShowBarcodeScanner(true)} variant="outline" size="sm" className="h-8 w-8 p-0">
+            <Button onClick={() => setShowBarcodeScanner(true)} variant="outline" size="sm" className="h-9 w-9 p-0">
               <ScanLine className="h-4 w-4" />
             </Button>
             {(cart.saleItemsCount > 0 || cart.returnCylindersCount > 0) && (
-              <Button onClick={cart.clearCart} variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive">
+              <Button onClick={cart.clearCart} variant="ghost" size="sm" className="h-9 w-9 p-0 text-destructive hover:bg-destructive/10">
                 <RotateCcw className="h-4 w-4" />
               </Button>
             )}

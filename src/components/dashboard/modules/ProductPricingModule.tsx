@@ -109,7 +109,7 @@ export const ProductPricingModule = () => {
   }
 
   return (
-    <div className="space-y-4 sm:space-y-6 p-4 sm:p-6 pb-24 sm:pb-6">
+    <div className="space-y-4 sm:space-y-6 p-4 sm:p-6 pb-32 sm:pb-24">
       {/* Soft loading indicator */}
       <SoftRefreshBadge isRefreshing={softLoading} />
 
@@ -126,26 +126,28 @@ export const ProductPricingModule = () => {
             lpgBrands={lpgBrands}
             onAddProduct={addProduct}
           />
-          
-          {/* Save Button - Sticky on mobile */}
-          <div className="fixed bottom-20 right-4 z-50 sm:relative sm:bottom-auto sm:right-auto sm:z-auto">
-            <Button
-              onClick={saveChanges}
-              disabled={!hasChanges || isSaving}
-              className="h-12 sm:h-9 rounded-full sm:rounded-lg shadow-lg sm:shadow-none gap-2 px-5 sm:px-4"
-            >
-              {isSaving ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="h-4 w-4" />
-              )}
-              <span className="sm:inline">
-                Save {pendingCount > 0 && `(${pendingCount})`}
-              </span>
-            </Button>
-          </div>
         </div>
       </div>
+
+      {/* Sticky Save Button — appears only when there are unsaved changes */}
+      {hasChanges && (
+        <div className="fixed bottom-16 md:bottom-0 left-0 right-0 z-30 bg-background/95 backdrop-blur-sm border-t border-border p-3 md:relative md:bottom-auto md:left-auto md:right-auto md:z-auto md:bg-transparent md:border-0 md:backdrop-blur-none md:p-0">
+          <Button
+            onClick={saveChanges}
+            disabled={isSaving}
+            className="w-full md:w-auto h-12 md:h-9 rounded-full md:rounded-lg shadow-lg md:shadow-none gap-2 px-5 md:px-4"
+          >
+            {isSaving ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4" />
+            )}
+            <span>
+              Save {pendingCount > 0 && `(${pendingCount})`}
+            </span>
+          </Button>
+        </div>
+      )}
 
       {/* Quick Stats */}
       <ProductPricingQuickStats stats={stats} />

@@ -363,12 +363,12 @@ export const BusinessDiaryModule = () => {
         <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-secondary/5 rounded-xl -z-10" />
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 sm:p-0">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg">
-              <BookOpen className="h-5 w-5 sm:h-5 sm:w-5 text-primary-foreground" />
+            <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg shrink-0">
+              <BookOpen className="h-5 w-5 sm:h-6 sm:w-6 text-primary-foreground" />
             </div>
             <div>
-              <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-foreground tracking-tight">Business Diary</h2>
-              <p className="text-[10px] sm:text-xs text-muted-foreground">Track all money IN & OUT • Real-time sync</p>
+              <h2 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight">Business Diary</h2>
+              <p className="text-xs sm:text-sm text-muted-foreground">Daily sales & expense ledger • Real-time sync</p>
             </div>
           </div>
 

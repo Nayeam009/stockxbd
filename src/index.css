@@ -756,4 +756,30 @@
     backface-visibility: hidden;
     -webkit-backface-visibility: hidden;
   }
+
+  /* =====================================================
+   * DESIGN SYSTEM: Unified card & module standards
+   * ===================================================== */
+
+  /* Standard content card — use on all module content areas */
+  .module-card {
+    @apply border border-border/40 rounded-xl shadow-sm bg-card;
+  }
+
+  /* Section header pattern — icon + title + subtitle */
+  .section-header {
+    @apply flex items-center gap-3 mb-4;
+  }
+
+  .section-header-icon {
+    @apply h-10 w-10 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg shrink-0;
+  }
+
+  .section-header-title {
+    @apply text-xl sm:text-2xl font-bold text-foreground tracking-tight;
+  }
+
+  .section-header-subtitle {
+    @apply text-xs sm:text-sm text-muted-foreground;
+  }
 }

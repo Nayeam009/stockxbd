@@ -559,11 +559,11 @@ export const CustomerManagementModule = () => {
           <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-accent/5 rounded-xl -z-10" />
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-0">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg">
+              <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg shrink-0">
                 <Users className="h-5 w-5 sm:h-6 sm:w-6 text-primary-foreground" />
               </div>
               <div>
-                <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground tracking-tight">
+                <h2 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight">
                   Customer Management
                 </h2>
                 <p className="text-xs sm:text-sm text-muted-foreground">
