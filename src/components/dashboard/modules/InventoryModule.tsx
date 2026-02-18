@@ -14,6 +14,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { PremiumModuleHeader } from "@/components/shared/PremiumModuleHeader";
+import { EmptyStateCard } from "@/components/shared/EmptyStateCard";
 import { 
   Search,
   Package,
@@ -166,22 +168,20 @@ export const InventoryModule = () => {
     <div className="space-y-4 pb-24 md:pb-4">
       {/* Header with Quick Stats */}
       <div className="space-y-3">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg shrink-0">
-              <Package className="h-5 w-5 sm:h-6 sm:w-6 text-primary-foreground" />
-            </div>
-            <div>
-              <h1 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight">Inventory</h1>
-              <p className="text-xs sm:text-sm text-muted-foreground">Manage your stock levels in real-time</p>
-            </div>
-          </div>
-          <Button size="sm" className="gap-1.5 h-9 shrink-0" onClick={() => openPOB('lpg')}>
-            <PackagePlus className="h-4 w-4" />
-            <span className="hidden sm:inline">Buy/Add Stock</span>
-          </Button>
-        </div>
-        
+        <PremiumModuleHeader
+          title="Inventory"
+          subtitle="Real-time stock management for cylinders, stoves & regulators"
+          icon={<Package className="h-6 w-6 text-primary-foreground" />}
+          gradientFrom="from-primary/5"
+          gradientTo="to-emerald-500/5"
+          onRefresh={refetchAll}
+          actions={
+            <Button size="sm" className="gap-1.5 h-10 shrink-0" onClick={() => openPOB('lpg')}>
+              <PackagePlus className="h-4 w-4" />
+              <span className="hidden sm:inline">Buy/Add Stock</span>
+            </Button>
+          }
+        />
         {/* Quick Stats Bar */}
         <InventoryQuickStats stats={todayStats} />
       </div>
@@ -276,13 +276,14 @@ export const InventoryModule = () => {
 
           {/* LPG Brand Cards */}
           {filteredLpgBrands.length === 0 ? (
-            <Card className="border-dashed">
-              <CardContent className="py-8 text-center text-muted-foreground">
-                <Cylinder className="h-12 w-12 mx-auto opacity-30 mb-3" />
-                <p className="font-medium">No cylinders found</p>
-                <p className="text-sm">Add stock using the Buy/Add button</p>
-              </CardContent>
-            </Card>
+            <EmptyStateCard
+              icon={<Cylinder className="h-10 w-10" />}
+              title={lpgSearchQuery ? `No brands match "${lpgSearchQuery}"` : "No LPG cylinders in inventory"}
+              subtitle={lpgSearchQuery ? "Clear the search to see all brands" : "Use Buy/Add Stock to add your first LPG brand"}
+              colorScheme="muted"
+              actionLabel={lpgSearchQuery ? "Clear Search" : "Buy/Add Stock"}
+              onAction={lpgSearchQuery ? () => setLpgSearchQuery('') : () => openPOB('lpg')}
+            />
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredLpgBrands.map(brand => (
@@ -341,13 +342,14 @@ export const InventoryModule = () => {
 
           {/* Stove Cards */}
           {filteredStoves.length === 0 ? (
-            <Card className="border-dashed">
-              <CardContent className="py-8 text-center text-muted-foreground">
-                <ChefHat className="h-12 w-12 mx-auto opacity-30 mb-3" />
-                <p className="font-medium">No stoves found</p>
-                <p className="text-sm">Add stock using the Buy/Add button</p>
-              </CardContent>
-            </Card>
+            <EmptyStateCard
+              icon={<ChefHat className="h-10 w-10" />}
+              title={stoveSearchQuery ? `No stoves match "${stoveSearchQuery}"` : "No stoves in inventory"}
+              subtitle={stoveSearchQuery ? "Clear the search to see all stoves" : "Use Buy/Add Stock to add your first stove"}
+              colorScheme="muted"
+              actionLabel={stoveSearchQuery ? "Clear Search" : "Add Stove"}
+              onAction={stoveSearchQuery ? () => setStoveSearchQuery('') : () => openPOB('stove')}
+            />
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredStoves.map(stove => (
@@ -400,13 +402,14 @@ export const InventoryModule = () => {
 
           {/* Regulator Cards */}
           {filteredRegulators.length === 0 ? (
-            <Card className="border-dashed">
-              <CardContent className="py-8 text-center text-muted-foreground">
-                <Gauge className="h-12 w-12 mx-auto opacity-30 mb-3" />
-                <p className="font-medium">No regulators found</p>
-                <p className="text-sm">Add stock using the Buy/Add button</p>
-              </CardContent>
-            </Card>
+            <EmptyStateCard
+              icon={<Gauge className="h-10 w-10" />}
+              title={regulatorSearchQuery ? `No regulators match "${regulatorSearchQuery}"` : "No regulators in inventory"}
+              subtitle={regulatorSearchQuery ? "Clear the search to see all regulators" : "Use Buy/Add Stock to add your first regulator"}
+              colorScheme="muted"
+              actionLabel={regulatorSearchQuery ? "Clear Search" : "Add Regulator"}
+              onAction={regulatorSearchQuery ? () => setRegulatorSearchQuery('') : () => openPOB('regulator')}
+            />
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredRegulators.map(regulator => (

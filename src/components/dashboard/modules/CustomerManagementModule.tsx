@@ -48,6 +48,8 @@ import { logger } from "@/lib/logger";
 import { InvoiceDialog } from "@/components/invoice/InvoiceDialog";
 import { useSharedCustomers, sharedKeys } from "@/hooks/useSharedQueries";
 import { useModuleEvent } from "@/lib/moduleEvents";
+import { PremiumModuleHeader } from "@/components/shared/PremiumModuleHeader";
+import { EmptyStateCard } from "@/components/shared/EmptyStateCard";
 
 interface Customer {
   id: string;
@@ -555,32 +557,23 @@ export const CustomerManagementModule = () => {
     return (
       <div className="space-y-4 sm:space-y-6 pb-4">
         {/* Premium Header */}
-        <div className="relative">
-          <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-accent/5 rounded-xl -z-10" />
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-0">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg shrink-0">
-                <Users className="h-5 w-5 sm:h-6 sm:w-6 text-primary-foreground" />
-              </div>
-              <div>
-                <h2 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight">
-                  Customer Management
-                </h2>
-                <p className="text-xs sm:text-sm text-muted-foreground">
-                  Manage accounts • Track dues • Recall memos
-                </p>
-              </div>
-            </div>
+        <PremiumModuleHeader
+          title="Customer Management"
+          subtitle="Manage accounts • Track dues • Recall memos"
+          icon={<Users className="h-6 w-6 text-primary-foreground" />}
+          gradientFrom="from-primary/5"
+          gradientTo="to-accent/5"
+          actions={
             <Button
               onClick={() => setAddCustomerDialogOpen(true)}
               size="sm"
-              className="h-11 w-full sm:w-auto bg-primary hover:bg-primary/90 shadow-lg touch-manipulation"
+              className="h-10 bg-primary hover:bg-primary/90 shadow-sm touch-manipulation"
             >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Customer
+              <Plus className="h-4 w-4 mr-1.5" />
+              <span className="hidden sm:inline">Add Customer</span>
             </Button>
-          </div>
-        </div>
+          }
+        />
 
         {/* 🔍 MEMO RECALL SEARCH BAR */}
         <Card className="relative overflow-hidden border-0 shadow-lg">
@@ -733,7 +726,7 @@ export const CustomerManagementModule = () => {
         {/* Premium Summary Stats - 2x2 Grid */}
         <div className="grid grid-cols-2 gap-2 sm:gap-4">
           {/* Total Customers */}
-          <Card className="relative overflow-hidden border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+          <Card className="relative overflow-hidden border border-border/20 shadow-sm hover:shadow-md transition-all duration-300">
             <div className="absolute inset-0 bg-gradient-to-br from-muted/50 via-muted/30 to-transparent" />
             <CardContent className="relative p-3 sm:p-5">
               <div className="flex items-center gap-3">
@@ -749,7 +742,7 @@ export const CustomerManagementModule = () => {
           </Card>
 
           {/* Due Accounts */}
-          <Card className="relative overflow-hidden border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+          <Card className="relative overflow-hidden border border-border/20 shadow-sm hover:shadow-md transition-all duration-300">
             <div className="absolute inset-0 bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-transparent" />
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-rose-500 to-rose-400" />
             <CardContent className="relative p-3 sm:p-5">
@@ -766,7 +759,7 @@ export const CustomerManagementModule = () => {
           </Card>
 
           {/* Total Due Amount */}
-          <Card className="relative overflow-hidden border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+          <Card className="relative overflow-hidden border border-border/20 shadow-sm hover:shadow-md transition-all duration-300">
             <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent" />
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 to-amber-400" />
             <CardContent className="relative p-3 sm:p-5">
@@ -785,7 +778,7 @@ export const CustomerManagementModule = () => {
           </Card>
 
           {/* Paid/Clear Accounts */}
-          <Card className="relative overflow-hidden border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+          <Card className="relative overflow-hidden border border-border/20 shadow-sm hover:shadow-md transition-all duration-300">
             <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-transparent" />
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-emerald-400" />
             <CardContent className="relative p-3 sm:p-5">
@@ -805,7 +798,7 @@ export const CustomerManagementModule = () => {
         {/* Premium Action Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-5">
           {/* Due Customers Card */}
-          <Card className="relative overflow-hidden border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer group">
+          <Card className="relative overflow-hidden border border-border/20 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer group">
             <div className="absolute inset-0 bg-gradient-to-br from-rose-500/5 via-card to-card group-hover:from-rose-500/10 transition-colors" />
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-rose-500 to-rose-400" />
             <CardContent className="relative p-4 sm:p-6">
@@ -835,7 +828,7 @@ export const CustomerManagementModule = () => {
           </Card>
 
           {/* Paid Customers Card */}
-          <Card className="relative overflow-hidden border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer group">
+          <Card className="relative overflow-hidden border border-border/20 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer group">
             <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 via-card to-card group-hover:from-emerald-500/10 transition-colors" />
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-emerald-400" />
             <CardContent className="relative p-4 sm:p-6">
@@ -1280,18 +1273,17 @@ export const CustomerManagementModule = () => {
                 </Card>
               ))}
               {filteredDueCustomers.length === 0 && (
-                <div className="text-center py-12">
-                  <div className="h-16 w-16 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-4">
-                    <UserCheck className="h-8 w-8 text-muted-foreground" />
-                  </div>
-                  <p className="text-muted-foreground font-medium">No due customers found</p>
-                  <p className="text-xs text-muted-foreground mt-1">All accounts are settled!</p>
-                </div>
+                <EmptyStateCard
+                  icon={<UserCheck className="h-10 w-10" />}
+                  title={searchQuery ? "No results found" : "No outstanding dues"}
+                  subtitle={searchQuery ? `No customers match "${searchQuery}"` : "All customers are fully paid up"}
+                  colorScheme="emerald"
+                />
               )}
             </div>
 
             {/* Desktop Table View */}
-            <div className="hidden sm:block">
+            <div className="hidden sm:block overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
               <Table>
                 <TableHeader>
                   <TableRow className="border-border hover:bg-transparent">

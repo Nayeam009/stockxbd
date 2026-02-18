@@ -18,6 +18,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
+import { EmptyStateCard } from "@/components/shared/EmptyStateCard";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { sharedKeys } from "@/hooks/useSharedQueries";
 import { dispatchModuleEvent } from "@/lib/moduleEvents";
@@ -429,7 +430,7 @@ export const UtilityExpenseModule = () => {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <Card className="relative overflow-hidden border-0 shadow-md bg-gradient-to-br from-rose-50 to-pink-50 dark:from-rose-950/30 dark:to-pink-950/30">
+        <Card className="relative overflow-hidden border border-border/20 shadow-sm bg-gradient-to-br from-rose-50 to-pink-50 dark:from-rose-950/30 dark:to-pink-950/30">
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-rose-400 to-pink-500" />
           <CardContent className="p-4">
             <div className="flex items-start gap-3">
@@ -447,7 +448,7 @@ export const UtilityExpenseModule = () => {
           </CardContent>
         </Card>
 
-        <Card className="relative overflow-hidden border-0 shadow-md bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30">
+        <Card className="relative overflow-hidden border border-border/20 shadow-sm bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30">
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-400 to-teal-500" />
           <CardContent className="p-4">
             <div className="flex items-start gap-3">
@@ -465,7 +466,7 @@ export const UtilityExpenseModule = () => {
           </CardContent>
         </Card>
 
-        <Card className="relative overflow-hidden border-0 shadow-md bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30">
+        <Card className="relative overflow-hidden border border-border/20 shadow-sm bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30">
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-400 to-orange-500" />
           <CardContent className="p-4">
             <div className="flex items-start gap-3">
@@ -483,7 +484,7 @@ export const UtilityExpenseModule = () => {
           </CardContent>
         </Card>
 
-        <Card className="relative overflow-hidden border-0 shadow-md bg-gradient-to-br from-violet-50 to-purple-50 dark:from-violet-950/30 dark:to-purple-950/30">
+        <Card className="relative overflow-hidden border border-border/20 shadow-sm bg-gradient-to-br from-violet-50 to-purple-50 dark:from-violet-950/30 dark:to-purple-950/30">
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-violet-400 to-purple-500" />
           <CardContent className="p-4">
             <div className="flex items-start gap-3">
@@ -731,16 +732,14 @@ export const UtilityExpenseModule = () => {
           </div>
 
           {costs.length === 0 ? (
-            <Card className="border-dashed">
-              <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                <Truck className="h-12 w-12 text-muted-foreground/40 mb-4" />
-                <p className="text-muted-foreground font-medium">No vehicle costs yet</p>
-                <p className="text-sm text-muted-foreground/70">Add your first vehicle and cost entry</p>
-                <Button className="mt-4 h-12 gap-2" onClick={() => setCostDialogOpen(true)}>
-                  <Plus className="h-4 w-4" /> Add Cost
-                </Button>
-              </CardContent>
-            </Card>
+            <EmptyStateCard
+              icon={<Truck className="h-10 w-10" />}
+              title="No vehicle costs yet"
+              subtitle="Add your delivery vehicle and track fuel and maintenance costs"
+              colorScheme="muted"
+              actionLabel="Add Cost"
+              onAction={() => setCostDialogOpen(true)}
+            />
           ) : (
             <div className="space-y-3">
               {costs.slice(0, 20).map(cost => (
