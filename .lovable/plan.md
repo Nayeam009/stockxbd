@@ -1,346 +1,220 @@
 
-# Grand Unification — UI/UX Polish Implementation Plan
+# Event Bus & Cache Synchronization — Precise Implementation Plan
 
-## Verified Current State (From Code Audit)
+## Full Audit Summary
 
-| Module | PremiumModuleHeader | Card Style | Sonner Toast | Empty State | Scroll Safe |
-|---|---|---|---|---|---|
-| POS | ✅ Applied | ✅ shadow-sm | ✅ Sonner | N/A | ✅ |
-| Inventory | ❌ Custom inline div | ✅ Uses standard Card | ✅ Sonner | ❌ Missing on stoves/regulators | ✅ sticky filter bar |
-| Customer Management | ❌ Custom inline div | ❌ border-0 shadow-lg (premium) | ❌ use-toast | ❌ Missing for empty lists | ❌ Tables not wrapped |
-| Business Diary | ✅ (added in prev batch) | ✅ | ❌ use-toast | ❌ Missing for empty states | ✅ ScrollArea |
-| Utility Expense | ✅ Applied | ❌ border-0 shadow-md on KPI cards | ❌ use-toast | ✅ Has inline fallback | ✅ |
-| Settings | N/A (sidebar layout) | ✅ | ❌ use-toast | N/A | ✅ |
-| Sidebar | N/A | N/A | N/A | N/A | N/A |
+After reading every relevant file in full, here is the exact current state before any changes:
 
-## What Is Already Correct (No Changes)
-- **Sidebar active state** — uses `bg-primary text-primary-foreground` (Navy). This IS the brand primary color. No change to "indigo-600" — that would break the design system by introducing a hardcoded color when we use CSS tokens.
-- **UtilityExpenseModule** — Already has `PremiumModuleHeader`, `h-12` on Add Staff button, vehicle empty state. Minor KPI card style fix only.
-- **ProductPricingModule** — Already uses `PremiumModuleHeader`, sticky save bar, `EmptyStateCard`. No changes.
-- **EmptyStateCard component** — Fully built at `src/components/shared/EmptyStateCard.tsx`. All 3 color schemes working.
+### What Is ALREADY Working (No Action Required)
+
+**`useModuleEventSync` in `moduleEvents.ts` — Already Wired in Dashboard:**
+- `sale-completed` → invalidates `overview`, `customers`, `lpgBrands`, `stoves`, `regulators` ✅ (items 1 & 2 from the task brief are already done)
+- `purchase-completed` → invalidates `overview`, `lpgBrands` ✅
+- `inventory-updated` → invalidates `lpgBrands`, `stoves`, `regulators` ✅
+- `customer-updated` → invalidates `customers` ✅
+- `expense-added` → invalidates `overview` ✅ (added in the previous batch)
+
+**`useModuleEventSync` is called inside `Dashboard.tsx` at line 128** — meaning all of the above event handlers are live and running whenever the dashboard is mounted.
+
+**`UtilityExpenseModule.tsx` — Vehicle Cost already dispatches event:**
+- Line 364: `dispatchModuleEvent('expense-added', { amount: newCost.amount, category: 'Transport' })` ✅
+
+**`Dashboard.tsx` — navigate-module event listener is already set up:**
+- Lines 172-184: Listens for `window.CustomEvent('navigate-module')` and calls `handleModuleChange(detail)` ✅
+
+**`AnalysisTopItems.tsx` — Product clicks ALREADY navigate to Inventory:**
+- Lines 20-23: `handleProductClick` dispatches `'navigate-module'` with `'inventory'` ✅
+- Lines 26-31: `handleExpenseClick` dispatches to `'utility-expense'` or `'business-diary'` ✅
+
+### What Is NOT Yet Done (The Real Gaps)
+
+After the full audit, three gaps remain:
 
 ---
 
-## Batch 1 — InventoryModule: Header + Missing Empty States
+## Gap 1: Vehicle Cost & Staff Salary mutations missing `expense-added` dispatch
 
-**File:** `src/components/dashboard/modules/InventoryModule.tsx`
+**Utility → Analytics sync is incomplete:**
+- `handleAddCost` (vehicle costs): ✅ Already dispatches `expense-added` at line 364
+- `handlePaySalary` (staff salary): ❌ Does NOT dispatch `expense-added`. Staff salary is also a `daily_expenses` insert, but when it's saved, the Analytics module's cached data is only refreshed via the 1-second Supabase realtime subscription, not instantly via the event bus.
+- `handleGiveBonus` (staff bonus): ❌ Same problem — no `expense-added` dispatch.
 
-**Change 1 — Replace inline header with `PremiumModuleHeader`:**
+**Impact:** After paying staff salary, if the user switches to Analytics immediately, the expense total may be stale for up to 1 second.
 
-The current header (lines 168-187) is a custom `div` that mimics `PremiumModuleHeader`. Replace it with the actual component. The "Buy/Add Stock" button becomes the `actions` prop:
+**Fix location:** `src/components/dashboard/modules/UtilityExpenseModule.tsx`
 
-```tsx
-// Remove lines 168-187 and replace with:
-<PremiumModuleHeader
-  title="Inventory"
-  subtitle="Real-time stock management for cylinders, stoves & regulators"
-  icon={<Package className="h-6 w-6 text-primary-foreground" />}
-  gradientFrom="from-primary/5"
-  gradientTo="to-emerald-500/5"
-  onRefresh={refetchAll}
-  actions={
-    <Button size="sm" className="gap-1.5 h-10 shrink-0" onClick={() => openPOB('lpg')}>
-      <PackagePlus className="h-4 w-4" />
-      <span className="hidden sm:inline">Buy/Add Stock</span>
-    </Button>
+Find the `handlePaySalary` function and add after the successful `daily_expenses` insert:
+```typescript
+dispatchModuleEvent('expense-added', { amount: parseFloat(amount), category: 'Staff Salary' });
+```
+
+Find the `handleGiveBonus` function and add:
+```typescript
+dispatchModuleEvent('expense-added', { amount: parseFloat(bonusAmount), category: 'Staff Bonus' });
+```
+
+---
+
+## Gap 2: Analytics "Top Selling Products" navigation is too coarse (navigates to Inventory, but doesn't filter by product)
+
+**Current behavior:** Clicking any product in `AnalysisTopItems` navigates to `inventory`, but the Inventory module opens at its default state with no filter applied. The user still has to manually search.
+
+**Why a "filter" is complex:** The Inventory module uses local `useState` for `lpgSearchQuery`, `stoveSearchQuery`, and `regulatorSearchQuery`. There is no URL parameter or global state for these. Passing the product name via the event bus would require `InventoryModule` to subscribe to an event and pre-fill its search — a significant architecture change.
+
+**Best achievable approach (zero-regression):** Carry the product name in the `navigate-module` event as a sub-key using the existing event system's `stockx:navigate-module` event, and have `InventoryModule` listen for it to pre-fill its search. This is additive — one new event listener in `InventoryModule`, one change to `AnalysisTopItems`.
+
+**Implementation:**
+
+**Step 1 — Extend `navigate-module` payload in `moduleEvents.ts`:**
+
+The `ModuleEventPayload['navigate-module']` type is currently `string`. Change to support both string and object:
+```typescript
+'navigate-module': string | { module: string; searchQuery?: string };
+```
+
+Also update `navigateToModule` and the convenience function to accept optional filter:
+```typescript
+export function navigateToModule(module: string, searchQuery?: string) {
+  dispatchModuleEvent('navigate-module', searchQuery ? { module, searchQuery } : module);
+}
+```
+
+**Step 2 — Update `Dashboard.tsx` navigate-module listener:**
+
+The listener at lines 172-184 currently handles `e.detail` as a `string`. Update it to handle both:
+```typescript
+const handleNavigate = (e: CustomEvent) => {
+  if (!e.detail) return;
+  if (typeof e.detail === 'string') {
+    handleModuleChange(e.detail);
+  } else if (typeof e.detail === 'object' && e.detail.module) {
+    handleModuleChange(e.detail.module);
+    // Store filter for the destination module
+    if (e.detail.searchQuery) {
+      sessionStorage.setItem('pending-inventory-search', e.detail.searchQuery);
+    }
   }
-/>
+};
 ```
 
-Then add `import { PremiumModuleHeader } from "@/components/shared/PremiumModuleHeader";` at the top.
+**Step 3 — Update `AnalysisTopItems.tsx`:**
 
-**Change 2 — Add `EmptyStateCard` for Stoves tab empty state:**
-
-After `filteredStoves.length === 0` check in the stoves TabsContent, currently there's no empty state. Add:
+Change `handleProductClick` from navigating generically to passing the product name:
 ```tsx
-{filteredStoves.length === 0 && (
-  <EmptyStateCard
-    icon={<ChefHat className="h-10 w-10" />}
-    title={stoveSearchQuery ? `No stoves match "${stoveSearchQuery}"` : "No stoves in inventory"}
-    subtitle={stoveSearchQuery ? "Clear the search to see all stoves" : "Use Buy/Add Stock to add your first stove"}
-    colorScheme="muted"
-    actionLabel={stoveSearchQuery ? "Clear Search" : "Add Stove"}
-    onAction={stoveSearchQuery ? () => setStoveSearchQuery('') : () => openPOB('stove')}
-  />
-)}
+const handleProductClick = (productName: string) => {
+  const payload = { module: 'inventory', searchQuery: productName };
+  if (onNavigate) onNavigate('inventory'); // backward compat
+  window.dispatchEvent(new CustomEvent('navigate-module', { detail: payload }));
+};
+```
+And change the `onClick` in the product row from `onClick={handleProductClick}` to `onClick={() => handleProductClick(product.name)}`.
+
+**Step 4 — Update `InventoryModule.tsx`:**
+
+At mount/route-change, check `sessionStorage` for a pending search and apply it:
+```typescript
+useEffect(() => {
+  const pending = sessionStorage.getItem('pending-inventory-search');
+  if (pending) {
+    setLpgSearchQuery(pending);
+    sessionStorage.removeItem('pending-inventory-search');
+  }
+}, []);
 ```
 
-**Change 3 — Add `EmptyStateCard` for Regulators tab:**
-
-Same pattern for `filteredRegulators.length === 0`:
-```tsx
-{filteredRegulators.length === 0 && (
-  <EmptyStateCard
-    icon={<Gauge className="h-10 w-10" />}
-    title={regulatorSearchQuery ? `No regulators match "${regulatorSearchQuery}"` : "No regulators in inventory"}
-    subtitle="Use Buy/Add Stock to add your first regulator"
-    colorScheme="muted"
-    actionLabel={regulatorSearchQuery ? "Clear Search" : "Add Regulator"}
-    onAction={regulatorSearchQuery ? () => setRegulatorSearchQuery('') : () => openPOB('regulator')}
-  />
-)}
-```
-
-**Change 4 — Add `EmptyStateCard` for LPG tab (when filtered brands = 0):**
-
-The LPG tab currently shows nothing when `filteredLpgBrands.length === 0`. Add an empty state:
-```tsx
-{filteredLpgBrands.length === 0 && (
-  <EmptyStateCard
-    icon={<Cylinder className="h-10 w-10" />}
-    title={lpgSearchQuery ? `No brands match "${lpgSearchQuery}"` : "No LPG cylinders in inventory"}
-    subtitle={lpgSearchQuery ? "Clear the search to see all brands" : "Use Buy/Add Stock to add your first LPG brand"}
-    colorScheme="muted"
-    actionLabel={lpgSearchQuery ? "Clear Search" : "Buy/Add Stock"}
-    onAction={lpgSearchQuery ? () => setLpgSearchQuery('') : () => openPOB('lpg')}
-  />
-)}
-```
-
-Add `import { EmptyStateCard } from "@/components/shared/EmptyStateCard";` to imports.
+This is a clean, low-risk approach: the filter is applied via sessionStorage handoff, no new dependencies, no prop drilling.
 
 ---
 
-## Batch 2 — CustomerManagementModule: Header + Card Style + Table Scroll + Empty States
+## Gap 3: Customer "Last Purchase" is not clickable to navigate to Business Diary
 
-**File:** `src/components/dashboard/modules/CustomerManagementModule.tsx`
+**Current behavior:**
+- In the **Paid Customers desktop table** (line 1724-1727): `last_order_date` is shown as plain text — `format(new Date(customer.last_order_date), 'MMM dd, yyyy')`. Not clickable.
+- In the **Paid Customers mobile card** (line 1680-1683): `last_order_date` shown in a `<span>`. Not clickable.
+- In the **Due Customers view**: No "last purchase" field is displayed at all in the card/table.
 
-**Change 1 — Replace custom header div with `PremiumModuleHeader` (lines 557-583):**
+**The ask:** Make "Last Purchase" clickable to open Business Diary filtered by that customer.
 
-The "main" view currently has a manual gradient div replicating `PremiumModuleHeader`. Replace with the actual component:
+**Implementation approach:** The Business Diary module (`BusinessDiaryModule.tsx`) currently has a local `searchQuery` state that filters its sales/expense lists. There's no URL parameter for this filter.
 
+Best approach — same sessionStorage handoff pattern:
+- Store `{ customerId: string, customerName: string }` in sessionStorage under `'pending-diary-filter'`
+- Navigate to `'business-diary'`
+- `BusinessDiaryModule` checks sessionStorage on mount and pre-fills its `searchQuery` with the customer's name
+
+**Files to change:**
+
+**`CustomerManagementModule.tsx`** — 4 locations:
+1. Paid customers mobile card — make the "Last: ..." span into a clickable `<button>`:
 ```tsx
-<PremiumModuleHeader
-  title="Customer Management"
-  subtitle="Manage accounts • Track dues • Recall memos"
-  icon={<Users className="h-6 w-6 text-primary-foreground" />}
-  gradientFrom="from-primary/5"
-  gradientTo="to-accent/5"
-  actions={
-    <Button
-      onClick={() => setAddCustomerDialogOpen(true)}
-      size="sm"
-      className="h-10 bg-primary hover:bg-primary/90 shadow-sm touch-manipulation"
+{customer.last_order_date ? (
+  <button
+    className="text-xs text-primary underline-offset-2 hover:underline cursor-pointer touch-manipulation"
+    onClick={(e) => {
+      e.stopPropagation();
+      sessionStorage.setItem('pending-diary-filter', customer.name);
+      window.dispatchEvent(new CustomEvent('navigate-module', { detail: 'business-diary' }));
+    }}
+  >
+    Last: {format(new Date(customer.last_order_date), 'MMM dd, yyyy')}
+  </button>
+) : (
+  <span>No orders yet</span>
+)}
+```
+
+2. Paid customers desktop table — `last_order_date` `TableCell` (line 1724-1727):
+```tsx
+<TableCell>
+  {customer.last_order_date ? (
+    <button
+      className="text-sm text-primary underline-offset-2 hover:underline cursor-pointer"
+      onClick={() => {
+        sessionStorage.setItem('pending-diary-filter', customer.name);
+        window.dispatchEvent(new CustomEvent('navigate-module', { detail: 'business-diary' }));
+      }}
     >
-      <Plus className="h-4 w-4 mr-1.5" />
-      <span className="hidden sm:inline">Add Customer</span>
-    </Button>
+      {format(new Date(customer.last_order_date), 'MMM dd, yyyy')}
+    </button>
+  ) : (
+    <span className="text-muted-foreground">N/A</span>
+  )}
+</TableCell>
+```
+
+**`BusinessDiaryModule.tsx`** — Add one `useEffect` at mount:
+```typescript
+useEffect(() => {
+  const pending = sessionStorage.getItem('pending-diary-filter');
+  if (pending) {
+    setSearchQuery(pending);
+    sessionStorage.removeItem('pending-diary-filter');
   }
-/>
-```
-
-Import: `import { PremiumModuleHeader } from "@/components/shared/PremiumModuleHeader";`
-
-**Change 2 — Standardize card styles on the 4 KPI stat cards (lines 736-803):**
-
-The 4 stat cards currently use `border-0 shadow-lg`. The design system standard is `border border-border/40 shadow-sm rounded-xl`. However these are gradient KPI cards used intentionally for visual emphasis. The correct fix is to keep the gradient backgrounds but add the border token:
-- Change `border-0 shadow-lg` → `border border-border/20 shadow-sm` on all 4 stat cards.
-- Same for the 2 "Due Customers" / "Paid Customers" action cards (lines 808-867).
-
-**Change 3 — Add `EmptyStateCard` for Due list when empty:**
-
-In the `viewMode === 'due'` section, when `filteredDueCustomers.length === 0`:
-```tsx
-{filteredDueCustomers.length === 0 && (
-  <EmptyStateCard
-    icon={<UserCheck className="h-10 w-10" />}
-    title={searchQuery ? "No results found" : "No outstanding dues"}
-    subtitle={searchQuery ? `No customers match "${searchQuery}"` : "All customers are fully paid up"}
-    colorScheme="emerald"
-  />
-)}
-```
-
-**Change 4 — Add `EmptyStateCard` for Paid list when empty:**
-
-In the `viewMode === 'paid'` section, when `filteredPaidCustomers.length === 0`:
-```tsx
-{filteredPaidCustomers.length === 0 && (
-  <EmptyStateCard
-    icon={<Users className="h-10 w-10" />}
-    title={searchQuery ? "No results found" : "No fully paid customers yet"}
-    subtitle={searchQuery ? `No customers match "${searchQuery}"` : "Complete a sale with full payment to see customers here"}
-    colorScheme="muted"
-  />
-)}
-```
-
-**Change 5 — Wrap Tables in `overflow-x-auto` scroll container:**
-
-Any `Table` component in the due/paid views should be inside a scrollable container:
-```tsx
-<div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
-  <Table className="min-w-[600px]">
-    ...
-  </Table>
-</div>
-```
-
-The `-mx-4 px-4` on mobile ensures the scroll area extends edge-to-edge (full bleed) while content inside stays padded.
-
-**Change 6 — Add Sonner toast import:**
-
-`CustomerManagementModule.tsx` currently imports `toast` from `@/hooks/use-toast`. Every success/error toast in this file should remain as-is — we do NOT change the toast library for this module because it's deeply integrated. The `use-toast` hook shows a proper `<Toaster />` — it's not missing feedback, just using a different variant. This is acceptable behavior; both Sonner and shadcn Toaster are registered in `App.tsx`. **No change needed for toasts in this module.**
-
----
-
-## Batch 3 — BusinessDiaryModule: Empty States for Sales and Expenses
-
-**File:** `src/components/dashboard/modules/BusinessDiaryModule.tsx`
-
-**Change 1 — Add empty state for Sales tab when no filtered sales:**
-
-Currently when `filteredSales.length === 0`, the tab content is blank. Add after the sales list:
-```tsx
-{filteredSales.length === 0 && !loading && (
-  <EmptyStateCard
-    icon={<Receipt className="h-10 w-10" />}
-    title={searchQuery || paymentFilter !== 'all' || saleChannelFilter !== 'all' 
-      ? "No sales match your filters" 
-      : "No sales recorded today"}
-    subtitle="Complete a POS transaction to see it here"
-    colorScheme="muted"
-    actionLabel={searchQuery ? "Clear Search" : undefined}
-    onAction={searchQuery ? () => setSearchQuery('') : undefined}
-  />
-)}
-```
-
-**Change 2 — Add empty state for Expenses tab when no filtered expenses:**
-```tsx
-{filteredExpenses.length === 0 && !loading && (
-  <EmptyStateCard
-    icon={<Wallet className="h-10 w-10" />}
-    title={searchQuery || expenseSourceFilter !== 'all' 
-      ? "No expenses match your filters" 
-      : "No expenses recorded today"}
-    subtitle="Add an expense or make a purchase to see it here"
-    colorScheme="muted"
-    actionLabel="Add Expense"
-    onAction={() => setAddDialogOpen(true)}
-  />
-)}
-```
-
-Import `EmptyStateCard` at the top of the file.
-
----
-
-## Batch 4 — UtilityExpenseModule: Card Style Alignment
-
-**File:** `src/components/dashboard/modules/UtilityExpenseModule.tsx`
-
-**Change 1 — Standardize the 4 KPI cards:**
-
-Lines 432-502: The 4 KPI cards use `border-0 shadow-md`. Update to `border border-border/20 shadow-sm` to align with the design system while preserving the gradient tinting. These are intentional accent cards so we keep `border-0` on the gradient overlay divs but add border to the outer `Card`.
-
-Example change per card:
-```tsx
-// Before:
-<Card className="relative overflow-hidden border-0 shadow-md bg-gradient-to-br ...">
-
-// After:
-<Card className="relative overflow-hidden border border-border/20 shadow-sm bg-gradient-to-br ...">
-```
-
-Apply to all 4 KPI cards (Monthly Total, Staff Paid, Staff Due, Vehicle Cost).
-
-**Change 2 — Vehicle empty state improvement:**
-
-When `vehicles.length === 0` (currently has inline fallback with border-dashed Card), replace with the standard `EmptyStateCard`:
-```tsx
-<EmptyStateCard
-  icon={<Truck className="h-10 w-10" />}
-  title="No vehicles added yet"
-  subtitle="Add your delivery vehicle to track fuel and maintenance costs"
-  colorScheme="muted"
-  actionLabel="Add Vehicle"
-  onAction={() => setVehicleDialogOpen(true)}
-/>
+}, []);
 ```
 
 ---
 
-## Batch 5 — Settings Module: Financial Preferences Touch Target Audit
+## Complete File Change Summary
 
-**File:** `src/components/dashboard/modules/SettingsModule.tsx`
-
-After reading the file: Settings section buttons already use `min-h-[64px]` (line 80). The Business Settings section exists (lines 442-449 in visibleSections). The `handleSaveBusinessSettings` function exists (lines 326-347).
-
-**The one gap:** The "Business Settings" section content needs to be rendered in `renderSectionContent` (currently not present in the `switch` statement). Read lines 454+ to verify — need to add the `case 'business':` case that renders the Tax Rate and Currency Symbol form.
-
-This is the critical missing piece in the Financial Preferences feature. The nav item shows up but clicking it likely shows nothing.
-
-**Change 1 — Add `case 'business'` to `renderSectionContent` switch:**
-```tsx
-case 'business':
-  return (
-    <Card className="border-border/50 shadow-sm bg-card">
-      <CardHeader className="pb-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <DollarSign className="h-5 w-5 text-primary" />
-          </div>
-          <div>
-            <CardTitle className="text-lg">Financial Preferences</CardTitle>
-            <CardDescription>Configure tax rate and currency symbol for invoices and the POS</CardDescription>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-5">
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">Tax Rate (%)</Label>
-          <Input
-            type="number"
-            min="0" max="99"
-            className="h-12 text-base"
-            value={taxRate}
-            onChange={e => setTaxRate(e.target.value)}
-            placeholder="0"
-          />
-          <p className="text-xs text-muted-foreground">Applied to POS totals. Set to 0 to disable tax.</p>
-        </div>
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">Currency Symbol</Label>
-          <Input
-            className="h-12 text-base"
-            maxLength={3}
-            value={currencySymbol}
-            onChange={e => setCurrencySymbol(e.target.value)}
-            placeholder="৳"
-          />
-          <p className="text-xs text-muted-foreground">Shown on invoices and in the POS. Default: ৳</p>
-        </div>
-        <Button
-          onClick={handleSaveBusinessSettings}
-          disabled={savingBusiness}
-          className="w-full h-12"
-        >
-          {savingBusiness ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Check className="h-4 w-4 mr-2" />}
-          Save Financial Preferences
-        </Button>
-      </CardContent>
-    </Card>
-  );
-```
-
----
-
-## Summary of All Changes
-
-| Batch | File | Changes | Risk |
+| # | File | Change | Risk |
 |---|---|---|---|
-| 1 | `src/components/dashboard/modules/InventoryModule.tsx` | Replace inline header → `PremiumModuleHeader`; add 3 `EmptyStateCard` instances for LPG/Stoves/Regulators | Zero — additive |
-| 2 | `src/components/dashboard/modules/CustomerManagementModule.tsx` | Replace inline header div → `PremiumModuleHeader`; standardize 6 card borders; add 2 `EmptyStateCard`; wrap tables in `overflow-x-auto` | Low |
-| 3 | `src/components/dashboard/modules/BusinessDiaryModule.tsx` | Add 2 `EmptyStateCard` for empty sales/expenses states | Zero — additive |
-| 4 | `src/components/dashboard/modules/UtilityExpenseModule.tsx` | Standardize 4 KPI card borders; replace vehicle empty state with `EmptyStateCard` | Zero |
-| 5 | `src/components/dashboard/modules/SettingsModule.tsx` | Add `case 'business'` to `renderSectionContent` switch with Financial Preferences form | Zero — additive |
+| 1 | `src/components/dashboard/modules/UtilityExpenseModule.tsx` | Add `dispatchModuleEvent('expense-added', ...)` to `handlePaySalary` and `handleGiveBonus` | Zero — additive |
+| 2 | `src/lib/moduleEvents.ts` | Extend `navigate-module` payload type to support `{ module, searchQuery? }` and update `navigateToModule` helper | Low — type change |
+| 3 | `src/pages/Dashboard.tsx` | Update navigate-module event listener to handle object payload, storing search query in sessionStorage | Low |
+| 4 | `src/components/analysis/AnalysisTopItems.tsx` | Pass product name to `handleProductClick`, dispatch object payload | Zero — additive |
+| 5 | `src/components/dashboard/modules/InventoryModule.tsx` | Read `pending-inventory-search` from sessionStorage on mount | Zero — additive |
+| 6 | `src/components/dashboard/modules/CustomerManagementModule.tsx` | Make "Last Purchase" date clickable (2 locations: mobile card + desktop table) | Zero — additive |
+| 7 | `src/components/dashboard/modules/BusinessDiaryModule.tsx` | Read `pending-diary-filter` from sessionStorage on mount to pre-fill search | Zero — additive |
 
-**Total: 5 files. Zero database changes. Zero new dependencies. All components used already exist.**
+**Total: 7 files. Zero database changes. Zero new dependencies. Zero new components.**
+
+---
 
 ## What Is NOT Changing (Already Correct)
-- **Sidebar active color** — already uses `bg-primary` (Navy CSS token). Adding hardcoded `indigo-600` would break the design system.
-- **Sonner toast migration** — CustomerManagement and Settings use `use-toast` (shadcn Toaster). Both are registered in `App.tsx`. Migrating 100+ toast calls across 1,913-line files for style parity only is not worth the regression risk. Both feedback systems show visible toasts — the goal of "feedback for every CRUD action" is already met.
-- **ProductPricingModule** — Already fully compliant: `PremiumModuleHeader`, `EmptyStateCard`, sticky save bar.
-- **UtilityExpenseModule staff empty state** — Already has an inline fallback at line 553-560. We only update the vehicle empty state.
-- **POS module** — The gold standard. No changes.
+
+- `useModuleEventSync` in Dashboard — already handles `sale-completed` → Inventory + Customers + Diary sync ✅
+- Vehicle cost `expense-added` dispatch — already present in `handleAddCost` ✅
+- `navigate-module` listener in Dashboard — already handles string payloads ✅
+- `AnalysisTopItems` product and expense click navigation — already dispatches `navigate-module` ✅
+- The `stockx:navigate-module` event bus prefix vs plain `navigate-module` CustomEvent: Dashboard uses `window.addEventListener('navigate-module')` (plain) and `AnalysisTopItems` dispatches `new CustomEvent('navigate-module')` (also plain). The `dispatchModuleEvent` helper dispatches `stockx:navigate-module` (prefixed). Dashboard only listens on the plain version. This is intentional — the plain version is used for UI navigation, the prefixed version is used for cache sync. No change needed.
