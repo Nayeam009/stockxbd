@@ -81,6 +81,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
   // Payment State
   const [showPaymentDrawer, setShowPaymentDrawer] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'bkash' | 'nagad' | 'rocket'>('cash');
 
   // Customer State
   const [customerState, setCustomerState] = useState<CustomerState>({
@@ -302,7 +303,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
         p_subtotal: cart.subtotal,
         p_discount: cart.discount,
         p_total: cart.total,
-        p_payment_method: 'cash',
+        p_payment_method: paymentMethod,
         p_payment_status: finalPaymentStatus,
         p_notes: finalPaymentStatus === 'partial' ? `Paid: ৳${paidAmount}, Due: ৳${remainingDue}` : null,
         p_is_online_order: cart.isOnlineOrder,
@@ -336,7 +337,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
         paid: paidAmount,
         due: remainingDue,
         paymentStatus: finalPaymentStatus,
-        paymentMethod: 'cash',
+        paymentMethod: paymentMethod,
         notes: cart.returnItems.length > 0 
           ? `Return: ${cart.returnItems.map(r => `${r.quantity}x ${r.brandName}${r.isLeaked ? ' (Leaked)' : ''}`).join(', ')}` 
           : undefined
@@ -361,6 +362,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
       // Reset
       cart.resetCart();
       setPaymentAmount("");
+      setPaymentMethod('cash');
       setCustomerState({ status: 'idle', customer: null, phoneQuery: '', newCustomerName: '', newCustomerAddress: '' });
 
       toast({ title: finalPaymentStatus === 'paid' ? "Sale completed!" : finalPaymentStatus === 'partial' ? "Partial payment saved!" : "Saved as due", description: transactionNumber });
@@ -545,7 +547,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
         <POSStickyFooter total={cart.total} itemCount={cart.saleItemsCount} onProceed={() => { setPaymentAmount(cart.total.toString()); setShowPaymentDrawer(true); }} disabled={!cart.isReturnCountMatched} processing={processing} />
 
         {/* Payment Drawer */}
-        <POSPaymentDrawer open={showPaymentDrawer} onOpenChange={setShowPaymentDrawer} total={cart.total} paymentAmount={paymentAmount} onPaymentAmountChange={setPaymentAmount} onComplete={handleCompleteSale} processing={processing} hasCustomer={hasCustomer} />
+        <POSPaymentDrawer open={showPaymentDrawer} onOpenChange={setShowPaymentDrawer} total={cart.total} paymentAmount={paymentAmount} onPaymentAmountChange={setPaymentAmount} paymentMethod={paymentMethod} onPaymentMethodChange={setPaymentMethod} onComplete={handleCompleteSale} processing={processing} hasCustomer={hasCustomer} />
 
         {/* Barcode Scanner */}
         <BarcodeScanner open={showBarcodeScanner} onOpenChange={setShowBarcodeScanner} onProductFound={(product) => { setShowBarcodeScanner(false); toast({ title: "Product scanned", description: product.name }); }} />

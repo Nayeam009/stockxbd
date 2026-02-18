@@ -195,7 +195,14 @@ const Dashboard = () => {
     lowStockItems: [],
     totalFullCylinders: overviewStats?.inventory?.total_full || 0,
     totalEmptyCylinders: overviewStats?.inventory?.total_empty || 0,
-    cylinderStockHealth: 'good' as const,
+    cylinderStockHealth: (() => {
+      const total_full = overviewStats?.inventory?.total_full || 0;
+      const total_empty = overviewStats?.inventory?.total_empty || 0;
+      if (total_full === 0) return 'critical' as const;
+      if (total_empty > total_full) return 'critical' as const;
+      if (total_full < 10) return 'warning' as const;
+      return 'good' as const;
+    })(),
     activeOrders: overviewStats?.orders?.total_active || 0,
     pendingOrders: overviewStats?.orders?.pending_count || 0,
     confirmedOrders: overviewStats?.orders?.confirmed_count || 0,

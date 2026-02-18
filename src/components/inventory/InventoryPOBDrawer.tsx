@@ -655,8 +655,13 @@ export const InventoryPOBDrawer = ({
 
       toast({
         title: paymentStatus === 'completed' ? "Purchase Completed!" : "Purchase Saved as Credit",
-        description: `${txnNumber} • ${BANGLADESHI_CURRENCY_SYMBOL}${subtotal.toLocaleString()}`
+        description: `${txnNumber} • ${BANGLADESHI_CURRENCY_SYMBOL}${subtotal.toLocaleString()} — Set selling prices in Product Pricing`
       });
+
+      // Guide owner to Product Pricing to set selling prices for new stock
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('navigate-module', { detail: 'product-pricing' }));
+      }, 1500);
 
       resetAllForms();
       onPurchaseComplete();
