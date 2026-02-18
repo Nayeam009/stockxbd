@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { PremiumModuleHeader } from "@/components/shared/PremiumModuleHeader";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -263,54 +264,41 @@ export const MyShopProfileModule = () => {
   return (
     <div className="space-y-5">
       {/* Premium Header */}
-      <div className="relative">
-        <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-secondary/5 rounded-xl -z-10" />
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-1">
-          <div className="flex items-center gap-3">
-            <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg">
-              <Store className="h-6 w-6 text-primary-foreground" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl sm:text-2xl font-bold tracking-tight">
-                  {currentProfile.shop_name || 'My Shop Profile'}
-                </h1>
-                {currentProfile.id && (
-                  <Badge className={`${currentProfile.is_open ? 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30' : 'bg-muted text-muted-foreground'}`}>
-                    {currentProfile.is_open ? '● Open' : '○ Closed'}
-                  </Badge>
-                )}
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Manage your shop, products, orders & analytics
-              </p>
-            </div>
+      <PremiumModuleHeader
+        title={currentProfile.shop_name || 'My Shop Profile'}
+        subtitle={
+          <span className="flex items-center gap-2">
+            Manage your shop, products, orders & analytics
+            {currentProfile.id && (
+              <Badge className={`${currentProfile.is_open ? 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30' : 'bg-muted text-muted-foreground'}`}>
+                {currentProfile.is_open ? '● Open' : '○ Closed'}
+              </Badge>
+            )}
+          </span>
+        }
+        icon={<Store className="h-5 w-5 sm:h-6 sm:w-6 text-primary-foreground" />}
+        actions={currentProfile.id ? (
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate(`/community/shop/${currentProfile.id}`)}
+              className="h-11 gap-2 text-sm touch-manipulation"
+            >
+              <ExternalLink className="h-4 w-4" />
+              <span className="hidden sm:inline">View Shop</span>
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => navigate('/community')}
+              className="h-11 gap-2 text-sm touch-manipulation"
+            >
+              <Globe className="h-4 w-4" />
+              <span className="hidden sm:inline">Marketplace</span>
+            </Button>
           </div>
-          
-          {/* Quick Actions */}
-          {currentProfile.id && (
-            <div className="flex items-center gap-2">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => navigate(`/community/shop/${currentProfile.id}`)}
-                className="h-10 gap-2 text-sm"
-              >
-                <ExternalLink className="h-4 w-4" />
-                <span className="hidden sm:inline">View Shop</span>
-              </Button>
-              <Button 
-                size="sm" 
-                onClick={() => navigate('/community')}
-                className="h-10 gap-2 text-sm"
-              >
-                <Globe className="h-4 w-4" />
-                <span className="hidden sm:inline">Marketplace</span>
-              </Button>
-            </div>
-          )}
-        </div>
-      </div>
+        ) : undefined}
+      />
 
       {/* Professional Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">

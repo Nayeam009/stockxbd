@@ -212,7 +212,7 @@ export const DashboardOverview = ({
           return (
             <Card
               key={card.id}
-              className={`group relative overflow-hidden border border-border/40 shadow-md hover:shadow-xl transition-all duration-300 bg-card min-h-[120px] ${card.clickable ? 'cursor-pointer hover:-translate-y-1 focus-visible:ring-2 focus-visible:ring-primary' : ''} ${card.warning ? 'border-destructive/30' : ''}`}
+              className={`group relative overflow-hidden border border-border/40 shadow-sm hover:shadow-md transition-all duration-300 bg-card min-h-[120px] ${card.clickable ? 'cursor-pointer hover:-translate-y-1 focus-visible:ring-2 focus-visible:ring-primary' : ''} ${card.warning ? 'border-destructive/30' : ''}`}
               onClick={card.clickable ? card.onClick : undefined}
               tabIndex={card.clickable ? 0 : undefined}
               onKeyDown={card.clickable ? (e) => e.key === 'Enter' && card.onClick?.() : undefined}
@@ -265,7 +265,7 @@ export const DashboardOverview = ({
 
       {/* Cylinder Balance Card */}
       {isOwnerOrManager && (
-        <Card className={`border shadow-md overflow-hidden ${analytics.cylinderStockHealth === 'critical' ? 'border-destructive/50 bg-destructive/5' :
+        <Card className={`border shadow-sm overflow-hidden ${analytics.cylinderStockHealth === 'critical' ? 'border-destructive/50 bg-destructive/5' :
           analytics.cylinderStockHealth === 'warning' ? 'border-warning/50 bg-warning/5' :
             'border-border/40 bg-card'
           }`}>

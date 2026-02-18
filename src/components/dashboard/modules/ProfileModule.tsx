@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { PremiumModuleHeader } from "@/components/shared/PremiumModuleHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -239,10 +241,10 @@ export const ProfileModule = () => {
   // Show skeleton during initial load
   if (initialLoading) {
     return (
-      <div className="space-y-6 max-w-3xl mx-auto animate-pulse">
-        <div className="h-8 w-48 bg-muted rounded" />
-        <div className="h-64 bg-muted rounded-lg" />
-        <div className="h-48 bg-muted rounded-lg" />
+      <div className="space-y-6 max-w-3xl mx-auto">
+        <Skeleton className="h-14 w-64 rounded-xl" />
+        <Skeleton className="h-64 w-full rounded-xl" />
+        <Skeleton className="h-48 w-full rounded-xl" />
       </div>
     );
   }
@@ -259,14 +261,15 @@ export const ProfileModule = () => {
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
-      {/* Header */}
-      <div>
-        <h2 className="text-3xl font-bold text-foreground">{t('profile')}</h2>
-        <p className="text-muted-foreground">{t('profile_desc')}</p>
-      </div>
+      {/* Premium Header */}
+      <PremiumModuleHeader
+        title={t('profile')}
+        subtitle={t('profile_desc')}
+        icon={<User className="h-5 w-5 sm:h-6 sm:w-6 text-primary-foreground" />}
+      />
 
       {/* Profile Card */}
-      <Card className="border-0 shadow-elegant overflow-hidden">
+      <Card className="border border-border/40 shadow-sm overflow-hidden">
         {/* Cover Image */}
         <div className="h-32 bg-gradient-to-r from-primary via-secondary to-accent" />
         
@@ -359,7 +362,7 @@ export const ProfileModule = () => {
       )}
 
       {/* Edit Profile Form */}
-      <Card className="border-0 shadow-elegant">
+      <Card className="border border-border/40 shadow-sm">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <User className="h-5 w-5 text-primary" />
@@ -428,7 +431,7 @@ export const ProfileModule = () => {
       </Card>
 
       {/* Account Info */}
-      <Card className="border-0 shadow-elegant">
+      <Card className="border border-border/40 shadow-sm">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Shield className="h-5 w-5 text-primary" />
