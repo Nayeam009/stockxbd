@@ -1,158 +1,158 @@
 
-# Retail / Wholesale Integration — Sync Repair Plan
+# Hard-Wired Real-Time Connectivity — Implementation Plan
 
-## Audit Summary
+## Audit: What Already Exists vs. What Needs Building
 
-After tracing all paths — the real-time subscription channel, the `complete_pos_sale` RPC, the Dashboard KPI aggregation, and every data flow between POS and the Customer module — here is the precise finding for each check.
+### Already Complete (No Rework Needed)
+- **Global `customers` listener** in `useUnifiedRealtime`: the `{ event: '*', table: 'customers' }` listener already fires on any INSERT/UPDATE/DELETE regardless of `customer_type`. This correctly invalidates `sharedKeys.customers()` which feeds both the retail AND wholesale views — no additional listener required.
+- **`saleType` wired to `POSCustomerLookup`**: already passed as a prop, cross-type warning already renders.
+- **Wholesale/Retail views**: already built, credit progress bar renders for wholesale.
 
----
-
-## Check 1: Real-Time Subscription — PASS (No Repair Needed)
-
-**Finding:** The `useUnifiedRealtime()` hook in `src/hooks/useSharedQueries.ts` (lines 370-373) listens to ALL rows on the `customers` table unconditionally:
-
-```typescript
-.on('postgres_changes',
-  { event: '*', schema: 'public', table: 'customers' },
-  () => invalidateWithDebounce(sharedKeys.customers(), 'normal')
-)
-```
-
-**Analysis:** The Postgres CDC (`postgres_changes`) event fires on ANY row change in the `customers` table regardless of column values. There is no `filter: 'customer_type=eq.retail'` predicate. This means a `customer_type = 'wholesale'` update triggers `sharedKeys.customers()` invalidation identically to a retail update.
-
-**Verdict:** CLEAN. Both the Dashboard and the Wholesale module share the same `sharedKeys.customers()` React Query cache. A single `postgres_changes` event on any customer row — retail or wholesale — invalidates the entire `customers` cache, causing all consumers (POS, CustomerManagementModule retail view, CustomerManagementModule wholesale view) to refetch in parallel within the 1500ms debounce window.
-
-**However — one secondary gap exists:** The `pos_transactions` listener in `useUnifiedRealtime` only invalidates `overview` and `todayStats`. It does NOT invalidate `customers`. The gap path is:
-
-```
-POS sale → complete_pos_sale RPC updates customer.total_due → 
-customers table row changes → 
-postgres_changes fires on 'customers' table → 
-customers cache invalidated ✅ (this leg works)
-```
-
-But the event path through `moduleEvents` also fires `notifySaleCompleted`, which in `CustomerManagementModule.tsx` (line 173-176) directly calls:
-```typescript
-queryClient.invalidateQueries({ queryKey: sharedKeys.customers(), refetchType: 'active' })
-```
-
-So the customer balance updates through **two parallel paths** after a POS sale — both the Postgres CDC and the module event bus. This is belt-and-suspenders. The Customer Balance display updates correctly.
+### What Needs Building — 3 Targeted Changes
 
 ---
 
-## Check 2: POS → Wholesale Customer Due Update — PASS (No Repair Needed)
+## Change 1: "View Ledger" Button on Wholesale Customer Cards
 
-**Finding:** The `complete_pos_sale` RPC (lines in the DB functions) updates `total_due` using:
+**File:** `src/components/dashboard/modules/CustomerManagementModule.tsx`
 
-```sql
-UPDATE customers SET
-  total_due = COALESCE(total_due, 0) + p_remaining_due,
-  billing_status = 'pending',
-  last_order_date = now()
-WHERE id = p_customer_id AND owner_id = v_owner_id;
-```
+**Where:** The wholesale customer card loop (lines ~1204-1255), inside the `filtered.map(c => ...)` block — specifically inside the `isWholesale` conditional section.
 
-The WHERE clause only uses `id` and `owner_id` — there is no `customer_type` filter. The RPC is completely agnostic to customer type. A wholesale customer's `total_due` is updated identically to a retail customer's.
+**What:** Add a "View Ledger" button next to the History button. When clicked it:
+1. Stores the customer name in `sessionStorage` under the key `'pending-diary-filter'` (this key is already read by `BusinessDiaryModule` on mount at line 237-242 — zero new wiring needed)
+2. Dispatches `window.dispatchEvent(new CustomEvent('navigate-module', { detail: 'business-diary' }))` — the same pattern used by `handleNavigateToSource` in `BusinessDiaryModule`
 
-**POS UI Balance Refresh Path:**
+**UI:** A `BookOpen` icon button (`h-8 w-8`) with a purple tint, labelled "Ledger" on tablet+, shown only when `isWholesale === true`.
 
-1. `complete_pos_sale` RPC runs → `customers` row updated
-2. Supabase realtime fires `postgres_changes` on `customers` table
-3. `useUnifiedRealtime` debounces and calls `queryClient.invalidateQueries(sharedKeys.customers())`
-4. `POSCustomerLookup` is fed from `usePOSData` → `useSharedCustomers` → same cache key
-5. The customer badge showing "Due: ৳X,XXX" on the customer lookup card updates within 1500ms
-
-**Verdict:** CLEAN. The wholesale customer's `total_due` updates correctly through both the RPC and the realtime listener.
+**Why this works out of the box:** `BusinessDiaryModule` already reads `sessionStorage.getItem('pending-diary-filter')` in a `useEffect` on mount (line 236-242), sets it as `searchQuery`, and the `filteredSales` memo already filters by `s.customerName.includes(query)`. The customer name stored in sessionStorage will instantly filter the diary to that wholesale account's transactions.
 
 ---
 
-## Check 3: Dashboard KPI Aggregation — PARTIAL GAP FOUND
+## Change 2: Optimistic UI for Payment Settlement
 
-**Finding:** The Dashboard's "Total Receivables" figure is NOT shown as a direct KPI on the `DashboardOverview` component at all. The KPI cards show:
-- Today's Sale (revenue from POS)
-- Today's Expense
-- Today's Profit
-- Active Orders count
+**File:** `src/components/dashboard/modules/CustomerManagementModule.tsx`
 
-**The `totalAmountDue` figure lives exclusively in `CustomerManagementModule.tsx` (line 405):**
+**Where:** The `handleSettleAccount` function (~lines 408-461).
+
+**What:** Before the `await supabase.from('customer_payments').insert(...)` call, immediately apply an optimistic update to the React Query cache using `queryClient.setQueryData`:
 
 ```typescript
-const totalAmountDue = dueCustomers.reduce((sum, c) => sum + Number(c.total_due), 0);
+// OPTIMISTIC UPDATE — fires instantly before server responds
+queryClient.setQueryData(sharedKeys.customers(), (old: SharedCustomer[] | undefined) => {
+  if (!old) return old;
+  return old.map(c => {
+    if (c.id !== selectedCustomer.id) return c;
+    const newDue = Math.max(0, c.total_due - amount);
+    return {
+      ...c,
+      total_due: newDue,
+      billing_status: newDue === 0 && Math.max(0, c.cylinders_due - cylinders) === 0 ? 'clear' : 'pending',
+      cylinders_due: Math.max(0, c.cylinders_due - cylinders),
+    };
+  });
+});
 ```
 
-where `dueCustomers = customers.filter(c => c.total_due > 0 || c.cylinders_due > 0)` — this filters ALL customers with dues, irrespective of `customer_type`. So the "Total Due" shown inside the Customer module is correct and includes both retail AND wholesale dues.
+If the server call fails, roll back by calling `queryClient.invalidateQueries({ queryKey: sharedKeys.customers() })` in the error handler — this refetches the true server state.
 
-**The gap:** `useDashboardData.ts` at line 197 fetches customers for the dashboard overview with a reduced query:
+**Why this is safe:** The `customers` cache is the single source of truth. The optimistic write makes the credit bar and due badge update in under 100ms (before the Supabase round trip). The Postgres CDC `customers` listener in `useUnifiedRealtime` will fire within 500ms and issue a normal invalidation anyway, confirming the new value from the server.
 
-```typescript
-supabase.from('customers').select('id, name, phone, address, total_due').order('name').limit(200)
-```
-
-This `total_due` data populates the `Customer[]` array used only by `analytics.totalCustomers`, `analytics.activeCustomers`, and `analytics.lostCustomers` — none of which are broken down by `customer_type`. The `get_customer_stats` RPC exists in the database (confirmed via `types.ts`) but is NOT called anywhere in the codebase. It would return a combined `total_due_amount` for all customers, making it the correct aggregation function to use.
-
-**Verdict:** The dashboard does not show a "Total Receivables" KPI by design — the current KPIs are revenue/expense/profit/orders. No filter accidentally excludes wholesale from the `totalAmountDue` calculation because that calculation is done in `CustomerManagementModule` on the complete unfiltered customer list. However, the `useDashboardData` overview fetch at line 197 does NOT select `customer_type`, which means if someone were to add a type-segmented KPI to the Dashboard later, the data would be missing.
+**Import needed:** `SharedCustomer` from `@/hooks/useSharedQueries` (already imported via `sharedKeys`).
 
 ---
 
-## Repair Plan — 2 Issues, 1 Enhancement
+## Change 3: POS "Smart Context" — Per-Customer Realtime Subscription
 
-### Issue 1 (Minor): `useDashboardData` overview query missing `customer_type`
-**Risk:** If a "Retail Due vs Wholesale Due" KPI is ever added to `DashboardOverview`, it would silently show `undefined` because the column isn't fetched.
-**Fix:** Add `customer_type` to the reduced select in line 197 of `src/hooks/useDashboardData.ts`:
+**File:** `src/components/pos/POSCustomerLookup.tsx`
+
+**What:** When a customer is in `status === 'found'`, subscribe to that specific customer's row using Supabase Realtime with a `filter` predicate. If that row changes while the POS is open (e.g., a manager updates the credit limit in the back office), fire a `toast` notification and call `onCustomerChange` with the refreshed data.
+
+**Implementation:**
+
 ```typescript
-// BEFORE:
-supabase.from('customers').select('id, name, phone, address, total_due').order('name').limit(200)
+// Add inside the component, after existing hooks:
+useEffect(() => {
+  if (status !== 'found' || !customer?.id) return;
 
-// AFTER:
-supabase.from('customers').select('id, name, phone, address, total_due, customer_type').order('name').limit(200)
+  const channel = supabase
+    .channel(`pos-customer-${customer.id}`)
+    .on('postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'customers', filter: `id=eq.${customer.id}` },
+      (payload) => {
+        const updated = payload.new as Customer;
+        // Update the customer in the POS state
+        onCustomerChange({
+          ...customerState,
+          customer: updated,
+        });
+        // Flash a toast
+        toast({
+          title: "Customer Updated",
+          description: `${updated.name}'s account was updated. Credit limit: ৳${(updated.credit_limit || 0).toLocaleString()}`,
+        });
+      }
+    )
+    .subscribe();
+
+  return () => { supabase.removeChannel(channel); };
+}, [status, customer?.id]);
 ```
 
-### Issue 2 (Critical): `pos_transactions` realtime listener does NOT trigger `customers` cache invalidation
-**Risk:** In an edge case where `notifySaleCompleted` module event fails to fire (e.g., the component is unmounted), the `customers` cache is stale until the Postgres CDC fires. This is currently mitigated by the dual-path (CDC fires anyway), but the `useUnifiedRealtime` hook should also explicitly invalidate `customers` when a new `pos_transactions` row is inserted, to make the refresh reliable without depending on the module event bus.
+**Why it's scoped:** The `filter: 'id=eq.${customer.id}'` predicate means only that specific customer's row triggers the handler — no unnecessary events. The channel is torn down and rebuilt whenever `customer.id` changes (new customer selected) or when the POS clears the customer (`status` changes away from `'found'`).
 
-**Fix:** In `src/hooks/useSharedQueries.ts`, add `customers` invalidation to the `pos_transactions` listener:
-```typescript
-// BEFORE (lines 354-360):
-.on('postgres_changes',
-  { event: '*', schema: 'public', table: 'pos_transactions' },
-  () => {
-    invalidateWithDebounce(sharedKeys.overview(), 'critical');
-    invalidateWithDebounce(sharedKeys.todayStats(), 'critical');
-  }
-)
-
-// AFTER:
-.on('postgres_changes',
-  { event: 'INSERT', schema: 'public', table: 'pos_transactions' },
-  () => {
-    invalidateWithDebounce(sharedKeys.overview(), 'critical');
-    invalidateWithDebounce(sharedKeys.todayStats(), 'critical');
-    invalidateWithDebounce(sharedKeys.customers(), 'critical'); // NEW
-  }
-)
-```
-
-Note: scoped to `INSERT` only (not `*`) because a new sale creates a new row — no need to re-fetch customers on UPDATE/DELETE of transactions.
-
-### Enhancement (No Risk): Add `get_customer_stats` RPC call to the Dashboard Overview
-The `get_customer_stats` database RPC already exists and returns `{ total_customers, customers_with_due, total_due_amount }` — a single server-side aggregation of ALL customers across both types. This can optionally be called in `useSharedOverviewStats` to add a "Total Receivables" KPI card to the Dashboard, showing the combined retail+wholesale outstanding amount without any additional filtering risk.
+**No import changes needed:** `supabase` and `toast` are already imported at the top of `POSCustomerLookup.tsx`.
 
 ---
 
-## Summary Table
+## File Change Summary
 
-| # | Component | Path | Status | Action |
+| # | File | Section | Change | Lines Touched |
 |---|---|---|---|---|
-| 1 | `useUnifiedRealtime` → `customers` listener | DB CDC → cache invalidation | **PASS** — fires on all rows regardless of `customer_type` | None |
-| 2 | `complete_pos_sale` RPC | Wholesale customer `total_due` update | **PASS** — no customer_type filter in WHERE | None |
-| 3 | POS → Customer balance UI refresh | `notifySaleCompleted` + CDC dual-path | **PASS** — two independent refresh paths | Add CDC as primary (Issue 2) |
-| 4 | `totalAmountDue` in CustomerManagementModule | Filters `total_due > 0`, no type filter | **PASS** — correctly includes retail+wholesale | None |
-| 5 | `useDashboardData` overview customer fetch | `select('id, name, phone, address, total_due')` | **GAP** — `customer_type` not fetched | Fix column select (Issue 1) |
-| 6 | `useUnifiedRealtime` → `pos_transactions` → `customers` | CDC path | **GAP** — new sale doesn't directly invalidate customers via realtime | Add invalidation (Issue 2) |
+| 1 | `CustomerManagementModule.tsx` | Wholesale card action buttons | Add "View Ledger" button with sessionStorage hand-off + navigate-module event | ~1241-1251 |
+| 2 | `CustomerManagementModule.tsx` | `handleSettleAccount` function | Add optimistic `setQueryData` before server call + rollback on error | ~408-461 |
+| 3 | `POSCustomerLookup.tsx` | After existing hooks | Add per-customer realtime subscription with toast notification | After line 136 |
 
-### Files to Change
+**Zero database changes. Zero new dependencies. Zero new files.**
 
-| # | File | Line | Change |
-|---|---|---|---|
-| 1 | `src/hooks/useDashboardData.ts` | 197 | Add `customer_type` to reduced select |
-| 2 | `src/hooks/useSharedQueries.ts` | 354-360 | Add `customers` cache invalidation on `pos_transactions INSERT` |
+---
+
+## Technical Architecture Diagram
+
+```text
+[Wholesale Customer Card]
+       |
+       |-- History btn → opens dialog (existing)
+       |-- Settle btn  → optimistic update → server → CDC confirms (NEW path)
+       |-- Ledger btn  → sessionStorage('pending-diary-filter', name)
+                         + navigate-module('business-diary')
+                         → BusinessDiaryModule reads key on mount
+                         → filteredSales auto-filters by customer name
+
+[POS — Customer Found]
+       |
+       |-- Per-customer Supabase channel (filter: id=eq.{id})
+       |-- UPDATE event → toast "Account Updated" + refresh customer state
+       |-- Channel torn down on customer change / deselect
+```
+
+---
+
+## Mobile UX Notes
+
+- The "View Ledger" button uses `h-8 w-8` (32px touch target) matching the existing History button size
+- On mobile (`sm:hidden`), the text label is hidden — only the `BookOpen` icon shows to preserve card width
+- On tablet+ (`hidden sm:inline`), "Ledger" text appears alongside the icon
+- The optimistic update makes the credit bar animate smoothly — Tailwind `transition-all` is already on the progress bar `div`
+- The per-customer toast is non-intrusive (top-right, auto-dismiss) and uses the existing `toast` utility
+
+---
+
+## Why NOT to Add a Separate "Global Dashboard Metrics Listener"
+
+The task asks to invalidate `['customers', 'retail']` and `['customers', 'wholesale']` as separate keys. However, the existing architecture uses a **single unified key** `sharedKeys.customers()` = `['shared', 'customers']` for all customers regardless of type — and filters client-side. Adding separate retail/wholesale keys would:
+
+1. **Double the Supabase network calls** (two fetches instead of one)
+2. **Break the existing POS customer lookup** (which uses the unified key)
+3. **Create cache desync** between the POS and Customer module
+
+The current unified key approach is the correct architecture. The retail/wholesale split happens at the React layer (`.filter(c => c.customer_type === 'retail')`), not at the data-fetch layer. This is intentional and correct.
