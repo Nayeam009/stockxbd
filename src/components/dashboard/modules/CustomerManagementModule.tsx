@@ -57,7 +57,7 @@ import { useModuleEvent } from "@/lib/moduleEvents";
 import { PremiumModuleHeader } from "@/components/shared/PremiumModuleHeader";
 import { EmptyStateCard } from "@/components/shared/EmptyStateCard";
 
-type ViewMode = 'main' | 'due' | 'paid' | 'memo-search' | 'retail' | 'wholesale';
+type ViewMode = 'main' | 'retail' | 'wholesale';
 
 interface Customer {
   id: string;
@@ -150,6 +150,7 @@ export const CustomerManagementModule = () => {
   const [salesHistory, setSalesHistory] = useState<POSTransaction[]>([]);
   const [softLoading, setSoftLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [customerTab, setCustomerTab] = useState<'all' | 'due' | 'paid'>('all');
   const [settleDialogOpen, setSettleDialogOpen] = useState(false);
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [salesHistoryDialogOpen, setSalesHistoryDialogOpen] = useState(false);
@@ -158,6 +159,8 @@ export const CustomerManagementModule = () => {
   const [paymentAmount, setPaymentAmount] = useState("");
   const [cylindersToCollect, setCylindersToCollect] = useState("");
   const [historyTab, setHistoryTab] = useState<'payments' | 'sales'>('sales');
+  const [subViewMemoResults, setSubViewMemoResults] = useState<MemoSearchResult[]>([]);
+  const [subViewMemoLoading, setSubViewMemoLoading] = useState(false);
   const [newCustomerType, setNewCustomerType] = useState<'retail' | 'wholesale'>('retail');
   const [newCustomer, setNewCustomer] = useState({
     name: "",
@@ -179,6 +182,13 @@ export const CustomerManagementModule = () => {
   const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
 
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Reset customerTab when switching between retail/wholesale/main
+  useEffect(() => {
+    setCustomerTab('all');
+    setSearchQuery('');
+    setSubViewMemoResults([]);
+  }, [viewMode]);
   
   // ===== LISTEN FOR CROSS-MODULE EVENTS (POS sales trigger instant refresh) =====
   useModuleEvent('sale-completed', () => {
@@ -830,71 +840,7 @@ export const CustomerManagementModule = () => {
           </Card>
         </div>
 
-        {/* Premium Action Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-5">
-          {/* Due Customers Card */}
-          <Card className="relative overflow-hidden border border-border/20 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer group">
-            <div className="absolute inset-0 bg-gradient-to-br from-rose-500/5 via-card to-card group-hover:from-rose-500/10 transition-colors" />
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-rose-500 to-rose-400" />
-            <CardContent className="relative p-4 sm:p-6">
-              <div className="flex items-start gap-4 mb-5">
-                <div className="p-3 rounded-xl bg-rose-500/20 group-hover:scale-110 transition-transform shrink-0">
-                  <UserX className="h-6 w-6 sm:h-8 sm:w-8 text-rose-500" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h3 className="text-lg sm:text-xl font-bold text-foreground">Due Customers</h3>
-                  <p className="text-xs sm:text-sm text-muted-foreground">Outstanding payments to collect</p>
-                  <div className="flex items-baseline gap-2 mt-2">
-                    <p className="text-2xl sm:text-3xl font-bold text-rose-600 dark:text-rose-400 tabular-nums">
-                      {BANGLADESHI_CURRENCY_SYMBOL}{totalAmountDue.toLocaleString()}
-                    </p>
-                    <p className="text-xs text-muted-foreground">from {dueCustomers.length} customers</p>
-                  </div>
-                </div>
-              </div>
-              <Button
-                className="w-full bg-rose-500 hover:bg-rose-600 text-white h-11 text-sm font-medium shadow-lg touch-manipulation"
-                onClick={() => setViewMode('due')}
-              >
-                Manage Due
-                <ArrowRight className="h-4 w-4 ml-2 group-hover:translate-x-1 transition-transform" />
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Paid Customers Card */}
-          <Card className="relative overflow-hidden border border-border/20 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer group">
-            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 via-card to-card group-hover:from-emerald-500/10 transition-colors" />
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-emerald-400" />
-            <CardContent className="relative p-4 sm:p-6">
-              <div className="flex items-start gap-4 mb-5">
-                <div className="p-3 rounded-xl bg-emerald-500/20 group-hover:scale-110 transition-transform shrink-0">
-                  <UserCheck className="h-6 w-6 sm:h-8 sm:w-8 text-emerald-500" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h3 className="text-lg sm:text-xl font-bold text-foreground">Paid Customers</h3>
-                  <p className="text-xs sm:text-sm text-muted-foreground">Accounts with no outstanding dues</p>
-                  <div className="flex items-baseline gap-2 mt-2">
-                    <p className="text-2xl sm:text-3xl font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
-                      {paidCustomers.length}
-                    </p>
-                    <p className="text-xs text-muted-foreground">customers all clear</p>
-                  </div>
-                </div>
-              </div>
-              <Button
-                variant="outline"
-                className="w-full border-emerald-500/30 hover:bg-emerald-500/10 hover:border-emerald-500/50 h-11 text-sm font-medium touch-manipulation"
-                onClick={() => setViewMode('paid')}
-              >
-                View Paid
-                <ArrowRight className="h-4 w-4 ml-2 group-hover:translate-x-1 transition-transform" />
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Customer Segments */}
+        {/* Customer Segment Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-5">
           {/* Retail Customers Card */}
           <Card className="relative overflow-hidden border border-border/20 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer group" onClick={() => setViewMode('retail')}>
@@ -908,9 +854,16 @@ export const CustomerManagementModule = () => {
                 <div className="min-w-0 flex-1">
                   <h3 className="text-base sm:text-lg font-bold text-foreground">Retail Customers</h3>
                   <p className="text-xs text-muted-foreground">Speed & Volume · Walk-in & delivery</p>
-                  <p className="text-2xl font-bold text-sky-600 dark:text-sky-400 tabular-nums mt-1">
-                    {customers.filter(c => c.customer_type === 'retail').length}
-                  </p>
+                  <div className="flex items-baseline gap-3 mt-1">
+                    <p className="text-2xl font-bold text-sky-600 dark:text-sky-400 tabular-nums">
+                      {customers.filter(c => c.customer_type === 'retail').length}
+                    </p>
+                    {customers.filter(c => c.customer_type === 'retail' && c.total_due > 0).length > 0 && (
+                      <span className="text-xs font-medium text-rose-500 bg-rose-500/10 px-1.5 py-0.5 rounded-full">
+                        {customers.filter(c => c.customer_type === 'retail' && c.total_due > 0).length} due
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
               <Button className="w-full bg-sky-500 hover:bg-sky-600 text-white h-10 text-sm font-medium touch-manipulation">
@@ -931,9 +884,16 @@ export const CustomerManagementModule = () => {
                 <div className="min-w-0 flex-1">
                   <h3 className="text-base sm:text-lg font-bold text-foreground">Wholesale Accounts</h3>
                   <p className="text-xs text-muted-foreground">Credit & Ledger · Account management</p>
-                  <p className="text-2xl font-bold text-purple-600 dark:text-purple-400 tabular-nums mt-1">
-                    {customers.filter(c => c.customer_type === 'wholesale').length}
-                  </p>
+                  <div className="flex items-baseline gap-3 mt-1">
+                    <p className="text-2xl font-bold text-purple-600 dark:text-purple-400 tabular-nums">
+                      {customers.filter(c => c.customer_type === 'wholesale').length}
+                    </p>
+                    {customers.filter(c => c.customer_type === 'wholesale' && c.total_due > 0).length > 0 && (
+                      <span className="text-xs font-medium text-rose-500 bg-rose-500/10 px-1.5 py-0.5 rounded-full">
+                        {customers.filter(c => c.customer_type === 'wholesale' && c.total_due > 0).length} due
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
               <Button className="w-full bg-purple-600 hover:bg-purple-700 text-white h-10 text-sm font-medium touch-manipulation">
@@ -942,6 +902,7 @@ export const CustomerManagementModule = () => {
             </CardContent>
           </Card>
         </div>
+
 
 
         <Dialog open={addCustomerDialogOpen} onOpenChange={setAddCustomerDialogOpen}>
@@ -1251,157 +1212,267 @@ export const CustomerManagementModule = () => {
           }
         />
 
-        <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm pb-3 pt-1 -mx-4 px-4">
+        <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm pb-3 pt-1 -mx-4 px-4 space-y-2">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder={`Search ${isWholesale ? 'wholesale' : 'retail'} customers...`}
+              placeholder={`Search by name, phone, or Memo ID (TXN-...)...`}
               value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="pl-10 h-11"
+              onChange={async e => {
+                const val = e.target.value;
+                setSearchQuery(val);
+                // Memo ID detection: starts with TXN- or matches pattern WORD-digits
+                const isMemoId = val.trim().match(/^[A-Z]+-\d+/i);
+                if (isMemoId && val.length >= 4) {
+                  setSubViewMemoLoading(true);
+                  try {
+                    const { data: transactions } = await supabase
+                      .from('pos_transactions')
+                      .select(`id, transaction_number, created_at, total, subtotal, discount, payment_status, payment_method, customer_id, pos_transaction_items (product_name, quantity, unit_price, total_price)`)
+                      .ilike('transaction_number', `%${val}%`)
+                      .order('created_at', { ascending: false })
+                      .limit(8);
+                    if (transactions) {
+                      const customerIds = transactions.filter(t => t.customer_id).map(t => t.customer_id) as string[];
+                      const { data: txCustomers } = customerIds.length > 0 ? await supabase.from('customers').select('id, name').in('id', customerIds) : { data: [] };
+                      const customerMap = new Map<string, string>();
+                      txCustomers?.forEach(c => customerMap.set(c.id, c.name));
+                      setSubViewMemoResults(transactions.map(t => ({
+                        type: 'transaction' as const,
+                        transaction: { ...t, customer_name: t.customer_id ? customerMap.get(t.customer_id) || 'Walk-in' : 'Walk-in', items: t.pos_transaction_items?.map((i: any) => `${i.quantity}x ${i.product_name}`).join(', ') || 'N/A' }
+                      })));
+                    }
+                  } finally {
+                    setSubViewMemoLoading(false);
+                  }
+                } else {
+                  setSubViewMemoResults([]);
+                }
+              }}
+              className="pl-10 h-11 pr-10"
             />
+            {searchQuery && (
+              <Button variant="ghost" size="sm" className="absolute right-1 top-1/2 -translate-y-1/2 h-9 w-9 p-0" onClick={() => { setSearchQuery(''); setSubViewMemoResults([]); }}>
+                <X className="h-4 w-4" />
+              </Button>
+            )}
           </div>
+
+          {/* Memo search results overlay */}
+          {subViewMemoResults.length > 0 && (
+            <div className="space-y-1.5 max-h-56 overflow-y-auto">
+              {subViewMemoLoading && <p className="text-xs text-center text-muted-foreground py-2">Searching memos...</p>}
+              {subViewMemoResults.map((result, idx) => (
+                <Card key={idx} className="border border-border/50 shadow-sm cursor-pointer hover:shadow-md transition-all"
+                  onClick={async () => {
+                    if (result.type === 'transaction' && result.transaction) {
+                      const txCustomerId = result.transaction.customer_id;
+                      if (txCustomerId) {
+                        const linkedCustomer = customers.find(c => c.id === txCustomerId);
+                        if (linkedCustomer) {
+                          // If customer is in different segment, show toast
+                          const expectedType = viewMode === 'retail' ? 'retail' : 'wholesale';
+                          if (linkedCustomer.customer_type !== expectedType) {
+                            toast({ title: `Customer is in ${linkedCustomer.customer_type === 'wholesale' ? 'Wholesale' : 'Retail'} — switching view` });
+                            setViewMode(linkedCustomer.customer_type === 'wholesale' ? 'wholesale' : 'retail');
+                          }
+                          setSelectedCustomer(linkedCustomer);
+                          fetchCustomerSalesHistory(linkedCustomer.id);
+                          fetchPayments();
+                          setHistoryDialogOpen(true);
+                          setSearchQuery('');
+                          setSubViewMemoResults([]);
+                        } else {
+                          handleViewTransaction(result.transaction);
+                        }
+                      } else {
+                        handleViewTransaction(result.transaction);
+                      }
+                    }
+                  }}
+                >
+                  <CardContent className="p-3 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="h-8 w-8 rounded-lg bg-purple-500/10 flex items-center justify-center shrink-0">
+                        <Receipt className="h-3.5 w-3.5 text-purple-500" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-mono text-sm font-semibold truncate">{result.transaction?.transaction_number}</p>
+                        <p className="text-xs text-muted-foreground truncate">{result.transaction?.customer_name}</p>
+                      </div>
+                    </div>
+                    <p className="font-bold text-sm tabular-nums shrink-0">{BANGLADESHI_CURRENCY_SYMBOL}{result.transaction?.total.toLocaleString()}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </div>
 
-        {filtered.length === 0 ? (
-          <EmptyStateCard
-            icon={<Users className="h-8 w-8" />}
-            title={`No ${isWholesale ? 'wholesale' : 'retail'} customers yet`}
-            subtitle={`Add your first ${isWholesale ? 'wholesale account' : 'retail customer'} to get started`}
-          />
-        ) : (
-          <div className="space-y-2">
-            {filtered.map(c => (
-              <Card key={c.id} className="border-border/40 shadow-sm">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${isWholesale ? 'bg-purple-500/20' : 'bg-sky-500/20'}`}>
-                      <span className={`text-sm font-bold ${isWholesale ? 'text-purple-600' : 'text-sky-600'}`}>
-                        {c.name.charAt(0).toUpperCase()}
-                      </span>
+        {/* All / Due / Paid Tabs */}
+        {(() => {
+          const dueFiltered = filtered.filter(c => c.total_due > 0 || c.cylinders_due > 0);
+          const paidFiltered = filtered.filter(c => c.total_due === 0 && c.cylinders_due === 0);
+          const tabList = customerTab === 'due' ? dueFiltered : customerTab === 'paid' ? paidFiltered : filtered;
+
+          const CustomerCard = ({ c }: { c: Customer }) => (
+            <Card key={c.id} className="border-border/40 shadow-sm">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${isWholesale ? 'bg-purple-500/20' : 'bg-sky-500/20'}`}>
+                    <span className={`text-sm font-bold ${isWholesale ? 'text-purple-600' : 'text-sky-600'}`}>
+                      {c.name.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold text-foreground truncate">{c.name}</p>
+                      <Badge className={`text-[10px] ${isWholesale ? 'bg-purple-500/20 text-purple-600 border-purple-500/30' : 'bg-sky-500/20 text-sky-600 border-sky-500/30'}`}>
+                        {isWholesale ? 'Wholesale' : 'Retail'}
+                      </Badge>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="font-semibold text-foreground truncate">{c.name}</p>
-                        <Badge className={`text-[10px] ${isWholesale ? 'bg-purple-500/20 text-purple-600 border-purple-500/30' : 'bg-sky-500/20 text-sky-600 border-sky-500/30'}`}>
-                          {isWholesale ? 'Wholesale' : 'Retail'}
-                        </Badge>
-                      </div>
-                      {isWholesale && c.company_name && (
-                        <p className="text-xs text-muted-foreground italic">{c.company_name}</p>
-                      )}
-                      <p className="text-xs text-muted-foreground">{c.phone || 'No phone'}</p>
-                      {!isWholesale && c.last_order_date && (
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          Visited {formatDistanceToNow(new Date(c.last_order_date), { addSuffix: true })}
-                        </p>
-                      )}
-                      {!isWholesale && !c.last_order_date && (
-                        <p className="text-xs text-muted-foreground/50 mt-0.5">No purchase yet</p>
-                      )}
-                      {isWholesale && c.credit_limit && (
-                        <div className="mt-1.5">
-                          {c.total_due > 0 && (
-                            <p className="text-sm font-bold text-rose-600 dark:text-rose-400 tabular-nums mb-1">
-                              {BANGLADESHI_CURRENCY_SYMBOL}{c.total_due.toLocaleString()} due
-                            </p>
-                          )}
-                          <div className="flex justify-between text-xs mb-1">
-                            <span className="text-muted-foreground">Credit used</span>
-                            <span className="tabular-nums text-muted-foreground">
-                              {BANGLADESHI_CURRENCY_SYMBOL}{(c.total_due || 0).toLocaleString()} / {BANGLADESHI_CURRENCY_SYMBOL}{c.credit_limit.toLocaleString()}
-                            </span>
-                          </div>
-                          <div className="h-2 rounded-full bg-muted overflow-hidden">
-                            <div
-                              className={`h-full rounded-full transition-all ${
-                                ((c.total_due || 0) / c.credit_limit) > 0.8
-                                  ? 'bg-rose-500'
-                                  : ((c.total_due || 0) / c.credit_limit) > 0.5
-                                  ? 'bg-amber-500'
-                                  : 'bg-emerald-500'
-                              }`}
-                              style={{ width: `${Math.min(100, ((c.total_due || 0) / c.credit_limit) * 100)}%` }}
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex flex-col gap-1 shrink-0 items-end">
-                      {!isWholesale && c.total_due > 0 && (
-                        <Badge variant="destructive" className="text-xs px-2 py-0.5">
-                          {BANGLADESHI_CURRENCY_SYMBOL}{c.total_due.toLocaleString()}
-                        </Badge>
-                      )}
-                      <div className="flex gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-11 w-11 p-0 touch-manipulation"
-                          title="View History"
-                          onClick={() => { setSelectedCustomer(c); fetchCustomerSalesHistory(c.id); fetchPayments(); setHistoryDialogOpen(true); }}
-                        >
-                          <History className="h-4 w-4" />
-                        </Button>
-                        {!isWholesale && c.phone && (
-                          <>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-11 w-11 p-0 text-emerald-600 hover:bg-emerald-500/10 touch-manipulation"
-                              asChild
-                            >
-                              <a href={`tel:${c.phone}`} aria-label={`Call ${c.name}`}>
-                                <Phone className="h-4 w-4" />
-                              </a>
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-11 w-11 p-0 text-green-600 hover:bg-green-500/10 touch-manipulation"
-                              asChild
-                            >
-                              <a
-                                href={`https://wa.me/${c.phone.replace(/\D/g, '')}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                aria-label={`WhatsApp ${c.name}`}
-                              >
-                                <MessageSquare className="h-4 w-4" />
-                              </a>
-                            </Button>
-                          </>
-                        )}
-                        {isWholesale && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-11 w-11 p-0 text-purple-600 hover:text-purple-700 hover:bg-purple-500/10 touch-manipulation"
-                            title="View Ledger"
-                            onClick={() => { setSelectedCustomer(c); fetchCustomerSalesHistory(c.id); fetchPayments(); setHistoryDialogOpen(true); }}
-                          >
-                            <BookOpen className="h-4 w-4" />
-                          </Button>
-                        )}
+                    {isWholesale && c.company_name && (
+                      <p className="text-xs text-muted-foreground italic">{c.company_name}</p>
+                    )}
+                    <p className="text-xs text-muted-foreground">{c.phone || 'No phone'}</p>
+                    {!isWholesale && c.last_order_date && (
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Visited {formatDistanceToNow(new Date(c.last_order_date), { addSuffix: true })}
+                      </p>
+                    )}
+                    {!isWholesale && !c.last_order_date && (
+                      <p className="text-xs text-muted-foreground/50 mt-0.5">No purchase yet</p>
+                    )}
+                    {isWholesale && c.credit_limit && (
+                      <div className="mt-1.5">
                         {c.total_due > 0 && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-11 w-11 p-0 text-emerald-600 hover:bg-emerald-500/10 touch-manipulation"
-                            title="Settle Account"
-                            onClick={() => { setSelectedCustomer(c); fetchPayments(); setSettleDialogOpen(true); }}
-                          >
-                            <Banknote className="h-4 w-4" />
-                          </Button>
+                          <p className="text-sm font-bold text-rose-600 dark:text-rose-400 tabular-nums mb-1">
+                            {BANGLADESHI_CURRENCY_SYMBOL}{c.total_due.toLocaleString()} due
+                          </p>
                         )}
+                        <div className="flex justify-between text-xs mb-1">
+                          <span className="text-muted-foreground">Credit used</span>
+                          <span className="tabular-nums text-muted-foreground">
+                            {BANGLADESHI_CURRENCY_SYMBOL}{(c.total_due || 0).toLocaleString()} / {BANGLADESHI_CURRENCY_SYMBOL}{c.credit_limit.toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="h-2 rounded-full bg-muted overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all ${
+                              ((c.total_due || 0) / c.credit_limit) > 0.8 ? 'bg-rose-500'
+                                : ((c.total_due || 0) / c.credit_limit) > 0.5 ? 'bg-amber-500'
+                                : 'bg-emerald-500'
+                            }`}
+                            style={{ width: `${Math.min(100, ((c.total_due || 0) / c.credit_limit) * 100)}%` }}
+                          />
+                        </div>
                       </div>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-1 shrink-0 items-end">
+                    {!isWholesale && c.total_due > 0 && (
+                      <Badge variant="destructive" className="text-xs px-2 py-0.5">
+                        {BANGLADESHI_CURRENCY_SYMBOL}{c.total_due.toLocaleString()}
+                      </Badge>
+                    )}
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="sm" className="h-11 w-11 p-0 touch-manipulation" title="View History"
+                        onClick={() => { setSelectedCustomer(c); fetchCustomerSalesHistory(c.id); fetchPayments(); setHistoryDialogOpen(true); }}>
+                        <History className="h-4 w-4" />
+                      </Button>
+                      {!isWholesale && c.phone && (
+                        <>
+                          <Button variant="ghost" size="sm" className="h-11 w-11 p-0 text-emerald-600 hover:bg-emerald-500/10 touch-manipulation" asChild>
+                            <a href={`tel:${c.phone}`} aria-label={`Call ${c.name}`}><Phone className="h-4 w-4" /></a>
+                          </Button>
+                          <Button variant="ghost" size="sm" className="h-11 w-11 p-0 text-green-600 hover:bg-green-500/10 touch-manipulation" asChild>
+                            <a href={`https://wa.me/${c.phone.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" aria-label={`WhatsApp ${c.name}`}><MessageSquare className="h-4 w-4" /></a>
+                          </Button>
+                        </>
+                      )}
+                      {isWholesale && (
+                        <Button variant="ghost" size="sm" className="h-11 w-11 p-0 text-purple-600 hover:text-purple-700 hover:bg-purple-500/10 touch-manipulation" title="View Ledger"
+                          onClick={() => { setSelectedCustomer(c); fetchCustomerSalesHistory(c.id); fetchPayments(); setHistoryDialogOpen(true); }}>
+                          <BookOpen className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {c.total_due > 0 && (
+                        <Button variant="ghost" size="sm" className="h-11 w-11 p-0 text-emerald-600 hover:bg-emerald-500/10 touch-manipulation" title="Settle Account"
+                          onClick={() => { setSelectedCustomer(c); fetchPayments(); setSettleDialogOpen(true); }}>
+                          <Banknote className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
+                </div>
+              </CardContent>
+            </Card>
+          );
+
+          return (
+            <Tabs value={customerTab} onValueChange={(v) => setCustomerTab(v as 'all' | 'due' | 'paid')}>
+              <TabsList className="grid w-full grid-cols-3 mb-3">
+                <TabsTrigger value="all" className="text-xs gap-1.5">
+                  <Users className="h-3.5 w-3.5" />All ({filtered.length})
+                </TabsTrigger>
+                <TabsTrigger value="due" className="text-xs gap-1.5">
+                  <UserX className="h-3.5 w-3.5" />Due ({dueFiltered.length})
+                </TabsTrigger>
+                <TabsTrigger value="paid" className="text-xs gap-1.5">
+                  <UserCheck className="h-3.5 w-3.5" />Paid ({paidFiltered.length})
+                </TabsTrigger>
+              </TabsList>
+
+              {/* Due summary strip */}
+              {customerTab === 'due' && dueFiltered.length > 0 && (
+                <div className="grid grid-cols-3 gap-2 mb-3">
+                  <div className="bg-rose-500/10 rounded-xl p-3 text-center">
+                    <p className="text-lg font-bold text-rose-600 tabular-nums">{dueFiltered.length}</p>
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Accounts</p>
+                  </div>
+                  <div className="bg-amber-500/10 rounded-xl p-3 text-center">
+                    <p className="text-sm font-bold text-amber-600 tabular-nums truncate">
+                      {BANGLADESHI_CURRENCY_SYMBOL}{dueFiltered.reduce((s, c) => s + c.total_due, 0).toLocaleString()}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Amount</p>
+                  </div>
+                  <div className="bg-purple-500/10 rounded-xl p-3 text-center">
+                    <p className="text-lg font-bold text-purple-600 tabular-nums">
+                      {dueFiltered.reduce((s, c) => s + c.cylinders_due, 0)}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Cylinders</p>
+                  </div>
+                </div>
+              )}
+
+              <TabsContent value="all" className="mt-0">
+                {filtered.length === 0 ? (
+                  <EmptyStateCard icon={<Users className="h-8 w-8" />} title={`No ${isWholesale ? 'wholesale' : 'retail'} customers yet`} subtitle={`Add your first ${isWholesale ? 'wholesale account' : 'retail customer'} to get started`} />
+                ) : (
+                  <div className="space-y-2">{filtered.map(c => <CustomerCard key={c.id} c={c} />)}</div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="due" className="mt-0">
+                {dueFiltered.length === 0 ? (
+                  <EmptyStateCard icon={<UserCheck className="h-8 w-8" />} title="No due customers" subtitle="All accounts are settled — great job!" />
+                ) : (
+                  <div className="space-y-2">{dueFiltered.map(c => <CustomerCard key={c.id} c={c} />)}</div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="paid" className="mt-0">
+                {paidFiltered.length === 0 ? (
+                  <EmptyStateCard icon={<Users className="h-8 w-8" />} title="No paid customers" subtitle="Customers with outstanding dues will appear in the Due tab" />
+                ) : (
+                  <div className="space-y-2">{paidFiltered.map(c => <CustomerCard key={c.id} c={c} />)}</div>
+                )}
+              </TabsContent>
+            </Tabs>
+          );
+        })()}
+
+
 
         {/* Customer History / Ledger Dialog */}
         <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
@@ -1625,835 +1696,6 @@ export const CustomerManagementModule = () => {
     );
   }
 
-  if (viewMode === 'due') {
-    return (
-      <div className="space-y-4 sm:space-y-6 pb-4">
-        {/* Premium Header */}
-        <div className="relative">
-          <div className="absolute inset-0 bg-gradient-to-r from-rose-500/5 via-transparent to-rose-500/5 rounded-xl -z-10" />
-          <div className="p-4 sm:p-0">
-            <Button
-              variant="ghost"
-              onClick={() => setViewMode('main')}
-              className="mb-3 -ml-2 text-muted-foreground hover:text-foreground h-9 px-3 text-sm touch-manipulation"
-            >
-              ← Back to Customer Management
-            </Button>
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-gradient-to-br from-rose-500 to-rose-600 flex items-center justify-center shadow-lg shrink-0">
-                <UserX className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
-              </div>
-              <div>
-                <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground tracking-tight">
-                  Due Customers
-                </h2>
-                <p className="text-xs sm:text-sm text-muted-foreground">
-                  Manage pending payments & unreturned cylinders
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Premium Summary Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-          {/* Due Accounts */}
-          <Card className="relative overflow-hidden border border-border/20 shadow-sm">
-            <div className="absolute inset-0 bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-transparent" />
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-rose-500 to-rose-400" />
-            <CardContent className="relative p-4 sm:p-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs sm:text-sm text-muted-foreground font-medium">Due Accounts</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-rose-600 dark:text-rose-400 mt-1 tabular-nums">{dueCustomers.length}</p>
-                  <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">Total customers with outstanding balance</p>
-                </div>
-                <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-rose-500/20 flex items-center justify-center shrink-0">
-                  <Users className="h-5 w-5 sm:h-6 sm:w-6 text-rose-500" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Total Amount Due */}
-          <Card className="relative overflow-hidden border border-border/20 shadow-sm">
-            <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent" />
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 to-amber-400" />
-            <CardContent className="relative p-4 sm:p-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs sm:text-sm text-muted-foreground font-medium">Total Amount Due</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-amber-600 dark:text-amber-400 mt-1 tabular-nums">
-                    {BANGLADESHI_CURRENCY_SYMBOL}{totalAmountDue.toLocaleString()}
-                  </p>
-                  <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">Sum of all pending payments</p>
-                </div>
-                <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-amber-500/20 flex items-center justify-center shrink-0">
-                  <Banknote className="h-5 w-5 sm:h-6 sm:w-6 text-amber-500" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Total Cylinders Due */}
-          <Card className="relative overflow-hidden border border-border/20 shadow-sm">
-            <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 via-purple-500/5 to-transparent" />
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 to-purple-400" />
-            <CardContent className="relative p-4 sm:p-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs sm:text-sm text-muted-foreground font-medium">Cylinders Due</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-purple-600 dark:text-purple-400 mt-1 tabular-nums">{totalCylindersDue}</p>
-                  <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">Total unreturned cylinders</p>
-                </div>
-                <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-purple-500/20 flex items-center justify-center shrink-0">
-                  <Package className="h-5 w-5 sm:h-6 sm:w-6 text-purple-500" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Search Bar */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by name, email, or phone..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 h-11 bg-card border-border shadow-sm"
-          />
-        </div>
-
-        {/* Customer List - Mobile Cards / Desktop Table */}
-        <Card className="relative overflow-hidden border border-border/20 shadow-sm">
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-rose-500 to-rose-400" />
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-rose-500/20 flex items-center justify-center">
-                <UserX className="h-4 w-4 text-rose-500" />
-              </div>
-              <div>
-                <CardTitle className="text-base sm:text-lg text-foreground">
-                  Due Accounts ({filteredDueCustomers.length})
-                </CardTitle>
-                <p className="text-xs text-muted-foreground">Customers with outstanding balance</p>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            {/* Mobile Card View */}
-            <div className="sm:hidden space-y-3">
-              {filteredDueCustomers.map((customer) => (
-                <Card key={customer.id} className="border border-border/50 shadow-sm">
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center gap-3">
-                        <Avatar className="h-10 w-10 bg-rose-500/10 shrink-0">
-                          <AvatarFallback className="bg-rose-500/10 text-rose-600 font-semibold">
-                            {getInitials(customer.name)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="min-w-0">
-                          <p className="font-semibold text-foreground truncate">{customer.name}</p>
-                          <p className="text-xs text-muted-foreground truncate">{customer.phone || customer.email || 'No contact'}</p>
-                        </div>
-                      </div>
-                      {getBillingBadge(customer.billing_status, customer.total_due)}
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3 mb-4">
-                      <div className="bg-rose-500/5 rounded-lg p-2.5">
-                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Amount Due</p>
-                        <p className="text-base font-bold text-rose-600 dark:text-rose-400 tabular-nums">
-                          {BANGLADESHI_CURRENCY_SYMBOL}{Number(customer.total_due).toLocaleString()}
-                        </p>
-                      </div>
-                      <div className="bg-purple-500/5 rounded-lg p-2.5">
-                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Cylinders</p>
-                        <p className="text-base font-bold text-purple-600 dark:text-purple-400 tabular-nums">
-                          {customer.cylinders_due} pcs
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        className="flex-1 h-10 bg-rose-500 hover:bg-rose-600 text-white font-medium touch-manipulation"
-                        onClick={() => {
-                          setSelectedCustomer(customer);
-                          setPaymentAmount(customer.total_due.toString());
-                          setCylindersToCollect(customer.cylinders_due.toString());
-                          setSettleDialogOpen(true);
-                        }}
-                      >
-                        Settle Account
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-10 px-3 border-border touch-manipulation"
-                        onClick={() => {
-                          setSelectedCustomer(customer);
-                          fetchCustomerSalesHistory(customer.id);
-                          setHistoryDialogOpen(true);
-                        }}
-                      >
-                        <History className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-              {filteredDueCustomers.length === 0 && (
-                <EmptyStateCard
-                  icon={<UserCheck className="h-10 w-10" />}
-                  title={searchQuery ? "No results found" : "No outstanding dues"}
-                  subtitle={searchQuery ? `No customers match "${searchQuery}"` : "All customers are fully paid up"}
-                  colorScheme="emerald"
-                />
-              )}
-            </div>
-
-            {/* Desktop Table View */}
-            <div className="hidden sm:block overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-border hover:bg-transparent">
-                    <TableHead className="text-muted-foreground font-semibold">Customer</TableHead>
-                    <TableHead className="text-muted-foreground font-semibold">Status</TableHead>
-                    <TableHead className="text-muted-foreground font-semibold text-right">Amount Due</TableHead>
-                    <TableHead className="text-muted-foreground font-semibold text-right">Cylinders</TableHead>
-                    <TableHead className="text-muted-foreground font-semibold text-center">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredDueCustomers.map((customer) => (
-                    <TableRow key={customer.id} className="border-border hover:bg-muted/30 transition-colors">
-                      <TableCell className="py-3">
-                        <div className="flex items-center gap-3">
-                          <Avatar className="h-10 w-10 bg-rose-500/10">
-                            <AvatarFallback className="bg-rose-500/10 text-rose-600 font-semibold">
-                              {getInitials(customer.name)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <p className="font-medium text-foreground">{customer.name}</p>
-                            <p className="text-xs text-muted-foreground">{customer.phone || customer.email || 'No contact'}</p>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="py-3">
-                        {getBillingBadge(customer.billing_status, customer.total_due)}
-                      </TableCell>
-                      <TableCell className="py-3 text-right">
-                        <span className="font-bold text-rose-600 dark:text-rose-400 tabular-nums">
-                          {BANGLADESHI_CURRENCY_SYMBOL}{Number(customer.total_due).toLocaleString()}
-                        </span>
-                      </TableCell>
-                      <TableCell className="py-3 text-right font-medium text-purple-600 dark:text-purple-400 tabular-nums">
-                        {customer.cylinders_due}
-                      </TableCell>
-                      <TableCell className="py-3">
-                        <div className="flex items-center justify-center gap-2">
-                          <Button
-                            size="sm"
-                            className="h-9 bg-rose-500 hover:bg-rose-600 text-white"
-                            onClick={() => {
-                              setSelectedCustomer(customer);
-                              setPaymentAmount(customer.total_due.toString());
-                              setCylindersToCollect(customer.cylinders_due.toString());
-                              setSettleDialogOpen(true);
-                            }}
-                          >
-                            Settle
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-9"
-                            onClick={() => {
-                              setSelectedCustomer(customer);
-                              fetchCustomerSalesHistory(customer.id);
-                              setHistoryDialogOpen(true);
-                            }}
-                          >
-                            <History className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {filteredDueCustomers.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={5} className="py-0 border-0">
-                        <EmptyStateCard
-                          icon={<UserCheck className="h-10 w-10" />}
-                          title={searchQuery ? "No results found" : "No outstanding dues"}
-                          subtitle={searchQuery ? `No customers match "${searchQuery}"` : "All customers are fully paid up"}
-                          colorScheme="emerald"
-                          className="border-0 bg-transparent"
-                        />
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Settle Account Dialog */}
-        <Dialog open={settleDialogOpen} onOpenChange={setSettleDialogOpen}>
-          <DialogContent className="bg-card border-border max-w-md">
-            <DialogHeader>
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-xl bg-rose-500/20 flex items-center justify-center">
-                  <Banknote className="h-5 w-5 text-rose-500" />
-                </div>
-                <div>
-                  <DialogTitle className="text-lg">Settle Account</DialogTitle>
-                  <p className="text-sm text-muted-foreground">{selectedCustomer?.name}</p>
-                </div>
-              </div>
-            </DialogHeader>
-            <div className="py-4 space-y-4">
-              {/* Payment Section */}
-              <div className="bg-muted/30 rounded-xl p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-foreground">Payment Collection</span>
-                  <Badge variant="outline" className="bg-rose-500/10 text-rose-600 border-rose-500/30">
-                    Due: {BANGLADESHI_CURRENCY_SYMBOL}{selectedCustomer?.total_due.toLocaleString()}
-                  </Badge>
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground font-medium">Amount Received ({BANGLADESHI_CURRENCY_SYMBOL})</label>
-                  <Input
-                    type="number"
-                    inputMode="numeric"
-                    value={paymentAmount}
-                    onChange={(e) => setPaymentAmount(e.target.value)}
-                    placeholder="0"
-                    className="mt-1.5 h-12 text-base font-semibold"
-                  />
-                </div>
-              </div>
-
-              {/* Cylinder Section */}
-              <div className="bg-muted/30 rounded-xl p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-foreground">Cylinder Collection</span>
-                  <Badge variant="outline" className="bg-purple-500/10 text-purple-600 border-purple-500/30">
-                    Due: {selectedCustomer?.cylinders_due || 0} pcs
-                  </Badge>
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground font-medium">Cylinders to Collect</label>
-                  <Input
-                    type="number"
-                    inputMode="numeric"
-                    value={cylindersToCollect}
-                    onChange={(e) => setCylindersToCollect(e.target.value)}
-                    placeholder="0"
-                    className="mt-1.5 h-12 text-base font-semibold"
-                  />
-                </div>
-              </div>
-            </div>
-            <MobileFormActions
-              onCancel={() => setSettleDialogOpen(false)}
-              onConfirm={handleSettleAccount}
-              cancelLabel="Cancel"
-              confirmLabel="Confirm & Settle"
-              confirmClassName="bg-rose-500 hover:bg-rose-600 text-white"
-            />
-          </DialogContent>
-        </Dialog>
-
-        {/* History Dialog */}
-        <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
-          <DialogContent className="bg-card border-border max-w-2xl max-h-[85dvh] overflow-hidden flex flex-col">
-            <DialogHeader className="shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                  <History className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <DialogTitle className="text-lg">Customer History</DialogTitle>
-                  <p className="text-sm text-muted-foreground">{selectedCustomer?.name}</p>
-                </div>
-              </div>
-            </DialogHeader>
-
-            <Tabs defaultValue="sales" className="flex-1 overflow-hidden flex flex-col">
-              <TabsList className="grid w-full grid-cols-2 shrink-0">
-                <TabsTrigger value="sales" className="gap-2">
-                  <ShoppingCart className="h-4 w-4" />
-                  Purchase History
-                </TabsTrigger>
-                <TabsTrigger value="payments" className="gap-2">
-                  <Banknote className="h-4 w-4" />
-                  Payments
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="sales" className="flex-1 overflow-auto mt-4">
-                {salesHistory.length > 0 ? (
-                  <div className="space-y-2">
-                    {salesHistory.map((tx) => (
-                      <Card
-                        key={tx.id}
-                        className="border border-border/50 shadow-sm hover:shadow-md transition-all cursor-pointer"
-                        onClick={() => handleViewTransaction(tx)}
-                      >
-                        <CardContent className="p-3">
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-3 min-w-0">
-                              <div className="h-9 w-9 rounded-lg bg-purple-500/10 flex items-center justify-center shrink-0">
-                                <Receipt className="h-4 w-4 text-purple-500" />
-                              </div>
-                              <div className="min-w-0">
-                                <p className="font-mono font-semibold text-foreground text-sm">
-                                  {tx.transaction_number}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                  {format(new Date(tx.created_at), 'MMM dd, yyyy • HH:mm')}
-                                </p>
-                                <p className="text-xs text-muted-foreground truncate max-w-[200px]">
-                                  {tx.items}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="text-right shrink-0">
-                              <p className="font-bold text-foreground tabular-nums">
-                                {BANGLADESHI_CURRENCY_SYMBOL}{tx.total.toLocaleString()}
-                              </p>
-                              <Badge
-                                className={tx.payment_status === 'paid'
-                                  ? 'bg-emerald-500/20 text-emerald-600 border-emerald-500/30'
-                                  : 'bg-amber-500/20 text-amber-600 border-amber-500/30'
-                                }
-                              >
-                                {tx.payment_status}
-                              </Badge>
-                              <Button variant="ghost" size="sm" className="h-7 px-2 mt-1">
-                                <Printer className="h-3.5 w-3.5" />
-                              </Button>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-12">
-                    <div className="h-12 w-12 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-3">
-                      <ShoppingCart className="h-6 w-6 text-muted-foreground" />
-                    </div>
-                    <p className="text-muted-foreground">No purchase history found</p>
-                  </div>
-                )}
-              </TabsContent>
-
-              <TabsContent value="payments" className="flex-1 overflow-auto mt-4">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="border-border">
-                      <TableHead className="text-muted-foreground font-semibold">Date</TableHead>
-                      <TableHead className="text-muted-foreground font-semibold text-right">Amount</TableHead>
-                      <TableHead className="text-muted-foreground font-semibold text-right">Cylinders</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {selectedCustomer && getCustomerPayments(selectedCustomer.id).map((payment) => (
-                      <TableRow key={payment.id} className="border-border">
-                        <TableCell className="text-foreground">
-                          {format(new Date(payment.payment_date), 'MMM dd, yyyy HH:mm')}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <span className="font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
-                            {BANGLADESHI_CURRENCY_SYMBOL}{Number(payment.amount).toLocaleString()}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-right font-medium text-foreground tabular-nums">
-                          {payment.cylinders_collected}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    {selectedCustomer && getCustomerPayments(selectedCustomer.id).length === 0 && (
-                      <TableRow>
-                        <TableCell colSpan={3} className="text-center py-8">
-                          <div className="h-12 w-12 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-3">
-                            <Receipt className="h-6 w-6 text-muted-foreground" />
-                          </div>
-                          <p className="text-muted-foreground">No payment history found</p>
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </TabsContent>
-            </Tabs>
-          </DialogContent>
-        </Dialog>
-
-        {/* Invoice Dialog for Memo Reprint */}
-        <InvoiceDialog
-          open={invoiceDialogOpen}
-          onOpenChange={setInvoiceDialogOpen}
-          invoiceData={getInvoiceData()}
-          businessName="Stock-X BD Ltd."
-          businessPhone="+880 1XXX-XXXXXX"
-          businessAddress="Dhaka, Bangladesh"
-        />
-      </div>
-    );
-  }
-
-  // Paid Customers View
-  return (
-    <div className="space-y-4 sm:space-y-6 pb-4">
-      {/* Premium Header */}
-      <div className="relative">
-        <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 via-transparent to-emerald-500/5 rounded-xl -z-10" />
-        <div className="p-4 sm:p-0">
-          <Button
-            variant="ghost"
-            onClick={() => setViewMode('main')}
-            className="mb-3 -ml-2 text-muted-foreground hover:text-foreground h-9 px-3 text-sm touch-manipulation"
-          >
-            ← Back to Customer Management
-          </Button>
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-lg shrink-0">
-              <UserCheck className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
-            </div>
-            <div>
-              <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground tracking-tight">
-                Paid Customers
-              </h2>
-              <p className="text-xs sm:text-sm text-muted-foreground">
-                Accounts with no outstanding balance
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Search Bar */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search by name, email, or phone..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-10 h-11 bg-card border-border shadow-sm"
-        />
-      </div>
-
-        {/* Customer List - Mobile Cards / Desktop Table */}
-        <Card className="relative overflow-hidden border border-border/20 shadow-sm">
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-emerald-400" />
-        <CardHeader className="pb-3">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
-              <UserCheck className="h-4 w-4 text-emerald-500" />
-            </div>
-            <div>
-              <CardTitle className="text-base sm:text-lg text-foreground">
-                Paid Customers ({filteredPaidCustomers.length})
-              </CardTitle>
-              <p className="text-xs text-muted-foreground">All dues have been settled</p>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="pt-0">
-          {/* Mobile Card View */}
-          <div className="sm:hidden space-y-3">
-            {filteredPaidCustomers.length === 0 && (
-              <EmptyStateCard
-                icon={<Users className="h-10 w-10" />}
-                title={searchQuery ? "No results found" : "No fully paid customers yet"}
-                subtitle={searchQuery ? `No customers match "${searchQuery}"` : "Complete a sale with full payment to see customers here"}
-                colorScheme="muted"
-              />
-            )}
-            {filteredPaidCustomers.map((customer, index) => (
-              <Card
-                key={customer.id}
-                className="border border-border/50 shadow-sm cursor-pointer hover:shadow-md transition-all"
-                onClick={() => {
-                  setSelectedCustomer(customer);
-                  fetchCustomerSalesHistory(customer.id);
-                  setHistoryDialogOpen(true);
-                }}
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-3">
-                    <Avatar className="h-10 w-10 bg-emerald-500/10 shrink-0">
-                      <AvatarFallback className="bg-emerald-500/10 text-emerald-600 font-semibold">
-                        {getInitials(customer.name)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="font-semibold text-foreground truncate">{customer.name}</p>
-                        <Badge className="bg-emerald-500/20 text-emerald-600 border-emerald-500/30 shrink-0">
-                          Clear
-                        </Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {customer.phone || customer.email || 'No contact'}
-                      </p>
-                        <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                          <span className="font-medium">ID: CUST-{String(index + 1).padStart(3, '0')}</span>
-                          {customer.last_order_date ? (
-                            <button
-                              className="text-primary underline-offset-2 hover:underline cursor-pointer touch-manipulation"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                sessionStorage.setItem('pending-diary-filter', customer.name);
-                                window.dispatchEvent(new CustomEvent('navigate-module', { detail: 'business-diary' }));
-                              }}
-                            >
-                              Last: {format(new Date(customer.last_order_date), 'MMM dd, yyyy')}
-                            </button>
-                          ) : (
-                            <span>No orders yet</span>
-                          )}
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-
-          {/* Desktop Table View */}
-          <div className="hidden sm:block overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
-            <Table className="min-w-[600px]">
-              <TableHeader>
-                <TableRow className="border-border hover:bg-transparent">
-                  <TableHead className="text-muted-foreground font-semibold">Customer ID</TableHead>
-                  <TableHead className="text-muted-foreground font-semibold">Customer</TableHead>
-                  <TableHead className="text-muted-foreground font-semibold">Contact</TableHead>
-                  <TableHead className="text-muted-foreground font-semibold">Last Order</TableHead>
-                  <TableHead className="text-muted-foreground font-semibold text-center">Status</TableHead>
-                  <TableHead className="text-muted-foreground font-semibold text-center">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredPaidCustomers.map((customer, index) => (
-                  <TableRow key={customer.id} className="border-border hover:bg-muted/30 transition-colors">
-                    <TableCell className="py-3 font-mono text-sm text-muted-foreground">
-                      CUST-{String(index + 1).padStart(3, '0')}
-                    </TableCell>
-                    <TableCell className="py-3">
-                      <div className="flex items-center gap-3">
-                        <Avatar className="h-9 w-9 bg-emerald-500/10">
-                          <AvatarFallback className="bg-emerald-500/10 text-emerald-600 font-semibold text-sm">
-                            {getInitials(customer.name)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span className="font-medium text-foreground">{customer.name}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="py-3 text-muted-foreground">
-                      {customer.phone || customer.email || 'N/A'}
-                    </TableCell>
-                    <TableCell className="py-3">
-                      {customer.last_order_date ? (
-                        <button
-                          className="text-sm text-primary underline-offset-2 hover:underline cursor-pointer"
-                          onClick={() => {
-                            sessionStorage.setItem('pending-diary-filter', customer.name);
-                            window.dispatchEvent(new CustomEvent('navigate-module', { detail: 'business-diary' }));
-                          }}
-                        >
-                          {format(new Date(customer.last_order_date), 'MMM dd, yyyy')}
-                        </button>
-                      ) : (
-                        <span className="text-muted-foreground">N/A</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="py-3 text-center">
-                      <Badge className="bg-emerald-500/20 text-emerald-600 border-emerald-500/30">
-                        Clear
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="py-3 text-center">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-9"
-                        onClick={() => {
-                          setSelectedCustomer(customer);
-                          fetchCustomerSalesHistory(customer.id);
-                          setHistoryDialogOpen(true);
-                        }}
-                      >
-                        <History className="h-4 w-4 mr-2" />
-                        History
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {filteredPaidCustomers.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={6} className="py-0 border-0">
-                      <EmptyStateCard
-                        icon={<Users className="h-10 w-10" />}
-                        title={searchQuery ? "No results found" : "No fully paid customers yet"}
-                        subtitle={searchQuery ? `No customers match "${searchQuery}"` : "Complete a sale with full payment to see customers here"}
-                        colorScheme="muted"
-                        className="border-0 bg-transparent"
-                      />
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* History Dialog */}
-      <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
-        <DialogContent className="bg-card border-border max-w-2xl max-h-[85dvh] overflow-hidden flex flex-col">
-          <DialogHeader className="shrink-0">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                <History className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <DialogTitle className="text-lg">Customer History</DialogTitle>
-                <p className="text-sm text-muted-foreground">{selectedCustomer?.name}</p>
-              </div>
-            </div>
-          </DialogHeader>
-
-          <Tabs defaultValue="sales" className="flex-1 overflow-hidden flex flex-col">
-            <TabsList className="grid w-full grid-cols-2 shrink-0">
-              <TabsTrigger value="sales" className="gap-2">
-                <ShoppingCart className="h-4 w-4" />
-                Purchase History
-              </TabsTrigger>
-              <TabsTrigger value="payments" className="gap-2">
-                <Banknote className="h-4 w-4" />
-                Payments
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="sales" className="flex-1 overflow-auto mt-4">
-              {salesHistory.length > 0 ? (
-                <div className="space-y-2">
-                  {salesHistory.map((tx) => (
-                    <Card
-                      key={tx.id}
-                      className="border border-border/50 shadow-sm hover:shadow-md transition-all cursor-pointer"
-                      onClick={() => handleViewTransaction(tx)}
-                    >
-                      <CardContent className="p-3">
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className="h-9 w-9 rounded-lg bg-purple-500/10 flex items-center justify-center shrink-0">
-                              <Receipt className="h-4 w-4 text-purple-500" />
-                            </div>
-                            <div className="min-w-0">
-                              <p className="font-mono font-semibold text-foreground text-sm">
-                                {tx.transaction_number}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                {format(new Date(tx.created_at), 'MMM dd, yyyy • HH:mm')}
-                              </p>
-                              <p className="text-xs text-muted-foreground truncate max-w-[200px]">
-                                {tx.items}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="text-right shrink-0">
-                            <p className="font-bold text-foreground tabular-nums">
-                              {BANGLADESHI_CURRENCY_SYMBOL}{tx.total.toLocaleString()}
-                            </p>
-                            <Badge
-                              className={tx.payment_status === 'paid'
-                                ? 'bg-emerald-500/20 text-emerald-600 border-emerald-500/30'
-                                : 'bg-amber-500/20 text-amber-600 border-amber-500/30'
-                              }
-                            >
-                              {tx.payment_status}
-                            </Badge>
-                            <Button variant="ghost" size="sm" className="h-7 px-2 mt-1">
-                              <Printer className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-12">
-                  <div className="h-12 w-12 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-3">
-                    <ShoppingCart className="h-6 w-6 text-muted-foreground" />
-                  </div>
-                  <p className="text-muted-foreground">No purchase history found</p>
-                </div>
-              )}
-            </TabsContent>
-
-            <TabsContent value="payments" className="flex-1 overflow-auto mt-4">
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-border">
-                    <TableHead className="text-muted-foreground font-semibold">Date</TableHead>
-                    <TableHead className="text-muted-foreground font-semibold text-right">Amount</TableHead>
-                    <TableHead className="text-muted-foreground font-semibold text-right">Cylinders</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {selectedCustomer && getCustomerPayments(selectedCustomer.id).map((payment) => (
-                    <TableRow key={payment.id} className="border-border">
-                      <TableCell className="text-foreground">
-                        {format(new Date(payment.payment_date), 'MMM dd, yyyy HH:mm')}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <span className="font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
-                          {BANGLADESHI_CURRENCY_SYMBOL}{Number(payment.amount).toLocaleString()}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right font-medium text-foreground tabular-nums">
-                        {payment.cylinders_collected}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {selectedCustomer && getCustomerPayments(selectedCustomer.id).length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={3} className="text-center py-8">
-                        <div className="h-12 w-12 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-3">
-                          <Receipt className="h-6 w-6 text-muted-foreground" />
-                        </div>
-                        <p className="text-muted-foreground">No payment history found</p>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </TabsContent>
-          </Tabs>
-        </DialogContent>
-      </Dialog>
-
-      {/* Invoice Dialog for Memo Reprint */}
-      <InvoiceDialog
-        open={invoiceDialogOpen}
-        onOpenChange={setInvoiceDialogOpen}
-        invoiceData={getInvoiceData()}
-        businessName="Stock-X BD Ltd."
-        businessPhone="+880 1XXX-XXXXXX"
-        businessAddress="Dhaka, Bangladesh"
-      />
-    </div>
-  );
-};
+  // Fallback — should never be reached
+  return null;
+}
