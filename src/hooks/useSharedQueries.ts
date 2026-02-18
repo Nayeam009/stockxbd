@@ -372,6 +372,14 @@ export function useUnifiedRealtime() {
         { event: '*', schema: 'public', table: 'customers' },
         () => invalidateWithDebounce(sharedKeys.customers(), 'normal')
       )
+      // Customer payments (settlement receipts) — invalidate overview so Dashboard KPI refreshes
+      .on('postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'customer_payments' },
+        () => {
+          invalidateWithDebounce(sharedKeys.overview(), 'critical');
+          invalidateWithDebounce(sharedKeys.todayStats(), 'critical');
+        }
+      )
       // Product prices
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'product_prices' },
