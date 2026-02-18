@@ -9,7 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { UserPlus, Loader2 } from "lucide-react";
+import { UserPlus, Loader2, ShoppingBag, Building2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { BANGLADESHI_CURRENCY_SYMBOL } from "@/lib/bangladeshConstants";
@@ -28,6 +28,7 @@ export const CustomerAddDialog = ({
   onSuccess
 }: CustomerAddDialogProps) => {
   const [isLoading, setIsLoading] = useState(false);
+  const [customerType, setCustomerType] = useState<'retail' | 'wholesale'>('retail');
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -39,6 +40,7 @@ export const CustomerAddDialog = ({
   });
 
   const resetForm = () => {
+    setCustomerType('retail');
     setFormData({
       name: "",
       email: "",
@@ -48,6 +50,14 @@ export const CustomerAddDialog = ({
       cylinders_due: "",
       credit_limit: "10000"
     });
+  };
+
+  const handleTypeChange = (type: 'retail' | 'wholesale') => {
+    setCustomerType(type);
+    setFormData(prev => ({
+      ...prev,
+      credit_limit: type === 'wholesale' ? "50000" : "10000"
+    }));
   };
 
   const handleAddCustomer = async () => {
@@ -87,10 +97,11 @@ export const CustomerAddDialog = ({
           total_due: totalDue,
           cylinders_due: cylindersDue,
           credit_limit: creditLimit,
+          customer_type: customerType,
           billing_status: totalDue > 0 || cylindersDue > 0 ? 'pending' : 'clear',
           created_by: user?.id,
           owner_id: ownerId || user?.id
-        });
+        } as any);
 
       if (error) {
         throw error;
@@ -128,6 +139,40 @@ export const CustomerAddDialog = ({
         </DialogHeader>
 
         <div className="space-y-4 py-4">
+          {/* Customer Type Toggle */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Customer Type</Label>
+            <div className="grid grid-cols-2 gap-2 p-1 bg-muted rounded-lg">
+              <button
+                type="button"
+                onClick={() => handleTypeChange('retail')}
+                className={`flex items-center justify-center gap-2 h-11 rounded-md text-sm font-semibold transition-all ${
+                  customerType === 'retail'
+                    ? 'bg-sky-500 text-white shadow-md'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <ShoppingBag className="h-4 w-4" />
+                Retail
+              </button>
+              <button
+                type="button"
+                onClick={() => handleTypeChange('wholesale')}
+                className={`flex items-center justify-center gap-2 h-11 rounded-md text-sm font-semibold transition-all ${
+                  customerType === 'wholesale'
+                    ? 'bg-purple-600 text-white shadow-md'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <Building2 className="h-4 w-4" />
+                Wholesale
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {customerType === 'retail' ? 'Regular retail customer — default credit limit ৳10,000' : 'Wholesale account — higher credit limit ৳50,000 (editable)'}
+            </p>
+          </div>
+
           {/* Name - Required */}
           <div className="space-y-2">
             <Label className="text-sm font-medium">
@@ -207,14 +252,19 @@ export const CustomerAddDialog = ({
 
           {/* Credit Limit */}
           <div className="space-y-2">
-            <Label className="text-sm font-medium">Credit Limit ({BANGLADESHI_CURRENCY_SYMBOL})</Label>
+            <Label className="text-sm font-medium">
+              Credit Limit ({BANGLADESHI_CURRENCY_SYMBOL})
+              {customerType === 'wholesale' && (
+                <span className="ml-2 text-xs text-purple-600 font-normal">Wholesale account</span>
+              )}
+            </Label>
             <Input
               type="number"
               inputMode="numeric"
               value={formData.credit_limit}
               onChange={(e) => setFormData({...formData, credit_limit: e.target.value})}
-              placeholder="10000"
-              className="h-11 text-base"
+              placeholder={customerType === 'wholesale' ? '50000' : '10000'}
+              className={`h-11 text-base ${customerType === 'wholesale' ? 'border-purple-300 focus:border-purple-500' : ''}`}
             />
           </div>
         </div>

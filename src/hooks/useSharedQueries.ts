@@ -71,6 +71,7 @@ export interface SharedCustomer {
   billing_status: string;
   last_order_date: string | null;
   credit_limit?: number;
+  customer_type: 'retail' | 'wholesale';
   created_at: string;
 }
 
@@ -162,7 +163,10 @@ async function fetchCustomers(): Promise<SharedCustomer[]> {
     .limit(500);
   
   if (error) throw error;
-  return data || [];
+  return (data || []).map(c => ({
+    ...c,
+    customer_type: (c.customer_type as 'retail' | 'wholesale') || 'retail',
+  })) as SharedCustomer[];
 }
 
 async function fetchProductPrices(): Promise<SharedProductPrice[]> {

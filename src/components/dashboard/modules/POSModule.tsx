@@ -157,6 +157,7 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
           cylinders_due: 0,
           billing_status: 'clear',
           last_order_date: null,
+          customer_type: 'retail',
           created_at: new Date().toISOString()
         },
         phoneQuery: pendingOrder.customer.phone,
@@ -309,9 +310,10 @@ export const POSModule = ({ userRole = 'owner', userName = 'User' }: POSModulePr
           name: sanitizeString(customerState.newCustomerName),
           phone: normalizedPhone,
           address: customerState.newCustomerAddress || null,
+          customer_type: saleType,
           created_by: user.id,
           owner_id: ownerId || user.id
-        }).select().single();
+        } as any).select().single();
         if (newCust) customerId = newCust.id;
       }
 
