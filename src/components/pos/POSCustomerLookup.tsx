@@ -135,6 +135,29 @@ export const POSCustomerLookup = ({
     }
   }, [phoneQuery]);
 
+  // Per-customer realtime subscription — toasts when manager updates the selected customer
+  useEffect(() => {
+    if (status !== 'found' || !customer?.id) return;
+
+    const channel = supabase
+      .channel(`pos-customer-${customer.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'customers', filter: `id=eq.${customer.id}` },
+        (payload) => {
+          const updated = payload.new as Customer;
+          onCustomerChange({ ...customerState, customer: updated });
+          toast({
+            title: "Customer Account Updated",
+            description: `${updated.name}'s details were updated${updated.credit_limit ? ` — Credit limit: ৳${updated.credit_limit.toLocaleString()}` : ''}.`,
+          });
+        }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [status, customer?.id]);
+
   const handlePhoneChange = (value: string) => {
     const cleaned = value.replace(/\D/g, '').slice(0, 11);
     onCustomerChange({ ...customerState, phoneQuery: cleaned });
