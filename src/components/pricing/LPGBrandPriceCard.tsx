@@ -55,7 +55,7 @@ export const LPGBrandPriceCard = ({
   }
 
   return (
-    <Card className="border-border hover:shadow-lg transition-all duration-200">
+    <Card className="border-border/40 shadow-sm hover:shadow-md transition-all duration-200">
       {/* Header */}
       <CardHeader className="pb-3 px-4 pt-4">
         <div className="flex items-center justify-between">

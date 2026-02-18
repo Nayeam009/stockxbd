@@ -114,20 +114,17 @@ export const ProductPricingModule = () => {
       <SoftRefreshBadge isRefreshing={softLoading} />
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <PremiumModuleHeader
-          icon={<Flame className="h-6 w-6" />}
-          title="Product Pricing"
-          subtitle="Manage prices for all products. Changes sync across modules."
-        />
-        
-        <div className="flex items-center gap-2 sm:gap-3">
+      <PremiumModuleHeader
+        icon={<Flame className="h-6 w-6" />}
+        title="Product Pricing"
+        subtitle="Manage prices for all products. Changes sync across modules."
+        actions={
           <AddProductDialog
             lpgBrands={lpgBrands}
             onAddProduct={addProduct}
           />
-        </div>
-      </div>
+        }
+      />
 
       {/* Sticky Save Button — appears only when there are unsaved changes */}
       {hasChanges && (

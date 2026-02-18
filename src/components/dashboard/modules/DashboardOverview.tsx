@@ -204,7 +204,7 @@ export const DashboardOverview = ({
         role="region"
         aria-label="Key performance indicators"
       >
-        {kpiCards.map((card) => {
+        {kpiCards.map((card, index) => {
           const Icon = card.icon;
           const isNegative = card.changeType === 'negative';
           const isWarning = card.changeType === 'warning';
@@ -212,7 +212,8 @@ export const DashboardOverview = ({
           return (
             <Card
               key={card.id}
-              className={`group relative overflow-hidden border border-border/40 shadow-sm hover:shadow-md transition-all duration-300 bg-card min-h-[120px] ${card.clickable ? 'cursor-pointer hover:-translate-y-1 focus-visible:ring-2 focus-visible:ring-primary' : ''} ${card.warning ? 'border-destructive/30' : ''}`}
+              style={{ animationDelay: `${index * 75}ms` }}
+              className={`group relative overflow-hidden border border-border/40 shadow-sm hover:shadow-md transition-all duration-300 bg-card min-h-[120px] animate-fade-in opacity-0 [animation-fill-mode:forwards] ${card.clickable ? 'cursor-pointer hover:-translate-y-1 focus-visible:ring-2 focus-visible:ring-primary' : ''} ${card.warning ? 'border-destructive/30' : ''}`}
               onClick={card.clickable ? card.onClick : undefined}
               tabIndex={card.clickable ? 0 : undefined}
               onKeyDown={card.clickable ? (e) => e.key === 'Enter' && card.onClick?.() : undefined}
