@@ -1,0 +1,1 @@
+ALTER TABLE public.pos_transaction_items DROP CONSTRAINT IF EXISTS pos_transaction_items_product_id_fkey;

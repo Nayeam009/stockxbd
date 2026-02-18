@@ -992,13 +992,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "pos_transaction_items_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "pos_transaction_items_transaction_id_fkey"
             columns: ["transaction_id"]
             isOneToOne: false
