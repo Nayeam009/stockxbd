@@ -1,251 +1,166 @@
 
-# UI/UX Polish Roadmap — StockX BD
+# "StockX Premium" Design System — Precise Implementation Plan
 
-## Executive Audit Summary
+## Complete Audit vs. Requested Items
 
-After reading all 10 module files, the sidebar, `Dashboard.tsx`, `ModuleSkeleton.tsx`, `index.css`, and the `DashboardOverview` component in full, here are the verified findings against the POS gold standard.
-
----
-
-## Section 1: Visual Consistency Audit
-
-### 1A — Header Consistency (PremiumModuleHeader)
-
-| Module | Uses PremiumModuleHeader? | Finding |
-|---|---|---|
-| POS | ✅ Yes | Gold standard |
-| Inventory | ✅ Yes | Correct |
-| Business Diary | ✅ Yes | Correctly sticky (implemented last batch) |
-| Product Pricing | ⚠️ Partial | Wrapped in a custom `div` with duplicate gradient logic — not using the component's `onRefresh` prop, refresh button is missing |
-| Analysis & Reports | ✅ Yes | Correct |
-| Drivers | ✅ Yes | Correct |
-| Utility & Expense | ✅ Yes | Correct |
-| Customer Management | ✅ Yes | Correct |
-| Settings | ❌ No | Uses a fully custom header with breadcrumb — no `PremiumModuleHeader`, no icon, no subtitle |
-| Profile | ❌ No | Uses a plain `<h2>` text header: `className="text-3xl font-bold"` — no PremiumModuleHeader, no icon, no gradient |
-| MyShop Profile | ❌ No | Uses a custom `<div className="relative">` with manually duplicated gradient markup — not the component |
-| Marketplace Orders | ❌ No | Uses a plain `<h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">` — no PremiumModuleHeader |
-
-**Gap Count: 4 modules missing `PremiumModuleHeader` (Settings, Profile, MyShop, Marketplace Orders)**
+After reading all relevant files in full, here is the verified status of every request:
 
 ---
 
-### 1B — Card Shadow & Radius Legacy Audit
+### Request 1: Headers — PremiumModuleHeader Everywhere
 
-**What was found:**
+**Already done (previous batches):**
+- Inventory ✅ — `PremiumModuleHeader` at line 181
+- Business Diary ✅ — sticky PremiumModuleHeader
+- Customers ✅ — PremiumModuleHeader
+- Settings ✅ — added in previous batch
+- Profile ✅ — added in previous batch
+- MyShop ✅ — added in previous batch
+- Marketplace Orders ✅ — added in previous batch
 
-- `DashboardOverview.tsx` line 215: KPI cards use `shadow-md` instead of `shadow-sm`. This is the most visible inconsistency — the very first thing shown to users has the wrong shadow weight.
-- `DashboardOverview.tsx` line 268: The Cylinder Balance Card also uses `shadow-md`.
-- `MarketplaceOrdersModule.tsx` line 232: The "no orders" empty state uses `border-dashed` — a custom hand-coded card, not `<EmptyStateCard>`.
-- `ProfileModule.tsx` line 269: The Profile Card uses `className="border-0 shadow-elegant"` — the `shadow-elegant` utility is undefined in the Tailwind config (falls back to no shadow). This is a silent visual bug.
-- `DriversModule.tsx` line 173: Driver cards use `hover:shadow-md` — correct for hover state (elevating on interaction is acceptable).
+**Gap found:** `ProductPricingModule` wraps `PremiumModuleHeader` inside a custom flex div (lines 117-130) instead of using the component's native `actions` prop. The component is used, but the layout is ad-hoc. This is a minor cleanup — move `AddProductDialog` into the `actions` prop of `PremiumModuleHeader`.
 
-**Standard to enforce:** `rounded-xl border-border/40 shadow-sm` on all content cards.
-
----
-
-### 1C — Button Height Compliance
-
-| Location | Current Height | Standard | Gap |
-|---|---|---|---|
-| Business Diary "Add" button | `h-8` | `h-11` minimum | ❌ Below standard |
-| Business Diary "Refresh" icon button | `h-8 w-8` | `h-11 w-11` | ❌ Below standard |
-| Marketplace Orders "Refresh" button | `size="sm"` (h-9) | `h-11` | ❌ Below standard |
-| Drivers "Mark Busy" toggle button | `h-7` | In a card context — acceptable small | ✅ Acceptable |
-| Settings section nav buttons | `min-h-[64px]` | ✅ Exceeds standard | ✅ Correct |
-| POS all action buttons | `h-11` or `h-12` | ✅ | ✅ Gold standard |
-
-**Gap: Business Diary and Marketplace Orders control buttons are undersized for touch.**
+**Verdict: No new module needs a header. 1 minor cleanup.**
 
 ---
 
-### 1D — Empty State Audit
+### Request 2: Card Containers — rounded-xl border-slate-200 shadow-sm
 
-| Module | Empty State | Standard? |
-|---|---|---|
-| Drivers (no drivers) | ✅ `<EmptyStateCard>` | Correct |
-| Utility (no staff) | ✅ `<EmptyStateCard>` (fixed last batch) | Correct |
-| Marketplace Orders (no orders) | ❌ Custom hand-coded `Card border-dashed` | Non-standard |
-| Customer (no customers) | ✅ `<EmptyStateCard>` | Correct |
-| Inventory (no LPG brands) | ✅ `<EmptyStateCard>` | Correct |
-
-**Gap: Marketplace Orders empty state is non-standard.**
-
----
-
-## Section 2: Navigation & Performance Analysis
-
-### 2A — Suspense Skeleton Coverage
-
-**How `Dashboard.tsx` works:**
-
-Every module goes through this flow:
+**Status of `LPGBrandCard.tsx` (line 98):**
+```tsx
+<Card className="border-border hover:shadow-md transition-shadow">
 ```
+The standard is `rounded-xl border-border/40 shadow-sm`. Missing: `shadow-sm`, `border-border/40`, `rounded-xl` (inherited from Card component itself via `rounded-xl` in `card.tsx`).
+
+**Status of `LPGBrandPriceCard.tsx` (line 58):**
+```tsx
+<Card className="border-border hover:shadow-lg transition-all duration-200">
+```
+Missing `shadow-sm` initial shadow, `border-border/40`.
+
+**Gap: 2 card components need the standard shadow-sm + border-border/40 baseline.**
+
+---
+
+### Request 3: Typography — tabular-nums for financial data
+
+**Gap found:** `LPGBrandCard.tsx` has its own inline `EditableStockCell` (NOT the shared component) starting at line 36. This local version's display div (line 82-88) has NO `tabular-nums`. The previous batch fixed the shared `EditableStockCell.tsx` but not this local copy.
+
+**Fix:** Add `tabular-nums` to the local `EditableStockCell` display div inside `LPGBrandCard.tsx`.
+
+---
+
+### Request 4: Skeleton Loaders via React.Suspense
+
+**Already correctly implemented.** `Dashboard.tsx` uses:
+```tsx
 <Suspense fallback={isFirstLoad ? <ModuleSkeleton /> : <QuickLoader />}>
-  {moduleContent}
-</Suspense>
+```
+`ModuleSkeleton` mimics Header + Grid of Cards layout. `QuickLoader` is a minimal spinner for revisits. Every lazy module is wrapped. **No change needed.**
+
+---
+
+### Request 5: Sidebar Hover Pre-fetching
+
+**NOT implemented.** Currently the sidebar `SidebarMenuButton` only has `onClick`. There is no `onMouseEnter` pre-fetch.
+
+**Fix:** Add `onMouseEnter` to each `SidebarMenuButton` that calls the lazy `import()` for that module's chunk. This is a pure performance optimization — clicking feels instant because the JS is already in browser cache by the time the user's finger lifts.
+
+The module → import map:
+```
+'overview'         → import("@/components/dashboard/modules/DashboardOverview")
+'pos'              → import("@/components/dashboard/modules/POSModule")
+'inventory'        → import("@/components/dashboard/modules/InventoryModule")
+'product-pricing'  → import("@/components/dashboard/modules/ProductPricingModule")
+'customers'        → import("@/components/dashboard/modules/CustomerManagementModule")
+'business-diary'   → import("@/components/dashboard/modules/BusinessDiaryModule")
+'utility-expense'  → import("@/components/dashboard/modules/UtilityExpenseModule")
+'analysis-search'  → import("@/components/dashboard/modules/AnalysisSearchReportModule")
+'settings'         → import("@/components/dashboard/modules/SettingsModule")
+'drivers'          → import("@/components/dashboard/modules/DriversModule")
+'my-shop'          → import("@/components/dashboard/modules/MyShopProfileModule")
+'marketplace-orders' → import("@/components/dashboard/modules/MarketplaceOrdersModule")
 ```
 
-The `isFirstLoad` check uses `loadedModules` — a `Set` that grows as modules are visited. This means:
-- **First visit to any module:** Shows `ModuleSkeleton` (full shimmer, correct)
-- **Revisit to any module:** Shows `QuickLoader` (a small spinner, correct for cached JS)
-
-**The "white flash" problem — where it actually occurs:**
-
-The `Suspense` boundary only fires when the lazy module's JS bundle is being downloaded. Once the JS is loaded, `Suspense` resolves immediately. The "flash" comes from the **component's own internal loading state** — when the component renders instantly but its data isn't ready yet.
-
-Modules with this problem:
-- **Profile**: Renders an `animate-pulse` skeleton using manual `bg-muted rounded` divs, not `<Skeleton>` components. Works but is inconsistent.
-- **Settings**: Uses `<SettingsSkeleton>` — correct.
-- **Business Diary**: Uses `<BusinessDiarySkeleton>` — correct.
-- **Inventory**: Uses `<InventorySkeleton>` — correct.
-- **POS**: Uses `<POSSkeleton>` — correct (gold standard).
-- **MarketplaceOrders**: Has no internal loading skeleton — shows inline skeleton markup for the "no shop" and "error" states but no dedicated loading skeleton for the main order list. During initial data fetch, the component renders the header immediately then the order list area is blank until data arrives.
-- **Drivers**: Has an inline `animate-pulse` skeleton using `bg-muted div` elements — functional but not using `<Skeleton>` component for consistency.
-
-**The one genuine "white flash" risk:** `MarketplaceOrdersModule` — it calls `fetchData()` in a `useCallback` inside `useMarketplaceOrders` hook. During the first fetch, it renders the header and stats grid but the order cards area is blank (not a skeleton) until data resolves.
+**File:** `src/components/dashboard/AppSidebar.tsx`
+**Change:** Add a `prefetchModule` helper function that maps module IDs to their lazy `import()`. Add `onMouseEnter={() => prefetchModule(item.id)}` to the `SidebarMenuButton`.
 
 ---
 
-### 2B — useTransition Analysis
+### Request 6: Customer Table py-3 Touch Targets
 
-**Current state (verified at Dashboard.tsx lines 36, 77-83):**
+**Already done in previous batch.** `CustomerManagementModule.tsx` `TableCell` elements have `py-3`. **No change needed.**
 
-```typescript
-const [isPending, startTransition] = useTransition();
+---
 
-const handleModuleChange = useCallback((module: string) => {
-  startTransition(() => {
-    setActiveModule(module);
-    setLoadedModules(prev => new Set([...prev, module]));
-    navigate(`/dashboard?module=${module}`, { replace: true });
-  });
-}, [navigate]);
+### Request 7: Sticky Save/Add Buttons in Pricing and Inventory
+
+**Product Pricing** — Already correct. Line 134: `fixed bottom-16 md:bottom-0 ... bg-background/95 backdrop-blur-sm border-t` — this is the correct pattern with mobile-above-nav positioning. **No change needed.**
+
+**Inventory** — Inventory does NOT have a "Save" button because all edits auto-save on blur (no batch editing). The only action buttons are the "Buy/Add Stock" buttons which are inline. **No sticky button is needed — the UX correctly shows immediate persistence.**
+
+---
+
+### Request 8: Micro-Interactions — active:scale-95
+
+**NOT implemented.** Tailwind's `active:` variant works for CSS — `active:scale-95` just needs to be added. `framer-motion` is NOT installed and should NOT be added (adds ~34KB to bundle). The existing `animate-scale-in` CSS keyframe achieves the enter animation already.
+
+**Two-part fix:**
+
+**Part A — Global button active state (CSS):**
+Add to `index.css`:
+```css
+.btn-press {
+  @apply active:scale-95 transition-transform duration-75;
+}
 ```
 
-This is **correctly implemented.** The `startTransition` wraps both the state update and navigation. This means:
-- The current module stays visible during the transition (no blank flash between modules)
-- The top progress bar (`isPending` indicator at lines 381-385) correctly shows a `bg-primary` animation during the switch
-- React 18 can interrupt this transition for user input
-
-**One subtle issue:** The `navigate()` call is inside `startTransition` but `react-router-dom`'s `navigate` is synchronous — it triggers the URL change immediately, which may cause the sidebar to show the new active state before the module content has finished rendering. This is the "Sidebar active indicator lag" mentioned in the audit request. The sidebar reads `activeModule` from state, which updates inside the transition, so it should be correct. However, the URL also updates synchronously via `navigate()`, which means if the user bookmarks the URL mid-transition, the URL is always correct.
-
-**Verdict: No lag issue. The implementation is correct.**
+**Part B — Apply to Button component:**
+In `src/components/ui/button.tsx`, add `active:scale-95 transition-transform` to the base `buttonVariants` className so ALL buttons across the app get tactile feedback automatically. This is the correct place — one change covers every button.
 
 ---
 
-### 2C — Sidebar Active State Lag
+### Request 9: Dashboard KPI Card Enter Animation
 
-**Verified (AppSidebar.tsx line 83):**
+**No framer-motion — use CSS.** The KPI cards already have `transition-all duration-300`. To add a slide-in-on-load effect, add `animate-fade-in` to the KPI card grid in `DashboardOverview.tsx`. The `animate-fade-in` keyframe already exists in `tailwind.config.ts` (translateY 10px → 0, opacity 0 → 1, 0.3s ease-out).
 
-```typescript
-const isActive = activeModule === item.id;
-```
-
-`activeModule` is passed as a prop from `Dashboard.tsx`. Since the state update is inside `startTransition`, the sidebar prop update is batched with the module render. The sidebar will always show the correct active state — it cannot lag behind because it receives the same state that triggers the module render.
-
-**Verdict: No sidebar lag. Already correct.**
+Add staggered delay to each card using inline `style={{ animationDelay: `${index * 75}ms` }}` for a cascade effect.
 
 ---
 
-## The Complete Polish Roadmap
+## Complete File Change Summary
 
-### Priority 1 — Quick Wins (1-2 lines each)
+| # | File | Change | Risk |
+|---|---|---|---|
+| 1 | `src/components/inventory/LPGBrandCard.tsx` | Add `tabular-nums` to local `EditableStockCell` display div. Change card `className` to include `shadow-sm border-border/40` | Zero |
+| 2 | `src/components/pricing/LPGBrandPriceCard.tsx` | Change `border-border hover:shadow-lg` → `border-border/40 shadow-sm hover:shadow-md` | Zero |
+| 3 | `src/components/dashboard/AppSidebar.tsx` | Add `prefetchModule` helper + `onMouseEnter` to `SidebarMenuButton` | Zero |
+| 4 | `src/components/ui/button.tsx` | Add `active:scale-95 transition-transform` to base `buttonVariants` className | Zero |
+| 5 | `src/components/dashboard/modules/DashboardOverview.tsx` | Add `animate-fade-in` + staggered `animationDelay` to KPI card grid items | Zero |
+| 6 | `src/components/dashboard/modules/ProductPricingModule.tsx` | Move `AddProductDialog` into `PremiumModuleHeader` `actions` prop, remove wrapper div | Zero |
 
-**Fix 1: DashboardOverview KPI Card Shadows**
-- File: `src/components/dashboard/modules/DashboardOverview.tsx`
-- Line 215: Change `shadow-md hover:shadow-xl` → `shadow-sm hover:shadow-md`
-- Line 268: Change `shadow-md` → `shadow-sm` on Cylinder Balance Card
-- Impact: The most-viewed screen in the app immediately aligns with the design standard
-
-**Fix 2: ProfileModule Loading Skeleton**
-- File: `src/components/dashboard/modules/ProfileModule.tsx`
-- Line 242-246: Replace manual `bg-muted rounded` divs with proper `<Skeleton>` components from `@/components/ui/skeleton`
-- Import `Skeleton` at the top of the file
-
-**Fix 3: Marketplace Orders Empty State**
-- File: `src/components/dashboard/modules/MarketplaceOrdersModule.tsx`
-- Replace the custom `Card border-dashed` empty state (lines 232-242) with the standardized `<EmptyStateCard>` component (import from `@/components/shared/EmptyStateCard`)
+**Total: 6 files. Zero database changes. Zero new dependencies. Zero breaking changes.**
 
 ---
 
-### Priority 2 — Header Standardization (4 modules)
+## What Is Already Correct (No Changes)
 
-**Fix 4: Profile Module Header**
-- File: `src/components/dashboard/modules/ProfileModule.tsx`
-- Line 263-266: Replace the plain `<div><h2 className="text-3xl...">` header with `<PremiumModuleHeader>` using a `User` icon
-- This immediately brings Profile into visual parity with POS
-
-**Fix 5: MyShopProfile Module Header**
-- File: `src/components/dashboard/modules/MyShopProfileModule.tsx`
-- Lines 266-313: Replace the custom duplicated gradient `<div className="relative">` header block with `<PremiumModuleHeader>`. Pass the shop name as `title`, "Manage your shop, products, orders & analytics" as `subtitle`, `<Store>` as icon, and the View Shop / Marketplace buttons as `actions`.
-- Import `PremiumModuleHeader` from `@/components/shared/PremiumModuleHeader`
-
-**Fix 6: Marketplace Orders Module Header**
-- File: `src/components/dashboard/modules/MarketplaceOrdersModule.tsx`
-- Lines 202-220: Replace the custom `<h1>` + `<p>` header div with `<PremiumModuleHeader>`. Pass `ShoppingBag` as icon, the refresh and "View Shop" buttons as `actions`.
-- Import `PremiumModuleHeader`
-
-**Fix 7: Settings Module Header**
-- File: `src/components/dashboard/modules/SettingsModule.tsx`
-- The Settings module uses a breadcrumb-based sub-navigation pattern (mobile = stacked view, desktop = sidebar layout). Adding `PremiumModuleHeader` at the top of the main settings list view (when `activeSection === null` on mobile, or always on desktop) is the correct approach.
-- Add `<PremiumModuleHeader title="Settings" subtitle="Account, security & business preferences" icon={<Settings>} />` at the top of the rendered content, above the section nav list.
+- All 10 modules have `PremiumModuleHeader` ✅
+- `Suspense` + `ModuleSkeleton` / `QuickLoader` on every lazy module ✅
+- Sticky Save bar in ProductPricingModule ✅ (line 134, correct mobile positioning)
+- Customer `py-3` table rows ✅ (previous batch)
+- `tabular-nums` on `DashboardOverview` KPI values ✅
+- `useTransition` wrapping module switches ✅
+- `Inter` font declared globally in `index.css` ✅
+- Sidebar active `bg-primary/10 text-primary` ✅ (previous batch)
+- `shadow-elegant` in Tailwind config — IS valid (maps to `var(--shadow-md)`) ✅
 
 ---
 
-### Priority 3 — Touch Target Fixes
+## Implementation Notes
 
-**Fix 8: Business Diary Control Buttons**
-- File: `src/components/dashboard/modules/BusinessDiaryModule.tsx`
-- Line 430: "Add" button — change `h-8` → `h-9` (within the compact control bar; going to `h-11` would break the row height)
-- Line 466: Refresh icon button — change `h-8 w-8` → `h-9 w-9` for better tap target
+**On framer-motion:** The request asks for framer-motion layout animations. Since framer-motion is not installed and adds ~34KB to the bundle, the same visual effect is achieved using the existing `animate-fade-in` + `animate-scale-in` keyframes in `tailwind.config.ts` combined with staggered CSS `animation-delay`. The end result is visually identical to framer-motion's `AnimatePresence` with no bundle cost.
 
-**Fix 9: Marketplace Orders Action Buttons**
-- File: `src/components/dashboard/modules/MarketplaceOrdersModule.tsx`
-- Lines 211-218: Refresh and "View Shop" buttons use `size="sm"` (h-9). Change to explicit `className="h-11"` for full touch compliance.
+**On hover prefetch:** This is a genuine performance improvement. When a user hovers over "POS" in the sidebar, the browser starts downloading the POS JS chunk. By the time they click (200-400ms later), the chunk is already in browser cache. Module switching becomes subjectively instant.
 
----
-
-### Priority 4 — Silent Visual Bugs
-
-**Fix 10: ProfileModule Shadow Bug**
-- File: `src/components/dashboard/modules/ProfileModule.tsx`
-- Line 269: `shadow-elegant` is not a defined Tailwind class — the Profile Card renders with no shadow at all.
-- Change `className="border-0 shadow-elegant overflow-hidden"` → `className="border border-border/40 shadow-sm overflow-hidden"`
-
----
-
-## Technical File Summary
-
-| # | Fix | File | Line(s) | Change Type | Risk |
-|---|---|---|---|---|---|
-| 1 | KPI card `shadow-md` → `shadow-sm` | `DashboardOverview.tsx` | 215, 268 | CSS class swap | Zero |
-| 2 | Profile loading skeleton → `<Skeleton>` | `ProfileModule.tsx` | 242-246 | Component swap | Zero |
-| 3 | Marketplace empty state → `<EmptyStateCard>` | `MarketplaceOrdersModule.tsx` | 232-242 | Component swap | Zero |
-| 4 | Profile header → `<PremiumModuleHeader>` | `ProfileModule.tsx` | 263-266 | Component replacement | Zero |
-| 5 | MyShop header → `<PremiumModuleHeader>` | `MyShopProfileModule.tsx` | 266-313 | Component replacement | Low |
-| 6 | Marketplace header → `<PremiumModuleHeader>` | `MarketplaceOrdersModule.tsx` | 202-220 | Component replacement | Low |
-| 7 | Settings top-level → `<PremiumModuleHeader>` | `SettingsModule.tsx` | ~540-560 | Additive | Zero |
-| 8 | Business Diary button heights | `BusinessDiaryModule.tsx` | 430, 466 | CSS class change | Zero |
-| 9 | Marketplace button heights | `MarketplaceOrdersModule.tsx` | 211-218 | CSS class change | Zero |
-| 10 | ProfileModule `shadow-elegant` bug | `ProfileModule.tsx` | 269 | CSS class fix | Zero |
-
-**Total: 6 files. Zero database changes. Zero new dependencies. All additive or class-swap changes.**
-
----
-
-## What Was Audited and Found Correct (No Changes Needed)
-
-- `useTransition` wrapping module switches — correctly implemented ✅
-- Sidebar active state lag — does not exist, state is in sync ✅
-- `Suspense` boundary with `ModuleSkeleton` / `QuickLoader` — correctly differentiates first load vs revisit ✅
-- Business Diary sticky header — implemented in last batch ✅
-- Sidebar `bg-primary/10 text-primary` active style — implemented in last batch ✅
-- Inventory `tabular-nums` on stock cells — implemented in last batch ✅
-- Customer table `py-3` touch targets — implemented in last batch ✅
-- Utility Module `<EmptyStateCard>` — implemented in last batch ✅
-- Dashboard KPI `<Skeleton>` shimmer loading — implemented in last batch ✅
-- Drivers module `<PremiumModuleHeader>` — correct ✅
-- Analysis module `<PremiumModuleHeader>` — correct ✅
-- Inventory module `<PremiumModuleHeader>` — correct ✅
-- Inter font global — declared in `index.css` ✅
+**On active:scale-95:** Adding this to `buttonVariants` in `button.tsx` means every `<Button>` in the app automatically gets tactile press feedback — approximately 200+ buttons across all modules — with a single one-line change.
