@@ -1674,13 +1674,22 @@ export const CustomerManagementModule = () => {
                       <p className="text-xs text-muted-foreground truncate">
                         {customer.phone || customer.email || 'No contact'}
                       </p>
-                      <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                        <span className="font-medium">ID: CUST-{String(index + 1).padStart(3, '0')}</span>
-                        <span>
-                          {customer.last_order_date
-                            ? `Last: ${format(new Date(customer.last_order_date), 'MMM dd, yyyy')}`
-                            : 'No orders yet'}
-                        </span>
+                        <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                          <span className="font-medium">ID: CUST-{String(index + 1).padStart(3, '0')}</span>
+                          {customer.last_order_date ? (
+                            <button
+                              className="text-primary underline-offset-2 hover:underline cursor-pointer touch-manipulation"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                sessionStorage.setItem('pending-diary-filter', customer.name);
+                                window.dispatchEvent(new CustomEvent('navigate-module', { detail: 'business-diary' }));
+                              }}
+                            >
+                              Last: {format(new Date(customer.last_order_date), 'MMM dd, yyyy')}
+                            </button>
+                          ) : (
+                            <span>No orders yet</span>
+                          )}
                       </div>
                     </div>
                   </div>
@@ -1721,10 +1730,20 @@ export const CustomerManagementModule = () => {
                     <TableCell className="text-muted-foreground">
                       {customer.phone || customer.email || 'N/A'}
                     </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {customer.last_order_date
-                        ? format(new Date(customer.last_order_date), 'MMM dd, yyyy')
-                        : 'N/A'}
+                    <TableCell>
+                      {customer.last_order_date ? (
+                        <button
+                          className="text-sm text-primary underline-offset-2 hover:underline cursor-pointer"
+                          onClick={() => {
+                            sessionStorage.setItem('pending-diary-filter', customer.name);
+                            window.dispatchEvent(new CustomEvent('navigate-module', { detail: 'business-diary' }));
+                          }}
+                        >
+                          {format(new Date(customer.last_order_date), 'MMM dd, yyyy')}
+                        </button>
+                      ) : (
+                        <span className="text-muted-foreground">N/A</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-center">
                       <Badge className="bg-emerald-500/20 text-emerald-600 border-emerald-500/30">

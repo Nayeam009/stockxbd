@@ -50,7 +50,7 @@ export interface ModuleEventPayload {
     productType: string; 
     brandId?: string;
   };
-  'navigate-module': string;
+  'navigate-module': string | { module: string; searchQuery?: string };
 }
 
 // ============= EVENT DISPATCHING =============
@@ -210,8 +210,8 @@ export function notifyInventoryUpdated(
 }
 
 /**
- * Navigate to a different module
+ * Navigate to a different module, optionally with a pre-fill search query
  */
-export function navigateToModule(module: string) {
-  dispatchModuleEvent('navigate-module', module);
+export function navigateToModule(module: string, searchQuery?: string) {
+  dispatchModuleEvent('navigate-module', searchQuery ? { module, searchQuery } : module);
 }

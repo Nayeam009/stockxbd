@@ -172,8 +172,14 @@ const Dashboard = () => {
   // Listen for module navigation events from other components
   useEffect(() => {
     const handleNavigate = (e: CustomEvent) => {
-      if (e.detail && typeof e.detail === 'string') {
+      if (!e.detail) return;
+      if (typeof e.detail === 'string') {
         handleModuleChange(e.detail);
+      } else if (typeof e.detail === 'object' && e.detail.module) {
+        handleModuleChange(e.detail.module);
+        if (e.detail.searchQuery) {
+          sessionStorage.setItem('pending-inventory-search', e.detail.searchQuery);
+        }
       }
     };
 

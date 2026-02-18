@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { InventoryStatCard } from "@/components/inventory/InventoryStatCard";
 import { InventoryPOBDrawer } from "@/components/inventory/InventoryPOBDrawer";
@@ -73,6 +73,16 @@ export const InventoryModule = () => {
     deleteRegulator,
     refetchAll
   } = useInventoryData(sizeTab, selectedWeight);
+
+  // On mount: check for a pending inventory search handed off via sessionStorage (e.g. from Analytics)
+  useEffect(() => {
+    const pending = sessionStorage.getItem('pending-inventory-search');
+    if (pending) {
+      setLpgSearchQuery(pending);
+      setActiveTab('lpg');
+      sessionStorage.removeItem('pending-inventory-search');
+    }
+  }, []);
 
   // Open POB drawer for specific product type
   const openPOB = (type: 'lpg' | 'stove' | 'regulator') => {

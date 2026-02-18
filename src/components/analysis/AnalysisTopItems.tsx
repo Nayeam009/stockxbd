@@ -17,10 +17,10 @@ interface AnalysisTopItemsProps {
 }
 
 export const AnalysisTopItems = ({ topProducts, topExpenses, onNavigate }: AnalysisTopItemsProps) => {
-  const handleProductClick = () => {
-    const module = 'inventory';
-    if (onNavigate) onNavigate(module);
-    else window.dispatchEvent(new CustomEvent('navigate-module', { detail: module }));
+  const handleProductClick = (productName: string) => {
+    const payload = { module: 'inventory', searchQuery: productName };
+    if (onNavigate) onNavigate('inventory');
+    window.dispatchEvent(new CustomEvent('navigate-module', { detail: payload }));
   };
 
   const handleExpenseClick = (name: string) => {
@@ -48,7 +48,7 @@ export const AnalysisTopItems = ({ topProducts, topExpenses, onNavigate }: Analy
               <div
                 key={product.name}
                 className="flex items-center justify-between gap-2 cursor-pointer hover:bg-muted/50 rounded-md px-1 -mx-1 py-0.5 transition-colors group"
-                onClick={handleProductClick}
+                onClick={() => handleProductClick(product.name)}
               >
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="text-xs font-bold text-muted-foreground w-5 shrink-0">
